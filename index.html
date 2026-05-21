@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>estar · Apartaestudios en Manizales</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="stylesheet" href="styles.css">
+<script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js"></script>
+</head>
+<body data-screen-label="01 Home">
+
+<!-- ============================== HEADER ============================== -->
+<header class="site-header">
+  <div class="container">
+    <a href="index.html" class="brand" aria-label="estar — inicio">
+      <span class="star-mark" aria-hidden="true"></span>
+      <span>estar</span>
+    </a>
+
+    <nav aria-label="Principal">
+      <ul class="nav-list">
+        <li><a href="index.html" class="is-current" data-i18n="nav_estadias">Estadías</a></li>
+        <li><a href="vivir.html" data-i18n="nav_vivir">Vivir en estar</a></li>
+        <li><a href="explora.html" data-i18n="nav_explorar">Explorar Manizales</a></li>
+        <li><a href="empresas.html" data-i18n="nav_empresas">Empresas</a></li>
+        <li><a href="grupos.html" data-i18n="nav_grupos">Grupos</a></li>
+      </ul>
+    </nav>
+
+    <div class="header-actions">
+      <button class="lang-toggle" data-i18n="lang_btn">EN</button>
+      <a href="#reservar" class="book-btn" data-i18n="book_btn">Reservar</a>
+      <button class="menu-btn" aria-label="Menú">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ============================== HERO ============================== -->
+<section class="hero has-star-cursor" data-screen-label="01.1 Hero">
+  <div class="hero-media">
+    <video autoplay muted loop playsinline poster="assets/photos/fachada.webp">
+      <source src="assets/video/hero.mp4" type="video/mp4">
+    </video>
+  </div>
+  <div class="hero-scrim"></div>
+
+  <div class="container hero-inner">
+    <p class="hero-eyebrow"><span class="dot"></span><span data-i18n="hero_eyebrow">Manizales · Caldas · Colombia</span></p>
+
+    <h1 class="hero-title" data-headline>
+      <span class="voice-only voice-susurro">Quédate.<span class="italic">Manizales, lento.</span></span>
+      <span class="voice-only voice-conversacion">Un lugar para estar.<span class="italic">Manizales,<br>a su ritmo.</span></span>
+      <span class="voice-only voice-manifiesto">Esta ciudad es tuya.<span class="italic">Estar te recibe.</span></span>
+    </h1>
+  </div>
+
+  <div class="scroll-cue"><span>Scroll</span></div>
+
+  <!-- Booking bar pinned to bottom of hero -->
+  <form class="booking-bar" id="reservar">
+    <div class="booking-field custom-select-field" id="checkin-field" tabindex="0">
+      <span class="label" data-i18n="book_check_in">Llegada</span>
+      <span class="value" id="checkin-display" data-i18n="book_pick_dates">Elige una fecha</span>
+      <input type="date" id="checkin-input" name="checkin" required style="display: none;">
+      <div class="custom-dropdown-menu calendar-dropdown" id="checkin-calendar"></div>
+    </div>
+    <div class="booking-field custom-select-field" id="checkout-field" tabindex="0">
+      <span class="label" data-i18n="book_check_out">Salida</span>
+      <span class="value" id="checkout-display" data-i18n="book_pick_dates">Elige una fecha</span>
+      <input type="date" id="checkout-input" name="checkout" required style="display: none;">
+      <div class="custom-dropdown-menu calendar-dropdown" id="checkout-calendar"></div>
+    </div>
+    <div class="booking-field custom-select-field" id="guests-field" tabindex="0">
+      <span class="label" data-i18n="book_guests">Huéspedes</span>
+      <span class="value" id="guests-display" data-i18n="book_one_guest">1 huésped</span>
+      <select id="guests-input" name="guests" style="display: none;">
+        <option value="1">1 huésped</option>
+        <option value="2">2 huéspedes</option>
+        <option value="3">3 huéspedes</option>
+        <option value="4">4 huéspedes o más</option>
+      </select>
+      
+      <!-- Custom Dropdown Panel -->
+      <div class="custom-dropdown-menu">
+        <div class="custom-dropdown-option active" data-value="1">
+          <span class="option-text" data-i18n="book_one_guest">1 huésped</span>
+          <span class="option-check">✶</span>
+        </div>
+        <div class="custom-dropdown-option" data-value="2">
+          <span class="option-text" data-i18n="book_two_guests">2 huéspedes</span>
+          <span class="option-check">✶</span>
+        </div>
+        <div class="custom-dropdown-option" data-value="3">
+          <span class="option-text" data-i18n="book_three_guests">3 huéspedes</span>
+          <span class="option-check">✶</span>
+        </div>
+        <div class="custom-dropdown-option" data-value="4">
+          <span class="option-text" data-i18n="book_four_guests_more">4 huéspedes o más</span>
+          <span class="option-check">✶</span>
+        </div>
+      </div>
+    </div>
+    <div class="booking-field custom-select-field" id="room-field" tabindex="0">
+      <span class="label" data-i18n="book_rooms">Habitación</span>
+      <span class="value" id="room-display">Todos</span>
+      <select id="room-input" name="room" style="display: none;">
+        <option value="">Todos</option>
+        <option value="clasic">Clasic</option>
+        <option value="seleccion">Seleccion</option>
+        <option value="reserva">Reserva</option>
+        <option value="origen">Origen</option>
+        <option value="especial">Especial</option>
+      </select>
+
+      <!-- Custom Dropdown Panel -->
+      <div class="custom-dropdown-menu">
+        <div class="custom-dropdown-option active" data-value="">
+          <span class="option-text" data-i18n="room_option_all">Todos</span>
+          <span class="option-check">✶</span>
+        </div>
+        <div class="custom-dropdown-option" data-value="clasic">
+          <span class="option-text">Clasic</span>
+          <span class="option-check">✶</span>
+        </div>
+        <div class="custom-dropdown-option" data-value="seleccion">
+          <span class="option-text">Seleccion</span>
+          <span class="option-check">✶</span>
+        </div>
+        <div class="custom-dropdown-option" data-value="reserva">
+          <span class="option-text">Reserva</span>
+          <span class="option-check">✶</span>
+        </div>
+        <div class="custom-dropdown-option" data-value="origen">
+          <span class="option-text">Origen</span>
+          <span class="option-check">✶</span>
+        </div>
+        <div class="custom-dropdown-option" data-value="especial">
+          <span class="option-text">Especial</span>
+          <span class="option-check">✶</span>
+        </div>
+      </div>
+    </div>
+    <button type="submit" class="booking-cta">
+      <span data-i18n="book_search">Buscar disponibilidad</span>
+      <span aria-hidden="true">→</span>
+    </button>
+  </form>
+</section>
+
+<!-- ============================== INTRO ============================== -->
+<section class="intro" data-screen-label="01.2 Intro">
+  <div class="container">
+    <div class="eye-col" data-reveal>
+      <div class="mark" aria-hidden="true"></div>
+      <p class="eyebrow terracotta">Bienvenido a estar</p>
+    </div>
+    <div data-reveal>
+      <h2>
+        Hospedaje sin filas, sin sorpresas. <span class="italic">Un café, una vista, una buena noche.</span>
+      </h2>
+      <div class="body">
+        <p>Somos 14 apartaestudios en el corazón de Manizales — pensados para que vengas, dejes la maleta y te sientas en casa. Sin recepción ruidosa, sin trámites largos, sin tarifas escondidas. Solo un lugar cálido, bien diseñado, listo para ti.</p>
+        <p>Pensamos cada detalle: la cocina equipada para preparar tu café de la mañana, el baño limpio y silencioso, la cama con ropa de cama suave, la red Wi-Fi estable cuando necesitas trabajar. Cosas pequeñas, hechas bien.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== FACTS STRIP ============================== -->
+<section class="facts-strip">
+  <div class="container">
+    <div class="fact" data-reveal><span class="num">14</span><span class="lbl">Apartaestudios</span></div>
+    <div class="fact" data-reveal><span class="num">2.160</span><span class="lbl">m. sobre el mar</span></div>
+    <div class="fact" data-reveal><span class="num">300+</span><span class="lbl">Reservas directas / año</span></div>
+    <div class="fact" data-reveal><span class="num">4.8</span><span class="lbl">Valoración huéspedes</span></div>
+  </div>
+</section>
+
+<!-- ============================== ROOMS ============================== -->
+<section class="rooms" id="habitaciones" data-screen-label="01.3 Habitaciones">
+  <div class="container">
+    <div class="rooms-head" data-reveal>
+      <div>
+        <p class="eyebrow terracotta">Apartaestudios</p>
+        <h2 class="display-l">Cinco formas <span class="serif-italic">de estar.</span></h2>
+      </div>
+      <p class="lead">Totalmente amoblados, con cocina equipada, baño privado y Wi-Fi de fibra. Trae solo tu maleta.</p>
+    </div>
+
+    <div class="room-list">
+
+      <!-- Room 1: Clásica -->
+      <article class="room has-star-cursor" data-reveal>
+        <div class="room-media">
+          <div class="badge">01 / Clásica</div>
+          <img src="assets/photos/clasic.webp" alt="Cocina equipada del apartaestudio Clásica">
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">Para una o dos personas</p>
+          <h3>Clásica</h3>
+          <p class="sub">Compacto, cálido, todo a la mano.</p>
+          <p class="body">Cama queen, escritorio frente a la ventana, cocina equipada con menaje completo y baño privado con ducha. La esencia de estar, en 28 m².</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacidad</span><span class="v">2 personas</span></div>
+            <div class="room-spec"><span class="k">Cama</span><span class="v">1 queen</span></div>
+            <div class="room-spec"><span class="k">Área</span><span class="v">28 m²</span></div>
+            <div class="room-spec"><span class="k">Vista</span><span class="v">Ciudad</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="clasica.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+            <a href="#" class="text-link book-room-trigger" data-room="clasic">Reservar <span class="arr">→</span></a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Room 2: Selección -->
+      <article class="room has-star-cursor" data-reveal>
+        <div class="room-media" style="background: var(--terracotta-300);">
+          <div class="badge">02 / Selección</div>
+          <img src="assets/photos/seleccion.webp" alt="Baño del apartaestudio Selección">
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">Para dos personas</p>
+          <h3>Selección</h3>
+          <p class="sub">Un poco de afuera, adentro.</p>
+          <p class="body">Mismo plano del Clásica, ahora con balcón privado para tu café de la mañana. La luz natural cambia toda la sensación del espacio.</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacidad</span><span class="v">2 personas</span></div>
+            <div class="room-spec"><span class="k">Cama</span><span class="v">1 queen</span></div>
+            <div class="room-spec"><span class="k">Área</span><span class="v">32 m²</span></div>
+            <div class="room-spec"><span class="k">Vista</span><span class="v">Cordillera</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="seleccion.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+            <a href="#" class="text-link book-room-trigger" data-room="seleccion">Reservar <span class="arr">→</span></a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Room 3: Reserva -->
+      <article class="room has-star-cursor" data-reveal>
+        <div class="room-media" style="background: var(--olive);">
+          <div class="badge">03 / Reserva</div>
+          <img src="assets/photos/reserva.webp" alt="Apartaestudio Reserva">
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">Para parejas o estancias largas</p>
+          <h3>Reserva</h3>
+          <p class="sub">Zona de estar separada de la cama.</p>
+          <p class="body">Espacios definidos: dormitorio, sala con sofá y zona de trabajo. Smart TV de 55", cocina abierta y un baño más amplio con ventana al exterior.</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacidad</span><span class="v">2 personas</span></div>
+            <div class="room-spec"><span class="k">Cama</span><span class="v">1 king</span></div>
+            <div class="room-spec"><span class="k">Área</span><span class="v">42 m²</span></div>
+            <div class="room-spec"><span class="k">Vista</span><span class="v">Ciudad</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="reserva.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+            <a href="#" class="text-link book-room-trigger" data-room="reserva">Reservar <span class="arr">→</span></a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Room 4: Origen -->
+      <article class="room has-star-cursor" data-reveal>
+        <div class="room-media" style="background: var(--sand);">
+          <div class="badge">04 / Origen</div>
+          <img src="assets/photos/origen.webp" alt="Apartaestudio Origen">
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">Para parejas</p>
+          <h3>Origen</h3>
+          <p class="sub">Nuestra habitación más pedida.</p>
+          <p class="body">El apartaestudio Origen con balcón al frente — el lugar donde la mayoría de huéspedes pasa la tarde leyendo o trabajando con el rumor de la ciudad de fondo.</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacidad</span><span class="v">2 personas</span></div>
+            <div class="room-spec"><span class="k">Cama</span><span class="v">1 king</span></div>
+            <div class="room-spec"><span class="k">Área</span><span class="v">48 m²</span></div>
+            <div class="room-spec"><span class="k">Vista</span><span class="v">Cordillera</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="origen.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+            <a href="#" class="text-link book-room-trigger" data-room="origen">Reservar <span class="arr">→</span></a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Room 5: Especial -->
+      <article class="room has-star-cursor" data-reveal>
+        <div class="room-media" style="background: var(--ink);">
+          <div class="badge">05 / Especial</div>
+          <img src="assets/photos/especial.webp" alt="Apartaestudio Especial">
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">Para grupos pequeños o familias</p>
+          <h3>Especial</h3>
+          <p class="sub">Dos ambientes, una sola tarifa.</p>
+          <p class="body">Cama king + sofá cama doble en zona de estar separada. Cocina completa con nevera grande. Ideal para familias o tres amigos viajando juntos.</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacidad</span><span class="v">4 personas</span></div>
+            <div class="room-spec"><span class="k">Cama</span><span class="v">1 king + sofá cama</span></div>
+            <div class="room-spec"><span class="k">Área</span><span class="v">55 m²</span></div>
+            <div class="room-spec"><span class="k">Vista</span><span class="v">Cordillera</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="especial.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+            <a href="#" class="text-link book-room-trigger" data-room="especial">Reservar <span class="arr">→</span></a>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================== FEATURE BAND (olive full bleed) ============================== -->
+<section class="feature-band wipe-band" data-reveal data-screen-label="01.4 Filosofía">
+  <div class="container">
+    <div>
+      <p class="eyebrow on-dark">Nuestra forma</p>
+      <h2>Lo simple, <span class="italic">bien hecho.</span></h2>
+      <p class="lead on-dark">No somos un hotel grande con servicios de hotel grande. Somos un equipo pequeño que cuida pocos espacios — y los cuida bien. Esa es toda la diferencia.</p>
+
+      <ul class="feature-list">
+        <li><span class="star">✶</span><span>Check-in 100% digital. Llegas, abres con tu código, descansas.</span></li>
+        <li><span class="star">✶</span><span>Una sola tarifa transparente. Sin cargos sorpresa al final.</span></li>
+        <li><span class="star">✶</span><span>Wi-Fi de fibra dedicada, probada para videollamadas.</span></li>
+        <li><span class="star">✶</span><span>Mejora de categoría según disponibilidad para reservas directas.</span></li>
+      </ul>
+    </div>
+    <div class="feature-media">
+      <img src="assets/photos/interior_detalle.webp" alt="Detalle de cocina equipada en apartaestudio estar">
+      <div class="feature-stamp" aria-hidden="true"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== SEGMENTS (4 profiles) ============================== -->
+<section class="segments" data-screen-label="01.5 Para quién">
+  <div class="container">
+    <div class="segments-head" data-reveal>
+      <p class="eyebrow terracotta">Para tu ritmo</p>
+      <h2 class="display-m">Diseñado para <span class="serif-italic">cada estadía.</span></h2>
+    </div>
+
+    <div class="segments-grid">
+      <a href="index.html" class="segment" data-reveal>
+        <span class="num">01</span>
+        <h3>Escapada corta</h3>
+        <p>De una noche a una semana. Visitas de turismo, fin de semana en el eje cafetero, una pausa.</p>
+        <span class="arrow">Reservar <span aria-hidden="true">→</span></span>
+      </a>
+      <a href="vivir.html" class="segment" data-reveal>
+        <span class="num">02</span>
+        <h3>Semanas y meses</h3>
+        <p>Para nómadas digitales. Internet dedicado, escritorio ergonómico, tarifa escalonada.</p>
+        <span class="arrow">Tarifas <span aria-hidden="true">→</span></span>
+      </a>
+      <a href="vivir.html#aplicar" class="segment" data-reveal>
+        <span class="num">03</span>
+        <h3>Vivir en estar</h3>
+        <p>De 3 a 12 meses. Para médicos residentes y posgrados. Una sola factura, sin fiadores.</p>
+        <span class="arrow">Aplicar <span aria-hidden="true">→</span></span>
+      </a>
+      <a href="empresas.html" class="segment" data-reveal>
+        <span class="num">04</span>
+        <h3>Empresas y grupos</h3>
+        <p>Convenios B2B, facturación centralizada, tarifas pre-negociadas para tu equipo.</p>
+        <span class="arrow">Acceso B2B <span aria-hidden="true">→</span></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== EXPLORE (Manizales cross-link) ============================== -->
+<section class="explore wipe-band" data-reveal data-screen-label="01.6 Manizales">
+  <div class="container">
+    <div>
+      <p class="eyebrow on-dark">Guía local</p>
+      <h2>Café, montañas <span class="italic">y atardeceres.</span></h2>
+      <p class="lead on-dark">Una curaduría hecha por nosotros: cafeterías de especialidad, restaurantes escondidos, termales del Ruiz, y el cable aéreo justo antes de que se ponga el sol.</p>
+      <a href="explora.html" class="btn btn-ghost-light" style="margin-top: 12px;">
+        Explorar Manizales <span aria-hidden="true">→</span>
+      </a>
+    </div>
+    <div class="explore-photos">
+      <div class="explore-photo" style="background-image: url('assets/photos/cable.webp'); background-size: cover; background-position: center;"></div>
+      <div class="explore-photo" style="background-image: url('assets/photos/termales.webp'); background-size: cover; background-position: center;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== AMENITIES ============================== -->
+<section class="amenities" data-screen-label="01.7 Servicios">
+  <div class="container">
+    <div class="head" data-reveal>
+      <p class="eyebrow terracotta">Lo que incluye</p>
+      <h2 class="display-m">Todo lo necesario, <span class="serif-italic">nada de lo demás.</span></h2>
+    </div>
+    <div class="amenities-grid">
+      <div class="amenity" data-reveal>
+        <i data-lucide="key-round"></i>
+        <h4>Check-in digital</h4>
+        <p>Llegas, abres con tu código, descansas. Sin recepción, sin esperas.</p>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="wifi"></i>
+        <h4>Wi-Fi de fibra</h4>
+        <p>Internet dedicado, probado para videollamadas y trabajo remoto.</p>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="utensils"></i>
+        <h4>Cocina equipada</h4>
+        <p>Estufa, nevera, cafetera y menaje completo en cada apartaestudio.</p>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="sparkles"></i>
+        <h4>Limpieza semanal</h4>
+        <p>Para estadías largas — sin costo extra. Cambio de sábanas opcional.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== TESTIMONIAL ============================== -->
+<section class="testimonial wipe-band" data-reveal data-screen-label="01.8 Voz huésped">
+  <div class="container">
+    <div class="quote-mark" aria-hidden="true">"</div>
+    <blockquote>
+      Nos quedamos cinco noches y la quinta sentíamos que era nuestra casa. La cocina, la luz por la mañana, el silencio. Eso no se finge.
+    </blockquote>
+    <cite>Mariana &amp; Felipe — Bogotá, 2025</cite>
+  </div>
+</section>
+
+<!-- ============================== NEWSLETTER ============================== -->
+<section class="newsletter" data-screen-label="01.9 Newsletter">
+  <div class="container">
+    <div data-reveal>
+      <p class="eyebrow on-dark">Quédate cerca</p>
+      <h3>Una carta breve <span class="serif-italic">cada estación.</span></h3>
+      <p>Recomendaciones locales, recetas con café de la región y disponibilidad antes que nadie.</p>
+    </div>
+    <form data-reveal onsubmit="event.preventDefault(); this.querySelector('input').value=''; this.querySelector('button').textContent='Gracias ✶';">
+      <input type="email" placeholder="tu@correo.com" required>
+      <button type="submit">Suscribirme <span aria-hidden="true">→</span></button>
+    </form>
+  </div>
+</section>
+
+<!-- ============================== FOOTER ============================== -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="brand-stack" aria-hidden="true"></div>
+        <p>Hospedaje contemporáneo en el corazón de Manizales, Caldas. 14 apartaestudios pensados para quedarse.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Estadías</h5>
+        <ul>
+          <li><a href="index.html">Apartaestudios</a></li>
+          <li><a href="vivir.html">Vivir en estar</a></li>
+          <li><a href="grupos.html">Grupos y eventos</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Empresas</h5>
+        <ul>
+          <li><a href="empresas.html">Portal corporativo</a></li>
+          <li><a href="empresas.html#contacto">Solicitar convenio</a></li>
+          <li><a href="grupos.html#cotizar">Cotizar grupos</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Descubre</h5>
+        <ul>
+          <li><a href="explora.html">Explorar Manizales</a></li>
+          <li><a href="#">Ayuda y contacto</a></li>
+          <li><a href="#">Términos</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bot">
+      <span>© 2026 estar · Manizales, Colombia</span>
+      <span><a href="#">Política de cancelación</a> · <a href="#">Privacidad</a></span>
+    </div>
+  </div>
+</footer>
+
+<!-- ============================== TWEAKS DEFAULTS ============================== -->
+<script>
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "atmosphere": "amanecer",
+    "voice": "conversacion",
+    "texture": "grano",
+    "language": "es"
+  }/*EDITMODE-END*/;
+</script>
+<script src="shell.js"></script>
+<script src="kunas.js"></script>
+<script>lucide.createIcons();</script>
+
+  <!-- Botón Flotante de WhatsApp -->
+  <a href="https://wa.me/573102490414" class="whatsapp-float" target="_blank" rel="noopener noreferrer" aria-label="Chat por WhatsApp">
+    <svg viewBox="0 0 175.216 175.552" xmlns="http://www.w3.org/2000/svg">
+      <!-- Chat Bubble Background (White) -->
+      <path fill="#FFFFFF" d="M87.184 25.227c-33.733 0-61.166 27.423-61.178 61.13a60.98 60.98 0 0 0 9.349 32.535l1.455 2.313-6.179 22.558 23.146-6.069 2.235 1.324c9.387 5.571 20.15 8.517 31.126 8.523h.023c33.707 0 61.14-27.426 61.153-61.135a60.75 60.75 0 0 0-17.895-43.251 60.75 60.75 0 0 0-43.235-17.928z"/>
+      <!-- Phone Handset Icon (WhatsApp Green, dynamically synced via CSS class) -->
+      <path class="whatsapp-phone-icon" fill="#25D366" fill-rule="evenodd" d="M68.772 55.603c-1.378-3.061-2.828-3.123-4.137-3.176l-3.524-.043c-1.226 0-3.218.46-4.902 2.3s-6.435 6.287-6.435 15.332 6.588 17.785 7.506 19.013 12.718 20.381 31.405 27.75c15.529 6.124 18.689 4.906 22.061 4.6s10.877-4.447 12.408-8.74 1.532-7.971 1.073-8.74-1.685-1.226-3.525-2.146-10.877-5.367-12.562-5.981-2.91-.919-4.137.921-4.746 5.979-5.819 7.206-2.144 1.381-3.984.462-7.76-2.861-14.784-9.124c-5.465-4.873-9.154-10.891-10.228-12.73s-.114-2.835.808-3.751c.825-.824 1.838-2.147 2.759-3.22s1.224-1.84 1.836-3.065.307-2.301-.153-3.22-4.032-10.011-5.666-13.647"/>
+    </svg>
+  </a>
+
+</body>
+</html>

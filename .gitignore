@@ -1,0 +1,5 @@
+# Ignorar descargas temporales grandes y respaldos
+assets/drive_downloads/
+uploads/
+scratch/
+*.zip

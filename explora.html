@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Explora Manizales · Guía local por estar</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="stylesheet" href="styles.css">
+<script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js"></script>
+</head>
+<body data-screen-label="03 Explora">
+
+<header class="site-header">
+  <div class="container">
+    <a href="index.html" class="brand"><span class="star-mark" aria-hidden="true"></span><span>estar</span></a>
+    <nav><ul class="nav-list">
+      <li><a href="index.html" data-i18n="nav_estadias">Estadías</a></li>
+      <li><a href="vivir.html" data-i18n="nav_vivir">Vivir en estar</a></li>
+      <li><a href="explora.html" class="is-current" data-i18n="nav_explorar">Explorar Manizales</a></li>
+      <li><a href="empresas.html" data-i18n="nav_empresas">Empresas</a></li>
+      <li><a href="grupos.html" data-i18n="nav_grupos">Grupos</a></li>
+    </ul></nav>
+    <div class="header-actions">
+      <button class="lang-toggle" data-i18n="lang_btn">EN</button>
+      <a href="index.html#reservar" class="book-btn" data-i18n="book_btn">Reservar</a>
+      <button class="menu-btn" aria-label="Menú"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+
+<!-- ============================== HERO ============================== -->
+<section class="sub-hero ink">
+  <div class="star-bg" aria-hidden="true"></div>
+  <div class="container">
+    <p class="eyebrow">Guía local</p>
+    <h1>La ciudad de las<span class="italic">puertas abiertas.</span></h1>
+    <p class="lead">Café de origen, montañas que tocan las nubes y atardeceres inolvidables. Una curaduría hecha por nosotros, no por una guía turística.</p>
+  </div>
+</section>
+
+<!-- ============================== DATA STRIP ============================== -->
+<section style="background: var(--ink); color: var(--paper); padding: 48px 0; border-top: 1px solid rgba(250,246,239,0.1);">
+  <div class="container" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px;">
+    <style>@media (min-width: 768px) { .data-grid { grid-template-columns: repeat(4, 1fr) !important; } }</style>
+    <div class="data-grid" style="display: contents;"></div>
+    <div><p class="eyebrow" style="color: rgba(250,246,239,0.55); margin-bottom: 6px;">Altitud</p><p class="display-s" style="color: var(--paper);">2.160 <span class="serif-italic" style="font-size: 0.6em;">msnm</span></p></div>
+    <div><p class="eyebrow" style="color: rgba(250,246,239,0.55); margin-bottom: 6px;">Clima</p><p class="display-s" style="color: var(--paper);">14° — 20°</p></div>
+    <div><p class="eyebrow" style="color: rgba(250,246,239,0.55); margin-bottom: 6px;">Vibe</p><p class="display-s" style="color: var(--paper);">Café <span class="serif-italic">& universidad</span></p></div>
+    <div><p class="eyebrow" style="color: rgba(250,246,239,0.55); margin-bottom: 6px;">Movilidad</p><p class="display-s" style="color: var(--paper);">Cable aéreo</p></div>
+  </div>
+</section>
+
+<!-- ============================== POI GRID ============================== -->
+<section class="section">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow terracotta">La curaduría</p>
+        <h2 class="display-l">Lugares que <span class="serif-italic">amamos.</span></h2>
+      </div>
+      <div class="filter-row">
+        <button class="filter-pill active">Todo</button>
+        <button class="filter-pill">Café</button>
+        <button class="filter-pill">Comer</button>
+        <button class="filter-pill">Naturaleza</button>
+        <button class="filter-pill">Atardecer</button>
+      </div>
+    </div>
+
+    <div class="poi-grid">
+      <article class="poi has-star-cursor" data-reveal>
+        <div class="poi-media" style="background-image: url('assets/photos/macondo.webp'); background-size: cover; background-position: center;"><span class="tag">Café</span></div>
+        <h4>Café Macondo</h4>
+        <p class="sub">Tostadores locales, 7 cosechas de Caldas.</p>
+        <p class="body">El barista te cuenta de cada finca. Pide el filtrado del día y siéntate junto a la ventana.</p>
+        <p class="meta"><span>Centro · 6 min</span><span>$$ · 10am–7pm</span></p>
+      </article>
+
+      <article class="poi has-star-cursor" data-reveal>
+        <div class="poi-media" style="background-image: url('assets/photos/termales.webp'); background-size: cover; background-position: center;"><span class="tag">Naturaleza</span></div>
+        <h4>Termales del Otoño</h4>
+        <p class="sub">Aguas sulfuradas, 38°C, abierto hasta tarde.</p>
+        <p class="body">A 25 minutos del hotel. Vamos los domingos por la mañana, cuando casi no hay gente.</p>
+        <p class="meta"><span>Carretera al Ruiz</span><span>$$ · 9am–10pm</span></p>
+      </article>
+
+      <article class="poi has-star-cursor" data-reveal>
+        <div class="poi-media" style="background-image: url('assets/photos/cable.webp'); background-size: cover; background-position: center;"><span class="tag">Atardecer</span></div>
+        <h4>Cable Aéreo</h4>
+        <p class="sub">El mejor mirador de la ciudad — gratis.</p>
+        <p class="body">Súbete antes de las 5:30pm. La vista hacia el Nevado del Ruiz al atardecer es de las cosas más bonitas que vas a ver.</p>
+        <p class="meta"><span>Centro a Cámbulos</span><span>$ · 6am–10pm</span></p>
+      </article>
+
+      <article class="poi has-star-cursor" data-reveal>
+        <div class="poi-media" style="background-image: url('assets/photos/patio.webp'); background-size: cover; background-position: center;"><span class="tag">Comer</span></div>
+        <h4>Cocina del Patio</h4>
+        <p class="sub">Comida regional con producto local.</p>
+        <p class="body">Patacones rellenos, sopa de mondongo y postre de natas. Reserva el viernes — se llena.</p>
+        <p class="meta"><span>Versalles</span><span>$$ · 12pm–11pm</span></p>
+      </article>
+
+      <article class="poi has-star-cursor" data-reveal>
+        <div class="poi-media" style="background-image: url('assets/photos/bolivar.webp'); background-size: cover; background-position: center;"><span class="tag">Café</span></div>
+        <h4>Tienda Juan Valdez · Plaza</h4>
+        <p class="sub">El clásico, pero con cosecha del mes.</p>
+        <p class="body">Para una pausa rápida entre paseos. Buen wifi si necesitas trabajar 30 min.</p>
+        <p class="meta"><span>Plaza de Bolívar</span><span>$ · 7am–9pm</span></p>
+      </article>
+
+      <article class="poi has-star-cursor" data-reveal>
+        <div class="poi-media" style="background-image: url('assets/photos/yarumos.webp'); background-size: cover; background-position: center;"><span class="tag">Naturaleza</span></div>
+        <h4>Parque de los Yarumos</h4>
+        <p class="sub">Reserva natural urbana, senderos cortos.</p>
+        <p class="body">Camina temprano. Hay mariposas, pájaros, y a veces neblina que cubre todo. Magia.</p>
+        <p class="meta"><span>Av. del Río</span><span>$ · 8am–5pm</span></p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== EDITORIAL SPLIT ============================== -->
+<section class="section" style="background: var(--olive); color: var(--paper);">
+  <div class="container">
+    <div class="split media-right">
+      <div class="text" data-reveal>
+        <p class="eyebrow on-dark">Nuestra historia favorita</p>
+        <h2 style="color: var(--paper);">Antes de salir, <span class="italic" style="color: var(--sand-300);">pídenos consejo.</span></h2>
+        <div class="body on-dark">
+          <p>Tres minutos en recepción digital, una sugerencia hecha a la medida. El mejor café de la mañana depende del día — los lunes Macondo es de mesa libre, los miércoles tienen filtros experimentales.</p>
+          <p>Si vienes por trabajo y solo tienes una tarde, te decimos a dónde ir. Si vienes a desconectar, también. Sabemos qué está abierto, qué está bueno y qué no vale la pena.</p>
+        </div>
+        <a href="index.html#reservar" class="btn btn-ghost-light">Reserva tu estadía <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="media" style="background: var(--sand);"><img src="assets/photos/recepcion.webp" alt="Recepción digital"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== FOOTER ============================== -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="brand-stack" aria-hidden="true"></div>
+        <p>Hospedaje contemporáneo en el corazón de Manizales, Caldas. 14 apartaestudios pensados para quedarse.</p>
+      </div>
+      <div class="footer-col"><h5>Estadías</h5><ul><li><a href="index.html">Apartaestudios</a></li><li><a href="vivir.html">Vivir en estar</a></li><li><a href="grupos.html">Grupos y eventos</a></li></ul></div>
+      <div class="footer-col"><h5>Empresas</h5><ul><li><a href="empresas.html">Portal corporativo</a></li><li><a href="empresas.html#contacto">Solicitar convenio</a></li><li><a href="grupos.html#cotizar">Cotizar grupos</a></li></ul></div>
+      <div class="footer-col"><h5>Descubre</h5><ul><li><a href="explora.html">Explorar Manizales</a></li><li><a href="#">Ayuda y contacto</a></li><li><a href="#">Términos</a></li></ul></div>
+    </div>
+    <div class="footer-bot"><span>© 2026 estar · Manizales, Colombia</span><span><a href="#">Política de cancelación</a> · <a href="#">Privacidad</a></span></div>
+  </div>
+</footer>
+
+<script>
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "brand": "olive",
+    "language": "es",
+    "density": "comfortable",
+    "cinemagraph": true
+  }/*EDITMODE-END*/;
+</script>
+<script src="shell.js"></script>
+<script>lucide.createIcons();</script>
+
+  <!-- Botón Flotante de WhatsApp -->
+  <a href="https://wa.me/573102490414" class="whatsapp-float" target="_blank" rel="noopener noreferrer" aria-label="Chat por WhatsApp">
+    <svg viewBox="0 0 175.216 175.552" xmlns="http://www.w3.org/2000/svg">
+      <!-- Chat Bubble Background (White) -->
+      <path fill="#FFFFFF" d="M87.184 25.227c-33.733 0-61.166 27.423-61.178 61.13a60.98 60.98 0 0 0 9.349 32.535l1.455 2.313-6.179 22.558 23.146-6.069 2.235 1.324c9.387 5.571 20.15 8.517 31.126 8.523h.023c33.707 0 61.14-27.426 61.153-61.135a60.75 60.75 0 0 0-17.895-43.251 60.75 60.75 0 0 0-43.235-17.928z"/>
+      <!-- Phone Handset Icon (WhatsApp Green, dynamically synced via CSS class) -->
+      <path class="whatsapp-phone-icon" fill="#25D366" fill-rule="evenodd" d="M68.772 55.603c-1.378-3.061-2.828-3.123-4.137-3.176l-3.524-.043c-1.226 0-3.218.46-4.902 2.3s-6.435 6.287-6.435 15.332 6.588 17.785 7.506 19.013 12.718 20.381 31.405 27.75c15.529 6.124 18.689 4.906 22.061 4.6s10.877-4.447 12.408-8.74 1.532-7.971 1.073-8.74-1.685-1.226-3.525-2.146-10.877-5.367-12.562-5.981-2.91-.919-4.137.921-4.746 5.979-5.819 7.206-2.144 1.381-3.984.462-7.76-2.861-14.784-9.124c-5.465-4.873-9.154-10.891-10.228-12.73s-.114-2.835.808-3.751c.825-.824 1.838-2.147 2.759-3.22s1.224-1.84 1.836-3.065.307-2.301-.153-3.22-4.032-10.011-5.666-13.647"/>
+    </svg>
+  </a>
+
+</body>
+</html>
