@@ -262,6 +262,9 @@ button { font: inherit; cursor: pointer; border: 0; background: none; color: inh
 .nav-list a.is-current { border-bottom-color: currentColor; }
 
 .header-actions { display: flex; align-items: center; gap: 16px; }
+@media (min-width: 1024px) {
+  .header-actions { margin-right: 24px; }
+}
 .lang-toggle {
   font-family: var(--font-label);
   font-weight: 700;
@@ -614,7 +617,7 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
 /* ---------- INTRO BAND ---------- */
 
 .intro {
-  padding: 120px 0 80px;
+  padding: 100px 0 40px;
   background: var(--paper);
 }
 .intro .container {
@@ -631,6 +634,24 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   width: 64px; height: 64px;
   background: url("assets/icon-star-taupe.png") center/contain no-repeat;
   opacity: 0.9;
+}
+.intro-image-wrapper {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  margin-top: var(--space-2);
+}
+.intro-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.intro-image-wrapper:hover .intro-image {
+  transform: scale(1.04);
 }
 .intro h2 {
   font-family: var(--font-heading);
@@ -653,8 +674,8 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
 .facts-strip {
   border-top: 1px solid var(--paper-400);
   border-bottom: 1px solid var(--paper-400);
-  margin-top: 80px;
-  padding: 40px 0;
+  margin-top: 32px;
+  padding: 32px 0;
 }
 .facts-strip .container {
   display: grid;
@@ -869,6 +890,139 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   font-size: 14px;
   color: var(--ink-500);
   margin-left: 4px;
+}
+
+/* ---------- ROOM SLIDER ---------- */
+.room-media.slider-active {
+  cursor: default; /* Allow buttons and swipes to work without confusing custom cursors */
+}
+.slider-wrapper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  overflow: hidden;
+}
+.slider-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.slider-slide {
+  width: 100%;
+  height: 100%;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.slider-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 1.2s var(--ease-out);
+}
+.room-media:hover .slider-slide img {
+  transform: scale(1.04);
+}
+.slider-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(250, 246, 239, 0.85); /* Glassmorphism/paper base */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--paper-400);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all var(--dur-base) var(--ease-out);
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: var(--shadow-sm);
+}
+.slider-arrow svg {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.room-media:hover .slider-arrow {
+  opacity: 1;
+  pointer-events: auto;
+}
+.slider-arrow:hover {
+  background: var(--terracotta);
+  border-color: var(--terracotta);
+  color: var(--paper);
+  box-shadow: var(--shadow-md);
+}
+.slider-arrow:hover.prev svg {
+  transform: translateX(-2px);
+}
+.slider-arrow:hover.next svg {
+  transform: translateX(2px);
+}
+.slider-arrow.prev {
+  left: 16px;
+}
+.slider-arrow.next {
+  right: 16px;
+}
+
+.slider-indicators {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 10;
+  background: rgba(40, 41, 43, 0.2);
+  padding: 6px 10px;
+  border-radius: 20px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+.slider-indicators .indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(250, 246, 239, 0.4);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.slider-indicators .indicator:hover {
+  background: rgba(250, 246, 239, 0.8);
+}
+.slider-indicators .indicator.active {
+  background: var(--paper);
+  width: 18px;
+  border-radius: 3px;
+}
+
+/* Make arrows permanently visible on mobile since there is no hover */
+@media (max-width: 1024px) {
+  .slider-arrow {
+    opacity: 0.85;
+    pointer-events: auto;
+    width: 36px;
+    height: 36px;
+  }
+  .slider-arrow.prev {
+    left: 8px;
+  }
+  .slider-arrow.next {
+    right: 8px;
+  }
+  .slider-indicators {
+    bottom: 12px;
+    padding: 4px 8px;
+  }
 }
 
 /* ---------- FEATURE BAND (olive full bleed) ---------- */
@@ -2042,7 +2196,7 @@ body[data-voice="susurro"] .explore h2 {
 body[data-voice="susurro"] .room-info h3 { font-size: clamp(30px, 3.6vw, 52px); }
 body[data-voice="susurro"] .lead { font-size: clamp(19px, 1.5vw, 24px); line-height: 1.7; }
 body[data-voice="susurro"] .eyebrow { opacity: 0.55; }
-body[data-voice="susurro"] .intro { padding: 160px 0 100px; }
+body[data-voice="susurro"] .intro { padding: 120px 0 60px; }
 body[data-voice="susurro"] .rooms { padding: 160px 0; }
 body[data-voice="susurro"] .room-list { gap: 160px; }
 

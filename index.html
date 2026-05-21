@@ -156,6 +156,9 @@
     <div class="eye-col" data-reveal>
       <div class="mark" aria-hidden="true"></div>
       <p class="eyebrow terracotta">Bienvenido a estar</p>
+      <div class="intro-image-wrapper">
+        <img src="assets/photos/mzl648.webp" alt="estar Manizales" class="intro-image">
+      </div>
     </div>
     <div data-reveal>
       <h2>
@@ -172,10 +175,22 @@
 <!-- ============================== FACTS STRIP ============================== -->
 <section class="facts-strip">
   <div class="container">
-    <div class="fact" data-reveal><span class="num">14</span><span class="lbl">Apartaestudios</span></div>
-    <div class="fact" data-reveal><span class="num">2.160</span><span class="lbl">m. sobre el mar</span></div>
-    <div class="fact" data-reveal><span class="num">300+</span><span class="lbl">Reservas directas / año</span></div>
-    <div class="fact" data-reveal><span class="num">4.8</span><span class="lbl">Valoración huéspedes</span></div>
+    <div class="fact" data-reveal>
+      <span class="num" data-i18n="fact_1_num">2025</span>
+      <span class="lbl" data-i18n="fact_1_lbl">Año de fundación</span>
+    </div>
+    <div class="fact" data-reveal>
+      <span class="num" data-i18n="fact_2_num">9.6</span>
+      <span class="lbl" data-i18n="fact_2_lbl">Calificación OTAs</span>
+    </div>
+    <div class="fact" data-reveal>
+      <span class="num" data-i18n="fact_3_num">100%</span>
+      <span class="lbl" data-i18n="fact_3_lbl">Check-in digital</span>
+    </div>
+    <div class="fact" data-reveal>
+      <span class="num" data-i18n="fact_4_num">4.8</span>
+      <span class="lbl" data-i18n="fact_4_lbl">Valoración huéspedes</span>
+    </div>
   </div>
 </section>
 
@@ -194,9 +209,38 @@
 
       <!-- Room 1: Clásica -->
       <article class="room has-star-cursor" data-reveal>
-        <div class="room-media">
+        <div class="room-media slider-active">
           <div class="badge">01 / Clásica</div>
-          <img src="assets/photos/clasic.webp" alt="Cocina equipada del apartaestudio Clásica">
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="assets/photos/tipo1/1.webp" alt="Cocina equipada del apartaestudio Clásica - Vista 1" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo1/2.webp" alt="Cocina equipada del apartaestudio Clásica - Vista 2" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo1/3.webp" alt="Cocina equipada del apartaestudio Clásica - Vista 3" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo1/4.webp" alt="Cocina equipada del apartaestudio Clásica - Vista 4" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo1/5.webp" alt="Cocina equipada del apartaestudio Clásica - Vista 5" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo1/6.webp" alt="Cocina equipada del apartaestudio Clásica - Vista 6" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo1/7.webp" alt="Cocina equipada del apartaestudio Clásica - Vista 7" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo1/8.webp" alt="Cocina equipada del apartaestudio Clásica - Vista 8" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo1/9.webp" alt="Cocina equipada del apartaestudio Clásica - Vista 9" loading="lazy"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Imagen anterior" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Imagen siguiente" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+            <span class="indicator" data-slide="3"></span>
+            <span class="indicator" data-slide="4"></span>
+            <span class="indicator" data-slide="5"></span>
+            <span class="indicator" data-slide="6"></span>
+            <span class="indicator" data-slide="7"></span>
+            <span class="indicator" data-slide="8"></span>
+          </div>
         </div>
         <div class="room-info">
           <p class="eyebrow">Para una o dos personas</p>
@@ -218,9 +262,40 @@
 
       <!-- Room 2: Selección -->
       <article class="room has-star-cursor" data-reveal>
-        <div class="room-media" style="background: var(--terracotta-300);">
+        <div class="room-media slider-active" style="background: var(--terracotta-300);">
           <div class="badge">02 / Selección</div>
-          <img src="assets/photos/seleccion.webp" alt="Baño del apartaestudio Selección">
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="assets/photos/tipo2/1.webp" alt="Baño del apartaestudio Selección - Vista 1" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo2/2.webp" alt="Baño del apartaestudio Selección - Vista 2" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo2/3.webp" alt="Baño del apartaestudio Selección - Vista 3" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo2/4.webp" alt="Baño del apartaestudio Selección - Vista 4" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo2/5.webp" alt="Baño del apartaestudio Selección - Vista 5" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo2/6.webp" alt="Baño del apartaestudio Selección - Vista 6" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo2/7.webp" alt="Baño del apartaestudio Selección - Vista 7" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo2/8.webp" alt="Baño del apartaestudio Selección - Vista 8" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo2/9.webp" alt="Baño del apartaestudio Selección - Vista 9" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo2/10.webp" alt="Baño del apartaestudio Selección - Vista 10" loading="lazy"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Imagen anterior" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Imagen siguiente" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+            <span class="indicator" data-slide="3"></span>
+            <span class="indicator" data-slide="4"></span>
+            <span class="indicator" data-slide="5"></span>
+            <span class="indicator" data-slide="6"></span>
+            <span class="indicator" data-slide="7"></span>
+            <span class="indicator" data-slide="8"></span>
+            <span class="indicator" data-slide="9"></span>
+          </div>
         </div>
         <div class="room-info">
           <p class="eyebrow">Para dos personas</p>
@@ -242,9 +317,32 @@
 
       <!-- Room 3: Reserva -->
       <article class="room has-star-cursor" data-reveal>
-        <div class="room-media" style="background: var(--olive);">
+        <div class="room-media slider-active" style="background: var(--olive);">
           <div class="badge">03 / Reserva</div>
-          <img src="assets/photos/reserva.webp" alt="Apartaestudio Reserva">
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="assets/photos/tipo3/1.webp" alt="Apartaestudio Reserva - Vista 1" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo3/2.webp" alt="Apartaestudio Reserva - Vista 2" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo3/3.webp" alt="Apartaestudio Reserva - Vista 3" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo3/4.webp" alt="Apartaestudio Reserva - Vista 4" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo3/5.webp" alt="Apartaestudio Reserva - Vista 5" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo3/6.webp" alt="Apartaestudio Reserva - Vista 6" loading="lazy"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Imagen anterior" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Imagen siguiente" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+            <span class="indicator" data-slide="3"></span>
+            <span class="indicator" data-slide="4"></span>
+            <span class="indicator" data-slide="5"></span>
+          </div>
         </div>
         <div class="room-info">
           <p class="eyebrow">Para parejas o estancias largas</p>
@@ -266,9 +364,32 @@
 
       <!-- Room 4: Origen -->
       <article class="room has-star-cursor" data-reveal>
-        <div class="room-media" style="background: var(--sand);">
+        <div class="room-media slider-active" style="background: var(--sand);">
           <div class="badge">04 / Origen</div>
-          <img src="assets/photos/origen.webp" alt="Apartaestudio Origen">
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="assets/photos/tipo4/1.webp" alt="Apartaestudio Origen - Vista 1" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo4/2.webp" alt="Apartaestudio Origen - Vista 2" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo4/3.webp" alt="Apartaestudio Origen - Vista 3" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo4/4.webp" alt="Apartaestudio Origen - Vista 4" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo4/5.webp" alt="Apartaestudio Origen - Vista 5" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo4/6.webp" alt="Apartaestudio Origen - Vista 6" loading="lazy"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Imagen anterior" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Imagen siguiente" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+            <span class="indicator" data-slide="3"></span>
+            <span class="indicator" data-slide="4"></span>
+            <span class="indicator" data-slide="5"></span>
+          </div>
         </div>
         <div class="room-info">
           <p class="eyebrow">Para parejas</p>
@@ -290,9 +411,32 @@
 
       <!-- Room 5: Especial -->
       <article class="room has-star-cursor" data-reveal>
-        <div class="room-media" style="background: var(--ink);">
+        <div class="room-media slider-active" style="background: var(--ink);">
           <div class="badge">05 / Especial</div>
-          <img src="assets/photos/especial.webp" alt="Apartaestudio Especial">
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="assets/photos/tipo5/1.webp" alt="Apartaestudio Especial - Vista 1" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo5/2.webp" alt="Apartaestudio Especial - Vista 2" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo5/3.webp" alt="Apartaestudio Especial - Vista 3" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo5/4.webp" alt="Apartaestudio Especial - Vista 4" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo5/5.webp" alt="Apartaestudio Especial - Vista 5" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo5/6.webp" alt="Apartaestudio Especial - Vista 6" loading="lazy"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Imagen anterior" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Imagen siguiente" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+            <span class="indicator" data-slide="3"></span>
+            <span class="indicator" data-slide="4"></span>
+            <span class="indicator" data-slide="5"></span>
+          </div>
         </div>
         <div class="room-info">
           <p class="eyebrow">Para grupos pequeños o familias</p>

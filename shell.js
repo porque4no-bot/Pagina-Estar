@@ -142,7 +142,15 @@
       book_four_guests_more: '4 huéspedes o más',
       room_option_all: 'Todos',
       book_one_room: '1 apartaestudio',
-      lang_btn: 'EN'
+      lang_btn: 'EN',
+      fact_1_num: '2025',
+      fact_1_lbl: 'Año de fundación',
+      fact_2_num: '9.6',
+      fact_2_lbl: 'Calificación OTAs',
+      fact_3_num: '100%',
+      fact_3_lbl: 'Check-in digital',
+      fact_4_num: '4.8',
+      fact_4_lbl: 'Valoración huéspedes'
     },
     en: {
       nav_estadias: 'Stays',
@@ -167,7 +175,15 @@
       book_four_guests_more: '4 guests or more',
       room_option_all: 'All',
       book_one_room: '1 studio',
-      lang_btn: 'ES'
+      lang_btn: 'ES',
+      fact_1_num: '2025',
+      fact_1_lbl: 'Year founded',
+      fact_2_num: '9.6',
+      fact_2_lbl: 'OTAs rating',
+      fact_3_num: '100%',
+      fact_3_lbl: 'Digital check-in',
+      fact_4_num: '4.8',
+      fact_4_lbl: 'Guest rating'
     }
   };
 
@@ -374,13 +390,108 @@
     }
   }
 
+  /* ----- ROOM SLIDERS ----- */
+  function setupRoomSliders() {
+    const sliders = document.querySelectorAll('.room-media.slider-active');
+    sliders.forEach((slider) => {
+      const track = slider.querySelector('.slider-track');
+      const slides = slider.querySelectorAll('.slider-slide');
+      const prevBtn = slider.querySelector('.slider-arrow.prev');
+      const nextBtn = slider.querySelector('.slider-arrow.next');
+      const indicators = slider.querySelectorAll('.slider-indicators .indicator');
+      
+      if (!track || slides.length === 0) return;
+      
+      let currentIndex = 0;
+      const totalSlides = slides.length;
+      
+      function goToSlide(index) {
+        if (index < 0) {
+          currentIndex = totalSlides - 1;
+        } else if (index >= totalSlides) {
+          currentIndex = 0;
+        } else {
+          currentIndex = index;
+        }
+        
+        // Translate track
+        track.style.transform = `translateX(-${currentIndex * 100}%)`;
+        
+        // Update indicators
+        indicators.forEach((ind, i) => {
+          ind.classList.toggle('active', i === currentIndex);
+        });
+      }
+      
+      // Event listeners for navigation buttons
+      if (prevBtn) {
+        prevBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          goToSlide(currentIndex - 1);
+        });
+      }
+      
+      if (nextBtn) {
+        nextBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          goToSlide(currentIndex + 1);
+        });
+      }
+      
+      // Event listeners for dot indicators
+      indicators.forEach((indicator) => {
+        indicator.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const slideIndex = parseInt(indicator.getAttribute('data-slide'));
+          if (!isNaN(slideIndex)) {
+            goToSlide(slideIndex);
+          }
+        });
+      });
+      
+      // Touch gestures for swipe support
+      let touchStartX = 0;
+      let touchEndX = 0;
+      
+      slider.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+      }, { passive: true });
+      
+      slider.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+      }, { passive: true });
+      
+      function handleSwipe() {
+        const threshold = 40; // minimum distance in pixels
+        if (touchStartX - touchEndX > threshold) {
+          // Swipe left -> Next slide
+          goToSlide(currentIndex + 1);
+        } else if (touchEndX - touchStartX > threshold) {
+          // Swipe right -> Previous slide
+          goToSlide(currentIndex - 1);
+        }
+      }
+    });
+  }
+
   /* ---------- INIT ---------- */
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { applyTweaks(); setupPanel(); setupHeaderLangToggle(); setupMobileBookingScroll(); });
+    document.addEventListener('DOMContentLoaded', () => { 
+      applyTweaks(); 
+      setupPanel(); 
+      setupHeaderLangToggle(); 
+      setupMobileBookingScroll(); 
+      setupRoomSliders();
+    });
   } else {
     applyTweaks();
     setupPanel();
     setupHeaderLangToggle();
     setupMobileBookingScroll();
+    setupRoomSliders();
   }
 })();
