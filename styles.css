@@ -1325,6 +1325,15 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   padding: 100px 0 40px;
   font-size: 14px;
 }
+.booking-spacer {
+  display: none;
+}
+@media (min-width: 901px) {
+  .booking-spacer {
+    display: block;
+    height: 140px;
+  }
+}
 .footer-top {
   display: grid;
   grid-template-columns: 1fr;
