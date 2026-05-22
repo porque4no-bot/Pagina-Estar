@@ -4,4 +4,6 @@ uploads/
 scratch/
 *.zip
 .netlify/
-
+.env
+.env.local
+.env.*
