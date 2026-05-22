@@ -107,7 +107,7 @@
       </ul>
     </div>
     <div class="feature-media">
-      <img src="assets/photos/bano-2.webp" alt="Apartaestudio listo para huéspedes corporativos">
+      <img src="assets/photos/Mzl648.jpg" alt="Apartaestudio listo para huéspedes corporativos">
       <div class="feature-stamp" aria-hidden="true"></div>
     </div>
   </div>
@@ -129,47 +129,40 @@
         </div>
       </div>
 
-      <form class="form" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Recibido ✶ — te escribimos pronto'; this.querySelector('button').disabled=true;">
+      <form class="form" onsubmit="event.preventDefault(); const btn=this.querySelector('button'); btn.disabled=true; const lang=document.documentElement.lang || 'es'; btn.textContent = (lang === 'en' ? 'Received ✶ — we will write you soon' : 'Recibido ✶ — te escribimos pronto');">
         <div class="field-row">
-          <div class="field"><label>Empresa</label><input type="text" placeholder="Ej. Hospital de Caldas"></div>
-          <div class="field"><label>Sector</label>
-            <select>
-              <option>Salud / Hospital</option>
-              <option>Consultoría / Servicios</option>
-              <option>Educación / Universidad</option>
-              <option>Café / Agroindustria</option>
-              <option>Tecnología</option>
-              <option>Otro</option>
-            </select>
+          <div class="field">
+            <label data-i18n="form_empresa">Empresa</label>
+            <input type="text" data-i18n-placeholder="form_empresa_placeholder" placeholder="Ej. Hospital de Caldas" required>
+          </div>
+          <div class="field">
+            <label data-i18n="form_contacto">Nombre del contacto</label>
+            <input type="text" data-i18n-placeholder="form_contacto_placeholder" placeholder="María Restrepo" required>
           </div>
         </div>
         <div class="field-row">
-          <div class="field"><label>Nombre del contacto</label><input type="text" placeholder="María Restrepo"></div>
-          <div class="field"><label>Cargo</label><input type="text" placeholder="Jefe de operaciones"></div>
+          <div class="field">
+            <label data-i18n="form_correo">Correo corporativo</label>
+            <input type="email" data-i18n-placeholder="form_correo_placeholder" placeholder="m.restrepo@empresa.co" required>
+          </div>
+          <div class="field">
+            <label data-i18n="form_whatsapp">WhatsApp</label>
+            <input type="tel" data-i18n-placeholder="form_whatsapp_placeholder" placeholder="+57 300 000 0000" required>
+          </div>
         </div>
-        <div class="field-row">
-          <div class="field"><label>Correo corporativo</label><input type="email" placeholder="m.restrepo@empresa.co"></div>
-          <div class="field"><label>WhatsApp</label><input type="tel" placeholder="+57 300 000 0000"></div>
+        <div class="field checkbox-field">
+          <label class="checkbox-label">
+            <input type="checkbox" name="credito_30_dias" checked>
+            <span data-i18n="form_credito">Solicitar crédito a 30 días (sujeto a aprobación)</span>
+          </label>
         </div>
-        <div class="field"><label>Volumen estimado por mes</label>
-          <select>
-            <option>1 — 3 huéspedes / mes</option>
-            <option>4 — 10 huéspedes / mes</option>
-            <option>10+ huéspedes / mes</option>
-            <option>Aún no sé, quiero explorar opciones</option>
-          </select>
+        <div class="field checkbox-field">
+          <label class="checkbox-label">
+            <input type="checkbox" name="aceptar_politica" required>
+            <span data-i18n-html="form_politica">Acepto la <a href="privacidad.html" target="_blank">Política de Tratamiento de Datos</a></span>
+          </label>
         </div>
-        <div class="field"><label>Cuéntanos más (opcional)</label>
-          <textarea placeholder="Frecuencia, duración promedio, necesidades especiales..."></textarea>
-        </div>
-        <label class="form-checkbox">
-          <input type="checkbox" required>
-          <span>
-            <span class="lang-es">Acepto la <a href="privacidad.html" target="_blank">Política de Privacidad</a> e información de Habeas Data corporativo.</span>
-            <span class="lang-en">I accept the <a href="privacidad.html" target="_blank">Privacy Policy</a> and corporate Habeas Data terms.</span>
-          </span>
-        </label>
-        <button type="submit" class="btn btn-ink" style="justify-content: center;">Enviar solicitud <span aria-hidden="true">→</span></button>
+        <button type="submit" class="btn btn-ink" style="justify-content: center;" data-i18n-html="form_enviar">Enviar solicitud <span aria-hidden="true">→</span></button>
       </form>
     </div>
 

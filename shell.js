@@ -210,7 +210,18 @@
       unit_select_placeholder: 'Selecciona una unidad',
       special_rates_label: '✶ Tarifas especiales:',
       special_rates_text: 'Ofrecemos descuentos preferenciales en estancias mensuales o reservas de más de 4 unidades.',
-      privacy_agreement: 'Acepto el tratamiento de mis datos personales para cotización según la <a href="privacidad.html" target="_blank">Política de Privacidad</a>.'
+      privacy_agreement: 'Acepto el tratamiento de mis datos personales para cotización según la <a href="privacidad.html" target="_blank">Política de Privacidad</a>.',
+      form_empresa: 'Empresa',
+      form_empresa_placeholder: 'Ej. Hospital de Caldas',
+      form_contacto: 'Nombre del contacto',
+      form_contacto_placeholder: 'María Restrepo',
+      form_correo: 'Correo corporativo',
+      form_correo_placeholder: 'm.restrepo@empresa.co',
+      form_whatsapp: 'WhatsApp',
+      form_whatsapp_placeholder: '+57 300 000 0000',
+      form_credito: 'Solicitar crédito a 30 días (sujeto a aprobación)',
+      form_politica: 'Acepto la <a href="privacidad.html" target="_blank">Política de Privacidad</a> e información de Habeas Data corporativo.',
+      form_enviar: 'Enviar solicitud <span aria-hidden="true">→</span>'
     },
     en: {
       nav_estadias: 'Stays',
@@ -303,7 +314,18 @@
       unit_select_placeholder: 'Select a unit',
       special_rates_label: '✶ Special rates:',
       special_rates_text: 'We offer preferential discounts for monthly stays or bookings of more than 4 units.',
-      privacy_agreement: 'I accept the processing of my personal data for quoting per the <a href="privacidad.html" target="_blank">Privacy Policy</a>.'
+      privacy_agreement: 'I accept the processing of my personal data for quoting per the <a href="privacidad.html" target="_blank">Privacy Policy</a>.',
+      form_empresa: 'Company',
+      form_empresa_placeholder: 'e.g. Hospital de Caldas',
+      form_contacto: 'Contact name',
+      form_contacto_placeholder: 'Maria Restrepo',
+      form_correo: 'Corporate email',
+      form_correo_placeholder: 'm.restrepo@empresa.co',
+      form_whatsapp: 'WhatsApp',
+      form_whatsapp_placeholder: '+57 300 000 0000',
+      form_credito: 'Request 30-day credit (subject to approval)',
+      form_politica: 'I accept the <a href="privacidad.html" target="_blank">Privacy Policy</a> and corporate Habeas Data terms.',
+      form_enviar: 'Send request <span aria-hidden="true">→</span>'
     }
   };
 
@@ -322,6 +344,10 @@
     document.querySelectorAll('[data-i18n-html]').forEach((el) => {
       const k = el.getAttribute('data-i18n-html');
       if (i18n[lang] && i18n[lang][k]) el.innerHTML = i18n[lang][k];
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+      const k = el.getAttribute('data-i18n-placeholder');
+      if (i18n[lang] && i18n[lang][k]) el.setAttribute('placeholder', i18n[lang][k]);
     });
   }
 
