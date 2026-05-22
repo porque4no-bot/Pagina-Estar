@@ -388,6 +388,12 @@ button { font: inherit; cursor: pointer; border: 0; background: none; color: inh
 }
 
 /* ---------- DARK HEADER on pages with light sub-heros ---------- */
+body[data-header="dark"] .site-header:not(.is-scrolled) {
+  background: rgba(250, 246, 239, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom-color: var(--paper-400);
+}
 body[data-header="dark"] .site-header:not(.is-scrolled) .brand .logo-img {
   filter: none;
 }
