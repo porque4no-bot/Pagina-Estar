@@ -1352,7 +1352,7 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   border-top: 1px solid var(--paper-400);
   border-bottom: 1px solid var(--paper-400);
 }
-@media (min-width: 768px) { .amenities-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 768px) { .amenities-grid { grid-template-columns: repeat(3, 1fr); } }
 .amenity {
   background: var(--paper);
   padding: 44px 28px;
