@@ -189,7 +189,18 @@
       footer_cancelacion: 'Política de cancelación',
       footer_privacidad: 'Privacidad',
       footer_cookies: 'Política de Cookies',
-      footer_escnna: 'Protección de Menores (ESCNNA)'
+      footer_escnna: 'Protección de Menores (ESCNNA)',
+      form_empresa: 'Empresa',
+      form_empresa_placeholder: 'Ej. Hospital de Caldas',
+      form_contacto: 'Nombre del contacto',
+      form_contacto_placeholder: 'María Restrepo',
+      form_correo: 'Correo corporativo',
+      form_correo_placeholder: 'm.restrepo@empresa.co',
+      form_whatsapp: 'WhatsApp',
+      form_whatsapp_placeholder: '+57 300 000 0000',
+      form_credito: 'Solicitar crédito a 30 días (sujeto a aprobación)',
+      form_politica: 'Acepto la <a href="privacidad.html" target="_blank">Política de Tratamiento de Datos</a>',
+      form_enviar: 'Enviar solicitud <span aria-hidden="true">→</span>'
     },
     en: {
       nav_estadias: 'Stays',
@@ -261,7 +272,18 @@
       footer_cancelacion: 'Cancellation Policy',
       footer_privacidad: 'Privacy Policy',
       footer_cookies: 'Cookies Policy',
-      footer_escnna: 'Child Protection (ESCNNA)'
+      footer_escnna: 'Child Protection (ESCNNA)',
+      form_empresa: 'Company',
+      form_empresa_placeholder: 'e.g. Hospital de Caldas',
+      form_contacto: 'Contact name',
+      form_contacto_placeholder: 'Maria Restrepo',
+      form_correo: 'Corporate email',
+      form_correo_placeholder: 'm.restrepo@empresa.co',
+      form_whatsapp: 'WhatsApp',
+      form_whatsapp_placeholder: '+57 300 000 0000',
+      form_credito: 'Request 30-day credit (subject to approval)',
+      form_politica: 'I accept the <a href="privacidad.html" target="_blank">Data Processing Policy</a>',
+      form_enviar: 'Send request <span aria-hidden="true">→</span>'
     }
   };
 
@@ -280,6 +302,10 @@
     document.querySelectorAll('[data-i18n-html]').forEach((el) => {
       const k = el.getAttribute('data-i18n-html');
       if (i18n[lang] && i18n[lang][k]) el.innerHTML = i18n[lang][k];
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+      const k = el.getAttribute('data-i18n-placeholder');
+      if (i18n[lang] && i18n[lang][k]) el.setAttribute('placeholder', i18n[lang][k]);
     });
   }
 
