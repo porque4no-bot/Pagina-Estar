@@ -520,7 +520,7 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   -webkit-backdrop-filter: blur(8px);
   border-radius: 4px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr) auto;
+  grid-template-columns: repeat(3, 1fr) auto;
   align-items: stretch;
 }
 @media (min-width: 768px) {
@@ -530,6 +530,10 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   .booking-bar {
     grid-template-columns: 1fr 1fr;
     grid-auto-rows: auto;
+  }
+  #guests-field {
+    grid-column: 1 / -1;
+    border-right: 0;
   }
 }
 @media (min-width: 901px) {
