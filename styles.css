@@ -456,8 +456,11 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   justify-content: flex-end;
   padding-bottom: 200px;
 }
-@media (max-width: 768px) {
-  .hero-inner { padding-bottom: 240px; }
+@media (max-width: 900px) {
+  .hero-inner { padding-bottom: 350px; }
+}
+@media (max-width: 600px) {
+  .hero-inner { padding-bottom: 430px; }
 }
 
 .hero-eyebrow {
