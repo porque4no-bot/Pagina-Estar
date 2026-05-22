@@ -54,6 +54,31 @@
   </div>
 </section>
 
+<!-- ============================== MAP SECTION ============================== -->
+<section class="section map-section" style="background: var(--paper); padding: 80px 0 48px 0; border-bottom: 1px solid var(--paper-400);">
+  <div class="container">
+    <div class="section-head" data-reveal style="margin-bottom: 32px;">
+      <div>
+        <p class="eyebrow terracotta" data-i18n="map_eyebrow">Explora Manizales</p>
+        <h2 class="display-l" data-i18n-html="map_title">Nuestro mapa <span class="serif-italic">curado.</span></h2>
+      </div>
+      <p class="lead" data-i18n="map_desc" style="max-width: 600px; margin: 0; color: var(--ink-700);">Hemos mapeado nuestros lugares favoritos de la ciudad. Filtra por categorías y planifica tu día desde Palogrande.</p>
+    </div>
+    <div class="explora-map-wrapper" data-reveal>
+      <iframe 
+        src="https://www.google.com/maps/d/u/0/embed?mid=1_0s9388R0uFZF0P7O3Hu6qshB5v_aBg&ehbc=2E312F&noprof=1" 
+        width="100%" 
+        height="100%" 
+        style="border:0;" 
+        allowfullscreen="" 
+        loading="lazy" 
+        referrerpolicy="no-referrer-when-downgrade"
+        title="estar - Mapa Interactivo">
+      </iframe>
+    </div>
+  </div>
+</section>
+
 <!-- ============================== POI GRID ============================== -->
 <section class="section">
   <div class="container">
@@ -63,62 +88,19 @@
         <h2 class="display-l">Lugares que <span class="serif-italic">amamos.</span></h2>
       </div>
       <div class="filter-row">
-        <button class="filter-pill active">Todo</button>
-        <button class="filter-pill">Café</button>
-        <button class="filter-pill">Comer</button>
-        <button class="filter-pill">Naturaleza</button>
-        <button class="filter-pill">Atardecer</button>
+        <button class="filter-pill active" data-category="all" data-i18n="cat_todo">Todo</button>
+        <button class="filter-pill" data-category="escapadas" data-i18n="cat_escapadas">Escapadas</button>
+        <button class="filter-pill" data-category="birding" data-i18n="cat_birding">Birding</button>
+        <button class="filter-pill" data-category="restaurantes" data-i18n="cat_restaurantes">Restaurantes</button>
+        <button class="filter-pill" data-category="cafes" data-i18n="cat_cafes">Cafés</button>
+        <button class="filter-pill" data-category="universidades" data-i18n="cat_universidades">Universidades</button>
+        <button class="filter-pill" data-category="deportivo" data-i18n="cat_deportivo">Deportivo</button>
+        <button class="filter-pill" data-category="turismo" data-i18n="cat_turismo">Turismo</button>
       </div>
     </div>
 
-    <div class="poi-grid">
-      <article class="poi has-star-cursor" data-reveal>
-        <div class="poi-media" style="background-image: url('assets/photos/macondo.webp'); background-size: cover; background-position: center;"><span class="tag">Café</span></div>
-        <h4>Café Macondo</h4>
-        <p class="sub">Tostadores locales, 7 cosechas de Caldas.</p>
-        <p class="body">El barista te cuenta de cada finca. Pide el filtrado del día y siéntate junto a la ventana.</p>
-        <p class="meta"><span>Centro · 6 min</span><span>$$ · 10am–7pm</span></p>
-      </article>
-
-      <article class="poi has-star-cursor" data-reveal>
-        <div class="poi-media" style="background-image: url('assets/photos/termales.webp'); background-size: cover; background-position: center;"><span class="tag">Naturaleza</span></div>
-        <h4>Termales del Otoño</h4>
-        <p class="sub">Aguas sulfuradas, 38°C, abierto hasta tarde.</p>
-        <p class="body">A 25 minutos del hotel. Vamos los domingos por la mañana, cuando casi no hay gente.</p>
-        <p class="meta"><span>Carretera al Ruiz</span><span>$$ · 9am–10pm</span></p>
-      </article>
-
-      <article class="poi has-star-cursor" data-reveal>
-        <div class="poi-media" style="background-image: url('assets/photos/cable.webp'); background-size: cover; background-position: center;"><span class="tag">Atardecer</span></div>
-        <h4>Cable Aéreo</h4>
-        <p class="sub">El mejor mirador de la ciudad — gratis.</p>
-        <p class="body">Súbete antes de las 5:30pm. La vista hacia el Nevado del Ruiz al atardecer es de las cosas más bonitas que vas a ver.</p>
-        <p class="meta"><span>Centro a Cámbulos</span><span>$ · 6am–10pm</span></p>
-      </article>
-
-      <article class="poi has-star-cursor" data-reveal>
-        <div class="poi-media" style="background-image: url('assets/photos/patio.webp'); background-size: cover; background-position: center;"><span class="tag">Comer</span></div>
-        <h4>Cocina del Patio</h4>
-        <p class="sub">Comida regional con producto local.</p>
-        <p class="body">Patacones rellenos, sopa de mondongo y postre de natas. Reserva el viernes — se llena.</p>
-        <p class="meta"><span>Versalles</span><span>$$ · 12pm–11pm</span></p>
-      </article>
-
-      <article class="poi has-star-cursor" data-reveal>
-        <div class="poi-media" style="background-image: url('assets/photos/bolivar.webp'); background-size: cover; background-position: center;"><span class="tag">Café</span></div>
-        <h4>Tienda Juan Valdez · Plaza</h4>
-        <p class="sub">El clásico, pero con cosecha del mes.</p>
-        <p class="body">Para una pausa rápida entre paseos. Buen wifi si necesitas trabajar 30 min.</p>
-        <p class="meta"><span>Plaza de Bolívar</span><span>$ · 7am–9pm</span></p>
-      </article>
-
-      <article class="poi has-star-cursor" data-reveal>
-        <div class="poi-media" style="background-image: url('assets/photos/yarumos.webp'); background-size: cover; background-position: center;"><span class="tag">Naturaleza</span></div>
-        <h4>Parque de los Yarumos</h4>
-        <p class="sub">Reserva natural urbana, senderos cortos.</p>
-        <p class="body">Camina temprano. Hay mariposas, pájaros, y a veces neblina que cubre todo. Magia.</p>
-        <p class="meta"><span>Av. del Río</span><span>$ · 8am–5pm</span></p>
-      </article>
+    <div class="poi-grid" id="poiGrid">
+      <!-- Dynamic cards will be rendered here -->
     </div>
   </div>
 </section>
@@ -277,5 +259,884 @@
     </div>
   </div>
 
+
+<!-- Dynamic POIs Rendering and Filtering Script -->
+<script>
+  (function() {
+    const pois = [
+  {
+    "id": 1,
+    "category": "escapadas",
+    "coords": [
+      4.970432,
+      -75.37819
+    ],
+    "img": "https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80",
+    "price": "$$$",
+    "hours": "24h",
+    "es": {
+      "name": "Hotel Termales del Ruiz",
+      "sub": "Aguas termales curativas en las alturas del páramo",
+      "body": "Un santuario a 3,500 metros sobre el nivel del mar. Sus piscinas de aguas termales ricas en minerales están rodeadas de colibríes de alta montaña y una neblina mística que te desconectará del mundo.",
+      "distance": "1h 15 min en carro"
+    },
+    "en": {
+      "name": "Hotel Termales del Ruiz",
+      "sub": "Healing hot springs high up in the paramo",
+      "body": "A sanctuary located 3,500 meters above sea level. Its mineral-rich thermal pools are surrounded by high-altitude hummingbirds and a mystical mist that will disconnect you from the world.",
+      "distance": "1h 15 min drive"
+    }
+  },
+  {
+    "id": 2,
+    "category": "escapadas",
+    "coords": [
+      5.0539302,
+      -75.5729697
+    ],
+    "img": "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&w=800&q=80",
+    "price": "$$",
+    "hours": "9am – 5pm",
+    "es": {
+      "name": "Viga Vieja",
+      "sub": "Arquitectura colonial y café en un entorno natural único",
+      "body": "Una joya arquitectónica rural cerca de la ciudad. Famosa por sus senderos ecológicos, su exquisito café y el ambiente campestre que evoca la historia de la colonización antioqueña.",
+      "distance": "40 min en carro"
+    },
+    "en": {
+      "name": "Viga Vieja",
+      "sub": "Colonial architecture and coffee in a unique natural setting",
+      "body": "A rural architectural gem close to the city. Famous for its ecological trails, exquisite coffee, and country atmosphere evoking the history of the Antioquian colonization.",
+      "distance": "40 min drive"
+    }
+  },
+  {
+    "id": 3,
+    "category": "escapadas",
+    "coords": [
+      5.0391232,
+      -75.4462709
+    ],
+    "img": "https://www.recintodelpensamiento.com/wp-content/uploads/elementor/thumbs/recinto-79-rcklshkrfzva16mtgvhymnaqmvnnikfnfscep1ik0w.jpg",
+    "price": "$$",
+    "hours": "9am – 5pm",
+    "es": {
+      "name": "Recinto del Pensamiento",
+      "sub": "Santuario de orquídeas, mariposas y bosque andino",
+      "body": "Un bosque húmedo de niebla con un pabellón de madera emblemático. Disfruta de su telesilla, avistamiento de colibríes, sendero ecológico y uno de los bosques de bonsáis más grandes de la región.",
+      "distance": "15 min en carro"
+    },
+    "en": {
+      "name": "Recinto del Pensamiento",
+      "sub": "Orchid sanctuary, butterflies, and Andean forest",
+      "body": "A humid cloud forest featuring an iconic wooden pavilion. Enjoy its chairlift, hummingbird watching, ecological path, and one of the largest bonsai forests in the region.",
+      "distance": "15 min drive"
+    }
+  },
+  {
+    "id": 4,
+    "category": "escapadas",
+    "coords": [
+      5.0380815,
+      -75.5636597
+    ],
+    "img": "https://haciendavenecia.com/wp-content/uploads/2026/04/Main_House_Exterior_View-scaled.webp",
+    "price": "$$$",
+    "hours": "8am – 5pm",
+    "es": {
+      "name": "Hacienda Venecia",
+      "sub": "Una inmersión auténtica en el Paisaje Cultural Cafetero",
+      "body": "Hacienda cafetera en funcionamiento con más de 100 años de historia. Aprende sobre el proceso del café desde la semilla hasta la taza en un recorrido guided por expertos locales.",
+      "distance": "30 min en carro"
+    },
+    "en": {
+      "name": "Hacienda Venecia",
+      "sub": "An authentic immersion into the Coffee Cultural Landscape",
+      "body": "A working coffee farm with over 100 years of history. Learn about the coffee process from bean to cup in an informative tour led by local experts.",
+      "distance": "30 min drive"
+    }
+  },
+  {
+    "id": 5,
+    "category": "escapadas",
+    "coords": [
+      5.084963999999999,
+      -75.618719
+    ],
+    "img": "https://images.unsplash.com/photo-1525310072745-f49212b5ac6d?auto=format&fit=crop&w=800&q=80",
+    "price": "$$$",
+    "hours": "Previa Reserva / By Booking",
+    "es": {
+      "name": "Finca Romelia",
+      "sub": "Paraíso de orquídeas y aves exóticas",
+      "body": "Una finca privada que alberga más de 800 especies de orquídeas en floración y más de 200 especies de aves registradas. Requiere reserva previa para una visita guiada e íntima.",
+      "distance": "45 min en carro"
+    },
+    "en": {
+      "name": "Finca Romelia",
+      "sub": "A paradise of orchids and exotic birds",
+      "body": "A private farm hosting over 800 blooming orchid species and more than 200 registered bird species. Requires prior booking for an intimate guided tour.",
+      "distance": "45 min drive"
+    }
+  },
+  {
+    "id": 6,
+    "category": "birding",
+    "coords": [
+      5.0246781,
+      -75.36954159999999
+    ],
+    "img": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80",
+    "price": "$$$",
+    "hours": "6am – 4pm",
+    "es": {
+      "name": "Hacienda El Bosque",
+      "sub": "Avistamiento de aves de alta montaña en un bosque de ensueño",
+      "body": "Uno de los destinos de avistamiento de aves más importantes de Caldas. Explora senderos de alta montaña para ver tucanes andinos, tangaras de montaña y el elusivo tororoí.",
+      "distance": "40 min en carro"
+    },
+    "en": {
+      "name": "Hacienda El Bosque",
+      "sub": "High-mountain birding in a dream forest",
+      "body": "One of the most premier birdwatching destinations in Caldas. Explore high-altitude forest paths to spot mountain toucans, mountain tanagers, and the elusive antpitta.",
+      "distance": "40 min drive"
+    }
+  },
+  {
+    "id": 7,
+    "category": "birding",
+    "coords": [
+      5.0649527,
+      -75.59187519999999
+    ],
+    "img": "https://images.unsplash.com/photo-1480044965905-02098d419e96?auto=format&fit=crop&w=800&q=80",
+    "price": "$$$",
+    "hours": "6am – 6pm",
+    "es": {
+      "name": "Reserva Tinamú",
+      "sub": "Santuario de colibríes en medio del bosque seco tropical",
+      "body": "Una reserva natural dedicada a la conservación y el avistamiento de aves. Ideal para amantes de la fotografía de naturaleza que buscan capturar la belleza de decenas de especies de colibríes y aves nativas.",
+      "distance": "30 min en carro"
+    },
+    "en": {
+      "name": "Tinamú Reserve",
+      "sub": "Hummingbird sanctuary in the tropical dry forest",
+      "body": "A natural reserve dedicated to conservation and bird watching. Ideal for nature photographers looking to capture the beauty of dozens of hummingbird and native bird species.",
+      "distance": "30 min drive"
+    }
+  },
+  {
+    "id": 8,
+    "category": "birding",
+    "coords": [
+      5.1506805,
+      -75.51179719999999
+    ],
+    "img": "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=800&q=80",
+    "price": "$$",
+    "hours": "Previa Reserva / By Booking",
+    "es": {
+      "name": "Tominejo Ecolodge",
+      "sub": "Conexión natural entre plantaciones de café y avistamiento",
+      "body": "Un alojamiento y reserva ecológica donde podrás observar aves nativas y migratorias en medio de hermosos senderos. Paz absoluta rodeado de naturaleza cafetera.",
+      "distance": "35 min en carro"
+    },
+    "en": {
+      "name": "Tominejo Ecolodge",
+      "sub": "Natural connection between coffee crops and birdwatching",
+      "body": "An eco-lodge and nature reserve where you can spot native and migratory birds along beautiful trails. Complete peace surrounded by coffee culture.",
+      "distance": "35 min drive"
+    }
+  },
+  {
+    "id": 9,
+    "category": "birding",
+    "coords": [
+      5.0800155,
+      -75.4449569
+    ],
+    "img": "https://reservarioblanco.co/assets/images/banner/3.jpg",
+    "price": "$$",
+    "hours": "6am – 5pm",
+    "es": {
+      "name": "Reserva Río Blanco (Owls Watch)",
+      "sub": "Uno de los hotspots de avistamiento de aves más famosos del mundo",
+      "body": "Reserva forestal protectora de la cuenca hídrica, conocida mundialmente por sus comederos de Tororoíes (Antpittas) y su altísima diversidad de aves de bosque nublado.",
+      "distance": "25 min en carro"
+    },
+    "en": {
+      "name": "Río Blanco Reserve (Owls Watch)",
+      "sub": "One of the most famous birding hotspots in the world",
+      "body": "A protective forest reserve known worldwide for its Antpitta feeding stations and its extremely high diversity of cloud-forest bird species.",
+      "distance": "25 min drive"
+    }
+  },
+  {
+    "id": 10,
+    "category": "birding",
+    "coords": [
+      4.9903395,
+      -75.4074799
+    ],
+    "img": "https://images.unsplash.com/photo-1533873984035-25970ab07461?auto=format&fit=crop&w=800&q=80",
+    "price": "$$$",
+    "hours": "Previa Reserva / By Booking",
+    "es": {
+      "name": "El Color de mis Rêves",
+      "sub": "Glamping de lujo en el corazón del bosque de niebla",
+      "body": "Una experiencia premium donde el lujo se mezcla con la naturaleza del páramo. Cabañas y tiendas de campaña elevadas con jacuzzi y fogata privada a las afueras de la ciudad.",
+      "distance": "35 min en carro"
+    },
+    "en": {
+      "name": "El Color de mis Rêves",
+      "sub": "Luxury glamping in the heart of the cloud forest",
+      "body": "A premium experience where luxury blends with the paramo forest. Elevated cabins and tents equipped with private jacuzzis and fire pits just outside the city.",
+      "distance": "35 min drive"
+    }
+  },
+  {
+    "id": 11,
+    "category": "restaurantes",
+    "coords": [
+      5.036595,
+      -75.427033
+    ],
+    "img": "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=80",
+    "price": "$$$",
+    "hours": "12pm – 11pm",
+    "es": {
+      "name": "2.0 Cocina y Copas",
+      "sub": "Alta cocina y cócteles de autor en un ambiente moderno",
+      "body": "Una propuesta gastronómica innovadora que mezcla ingredientes locales con técnicas internacionales. Excelente lugar para cenar y disfrutar de cócteles creativos.",
+      "distance": "15 min en carro"
+    },
+    "en": {
+      "name": "2.0 Cocina y Copas",
+      "sub": "Fine dining and signature cocktails in a trendy setting",
+      "body": "An innovative gastronomic proposal blending local ingredients with international techniques. An excellent venue for dinner and creative cocktails.",
+      "distance": "15 min drive"
+    }
+  },
+  {
+    "id": 12,
+    "category": "restaurantes",
+    "coords": [
+      5.060228899999999,
+      -75.4888206
+    ],
+    "img": "https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?auto=format&fit=crop&w=800&q=80",
+    "price": "$$$",
+    "hours": "12pm – 10pm",
+    "es": {
+      "name": "Lyara Restaurante",
+      "sub": "Gastronomía contemporánea a unos pasos de estar",
+      "body": "Cocina sofisticada que celebra los sabores colombianos con un giro moderno. Ubicado justo al lado de Palogrande, ideal para almuerzos de negocios o cenas íntimas.",
+      "distance": "2 min caminando"
+    },
+    "en": {
+      "name": "Lyara Restaurante",
+      "sub": "Contemporary gastronomy steps away from estar",
+      "body": "Sophisticated cuisine celebrating Colombian flavors with a modern twist. Located right by Palogrande, ideal for business lunches or intimate dinners.",
+      "distance": "2 min walk"
+    }
+  },
+  {
+    "id": 13,
+    "category": "restaurantes",
+    "coords": [
+      5.050757,
+      -75.48822129999999
+    ],
+    "img": "https://images.unsplash.com/photo-1537047902294-62a40c20a6ae?auto=format&fit=crop&w=800&q=80",
+    "price": "$$$",
+    "hours": "12pm – 11pm",
+    "es": {
+      "name": "Ednia Cocina Mediterránea",
+      "sub": "Sabores frescos del mediterráneo en el sector de Milán",
+      "body": "Famoso por sus mariscos, pastas artesanales y ambiente acogedor. Uno de los restaurantes más populares de la zona rosa gastronómica de Manizales.",
+      "distance": "10 min caminando"
+    },
+    "en": {
+      "name": "Ednia Cocina Mediterránea",
+      "sub": "Fresh Mediterranean flavors in the Milan neighborhood",
+      "body": "Famous for its seafood, artisanal pastas, and cozy atmosphere. One of the most popular restaurants in Manizales' culinary district.",
+      "distance": "10 min walk"
+    }
+  },
+  {
+    "id": 14,
+    "category": "restaurantes",
+    "coords": [
+      5.0601933,
+      -75.4892673
+    ],
+    "img": "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=800&q=80",
+    "price": "$$$",
+    "hours": "12pm – 10pm",
+    "es": {
+      "name": "KOMO",
+      "sub": "Fusión asiática y sushi premium en Palogrande",
+      "body": "Un espacio vanguardista con el mejor sushi, ramen y platos tradicionales de la cocina asiática preparados con ingredientes de alta calidad. Gran selección de sake y cócteles.",
+      "distance": "2 min caminando"
+    },
+    "en": {
+      "name": "KOMO",
+      "sub": "Asian fusion and premium sushi in Palogrande",
+      "body": "An avant-garde space offering the best sushi, ramen, and traditional Asian dishes prepared with high-quality ingredients. Great selection of sake and cocktails.",
+      "distance": "2 min walk"
+    }
+  },
+  {
+    "id": 15,
+    "category": "restaurantes",
+    "coords": [
+      5.0658276,
+      -75.504963
+    ],
+    "img": "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=800&q=80",
+    "price": "$$",
+    "hours": "4pm – 11pm",
+    "es": {
+      "name": "Lobo Cantina Mex",
+      "sub": "Tacos auténticos y margaritas con excelente música",
+      "body": "La mejor experiencia de comida urbana mexicana en la ciudad. Margaritas heladas, tacos al pastor y quesadillas en un ambiente relajado y con una vibra excelente.",
+      "distance": "8 min en carro"
+    },
+    "en": {
+      "name": "Lobo Cantina Mex",
+      "sub": "Authentic tacos and margaritas with great music",
+      "body": "The best street-food Mexican experience in the city. Frozen margaritas, pastor tacos, and quesadillas in a relaxed atmosphere with an excellent vibe.",
+      "distance": "8 min drive"
+    }
+  },
+  {
+    "id": 16,
+    "category": "restaurantes",
+    "coords": [
+      5.046498199999999,
+      -75.4794483
+    ],
+    "img": "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
+    "price": "$$$",
+    "hours": "12pm – 10:30pm",
+    "es": {
+      "name": "Vino y Pimienta",
+      "sub": "Cortes de carne premium y una selecta carta de vinos",
+      "body": "Reconocido por la calidad de sus carnes maduradas a la parrilla y su atmósfera íntima. La parada obligada en Milán para los amantes del buen vino y los asados.",
+      "distance": "12 min caminando"
+    },
+    "en": {
+      "name": "Vino y Pimienta",
+      "sub": "Premium steak cuts and a select wine list",
+      "body": "Recognized for the quality of its dry-aged grilled steaks and its intimate atmosphere. A must-visit spot in Milan for lovers of good wine and grills.",
+      "distance": "12 min walk"
+    }
+  },
+  {
+    "id": 17,
+    "category": "cafes",
+    "coords": [
+      5.057852899999999,
+      -75.4877432
+    ],
+    "img": "https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=800&q=80",
+    "price": "$",
+    "hours": "8am – 9pm",
+    "es": {
+      "name": "Caferatto Café Especial",
+      "sub": "Métodos de filtrado y repostería artesanal en la zona universitaria",
+      "body": "Un espacio acogedor donde el café de origen se toma en serio. Prueba sus filtrados Chemex o V60 con granos seleccionados directamente de fincas locales de Caldas.",
+      "distance": "3 min caminando"
+    },
+    "en": {
+      "name": "Caferatto Café Especial",
+      "sub": "Brewing methods and artisanal pastries in the university area",
+      "body": "A cozy spot where single-origin coffee is taken seriously. Try their Chemex or V60 pour-overs with beans sourced directly from local Caldas farms.",
+      "distance": "3 min walk"
+    }
+  },
+  {
+    "id": 18,
+    "category": "cafes",
+    "coords": [
+      5.059877,
+      -75.489171
+    ],
+    "img": "https://images.unsplash.com/photo-1498804103079-a6351b050096?auto=format&fit=crop&w=800&q=80",
+    "price": "$",
+    "hours": "9am – 8:30pm",
+    "es": {
+      "name": "Differente Coffee",
+      "sub": "Cafetería de especialidad moderna y minimalista",
+      "body": "Un rincón minimalista enfocado en exaltar el sabor del café local. Excelentes espressos, lattes impecables y un ambiente perfecto para leer o trabajar un rato.",
+      "distance": "1 min caminando"
+    },
+    "en": {
+      "name": "Differente Coffee",
+      "sub": "Modern and minimalist specialty coffee shop",
+      "body": "A minimalist corner focused on exalting the taste of local coffee. Excellent espressos, flawless lattes, and a perfect atmosphere to read or work for a bit.",
+      "distance": "1 min walk"
+    }
+  },
+  {
+    "id": 19,
+    "category": "cafes",
+    "coords": [
+      5.0521221,
+      -75.4888969
+    ],
+    "img": "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=800&q=80",
+    "price": "$$",
+    "hours": "10am – 8pm",
+    "es": {
+      "name": "35mm Coffee Lab",
+      "sub": "El encuentro de la fotografía análoga y el café de origen",
+      "body": "Inspirado en el cine y la fotografía. Ofrece una experiencia única con granos seleccionados, tuestes medianos y un espacio repleto de cámaras vintage y buena música.",
+      "distance": "8 min caminando"
+    },
+    "en": {
+      "name": "35mm Coffee Lab",
+      "sub": "The union of analog photography and specialty coffee",
+      "body": "Inspired by film and photography. It offers a unique experience with selected beans, medium roasts, and a space packed with vintage cameras and great music.",
+      "distance": "8 min walk"
+    }
+  },
+  {
+    "id": 20,
+    "category": "universidades",
+    "coords": [
+      5.0559546,
+      -75.49288829999999
+    ],
+    "img": "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&q=80",
+    "price": "Gratuito",
+    "hours": "7am – 9pm",
+    "es": {
+      "name": "Universidad de Caldas - Sede Central",
+      "sub": "El corazón cultural y académico de la ciudad",
+      "body": "Campus principal de la universidad pública, hogar de una gran oferta artística y cultural. Sus zonas verdes y el centro de museos son visitas recomendadas.",
+      "distance": "5 min caminando"
+    },
+    "en": {
+      "name": "Universidad de Caldas - Main Campus",
+      "sub": "The cultural and academic heart of the city",
+      "body": "The main campus of the public university, home to a wealth of art and culture. Its green spaces and museum center are highly recommended visits.",
+      "distance": "5 min walk"
+    }
+  },
+  {
+    "id": 21,
+    "category": "universidades",
+    "coords": [
+      5.0601744,
+      -75.4873758
+    ],
+    "img": "https://ucm.edu.co/360/TourUCMdata/entrada_19/thumbnail.jpg",
+    "price": "Gratuito",
+    "hours": "7am – 8pm",
+    "es": {
+      "name": "Universidad Católica de Manizales",
+      "sub": "Campus moderno con arquitectura icónica en la Av. Santander",
+      "body": "Reconocida institución de educación superior privada. Su campus central cuenta con amplios espacios académicos y un hermoso templo de diseño contemporáneo.",
+      "distance": "4 min caminando"
+    },
+    "en": {
+      "name": "Catholic University of Manizales",
+      "sub": "Modern campus with iconic architecture on Av. Santander",
+      "body": "A renowned private higher education institution. Its central campus features spacious academic facilities and a beautiful contemporary temple.",
+      "distance": "4 min walk"
+    }
+  },
+  {
+    "id": 22,
+    "category": "universidades",
+    "coords": [
+      5.0612653,
+      -75.4903248
+    ],
+    "img": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=800&q=80",
+    "price": "Gratuito",
+    "hours": "7am – 9pm",
+    "es": {
+      "name": "Universidad de Caldas - Sede Palogrande",
+      "sub": "Facultades del área de salud y deporte frente a estar",
+      "body": "Ubicada a solo unos pasos de nuestros apartaestudios. Alberga programas de educación física y áreas deportivas integradas en el entorno urbano de Palogrande.",
+      "distance": "3 min caminando"
+    },
+    "en": {
+      "name": "Universidad de Caldas - Palogrande Campus",
+      "sub": "Health and sports faculties right in front of estar",
+      "body": "Located just steps away from our studio apartments. It houses physical education programs and sports facilities integrated into Palogrande's urban area.",
+      "distance": "3 min walk"
+    }
+  },
+  {
+    "id": 23,
+    "category": "universidades",
+    "coords": [
+      5.0560227,
+      -75.4912019
+    ],
+    "img": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=800&q=80",
+    "price": "Gratuito",
+    "hours": "7am – 9pm",
+    "es": {
+      "name": "Universidad Nacional - Campus Palogrande",
+      "sub": "Arquitectura republicana e ingenierías",
+      "body": "Uno de los tres campus principales de la Universidad Nacional en la ciudad. Destaca por su emblemático edificio del bloque C y su importancia científica en la región.",
+      "distance": "3 min caminando"
+    },
+    "en": {
+      "name": "Universidad Nacional - Palogrande Campus",
+      "sub": "Republican architecture and engineering",
+      "body": "One of the three main campuses of the Universidad Nacional in the city. Notable for its iconic Block C building and its scientific importance in the region.",
+      "distance": "3 min walk"
+    }
+  },
+  {
+    "id": 24,
+    "category": "deportivo",
+    "coords": [
+      5.0569638,
+      -75.48999490000001
+    ],
+    "img": "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80",
+    "price": "Según Evento / Event Dependent",
+    "hours": "Según Evento / Event Dependent",
+    "es": {
+      "name": "Estadio Palogrande",
+      "sub": "El hogar del Once Caldas y epicentro de eventos deportivos",
+      "body": "Con capacidad para más de 28,000 espectadores. Aquí juega el equipo local 'Once Caldas', campeón de la Copa Libertadores en 2004. Ubicado justo frente a estar.",
+      "distance": "1 min caminando"
+    },
+    "en": {
+      "name": "Palogrande Stadium",
+      "sub": "Home of Once Caldas and epicenter of sporting events",
+      "body": "With a capacity of over 28,000 spectators. This is the home stadium of the local team 'Once Caldas', 2004 Copa Libertadores champions. Located right in front of estar.",
+      "distance": "1 min walk"
+    }
+  },
+  {
+    "id": 25,
+    "category": "deportivo",
+    "coords": [
+      5.0559021,
+      -75.48863159999999
+    ],
+    "img": "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=800&q=80",
+    "price": "Gratuito",
+    "hours": "6am – 10pm",
+    "es": {
+      "name": "Coliseo Menor Ramón Marín",
+      "sub": "Espacio público para baloncesto, voleibol y fútbol de salón",
+      "body": "Un escenario deportivo multiusos donde locales entrenan a diario. Cuenta con canchas cubiertas y acoge torneos locales y regionales.",
+      "distance": "2 min caminando"
+    },
+    "en": {
+      "name": "Coliseo Menor Ramón Marín",
+      "sub": "Public space for basketball, volleyball, and futsal",
+      "body": "A multi-use sports arena where locals train daily. It features indoor courts and hosts local and regional tournaments.",
+      "distance": "2 min walk"
+    }
+  },
+  {
+    "id": 26,
+    "category": "deportivo",
+    "coords": [
+      5.0582306,
+      -75.4882592
+    ],
+    "img": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=80",
+    "price": "Gratuito",
+    "hours": "6am – 9pm",
+    "es": {
+      "name": "Coliseo Mayor Jorge Arango",
+      "sub": "El principal coliseo cubierto de la Unidad Deportiva Palogrande",
+      "body": "Escenario para disciplinas como gimnasia, tenis de mesa y karate. Es parte del gran cinturón deportivo que rodea el hotel.",
+      "distance": "2 min caminando"
+    },
+    "en": {
+      "name": "Coliseo Mayor Jorge Arango",
+      "sub": "The main indoor arena of the Palogrande Sports Complex",
+      "body": "Venue for disciplines such as gymnastics, table tennis, and karate. It is part of the major sports belt surrounding the hotel.",
+      "distance": "2 min walk"
+    }
+  },
+  {
+    "id": 27,
+    "category": "deportivo",
+    "coords": [
+      5.0323831,
+      -75.4785088
+    ],
+    "img": "https://images.unsplash.com/photo-1564982752979-3f7bc974d29a?auto=format&fit=crop&w=800&q=80",
+    "price": "Gratuito",
+    "hours": "6am – 9pm",
+    "es": {
+      "name": "Patinódromo Felipe Rojas",
+      "sub": "Pista de patinaje de velocidad en la Unidad Deportiva Palogrande",
+      "body": "Una pista ovalada de alta velocidad donde entrenan patinadores profesionales y recreativos de la ciudad. Abierta al público en horarios específicos.",
+      "distance": "10 min en carro"
+    },
+    "en": {
+      "name": "Patinódromo Felipe Rojas",
+      "sub": "Speed skating track in the Palogrande Sports Complex",
+      "body": "A high-speed oval track where professional and recreational skaters of the city train. Open to the public during designated hours.",
+      "distance": "10 min drive"
+    }
+  },
+  {
+    "id": 28,
+    "category": "deportivo",
+    "coords": [
+      5.0180006,
+      -75.46840080000001
+    ],
+    "img": "https://images.unsplash.com/photo-1486218119243-13883505764c?auto=format&fit=crop&w=800&q=80",
+    "price": "Gratuito",
+    "hours": "6am – 6pm",
+    "es": {
+      "name": "Pista de Downhill (La Florida)",
+      "sub": "Pistas desafiantes para ciclismo de montaña extremo",
+      "body": "Famosa pista de descenso en bicicleta de montaña que aprovecha la geografía montañosa de la ciudad. Sede de campeonatos nacionales.",
+      "distance": "15 min en carro"
+    },
+    "en": {
+      "name": "Downhill Track (La Florida)",
+      "sub": "Challenging trails for extreme mountain biking",
+      "body": "Famous mountain bike descent track taking advantage of the city's mountainous geography. Host to national championships.",
+      "distance": "15 min drive"
+    }
+  },
+  {
+    "id": 29,
+    "category": "deportivo",
+    "coords": [
+      5.0335036,
+      -75.47887709999999
+    ],
+    "img": "https://images.unsplash.com/photo-1541614101331-1a5a3a194e92?auto=format&fit=crop&w=800&q=80",
+    "price": "Gratuito",
+    "hours": "8am – 5pm",
+    "es": {
+      "name": "Pista de BMX (Bosque Popular)",
+      "sub": "Pista de bicicross homologada dentro del Bosque Popular el Prado",
+      "body": "Un circuito técnico con saltos y peraltes de primer nivel para pilotos de todas las edades. Ubicada dentro del parque más grande de la ciudad.",
+      "distance": "10 min en carro"
+    },
+    "en": {
+      "name": "BMX Track (BMX Bosque Popular)",
+      "sub": "Certified BMX track within Bosque Popular el Prado",
+      "body": "A technical circuit with world-class jumps and berms for riders of all ages. Located inside the largest park in the city.",
+      "distance": "10 min drive"
+    }
+  },
+  {
+    "id": 30,
+    "category": "deportivo",
+    "coords": [
+      5.0362536,
+      -75.4783085
+    ],
+    "img": "https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?auto=format&fit=crop&w=800&q=80",
+    "price": "Gratuito / Free",
+    "hours": "6am – 8pm",
+    "es": {
+      "name": "Complejo Acuático de Manizales",
+      "sub": "Piscinas olímpicas climatizadas para entrenamiento",
+      "body": "Instalación de natación de alto rendimiento con piscinas olímpicas y de clavados. Situado dentro del Bosque Popular El Prado.",
+      "distance": "10 min en carro"
+    },
+    "en": {
+      "name": "Manizales Aquatic Complex",
+      "sub": "Heated Olympic pools for training",
+      "body": "A high-performance swimming facility featuring Olympic-sized and diving pools. Located inside the Bosque Popular El Prado park.",
+      "distance": "10 min drive"
+    }
+  },
+  {
+    "id": 31,
+    "category": "turismo",
+    "coords": [
+      5.0674217,
+      -75.5171613
+    ],
+    "img": "https://images.unsplash.com/photo-1478147427282-58a87a120781?auto=format&fit=crop&w=800&q=80",
+    "price": "Entrada libre (Corredor $)",
+    "hours": "8am – 6pm",
+    "es": {
+      "name": "Catedral Basílica Metropolitana",
+      "sub": "La catedral más alta de Colombia con su imponente Corredor Polaco",
+      "body": "Una obra de arte del estilo neogótico en concreto reforzado. Mide 113 metros de altura. No dejes de subir al Corredor Polaco para una vista de 360 grados del centro histórico.",
+      "distance": "12 min en carro"
+    },
+    "en": {
+      "name": "Metropolitan Basilica Cathedral",
+      "sub": "The tallest cathedral in Colombia with its impressive Polish Corridor",
+      "body": "A masterpiece of neo-gothic style built in reinforced concrete. Rising 113 meters high. Do not miss climbing to the Polish Corridor for a 360-degree view of downtown.",
+      "distance": "12 min drive"
+    }
+  },
+  {
+    "id": 32,
+    "category": "turismo",
+    "coords": [
+      5.0561457,
+      -75.4862758
+    ],
+    "img": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80",
+    "price": "Gratuito",
+    "hours": "Acceso libre / Open access",
+    "es": {
+      "name": "Torre del Cable",
+      "sub": "Patrimonio histórico e ícono de la época de oro del café",
+      "body": "Una estructura de madera de más de 50 metros, declarada Monumento Nacional. Formaba parte del antiguo cable aéreo de Manizales a Mariquita. Hoy es el centro de reunión del sector de El Cable.",
+      "distance": "4 min caminando"
+    },
+    "en": {
+      "name": "Torre del Cable",
+      "sub": "Historical heritage and icon of the coffee golden age",
+      "body": "A wooden structure over 50 meters tall, declared a National Monument. It was part of the ancient cableway connecting Manizales to Mariquita. Today, it stands as the meeting point in El Cable.",
+      "distance": "4 min walk"
+    }
+  },
+  {
+    "id": 33,
+    "category": "turismo",
+    "coords": [
+      5.0723748,
+      -75.52504499999999
+    ],
+    "img": "https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=80",
+    "price": "$ (Mirador)",
+    "hours": "10am – 9pm",
+    "es": {
+      "name": "Torre de Chipre",
+      "sub": "Atardeceres infinitos y actividades de aventura",
+      "body": "Un antiguo tanque de agua convertido en mirador de 360 grados. En días despejados se ven varios departamentos. Ofrece caminatas extremas por el borde exterior ('Sky Walk').",
+      "distance": "15 min en carro"
+    },
+    "en": {
+      "name": "Chipre Tower",
+      "sub": "Chipre Tower Viewpoint",
+      "body": "An old water tank turned into a 360-degree viewpoint. On clear days you can see several provinces. It offers extreme walks along the outer ledge ('Sky Walk').",
+      "distance": "15 min drive"
+    }
+  },
+  {
+    "id": 34,
+    "category": "turismo",
+    "coords": [
+      4.8919993,
+      -75.3188351
+    ],
+    "img": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80",
+    "price": "$$ (Ingreso Parque)",
+    "hours": "7am – 2pm (Ingreso)",
+    "es": {
+      "name": "Nevado del Ruiz",
+      "sub": "Volcán activo y cumbres nevadas del Parque Los Nevados",
+      "body": "El volcán más emblemático de la Cordillera Central. Se puede visitar hasta la zona del valle de las tumbas (según actividad volcánica). Un paisaje de páramo soberbio y frailejones centenarios.",
+      "distance": "1h 30 min en carro"
+    },
+    "en": {
+      "name": "Nevado del Ruiz Volcano",
+      "sub": "Active volcano and snow-capped peaks of Los Nevados Park",
+      "body": "The most iconic volcano in the Central Mountain Range. It can be visited up to the Valle de las Tumbas (subject to volcanic activity). A superb paramo landscape with ancient frailejones.",
+      "distance": "1h 30 min drive"
+    }
+  }
+];
+
+    const poiGrid = document.getElementById('poiGrid');
+    const filterPills = document.querySelectorAll('.filter-pill');
+    let activeCategory = 'all';
+
+    function getActiveLanguage() {
+      return document.documentElement.lang || 'es';
+    }
+
+    function renderPOIs(category = 'all', lang = 'es') {
+      if (!poiGrid) return;
+      poiGrid.innerHTML = '';
+      
+      const filtered = category === 'all' 
+        ? pois 
+        : pois.filter(p => p.category === category);
+
+      filtered.forEach((poi, index) => {
+        const text = poi[lang] || poi['es'];
+        const card = document.createElement('article');
+        card.className = 'poi has-star-cursor';
+        card.setAttribute('data-reveal', '');
+        
+        card.innerHTML = `
+          <div class="poi-media" style="background-image: url('${poi.img}'); background-size: cover; background-position: center;">
+            <span class="tag" data-i18n="cat_${poi.category}">${lang === 'es' ? getCategoryLabelEs(poi.category) : getCategoryLabelEn(poi.category)}</span>
+          </div>
+          <h4>${text.name}</h4>
+          <p class="sub">${text.sub}</p>
+          <p class="body">${text.body}</p>
+          <p class="meta">
+            <span>${text.distance}</span>
+            <span>${poi.price} · ${poi.hours}</span>
+          </p>
+        `;
+        
+        poiGrid.appendChild(card);
+
+        // Cascading transition reveal delay
+        setTimeout(() => {
+          card.classList.add('is-visible');
+        }, index * 40);
+      });
+    }
+
+    function getCategoryLabelEs(cat) {
+      const labels = {
+        escapadas: 'Escapadas',
+        birding: 'Birding',
+        restaurantes: 'Restaurantes',
+        cafes: 'Cafés',
+        universidades: 'Universidades',
+        deportivo: 'Deportivo',
+        turismo: 'Turismo'
+      };
+      return labels[cat] || cat;
+    }
+
+    function getCategoryLabelEn(cat) {
+      const labels = {
+        escapadas: 'Escapadas',
+        birding: 'Birding',
+        restaurantes: 'Restaurants',
+        cafes: 'Cafés',
+        universidades: 'Universities',
+        deportivo: 'Sports',
+        turismo: 'Tourism'
+      };
+      return labels[cat] || cat;
+    }
+
+    // Set up filter click handlers
+    filterPills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        filterPills.forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        activeCategory = pill.getAttribute('data-category');
+        renderPOIs(activeCategory, getActiveLanguage());
+      });
+    });
+
+    // Initial render
+    renderPOIs(activeCategory, getActiveLanguage());
+
+    // Listen to shell.js language changes
+    document.addEventListener('estar-lang-change', (e) => {
+      const newLang = e.detail.lang || 'es';
+      renderPOIs(activeCategory, newLang);
+    });
+  })();
+</script>
 </body>
 </html>
