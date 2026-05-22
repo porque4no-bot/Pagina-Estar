@@ -134,6 +134,10 @@
           </div>
           <div class="room-foot">
             <a href="clasica.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+            <a href="#aplicar" class="btn btn-primary btn-aplicar" data-room="clasica" style="padding: 10px 18px; font-size: 10px;">
+              <span class="lang-es">Aplicar</span>
+              <span class="lang-en">Apply</span>
+            </a>
           </div>
         </div>
       </article>
@@ -176,6 +180,10 @@
           </div>
           <div class="room-foot">
             <a href="seleccion.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+            <a href="#aplicar" class="btn btn-primary btn-aplicar" data-room="seleccion" style="padding: 10px 18px; font-size: 10px;">
+              <span class="lang-es">Aplicar</span>
+              <span class="lang-en">Apply</span>
+            </a>
           </div>
         </div>
       </article>
@@ -216,6 +224,10 @@
           </div>
           <div class="room-foot">
             <a href="reserva.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+            <a href="#aplicar" class="btn btn-primary btn-aplicar" data-room="reserva" style="padding: 10px 18px; font-size: 10px;">
+              <span class="lang-es">Aplicar</span>
+              <span class="lang-en">Apply</span>
+            </a>
           </div>
         </div>
       </article>
@@ -260,6 +272,10 @@
           </div>
           <div class="room-foot">
             <a href="origen.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+            <a href="#aplicar" class="btn btn-primary btn-aplicar" data-room="origen" style="padding: 10px 18px; font-size: 10px;">
+              <span class="lang-es">Aplicar</span>
+              <span class="lang-en">Apply</span>
+            </a>
           </div>
         </div>
       </article>
@@ -302,6 +318,10 @@
           </div>
           <div class="room-foot">
             <a href="especial.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+            <a href="#aplicar" class="btn btn-primary btn-aplicar" data-room="especial" style="padding: 10px 18px; font-size: 10px;">
+              <span class="lang-es">Aplicar</span>
+              <span class="lang-en">Apply</span>
+            </a>
           </div>
         </div>
       </article>
@@ -435,13 +455,13 @@
 
       <form class="form" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Solicitud enviada ✶'; this.querySelector('button').disabled=true;">
         <div class="field-row">
-          <div class="field"><label>Nombre completo</label><input type="text" placeholder="Carlos Mendoza"></div>
-          <div class="field"><label>Correo</label><input type="email" placeholder="tu@correo.com"></div>
+          <div class="field"><label for="form-nombre">Nombre completo</label><input type="text" id="form-nombre" name="nombre" placeholder="Carlos Mendoza"></div>
+          <div class="field"><label for="form-correo">Correo</label><input type="email" id="form-correo" name="correo" placeholder="tu@correo.com"></div>
         </div>
         <div class="field-row">
-          <div class="field"><label>Fecha estimada de mudanza</label><input type="text" placeholder="Vie, 24 may"></div>
-          <div class="field"><label>Tiempo estimado</label>
-            <select>
+          <div class="field"><label for="form-fecha-mudanza">Fecha estimada de mudanza</label><input type="text" id="form-fecha-mudanza" name="fecha_mudanza" placeholder="Vie, 24 may"></div>
+          <div class="field"><label for="form-tiempo-estimado">Tiempo estimado</label>
+            <select id="form-tiempo-estimado" name="tiempo_estimado">
               <option>1 — 2 meses</option>
               <option>3 — 5 meses</option>
               <option selected>6 — 11 meses</option>
@@ -449,17 +469,29 @@
             </select>
           </div>
         </div>
-        <div class="field"><label>Motivo del viaje</label>
-          <select>
-            <option>Trabajo remoto / Nómada digital</option>
-            <option>Residencia médica / Hospital</option>
-            <option>Posgrado / Universidad</option>
-            <option>Reubicación corporativa</option>
-            <option>Otro</option>
-          </select>
+        <div class="field-row">
+          <div class="field">
+            <label for="tipologia-select" data-i18n="typology_label">Tipología de habitación</label>
+            <select id="tipologia-select" name="tipologia">
+              <option value="clasica" data-i18n="typology_clasica">Clásica</option>
+              <option value="seleccion" data-i18n="typology_seleccion" selected>Selección</option>
+              <option value="reserva" data-i18n="typology_reserva">Reserva</option>
+              <option value="origen" data-i18n="typology_origen">Origen</option>
+              <option value="especial" data-i18n="typology_especial">Especial</option>
+            </select>
+          </div>
+          <div class="field"><label for="form-motivo">Motivo del viaje</label>
+            <select id="form-motivo" name="motivo_viaje">
+              <option>Trabajo remoto / Nómada digital</option>
+              <option>Residencia médica / Hospital</option>
+              <option>Posgrado / Universidad</option>
+              <option>Reubicación corporativa</option>
+              <option>Otro</option>
+            </select>
+          </div>
         </div>
-        <div class="field"><label>Cuéntanos algo más (opcional)</label>
-          <textarea placeholder="Mascotas, preferencias, fecha exacta de llegada..."></textarea>
+        <div class="field"><label for="form-mensaje">Cuéntanos algo más (opcional)</label>
+          <textarea id="form-mensaje" name="mensaje" placeholder="Mascotas, preferencias, fecha exacta de llegada..."></textarea>
         </div>
         <label class="form-checkbox">
           <input type="checkbox" required>
@@ -715,6 +747,20 @@
 
     // Initialize display with Selección
     selectTypology(1);
+
+    // Select typology in form when clicking 'Aplicar' on a room card
+    const aplicarButtons = document.querySelectorAll('.btn-aplicar');
+    const formTipologia = document.getElementById('tipologia-select');
+    aplicarButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const room = btn.getAttribute('data-room');
+        if (formTipologia && room) {
+          formTipologia.value = room;
+          // Trigger change event if there are listeners (just in case)
+          formTipologia.dispatchEvent(new Event('change'));
+        }
+      });
+    });
   });
 </script>
 
