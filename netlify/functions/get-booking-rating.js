@@ -1,31 +1,27 @@
 const https = require('https');
 
-// Netlify serverless function to fetch Booking.com rating for Estar Apartaestudios
+// Service-agnostic Netlify serverless function to fetch Booking.com rating.
+// It retrieves the scraping URL from process.env.PROXY_URL.
 exports.handler = async (event, context) => {
-  const targetUrl = 'https://www.booking.com/hotel/co/estar-apartaestudios.html';
-  const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
+  const PROXY_URL = process.env.PROXY_URL;
   const FALLBACK_RATING = "9.6";
 
-  // If no api key is present, fallback immediately to preserve standard behavior
-  if (!SCRAPER_API_KEY) {
+  // If no proxy URL is configured, immediately return the fallback rating
+  if (!PROXY_URL) {
     return {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'public, max-age=3600' // Cache fallback for 1 hour
       },
-      body: JSON.stringify({ rating: FALLBACK_RATING, note: 'fallback: key missing' })
+      body: JSON.stringify({ rating: FALLBACK_RATING, note: 'fallback: PROXY_URL env var is missing' })
     };
   }
 
-  // ScraperAPI URL to bypass Booking's AWS WAF checks
-  const proxyUrl = `https://api.scraperapi.com/?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}`;
-
   try {
-    const html = await fetchUrl(proxyUrl);
+    const html = await fetchUrl(PROXY_URL);
     
-    // Attempt to match the rating score from schema JSON-LD or pages scripts
-    // Booking.com regularly puts "reviewScore": "9.6" or "ratingValue": 9.6 or "ratingValue":"9.6"
+    // Attempt to match the rating score from schema JSON-LD or page scripts
     const scoreMatch = html.match(/"reviewScore"\s*:\s*"([\d.]+)"/) || 
                        html.match(/"ratingValue"\s*:\s*"?([\d.]+)"?/) ||
                        html.match(/score_value[^>]*>([\d.]+)<\/span>/);
@@ -37,13 +33,13 @@ exports.handler = async (event, context) => {
         headers: {
           'Content-Type': 'application/json',
           // Cache in Netlify Edge CDN for 24 hours (86400 seconds)
-          // This keeps ScraperAPI usage to a minimum (only ~30 executions per month)
+          // This keeps proxy requests to a minimum (only ~30 executions per month)
           'Cache-Control': 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=7200'
         },
         body: JSON.stringify({ rating })
       };
     } else {
-      throw new Error('Rating value pattern not found in Booking.com HTML');
+      throw new Error('Rating value pattern not found in HTML response');
     }
   } catch (error) {
     console.error('Dynamic rating fetch error:', error.message);
@@ -58,7 +54,7 @@ exports.handler = async (event, context) => {
   }
 };
 
-// Helper function to perform HTTPS GET requests using native node https module
+// Helper function to perform HTTPS GET requests using native Node.js https module
 function fetchUrl(url) {
   return new Promise((resolve, reject) => {
     https.get(url, (res) => {
