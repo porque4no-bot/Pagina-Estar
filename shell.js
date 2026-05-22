@@ -757,6 +757,54 @@
     });
   }
 
+  /* ----- ROOM LIST CAROUSEL ----- */
+  function setupRoomListCarousel() {
+    if (document.querySelector('.tier-table')) return;
+
+    const container = document.querySelector('.room-list-container');
+    if (!container) return;
+
+    const list = container.querySelector('.room-list');
+    const prevBtn = container.querySelector('.room-list-btn.prev');
+    const nextBtn = container.querySelector('.room-list-btn.next');
+
+    if (!list || !prevBtn || !nextBtn) return;
+
+    function getScrollStep() {
+      const firstCard = list.querySelector('.room');
+      if (firstCard) {
+        const style = window.getComputedStyle(list);
+        const gap = parseFloat(style.columnGap || style.gap) || 32;
+        return firstCard.clientWidth + gap;
+      }
+      return 450;
+    }
+
+    function updateButtonStates() {
+      const scrollLeft = list.scrollLeft;
+      const maxScroll = list.scrollWidth - list.clientWidth;
+      
+      prevBtn.disabled = scrollLeft <= 10;
+      nextBtn.disabled = scrollLeft >= maxScroll - 10;
+    }
+
+    prevBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      list.scrollBy({ left: -getScrollStep(), behavior: 'smooth' });
+    });
+
+    nextBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      list.scrollBy({ left: getScrollStep(), behavior: 'smooth' });
+    });
+
+    list.addEventListener('scroll', updateButtonStates);
+    window.addEventListener('resize', updateButtonStates);
+    
+    // Initial check
+    setTimeout(updateButtonStates, 100);
+  }
+
   /* ---------- INIT ---------- */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => { 
@@ -766,6 +814,7 @@
       setupHeaderLangToggle(); 
       setupMobileBookingScroll(); 
       setupRoomSliders();
+      setupRoomListCarousel();
       setupContactFloat();
       setupBookingBarScroll();
       fetchDynamicRating();
@@ -777,6 +826,7 @@
     setupHeaderLangToggle();
     setupMobileBookingScroll();
     setupRoomSliders();
+    setupRoomListCarousel();
     setupContactFloat();
     setupBookingBarScroll();
     fetchDynamicRating();

@@ -868,7 +868,90 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
 @media (min-width: 1024px) {
   .rooms-head { grid-template-columns: 1.2fr 1fr; }
 }
-.rooms-head h2 { margin: 12px 0 0; font-size: clamp(36px, 4.6vw, 68px); }.room-list {
+.rooms-head h2 { margin: 12px 0 0; font-size: clamp(36px, 4.6vw, 68px); }
+
+.room-list-container {
+  position: relative;
+  width: 100%;
+}
+
+/* Room List Navigation Buttons */
+.room-list-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(250, 246, 239, 0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--paper-400);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all var(--dur-fast) var(--ease-out);
+  box-shadow: var(--shadow-sm);
+}
+
+.room-list-btn svg {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.room-list-btn:hover {
+  background: var(--terracotta);
+  border-color: var(--terracotta);
+  color: var(--white);
+  box-shadow: var(--shadow-md);
+}
+
+.room-list-btn:hover.prev svg {
+  transform: translateX(-2px);
+}
+
+.room-list-btn:hover.next svg {
+  transform: translateX(2px);
+}
+
+.room-list-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.room-list-btn.prev {
+  left: -22px;
+}
+
+.room-list-btn.next {
+  right: -22px;
+}
+
+/* Adjust button positions and sizes for medium screens */
+@media (max-width: 1024px) {
+  .room-list-btn {
+    width: 38px;
+    height: 38px;
+  }
+  .room-list-btn.prev {
+    left: -12px;
+  }
+  .room-list-btn.next {
+    right: -12px;
+  }
+}
+
+/* Hide on mobile where swipe is natural and side margins are small */
+@media (max-width: 768px) {
+  .room-list-btn {
+    display: none;
+  }
+}
+
+.room-list {
   display: flex;
   flex-direction: row;
   overflow-x: auto;
@@ -898,8 +981,8 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   max-width: 85vw;
   flex-shrink: 0;
   scroll-snap-align: start;
-  background: var(--paper-100);
-  border: 1px solid var(--paper-300);
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
   transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s, border-color 0.3s;
@@ -912,6 +995,20 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   box-shadow: var(--shadow-lg);
   border-color: var(--terracotta-300);
 }
+
+.room.active {
+  border-color: var(--terracotta);
+  border-width: 2px;
+  box-shadow: var(--shadow-lg);
+  background: var(--white);
+  margin: -1px;
+}
+
+.room.active:hover {
+  border-color: var(--terracotta);
+  border-width: 2px;
+}
+
 
 .room-media {
   position: relative;
@@ -985,8 +1082,8 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   flex-wrap: wrap;
   gap: 12px 24px;
   padding: 16px 0;
-  border-top: 1px solid var(--paper-300);
-  border-bottom: 1px solid var(--paper-300);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   margin-bottom: 20px;
 }
 .room-spec {
@@ -1092,8 +1189,8 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   cursor: pointer;
   z-index: 10;
   transition: all var(--dur-base) var(--ease-out);
-  opacity: 0;
-  pointer-events: none;
+  opacity: 0.8;
+  pointer-events: auto;
   box-shadow: var(--shadow-sm);
 }
 .slider-arrow svg {
@@ -3592,3 +3689,193 @@ html[lang="en"] .lang-es { display: none !important; }
     gap: var(--space-3);
   }
 }
+
+/* ============================================================
+   PRICING CAROUSEL SELECTOR
+   ============================================================ */
+.pricing-carousel-container {
+  position: relative;
+  margin-bottom: var(--space-6);
+  width: 100%;
+}
+
+.pricing-carousel-viewport {
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  width: 100%;
+  scrollbar-width: none;
+  padding: 12px 0;
+}
+
+.pricing-carousel-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.pricing-carousel-track {
+  display: flex;
+  gap: 16px;
+  min-width: max-content;
+  padding: 0 48px; /* Room for absolute buttons */
+}
+
+/* Pricing Card */
+.pricing-card {
+  width: 220px;
+  background: var(--paper);
+  border: 1px solid var(--paper-400);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--dur-base) var(--ease-out);
+  display: flex;
+  flex-direction: column;
+}
+
+.pricing-card:hover {
+  border-color: var(--terracotta-300);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.pricing-card.active {
+  border-color: var(--terracotta);
+  border-width: 2px;
+  box-shadow: var(--shadow-lg);
+  background: var(--white);
+  transform: translateY(-4px);
+  margin: -1px; /* offset 2px border */
+}
+
+.pricing-card-img {
+  width: 100%;
+  height: 120px;
+  overflow: hidden;
+  position: relative;
+  background: var(--paper-200);
+}
+
+.pricing-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+
+.pricing-card:hover .pricing-card-img img {
+  transform: scale(1.05);
+}
+
+.pricing-card-info {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pricing-card-info h4 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 16px;
+  margin: 0;
+  color: var(--fg);
+}
+
+.pricing-card-info .specs {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin: 0;
+  line-height: 1.4;
+  height: 32px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pricing-card-info .base-price {
+  font-family: var(--font-label);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--terracotta-700);
+  margin: 4px 0 0 0;
+}
+
+.pricing-card-info .base-price strong {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+/* Pricing Carousel Navigation Buttons */
+.pricing-carousel-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(250, 246, 239, 0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--paper-400);
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all var(--dur-fast) var(--ease-out);
+  box-shadow: var(--shadow-sm);
+}
+
+.pricing-carousel-btn.prev {
+  left: 4px;
+}
+
+.pricing-carousel-btn.next {
+  right: 4px;
+}
+
+.pricing-carousel-btn:hover {
+  background: var(--terracotta);
+  border-color: var(--terracotta);
+  color: var(--white);
+  box-shadow: var(--shadow-md);
+}
+
+.pricing-carousel-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Desktop Styles: Scrollable Carousel */
+@media (min-width: 1100px) {
+  .pricing-carousel-container {
+    padding: 0 48px; /* space for absolute buttons on sides */
+  }
+  .pricing-carousel-viewport {
+    overflow-x: auto;
+  }
+  .pricing-carousel-track {
+    padding: 0;
+    min-width: max-content;
+    display: flex;
+    gap: 16px;
+  }
+  .pricing-card {
+    width: 240px; /* fixed width for cards to enable overflow */
+  }
+  .pricing-carousel-btn {
+    display: flex; /* Keep arrows visible */
+  }
+  .pricing-carousel-btn.prev {
+    left: 0px;
+  }
+  .pricing-carousel-btn.next {
+    right: 0px;
+  }
+}
+

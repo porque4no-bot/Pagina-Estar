@@ -84,14 +84,314 @@
         <p class="eyebrow terracotta">Tarifas</p>
         <h2 class="display-l">Mientras más tiempo, <span class="serif-italic">mejor tarifa.</span></h2>
       </div>
-      <p class="lead">Precios en COP, todo incluido. Para el apartaestudio Seleccion — otras categorías ajustan proporcionalmente.</p>
+      <p class="lead" id="pricing-lead-text">
+        <span class="lang-es">Precios en COP, todo incluido. Mostrando tarifas para: <strong id="selected-name-es">Selección</strong>.</span>
+        <span class="lang-en">Prices in COP, all inclusive. Showing rates for: <strong id="selected-name-en">Selección</strong>.</span>
+      </p>
+    </div>
+
+    <!-- Selector de Apartamentos (Carousel) -->
+    <div class="room-list-container" data-reveal>
+      <button type="button" class="room-list-btn prev" aria-label="Anterior tipología" aria-controls="room-list">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      
+      <div class="room-list" id="room-list">
+
+      <!-- Room 1: Clásica -->
+      <article class="room has-star-cursor" data-typology="clasica" data-reveal>
+        <div class="room-media slider-active">
+          <div class="badge">01 / Clásica</div>
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="assets/photos/tipo1/1.webp" alt="Apartaestudio Clásica - Vista 1" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo1/2.webp" alt="Apartaestudio Clásica - Vista 2" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo1/3.webp" alt="Apartaestudio Clásica - Vista 3" loading="lazy"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Imagen anterior" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Imagen siguiente" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+          </div>
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">Para una o dos personas</p>
+          <h3>Clásica</h3>
+          <p class="sub">Compacto, cálido, todo a la mano.</p>
+          <p class="body">Cama queen, escritorio frente a la ventana, cocina equipada con menaje completo y baño privado con ducha. La esencia de estar, en 28 m².</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacidad</span><span class="v">2 personas</span></div>
+            <div class="room-spec"><span class="k">Cama</span><span class="v">1 queen</span></div>
+            <div class="room-spec"><span class="k">Área</span><span class="v">28 m²</span></div>
+            <div class="room-spec"><span class="k">Vista</span><span class="v">Ciudad</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="clasica.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Room 2: Selección -->
+      <article class="room has-star-cursor active" data-typology="seleccion" data-reveal>
+        <div class="room-media slider-active" style="background: var(--terracotta-300);">
+          <div class="badge">02 / Selección</div>
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="assets/photos/tipo2/1.webp" alt="Apartaestudio Selección - Vista 1" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo2/2.webp" alt="Apartaestudio Selección - Vista 2" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo2/3.webp" alt="Apartaestudio Selección - Vista 3" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo2/4.webp" alt="Apartaestudio Selección - Vista 4" loading="lazy"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Imagen anterior" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Imagen siguiente" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+            <span class="indicator" data-slide="3"></span>
+          </div>
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">Para dos personas</p>
+          <h3>Selección</h3>
+          <p class="sub">Un poco de afuera, adentro.</p>
+          <p class="body">Mismo plano del Clásica, ahora con balcón privado para tu café de la mañana. La luz natural cambia toda la sensación del espacio.</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacidad</span><span class="v">2 personas</span></div>
+            <div class="room-spec"><span class="k">Cama</span><span class="v">1 queen</span></div>
+            <div class="room-spec"><span class="k">Área</span><span class="v">32 m²</span></div>
+            <div class="room-spec"><span class="k">Vista</span><span class="v">Cordillera</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="seleccion.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Room 3: Reserva -->
+      <article class="room has-star-cursor" data-typology="reserva" data-reveal>
+        <div class="room-media slider-active" style="background: var(--olive);">
+          <div class="badge">03 / Reserva</div>
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="assets/photos/tipo3/1.webp" alt="Apartaestudio Reserva - Vista 1" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo3/2.webp" alt="Apartaestudio Reserva - Vista 2" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo3/3.webp" alt="Apartaestudio Reserva - Vista 3" loading="lazy"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Imagen anterior" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Imagen siguiente" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+          </div>
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">Para parejas o estancias largas</p>
+          <h3>Reserva</h3>
+          <p class="sub">Zona de estar separada de la cama.</p>
+          <p class="body">Espacios definidos: dormitorio, sala con sofá y zona de trabajo. Smart TV de 55", cocina abierta y un baño más amplio con ventana al exterior.</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacidad</span><span class="v">2 personas</span></div>
+            <div class="room-spec"><span class="k">Cama</span><span class="v">1 king</span></div>
+            <div class="room-spec"><span class="k">Área</span><span class="v">42 m²</span></div>
+            <div class="room-spec"><span class="k">Vista</span><span class="v">Ciudad</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="reserva.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Room 4: Origen -->
+      <article class="room has-star-cursor" data-typology="origen" data-reveal>
+        <div class="room-media slider-active" style="background: var(--sand);">
+          <div class="badge">04 / Origen</div>
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="assets/photos/tipo4/1.webp" alt="Apartaestudio Origen - Vista 1" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo4/2.webp" alt="Apartaestudio Origen - Vista 2" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo4/3.webp" alt="Apartaestudio Origen - Vista 3" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo4/4.webp" alt="Apartaestudio Origen - Vista 4" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo4/5.webp" alt="Apartaestudio Origen - Vista 5" loading="lazy"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Imagen anterior" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Imagen siguiente" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+            <span class="indicator" data-slide="3"></span>
+            <span class="indicator" data-slide="4"></span>
+          </div>
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">Para parejas</p>
+          <h3>Origen</h3>
+          <p class="sub">Nuestra habitación más pedida.</p>
+          <p class="body">El apartaestudio Origen con balcón al frente — el lugar donde la mayoría de huéspedes pasa la tarde leyendo o trabajando con el rumor de la ciudad de fondo.</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacidad</span><span class="v">2 personas</span></div>
+            <div class="room-spec"><span class="k">Cama</span><span class="v">1 king</span></div>
+            <div class="room-spec"><span class="k">Área</span><span class="v">48 m²</span></div>
+            <div class="room-spec"><span class="k">Vista</span><span class="v">Cordillera</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="origen.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Room 5: Especial -->
+      <article class="room has-star-cursor" data-typology="especial" data-reveal>
+        <div class="room-media slider-active" style="background: var(--ink);">
+          <div class="badge">05 / Especial</div>
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="assets/photos/tipo5/1.webp" alt="Apartaestudio Especial - Vista 1" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo5/2.webp" alt="Apartaestudio Especial - Vista 2" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo5/3.webp" alt="Apartaestudio Especial - Vista 3" loading="lazy"></div>
+              <div class="slider-slide"><img src="assets/photos/tipo5/4.webp" alt="Apartaestudio Especial - Vista 4" loading="lazy"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Imagen anterior" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Imagen siguiente" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+            <span class="indicator" data-slide="3"></span>
+          </div>
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">Para grupos pequeños o familias</p>
+          <h3>Especial</h3>
+          <p class="sub">Dos ambientes, una sola tarifa.</p>
+          <p class="body">Cama king + sofá cama doble en zona de estar separada. Cocina completa con nevera grande. Ideal para familias o tres amigos viajando juntos.</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacidad</span><span class="v">4 personas</span></div>
+            <div class="room-spec"><span class="k">Cama</span><span class="v">1 king + sofá cama</span></div>
+            <div class="room-spec"><span class="k">Área</span><span class="v">55 m²</span></div>
+            <div class="room-spec"><span class="k">Vista</span><span class="v">Cordillera</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="especial.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">Ver detalles</a>
+          </div>
+        </div>
+      </article>
+
+      </div>
+      <button type="button" class="room-list-btn next" aria-label="Siguiente tipología" aria-controls="room-list">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
     </div>
 
     <div class="tier-table">
-      <div class="tier"><span class="dur">1 — 2 meses</span><span class="amount">$ 4.200.000</span><span class="per">/ mes, todo incluido</span><span class="save">Sin descuento</span></div>
-      <div class="tier"><span class="dur">3 — 5 meses</span><span class="amount">$ 3.500.000</span><span class="per">/ mes, todo incluido</span><span class="save">Ahorras 17%</span></div>
-      <div class="tier featured"><span class="dur">6 — 11 meses</span><span class="amount">$ 2.900.000</span><span class="per">/ mes, todo incluido</span><span class="save">Más pedido — 31%</span></div>
-      <div class="tier"><span class="dur">12 meses o más</span><span class="amount">$ 2.500.000</span><span class="per">/ mes, todo incluido</span><span class="save">Ahorras 40%</span></div>
+      <!-- Tier 1 -->
+      <div class="tier">
+        <span class="dur">
+          <span class="lang-es">1 — 2 meses</span>
+          <span class="lang-en">1 — 2 months</span>
+        </span>
+        <span class="amount">
+          <span class="lang-es" id="price-tier-1-es">$ 4.200.000</span>
+          <span class="lang-en" id="price-tier-1-en">$ 4,200,000</span>
+        </span>
+        <span class="per">
+          <span class="lang-es">/ mes, todo incluido</span>
+          <span class="lang-en">/ month, all inclusive</span>
+        </span>
+        <span class="save">
+          <span class="lang-es" id="save-tier-1-es">Sin descuento</span>
+          <span class="lang-en" id="save-tier-1-en">No discount</span>
+        </span>
+      </div>
+      
+      <!-- Tier 2 -->
+      <div class="tier">
+        <span class="dur">
+          <span class="lang-es">3 — 5 meses</span>
+          <span class="lang-en">3 — 5 months</span>
+        </span>
+        <span class="amount">
+          <span class="lang-es" id="price-tier-2-es">$ 3.500.000</span>
+          <span class="lang-en" id="price-tier-2-en">$ 3,500,000</span>
+        </span>
+        <span class="per">
+          <span class="lang-es">/ mes, todo incluido</span>
+          <span class="lang-en">/ month, all inclusive</span>
+        </span>
+        <span class="save">
+          <span class="lang-es" id="save-tier-2-es">Ahorras 17%</span>
+          <span class="lang-en">Save 17%</span>
+        </span>
+      </div>
+      
+      <!-- Tier 3 -->
+      <div class="tier featured">
+        <span class="dur">
+          <span class="lang-es">6 — 11 meses</span>
+          <span class="lang-en">6 — 11 months</span>
+        </span>
+        <span class="amount">
+          <span class="lang-es" id="price-tier-3-es">$ 2.900.000</span>
+          <span class="lang-en" id="price-tier-3-en">$ 2,900,000</span>
+        </span>
+        <span class="per">
+          <span class="lang-es">/ mes, todo incluido</span>
+          <span class="lang-en">/ month, all inclusive</span>
+        </span>
+        <span class="save">
+          <span class="lang-es" id="save-tier-3-es">Más pedido — 31%</span>
+          <span class="lang-en">Best seller — 31%</span>
+        </span>
+      </div>
+      
+      <!-- Tier 4 -->
+      <div class="tier">
+        <span class="dur">
+          <span class="lang-es">12 meses o más</span>
+          <span class="lang-en">12 months or more</span>
+        </span>
+        <span class="amount">
+          <span class="lang-es" id="price-tier-4-es">$ 2.500.000</span>
+          <span class="lang-en" id="price-tier-4-en">$ 2,500,000</span>
+        </span>
+        <span class="per">
+          <span class="lang-es">/ mes, todo incluido</span>
+          <span class="lang-en">/ month, all inclusive</span>
+        </span>
+        <span class="save">
+          <span class="lang-es" id="save-tier-4-es">Ahorras 40%</span>
+          <span class="lang-en">Save 40%</span>
+        </span>
+      </div>
     </div>
     <p class="body" style="margin-top: 32px; font-style: italic; text-align: center; width: 100%; max-width: none; color: var(--ink-500);">
       ✶ Limpieza profesional semanal incluida. Cambio de sábanas opcional. Mascotas bienvenidas con depósito.
@@ -254,6 +554,169 @@
 </script>
 <script src="shell.js"></script>
 <script>lucide.createIcons();</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Pricing data matrix per typology
+    const TYPOLOGY_DATA = {
+      clasica: {
+        prices: {
+          es: ['$ 3.600.000', '$ 3.000.000', '$ 2.500.000', '$ 2.100.000'],
+          en: ['$ 3,600,000', '$ 3,000,000', '$ 2,500,000', '$ 2,100,000']
+        },
+        savings: {
+          es: ['Sin descuento', 'Ahorras 17%', 'Más pedido — 31%', 'Ahorras 42%'],
+          en: ['No discount', 'Save 17%', 'Best seller — 31%', 'Save 42%']
+        }
+      },
+      seleccion: {
+        prices: {
+          es: ['$ 4.200.000', '$ 3.500.000', '$ 2.900.000', '$ 2.500.000'],
+          en: ['$ 4,200,000', '$ 3,500,000', '$ 2,900,000', '$ 2,500,000']
+        },
+        savings: {
+          es: ['Sin descuento', 'Ahorras 17%', 'Más pedido — 31%', 'Ahorras 40%'],
+          en: ['No discount', 'Save 17%', 'Best seller — 31%', 'Save 40%']
+        }
+      },
+      reserva: {
+        prices: {
+          es: ['$ 5.000.000', '$ 4.200.000', '$ 3.500.000', '$ 3.000.000'],
+          en: ['$ 5,000,000', '$ 4,200,000', '$ 3,500,000', '$ 3,000,000']
+        },
+        savings: {
+          es: ['Sin descuento', 'Ahorras 16%', 'Más pedido — 30%', 'Ahorras 40%'],
+          en: ['No discount', 'Save 16%', 'Best seller — 30%', 'Save 40%']
+        }
+      },
+      origen: {
+        prices: {
+          es: ['$ 5.500.000', '$ 4.600.000', '$ 3.800.000', '$ 3.300.000'],
+          en: ['$ 5,500,000', '$ 4,600,000', '$ 3,800,000', '$ 3,300,000']
+        },
+        savings: {
+          es: ['Sin descuento', 'Ahorras 16%', 'Más pedido — 31%', 'Ahorras 40%'],
+          en: ['No discount', 'Save 16%', 'Best seller — 31%', 'Save 40%']
+        }
+      },
+      especial: {
+        prices: {
+          es: ['$ 6.300.000', '$ 5.300.000', '$ 4.400.000', '$ 3.800.000'],
+          en: ['$ 6,300,000', '$ 5,300,000', '$ 4,400,000', '$ 3,800,000']
+        },
+        savings: {
+          es: ['Sin descuento', 'Ahorras 16%', 'Más pedido — 30%', 'Ahorras 40%'],
+          en: ['No discount', 'Save 16%', 'Best seller — 30%', 'Save 40%']
+        }
+      }
+    };
+
+    const cards = document.querySelectorAll('.room');
+    const prevBtn = document.querySelector('.room-list-btn.prev');
+    const nextBtn = document.querySelector('.room-list-btn.next');
+    const viewport = document.querySelector('.room-list');
+    
+    const typologies = ['clasica', 'seleccion', 'reserva', 'origen', 'especial'];
+    let activeIndex = 1; // Default 'seleccion' index is 1
+
+    function updatePricingDisplay(typology) {
+      const data = TYPOLOGY_DATA[typology];
+      if (!data) return;
+      
+      // Update prices & savings in the table
+      for (let i = 0; i < 4; i++) {
+        const esPriceEl = document.getElementById(`price-tier-${i + 1}-es`);
+        const enPriceEl = document.getElementById(`price-tier-${i + 1}-en`);
+        if (esPriceEl) esPriceEl.textContent = data.prices.es[i];
+        if (enPriceEl) enPriceEl.textContent = data.prices.en[i];
+        
+        const esSaveEl = document.getElementById(`save-tier-${i + 1}-es`);
+        const enSaveEl = document.getElementById(`save-tier-${i + 1}-en`);
+        if (esSaveEl) esSaveEl.textContent = data.savings.es[i];
+        if (enSaveEl) enSaveEl.textContent = data.savings.en[i];
+      }
+      
+      // Update lead text names
+      const leadNameEs = document.getElementById('selected-name-es');
+      const leadNameEn = document.getElementById('selected-name-en');
+      
+      const displayNames = {
+        clasica: { es: 'Clásica', en: 'Clásica' },
+        seleccion: { es: 'Selección', en: 'Selección' },
+        reserva: { es: 'Reserva', en: 'Reserva' },
+        origen: { es: 'Origen', en: 'Origen' },
+        especial: { es: 'Especial', en: 'Especial' }
+      };
+      
+      if (leadNameEs) leadNameEs.textContent = displayNames[typology].es;
+      if (leadNameEn) leadNameEn.textContent = displayNames[typology].en;
+    }
+
+    function selectTypology(index) {
+      if (index < 0 || index >= typologies.length) return;
+      activeIndex = index;
+      const typology = typologies[activeIndex];
+      
+      // Update active classes
+      cards.forEach((card, idx) => {
+        card.classList.toggle('active', idx === activeIndex);
+        card.setAttribute('aria-selected', idx === activeIndex ? 'true' : 'false');
+      });
+      
+      // Update table display values
+      updatePricingDisplay(typology);
+      
+      // Center card in the carousel view
+      if (viewport) {
+        const activeCard = cards[activeIndex];
+        if (activeCard) {
+          const viewportWidth = viewport.clientWidth;
+          const cardWidth = activeCard.clientWidth;
+          const cardLeft = activeCard.offsetLeft;
+          const scrollTarget = cardLeft - (viewportWidth / 2) + (cardWidth / 2);
+          viewport.scrollTo({ left: scrollTarget, behavior: 'smooth' });
+        }
+      }
+      
+      // Disable/enable arrows appropriately
+      if (prevBtn) prevBtn.disabled = activeIndex === 0;
+      if (nextBtn) nextBtn.disabled = activeIndex === typologies.length - 1;
+    }
+
+    // Add click listeners to cards
+    cards.forEach((card, index) => {
+      card.addEventListener('click', () => {
+        selectTypology(index);
+      });
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          selectTypology(index);
+        }
+      });
+    });
+
+    // Add click listeners to nav buttons
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        if (activeIndex > 0) {
+          selectTypology(activeIndex - 1);
+        }
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        if (activeIndex < typologies.length - 1) {
+          selectTypology(activeIndex + 1);
+        }
+      });
+    }
+
+    // Initialize display with Selección
+    selectTypology(1);
+  });
+</script>
 
   <!-- Burbuja Flotante de Contacto -->
   <div class="contact-float" id="contactFloat">

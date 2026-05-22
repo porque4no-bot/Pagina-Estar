@@ -316,7 +316,12 @@
       <p class="lead">Totalmente amoblados, con cocina equipada, baño privado y Wi-Fi de fibra. Trae solo tu maleta.</p>
     </div>
 
-    <div class="room-list">
+    <div class="room-list-container">
+      <button type="button" class="room-list-btn prev" aria-label="Anterior apartamento" aria-controls="room-list">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+
+      <div class="room-list" id="room-list">
 
       <!-- Room 1: Clásica -->
       <article class="room has-star-cursor" data-reveal>
@@ -531,6 +536,10 @@
         </div>
       </article>
 
+      </div>
+      <button type="button" class="room-list-btn next" aria-label="Siguiente apartamento" aria-controls="room-list">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
     </div>
   </div>
 </section>
