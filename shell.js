@@ -200,7 +200,17 @@
       footer_cancelacion: 'Política de cancelación',
       footer_privacidad: 'Privacidad',
       footer_cookies: 'Política de Cookies',
-      footer_escnna: 'Protección de Menores (ESCNNA)'
+      footer_escnna: 'Protección de Menores (ESCNNA)',
+      duration_label: 'Duración de la estadía',
+      duration_1_3: '1 a 3 meses',
+      duration_3_6: '3 a 6 meses',
+      duration_6_11: '6 a 11 meses',
+      duration_12_plus: '12 o más meses',
+      unit_label: 'Unidad de interés',
+      unit_select_placeholder: 'Selecciona una unidad',
+      special_rates_label: '✶ Tarifas especiales:',
+      special_rates_text: 'Ofrecemos descuentos preferenciales en estancias mensuales o reservas de más de 4 unidades.',
+      privacy_agreement: 'Acepto el tratamiento de mis datos personales para cotización según la <a href="privacidad.html" target="_blank">Política de Privacidad</a>.'
     },
     en: {
       nav_estadias: 'Stays',
@@ -283,7 +293,17 @@
       footer_cancelacion: 'Cancellation Policy',
       footer_privacidad: 'Privacy Policy',
       footer_cookies: 'Cookies Policy',
-      footer_escnna: 'Child Protection (ESCNNA)'
+      footer_escnna: 'Child Protection (ESCNNA)',
+      duration_label: 'Stay duration',
+      duration_1_3: '1 to 3 months',
+      duration_3_6: '3 to 6 months',
+      duration_6_11: '6 to 11 months',
+      duration_12_plus: '12 or more months',
+      unit_label: 'Unit of interest',
+      unit_select_placeholder: 'Select a unit',
+      special_rates_label: '✶ Special rates:',
+      special_rates_text: 'We offer preferential discounts for monthly stays or bookings of more than 4 units.',
+      privacy_agreement: 'I accept the processing of my personal data for quoting per the <a href="privacidad.html" target="_blank">Privacy Policy</a>.'
     }
   };
 

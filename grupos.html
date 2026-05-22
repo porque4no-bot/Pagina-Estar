@@ -165,6 +165,12 @@
             </div>
           </div>
         </div>
+        <div class="special-rate-notice" style="margin-top: 24px; padding: 16px; background: rgba(196, 122, 75, 0.08); border-left: 3.3px solid var(--terracotta); border-radius: 4px;">
+          <p style="font-family: var(--font-body); font-size: 13.5px; line-height: 1.5; color: var(--ink); margin: 0;">
+            <span style="font-family: var(--font-heading); font-weight: 700; color: var(--terracotta-700);" data-i18n="special_rates_label">✶ Tarifas especiales:</span> 
+            <span data-i18n="special_rates_text">Ofrecemos descuentos preferenciales en estancias mensuales o reservas de más de 4 unidades.</span>
+          </p>
+        </div>
       </div>
 
       <form class="form" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Solicitud enviada ✶'; this.querySelector('button').disabled=true;">
@@ -219,6 +225,77 @@
           </div>
         </div>
 
+        <div class="field-row">
+          <div class="field">
+            <label data-i18n="duration_label">Duración de la estadía</label>
+            <select id="duration-select" required>
+              <option value="1-3" data-i18n="duration_1_3" selected>1 a 3 meses</option>
+              <option value="3-6" data-i18n="duration_3_6">3 a 6 meses</option>
+              <option value="6-11" data-i18n="duration_6_11">6 a 11 meses</option>
+              <option value="12+" data-i18n="duration_12_plus">12 o más meses</option>
+            </select>
+          </div>
+          <div class="field custom-select-field" id="unit-field">
+            <label data-i18n="unit_label">Unidad de interés</label>
+            <div class="custom-select-trigger" tabindex="0">
+              <span class="value" id="unit-display" data-i18n="unit_select_placeholder">Selecciona una unidad</span>
+              <span class="arrow-icon">
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg" style="transition: transform 0.3s ease;">
+                  <path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+            </div>
+            
+            <select id="unit-input" name="unit" required style="display: none;">
+              <option value="" disabled selected data-i18n="unit_select_placeholder">Selecciona una unidad</option>
+              <option value="clasica">Clásica</option>
+              <option value="seleccion">Selección</option>
+              <option value="reserva">Reserva</option>
+              <option value="origen">Origen</option>
+              <option value="especial">Especial</option>
+            </select>
+
+            <!-- Custom Dropdown Panel -->
+            <div class="custom-dropdown-menu">
+              <div class="custom-dropdown-option" data-value="clasica">
+                <span class="option-text">Clásica</span>
+                <span class="option-meta">
+                  <span class="option-price"></span>
+                  <span class="option-check">✶</span>
+                </span>
+              </div>
+              <div class="custom-dropdown-option" data-value="seleccion">
+                <span class="option-text">Selección</span>
+                <span class="option-meta">
+                  <span class="option-price"></span>
+                  <span class="option-check">✶</span>
+                </span>
+              </div>
+              <div class="custom-dropdown-option" data-value="reserva">
+                <span class="option-text">Reserva</span>
+                <span class="option-meta">
+                  <span class="option-price"></span>
+                  <span class="option-check">✶</span>
+                </span>
+              </div>
+              <div class="custom-dropdown-option" data-value="origen">
+                <span class="option-text">Origen</span>
+                <span class="option-meta">
+                  <span class="option-price"></span>
+                  <span class="option-check">✶</span>
+                </span>
+              </div>
+              <div class="custom-dropdown-option" data-value="especial">
+                <span class="option-text">Especial</span>
+                <span class="option-meta">
+                  <span class="option-price"></span>
+                  <span class="option-check">✶</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="field">
           <label>Requerimientos adicionales (opcional)</label>
           <textarea placeholder="Ej. Habitaciones continuas, check-in temprano, facilidades especiales..."></textarea>
@@ -226,10 +303,7 @@
 
         <label class="form-checkbox">
           <input type="checkbox" required>
-          <span>
-            <span class="lang-es">Acepto el tratamiento de mis datos personales para cotización según la <a href="privacidad.html" target="_blank">Política de Privacidad</a>.</span>
-            <span class="lang-en">I accept the processing of my personal data for quoting per the <a href="privacidad.html" target="_blank">Privacy Policy</a>.</span>
-          </span>
+          <span data-i18n-html="privacy_agreement">Acepto el tratamiento de mis datos personales para cotización según la <a href="privacidad.html" target="_blank">Política de Privacidad</a>.</span>
         </label>
 
         <button type="submit" class="btn btn-ink" style="justify-content: center;">Enviar cotización <span aria-hidden="true">→</span></button>
@@ -320,6 +394,314 @@
 </script>
 <script src="shell.js"></script>
 <script>lucide.createIcons();</script>
+
+<style>
+  /* Estilo personalizado para el selector de unidad de interés */
+  .custom-select-trigger {
+    background: var(--paper);
+    border: 1px solid var(--paper-400);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: var(--font-body);
+    font-size: 15px;
+    color: var(--ink);
+    outline: none;
+    transition: border-color var(--dur-base) var(--ease-out);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    box-sizing: border-box;
+    min-height: 49px;
+  }
+  .custom-select-trigger:focus,
+  .custom-select-field.active .custom-select-trigger {
+    border-color: var(--ink);
+  }
+  .custom-select-field .arrow-icon {
+    display: flex;
+    align-items: center;
+    color: var(--ink-500);
+  }
+  .custom-select-field.active .arrow-icon svg {
+    transform: rotate(180deg);
+  }
+  #unit-field .custom-dropdown-menu {
+    top: calc(100% + 6px);
+    box-sizing: border-box;
+    width: 100%;
+  }
+  .custom-select-field .option-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .custom-select-field .option-price {
+    font-size: 13px;
+    color: var(--ink-500);
+    font-weight: normal;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+  }
+  .custom-dropdown-option.active .option-price {
+    color: rgba(255, 255, 255, 0.7);
+  }
+  .form-checkbox {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--ink-500);
+    margin: 12px 0 20px 0;
+  }
+  .form-checkbox input {
+    margin-top: 3px;
+    cursor: pointer;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+  .form-checkbox a {
+    color: var(--terracotta);
+    text-decoration: underline;
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const durationSelect = document.getElementById('duration-select');
+    const unitField = document.getElementById('unit-field');
+    const unitInput = document.getElementById('unit-input');
+    const unitDisplay = document.getElementById('unit-display');
+    const options = unitField.querySelectorAll('.custom-dropdown-option');
+
+    // Matrix de precios por tipología y temporalidad
+    const UNIT_PRICES = {
+      es: {
+        '1-3': {
+          clasica: { name: 'Clásica', price: '$ 3.600.000' },
+          seleccion: { name: 'Selección', price: '$ 4.200.000' },
+          reserva: { name: 'Reserva', price: '$ 5.000.000' },
+          origen: { name: 'Origen', price: '$ 5.500.000' },
+          especial: { name: 'Especial', price: '$ 6.300.000' }
+        },
+        '3-6': {
+          clasica: { name: 'Clásica', price: '$ 3.000.000' },
+          seleccion: { name: 'Selección', price: '$ 3.500.000' },
+          reserva: { name: 'Reserva', price: '$ 4.200.000' },
+          origen: { name: 'Origen', price: '$ 4.600.000' },
+          especial: { name: 'Especial', price: '$ 5.300.000' }
+        },
+        '6-11': {
+          clasica: { name: 'Clásica', price: '$ 2.500.000' },
+          seleccion: { name: 'Selección', price: '$ 2.900.000' },
+          reserva: { name: 'Reserva', price: '$ 3.500.000' },
+          origen: { name: 'Origen', price: '$ 3.800.000' },
+          especial: { name: 'Especial', price: '$ 4.400.000' }
+        },
+        '12+': {
+          clasica: { name: 'Clásica', price: '$ 2.100.000' },
+          seleccion: { name: 'Selección', price: '$ 2.500.000' },
+          reserva: { name: 'Reserva', price: '$ 3.000.000' },
+          origen: { name: 'Origen', price: '$ 3.300.000' },
+          especial: { name: 'Especial', price: '$ 3.800.000' }
+        }
+      },
+      en: {
+        '1-3': {
+          clasica: { name: 'Clásica', price: '$ 3,600,000' },
+          seleccion: { name: 'Selección', price: '$ 4,200,000' },
+          reserva: { name: 'Reserva', price: '$ 5,000,000' },
+          origen: { name: 'Origen', price: '$ 5,500,000' },
+          especial: { name: 'Especial', price: '$ 6,300,000' }
+        },
+        '3-6': {
+          clasica: { name: 'Clásica', price: '$ 3,000,000' },
+          seleccion: { name: 'Selección', price: '$ 3,500,000' },
+          reserva: { name: 'Reserva', price: '$ 4,200,000' },
+          origen: { name: 'Origen', price: '$ 4,600,000' },
+          especial: { name: 'Especial', price: '$ 5,300,000' }
+        },
+        '6-11': {
+          clasica: { name: 'Clásica', price: '$ 2,500,000' },
+          seleccion: { name: 'Selección', price: '$ 2,900,000' },
+          reserva: { name: 'Reserva', price: '$ 3,500,000' },
+          origen: { name: 'Origen', price: '$ 3,800,000' },
+          especial: { name: 'Especial', price: '$ 4,400,000' }
+        },
+        '12+': {
+          clasica: { name: 'Clásica', price: '$ 2,100,000' },
+          seleccion: { name: 'Selección', price: '$ 2,500,000' },
+          reserva: { name: 'Reserva', price: '$ 3,000,000' },
+          origen: { name: 'Origen', price: '$ 3,300,000' },
+          especial: { name: 'Especial', price: '$ 3,800,000' }
+        }
+      }
+    };
+
+    function getActiveLanguage() {
+      return document.documentElement.lang || 'es';
+    }
+
+    function updatePrices(lang) {
+      if (!lang) lang = getActiveLanguage();
+      const duration = durationSelect.value;
+      const pricing = UNIT_PRICES[lang][duration];
+      const perText = lang === 'es' ? '/ mes' : '/ month';
+
+      // Actualizar precios en el menú personalizado
+      options.forEach(opt => {
+        const val = opt.getAttribute('data-value');
+        if (pricing[val]) {
+          const priceSpan = opt.querySelector('.option-price');
+          if (priceSpan) {
+            priceSpan.textContent = `${pricing[val].price} ${perText}`;
+          }
+        }
+      });
+
+      // Actualizar opciones del select nativo
+      Array.from(unitInput.options).forEach(opt => {
+        const val = opt.value;
+        if (val && pricing[val]) {
+          opt.textContent = `${pricing[val].name} (${pricing[val].price} ${perText})`;
+        } else if (!val) {
+          opt.textContent = lang === 'es' ? 'Selecciona una unidad' : 'Select a unit';
+        }
+      });
+
+      // Actualizar texto del trigger si ya hay una selección
+      const currentVal = unitInput.value;
+      if (currentVal && pricing[currentVal]) {
+        unitDisplay.textContent = `${pricing[currentVal].name} · ${pricing[currentVal].price} ${perText}`;
+        unitDisplay.removeAttribute('data-i18n');
+      } else {
+        unitDisplay.setAttribute('data-i18n', 'unit_select_placeholder');
+        unitDisplay.textContent = lang === 'es' ? 'Selecciona una unidad' : 'Select a unit';
+      }
+    }
+
+    // Toggle dropdown en escritorio
+    const trigger = unitField.querySelector('.custom-select-trigger');
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (window.innerWidth <= 900) return; // En móvil se abre el select nativo transparente
+      
+      const isActive = unitField.classList.contains('active');
+      if (isActive) {
+        unitField.classList.remove('active');
+      } else {
+        unitField.classList.add('active');
+      }
+    });
+
+    // Cerrar al hacer click fuera
+    document.addEventListener('click', (e) => {
+      if (!unitField.contains(e.target)) {
+        unitField.classList.remove('active');
+      }
+    });
+
+    // Clicks en opciones
+    options.forEach(opt => {
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const val = opt.getAttribute('data-value');
+        unitInput.value = val;
+        unitInput.dispatchEvent(new Event('change'));
+        unitField.classList.remove('active');
+      });
+    });
+
+    // Sincronizar display y clase activa al cambiar el valor
+    unitInput.addEventListener('change', () => {
+      const val = unitInput.value;
+      const duration = durationSelect.value;
+      const lang = getActiveLanguage();
+      const pricing = UNIT_PRICES[lang][duration];
+      const perText = lang === 'es' ? '/ mes' : '/ month';
+
+      options.forEach(opt => {
+        opt.classList.toggle('active', opt.getAttribute('data-value') === val);
+      });
+
+      if (val && pricing[val]) {
+        unitDisplay.textContent = `${pricing[val].name} · ${pricing[val].price} ${perText}`;
+        unitDisplay.removeAttribute('data-i18n');
+      } else {
+        unitDisplay.setAttribute('data-i18n', 'unit_select_placeholder');
+        unitDisplay.textContent = lang === 'es' ? 'Selecciona una unidad' : 'Select a unit';
+      }
+    });
+
+    // Al cambiar la duración, actualizar precios
+    durationSelect.addEventListener('change', () => {
+      updatePrices();
+    });
+
+    // Escuchar el evento de cambio de idioma global
+    document.addEventListener('estar-lang-change', (e) => {
+      const lang = (e.detail && e.detail.lang) || getActiveLanguage();
+      updatePrices(lang);
+    });
+
+    // Accesibilidad mediante teclado
+    trigger.addEventListener('keydown', (e) => {
+      if (window.innerWidth <= 900) return;
+      const isActive = unitField.classList.contains('active');
+
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (!isActive) {
+          unitField.classList.add('active');
+        } else {
+          const activeOpt = unitField.querySelector('.custom-dropdown-option.active');
+          if (activeOpt) {
+            const val = activeOpt.getAttribute('data-value');
+            unitInput.value = val;
+            unitInput.dispatchEvent(new Event('change'));
+          }
+          unitField.classList.remove('active');
+        }
+      } else if (e.key === 'Escape') {
+        if (isActive) {
+          e.preventDefault();
+          unitField.classList.remove('active');
+        }
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!isActive) {
+          unitField.classList.add('active');
+          return;
+        }
+
+        const optsArray = Array.from(options);
+        const currentActiveIdx = optsArray.findIndex(opt => opt.classList.contains('active'));
+        let nextIdx = currentActiveIdx;
+
+        if (e.key === 'ArrowDown') {
+          nextIdx = (currentActiveIdx + 1) % optsArray.length;
+        } else {
+          nextIdx = (currentActiveIdx - 1 + optsArray.length) % optsArray.length;
+        }
+
+        const nextOpt = optsArray[nextIdx];
+        if (nextOpt) {
+          const val = nextOpt.getAttribute('data-value');
+          unitInput.value = val;
+          unitInput.dispatchEvent(new Event('change'));
+        }
+      }
+    });
+
+    // Inicializar precios al cargar la página
+    updatePrices();
+  });
+</script>
 
   <!-- Burbuja Flotante de Contacto -->
   <div class="contact-float" id="contactFloat">
