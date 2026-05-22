@@ -51,8 +51,8 @@
   }
 
   /* ----- STAR CURSOR (only on .has-star-cursor) ----- */
-  const cursorEls = document.querySelectorAll('.has-star-cursor');
-  if (cursorEls.length && window.matchMedia('(pointer:fine)').matches) {
+  const hasStarCursor = document.querySelector('.has-star-cursor, #poiGrid') !== null;
+  if (hasStarCursor && window.matchMedia('(pointer:fine)').matches) {
     const cursor = document.createElement('div');
     cursor.className = 'star-cursor';
     cursor.innerHTML = '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M50 0 L57 35 L92 35 L62 56 L78 92 L50 70 L22 92 L38 56 L8 35 L43 35 Z" fill="currentColor"/></svg>';
@@ -70,13 +70,19 @@
 
     window.addEventListener('mousemove', (e) => { tx = e.clientX; ty = e.clientY; });
 
-    cursorEls.forEach((el) => {
-      el.addEventListener('mouseenter', () => {
+    document.addEventListener('mouseover', (e) => {
+      const el = e.target.closest('.has-star-cursor');
+      if (el) {
         if (!visible) { cursor.classList.add('show'); visible = true; }
-      });
-      el.addEventListener('mouseleave', () => {
+      }
+    });
+
+    document.addEventListener('mouseout', (e) => {
+      const el = e.target.closest('.has-star-cursor');
+      const related = e.relatedTarget;
+      if (el && (!related || !el.contains(related))) {
         if (visible) { cursor.classList.remove('show'); visible = false; }
-      });
+      }
     });
   }
 
