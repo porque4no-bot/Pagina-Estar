@@ -227,7 +227,12 @@
       form_whatsapp_placeholder: '+57 300 000 0000',
       form_credito: 'Solicitar crédito a 30 días (sujeto a aprobación)',
       form_politica: 'Acepto la <a href="privacidad.html" target="_blank">Política de Privacidad</a> e información de Habeas Data corporativo.',
-      form_enviar: 'Enviar solicitud <span aria-hidden="true">→</span>'
+      form_enviar: 'Enviar solicitud <span aria-hidden="true">→</span>',
+      cookie_title: 'Control de Cookies',
+      cookie_desc: 'Utilizamos cookies esenciales para recordar tus preferencias (idioma y atmósfera) y analíticas para optimizar el sitio. Puedes aceptar o rechazar las de análisis.',
+      cookie_accept: 'Aceptar',
+      cookie_reject: 'Rechazar',
+      cookie_policy: 'Política de Cookies'
     },
     en: {
       nav_estadias: 'Stays',
@@ -331,7 +336,12 @@
       form_whatsapp_placeholder: '+57 300 000 0000',
       form_credito: 'Request 30-day credit (subject to approval)',
       form_politica: 'I accept the <a href="privacidad.html" target="_blank">Privacy Policy</a> and corporate Habeas Data terms.',
-      form_enviar: 'Send request <span aria-hidden="true">→</span>'
+      form_enviar: 'Send request <span aria-hidden="true">→</span>',
+      cookie_title: 'Cookie Preferences',
+      cookie_desc: 'We use essential cookies to remember your preferences (language and atmosphere) and analytics to optimize our site. You can accept or reject analytics.',
+      cookie_accept: 'Accept',
+      cookie_reject: 'Reject',
+      cookie_policy: 'Cookies Policy'
     }
   };
 
@@ -711,9 +721,46 @@
     onScroll();
   }
 
+  /* ----- COOKIE CONSENT BANNER ----- */
+  function setupCookieConsent() {
+    const consent = localStorage.getItem('estar-cookie-consent');
+    if (consent) return; // Consent already given/refused
+
+    const banner = document.createElement('div');
+    banner.className = 'cookie-banner';
+    banner.id = 'cookieBanner';
+    banner.innerHTML = `
+      <h4 data-i18n="cookie_title">Control de Cookies</h4>
+      <p>
+        <span data-i18n="cookie_desc">Utilizamos cookies esenciales para recordar tus preferencias (idioma y atmósfera) y analíticas para optimizar el sitio. Puedes aceptar o rechazar las de análisis.</span>
+        <a href="cookies.html" target="_blank" data-i18n="cookie_policy">Política de Cookies</a>.
+      </p>
+      <div class="cookie-banner-actions">
+        <button class="btn-accept" data-i18n="cookie_accept">Aceptar</button>
+        <button class="btn-reject" data-i18n="cookie_reject">Rechazar</button>
+      </div>
+    `;
+    
+    document.body.appendChild(banner);
+    banner.style.display = 'flex';
+
+    banner.querySelector('.btn-accept').addEventListener('click', () => {
+      localStorage.setItem('estar-cookie-consent', 'accepted');
+      banner.style.opacity = '0';
+      setTimeout(() => banner.remove(), 400);
+    });
+
+    banner.querySelector('.btn-reject').addEventListener('click', () => {
+      localStorage.setItem('estar-cookie-consent', 'rejected');
+      banner.style.opacity = '0';
+      setTimeout(() => banner.remove(), 400);
+    });
+  }
+
   /* ---------- INIT ---------- */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => { 
+      setupCookieConsent();
       applyTweaks(); 
       setupPanel(); 
       setupHeaderLangToggle(); 
@@ -724,6 +771,7 @@
       fetchDynamicRating();
     });
   } else {
+    setupCookieConsent();
     applyTweaks();
     setupPanel();
     setupHeaderLangToggle();
