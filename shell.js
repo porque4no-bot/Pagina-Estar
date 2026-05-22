@@ -152,19 +152,15 @@
       fact_4_num: '4.8',
       fact_4_lbl: 'Valoración huéspedes',
       loc_eyebrow: 'Ubicación estratégica',
-      loc_title: 'En el corazón del sector Palogrande',
+      loc_title: 'En el corazón de <span class="serif-italic">Palogrande</span>',
       loc_booking_lbl: 'Calificación Booking',
       loc_booking_score: '9.0',
-      loc_booking_reviews: '126 reseñas',
+      loc_booking_reviews: '126 reseñas de huéspedes',
       loc_location_lbl: 'Excelente ubicación',
       loc_location_score: '9.4',
+      loc_location_desc_short: 'Puntaje destacado por su cercanía y accesibilidad.',
       loc_location_desc: 'No solo lo decimos nosotros, nuestros huéspedes también valoran de forma excelente nuestra cercanía a puntos clave de la ciudad.',
-      loc_places_title: 'Lugares estratégicos cercanos',
-      loc_place_1: 'Universidad Católica · 200m / 3 min caminando',
-      loc_place_2: 'Universidad de Caldas (Palogrande) · 400m / 5 min caminando',
-      loc_place_3: 'Universidad Nacional (El Cable) · 500m / 7 min caminando',
-      loc_place_4: 'Estadio Palogrande · 400m / 6 min caminando',
-      loc_place_5: 'Torre del Cable · 450m / 6 min caminando',
+      loc_places_title: 'Distancias a pie',
       map_btn_illustrated: 'Mapa Ilustrado',
       map_btn_interactive: 'Mapa Interactivo',
       contact_title: 'Escríbenos',
@@ -172,7 +168,28 @@
       contact_wa_desc: 'Chatea con nosotros',
       contact_email_title: 'Correo',
       contact_maps_desc: 'Cómo llegar',
-      contact_waze_desc: 'Navegar con Waze'
+      contact_waze_desc: 'Navegar con Waze',
+      footer_desc: 'Hospedaje contemporáneo en el corazón de Manizales, Caldas. 14 apartaestudios pensados para quedarse.',
+      footer_estadias: 'Estadías',
+      footer_apartaestudios: 'Apartaestudios',
+      footer_vivir: 'Vivir en estar',
+      footer_grupos: 'Grupos y eventos',
+      footer_empresas: 'Empresas',
+      footer_portal: 'Portal corporativo',
+      footer_convenio: 'Solicitar convenio',
+      footer_cotizar: 'Cotizar grupos',
+      footer_trabaja: 'Trabaja con nosotros',
+      footer_descubre: 'Descubre',
+      footer_explorar: 'Explorar Manizales',
+      footer_preguntas: 'Preguntas Frecuentes',
+      footer_contacto: 'Contáctanos',
+      footer_copyright: '© 2026 estar · Manizales, Colombia',
+      footer_rnt: 'RNT 276306',
+      footer_aviso: 'Aviso Legal',
+      footer_cancelacion: 'Política de cancelación',
+      footer_privacidad: 'Privacidad',
+      footer_cookies: 'Política de Cookies',
+      footer_escnna: 'Protección de Menores (ESCNNA)'
     },
     en: {
       nav_estadias: 'Stays',
@@ -207,19 +224,15 @@
       fact_4_num: '4.8',
       fact_4_lbl: 'Guest rating',
       loc_eyebrow: 'Strategic location',
-      loc_title: 'In the heart of the Palogrande sector',
+      loc_title: 'In the heart of <span class="serif-italic">Palogrande</span>',
       loc_booking_lbl: 'Booking rating',
       loc_booking_score: '9.0',
-      loc_booking_reviews: '126 reviews',
+      loc_booking_reviews: '126 guest reviews',
       loc_location_lbl: 'Excellent location',
       loc_location_score: '9.4',
+      loc_location_desc_short: 'Outstanding score for its proximity and accessibility.',
       loc_location_desc: 'It\'s not just us saying it, our guests also rate our proximity to key city spots outstandingly.',
-      loc_places_title: 'Nearby strategic locations',
-      loc_place_1: 'Universidad Católica · 200m / 3 min walk',
-      loc_place_2: 'Universidad de Caldas (Palogrande) · 400m / 5 min walk',
-      loc_place_3: 'Universidad Nacional (El Cable) · 500m / 7 min walk',
-      loc_place_4: 'Estadio Palogrande · 400m / 6 min walk',
-      loc_place_5: 'Torre del Cable · 450m / 6 min walk',
+      loc_places_title: 'Walking distances',
       map_btn_illustrated: 'Illustrated Map',
       map_btn_interactive: 'Interactive Map',
       contact_title: 'Contact Us',
@@ -227,7 +240,28 @@
       contact_wa_desc: 'Chat with us',
       contact_email_title: 'Email',
       contact_maps_desc: 'Get directions',
-      contact_waze_desc: 'Navigate with Waze'
+      contact_waze_desc: 'Navigate with Waze',
+      footer_desc: 'Contemporary lodging in the heart of Manizales, Caldas. 14 studio apartments designed for staying.',
+      footer_estadias: 'Stays',
+      footer_apartaestudios: 'Studio apartments',
+      footer_vivir: 'Live at estar',
+      footer_grupos: 'Groups & events',
+      footer_empresas: 'Companies',
+      footer_portal: 'Corporate portal',
+      footer_convenio: 'Request agreement',
+      footer_cotizar: 'Quote groups',
+      footer_trabaja: 'Work with us',
+      footer_descubre: 'Discover',
+      footer_explorar: 'Explore Manizales',
+      footer_preguntas: 'FAQ',
+      footer_contacto: 'Contact Us',
+      footer_copyright: '© 2026 estar · Manizales, Colombia',
+      footer_rnt: 'RNT 276306',
+      footer_aviso: 'Legal Notice',
+      footer_cancelacion: 'Cancellation Policy',
+      footer_privacidad: 'Privacy Policy',
+      footer_cookies: 'Cookies Policy',
+      footer_escnna: 'Child Protection (ESCNNA)'
     }
   };
 
@@ -553,67 +587,7 @@
       });
   }
 
-  /* ----- MAP SWITCHER & LIGHTBOX ----- */
-  function setupMapToggle() {
-    const toggleBtns = document.querySelectorAll('.map-toggle-btn');
-    const mapViews = document.querySelectorAll('.map-view');
-    
-    toggleBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const targetView = btn.getAttribute('data-view');
-        
-        toggleBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        mapViews.forEach(view => {
-          if (view.classList.contains(`view-${targetView}`)) {
-            view.classList.add('active');
-          } else {
-            view.classList.remove('active');
-          }
-        });
-      });
-    });
 
-    // Lightbox for the brochure map
-    const brochureMapImg = document.querySelector('.brochure-map-img');
-    if (brochureMapImg) {
-      brochureMapImg.addEventListener('click', () => {
-        const overlay = document.createElement('div');
-        overlay.className = 'map-lightbox-overlay';
-        overlay.innerHTML = `
-          <div class="lightbox-content">
-            <button class="lightbox-close" aria-label="Cerrar">&times;</button>
-            <img src="${brochureMapImg.getAttribute('src')}" alt="Mapa Ilustrado Estar" class="lightbox-img">
-          </div>
-        `;
-        document.body.appendChild(overlay);
-        document.body.style.overflow = 'hidden';
-
-        const closeLightbox = () => {
-          overlay.classList.add('fade-out');
-          setTimeout(() => {
-            overlay.remove();
-            document.body.style.overflow = '';
-          }, 300);
-        };
-
-        overlay.addEventListener('click', (e) => {
-          if (e.target === overlay || e.target.classList.contains('lightbox-close') || e.target.classList.contains('lightbox-content')) {
-            closeLightbox();
-          }
-        });
-
-        const escHandler = (e) => {
-          if (e.key === 'Escape') {
-            closeLightbox();
-            document.removeEventListener('keydown', escHandler);
-          }
-        };
-        document.addEventListener('keydown', escHandler);
-      });
-    }
-  }
 
   /* ----- CONTACT HUB FLOATING WIDGET ----- */
   function setupContactFloat() {
@@ -671,7 +645,6 @@
       setupHeaderLangToggle(); 
       setupMobileBookingScroll(); 
       setupRoomSliders();
-      setupMapToggle();
       setupContactFloat();
       setupBookingBarScroll();
       fetchDynamicRating();
@@ -682,7 +655,6 @@
     setupHeaderLangToggle();
     setupMobileBookingScroll();
     setupRoomSliders();
-    setupMapToggle();
     setupContactFloat();
     setupBookingBarScroll();
     fetchDynamicRating();
