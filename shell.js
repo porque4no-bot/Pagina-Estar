@@ -478,6 +478,26 @@
     });
   }
 
+  /* ----- DYNAMIC RATING FETCH ----- */
+  function fetchDynamicRating() {
+    fetch('/api/get-booking-rating')
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP status ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (data && data.rating) {
+          const score = data.rating;
+          i18n.es.fact_2_num = score;
+          i18n.en.fact_2_num = score;
+          applyTweaks();
+        }
+      })
+      .catch(err => {
+        console.warn('Could not fetch dynamic rating, using fallback:', err);
+      });
+  }
+
   /* ---------- INIT ---------- */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => { 
@@ -486,6 +506,7 @@
       setupHeaderLangToggle(); 
       setupMobileBookingScroll(); 
       setupRoomSliders();
+      fetchDynamicRating();
     });
   } else {
     applyTweaks();
@@ -493,5 +514,6 @@
     setupHeaderLangToggle();
     setupMobileBookingScroll();
     setupRoomSliders();
+    fetchDynamicRating();
   }
 })();

@@ -3,3 +3,5 @@ assets/drive_downloads/
 uploads/
 scratch/
 *.zip
+.netlify/
+
