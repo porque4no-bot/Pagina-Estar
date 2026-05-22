@@ -102,6 +102,16 @@ button { font: inherit; cursor: pointer; border: 0; background: none; color: inh
   font-weight: 400;
 }
 
+.display-xl, .display-l, .display-m, .display-s,
+.hero-title, .policy-title, .t-h1, .t-h2, .t-h3, .t-h4,
+h1, h2, h3, h4, h5, h6 {
+  text-transform: uppercase;
+}
+
+.serif-italic, .italic {
+  text-transform: none !important;
+}
+
 .lead {
   font-family: var(--font-body);
   font-style: italic;
@@ -152,10 +162,10 @@ button { font: inherit; cursor: pointer; border: 0; background: none; color: inh
 .btn:active { transform: scale(0.98); }
 
 .btn-primary {
-  background: var(--olive);
+  background: var(--terracotta);
   color: var(--white);
 }
-.btn-primary:hover { background: var(--olive-700); }
+.btn-primary:hover { background: var(--terracotta-700); }
 
 .btn-ink {
   background: var(--ink);
@@ -292,16 +302,16 @@ button { font: inherit; cursor: pointer; border: 0; background: none; color: inh
   text-transform: uppercase;
   padding: 12px 20px;
   border-radius: 8px;
-  border: 1px solid #342b24;
-  background: #342b24;
+  border: 1px solid var(--terracotta);
+  background: var(--terracotta);
   color: var(--paper);
   transition: background var(--dur-base) var(--ease-out),
               color var(--dur-base) var(--ease-out),
               border-color var(--dur-base) var(--ease-out);
 }
-.book-btn:hover { background: #4a3e35; color: var(--paper); border-color: #4a3e35; }
-.is-scrolled .book-btn { border-color: #342b24; background: #342b24; color: var(--paper); }
-.is-scrolled .book-btn:hover { background: #4a3e35; color: var(--paper); border-color: #4a3e35; }
+.book-btn:hover { background: var(--terracotta-700); color: var(--paper); border-color: var(--terracotta-700); }
+.is-scrolled .book-btn { border-color: var(--terracotta); background: var(--terracotta); color: var(--paper); }
+.is-scrolled .book-btn:hover { background: var(--terracotta-700); color: var(--paper); border-color: var(--terracotta-700); }
 
 .menu-btn {
   display: flex;
@@ -405,14 +415,14 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .nav-list a,
 body[data-header="dark"] .site-header:not(.is-scrolled) .lang-toggle,
 body[data-header="dark"] .site-header:not(.is-scrolled) .menu-btn { color: var(--ink); }
 body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn {
-  border-color: #342b24;
-  background: #342b24;
+  border-color: var(--terracotta);
+  background: var(--terracotta);
   color: var(--paper);
 }
 body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
-  background: #4a3e35;
+  background: var(--terracotta-700);
   color: var(--paper);
-  border-color: #4a3e35;
+  border-color: var(--terracotta-700);
 }
 
 /* ---------- HERO ---------- */
@@ -602,7 +612,7 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
 }
 .booking-cta {
   padding: 20px 40px;
-  background: var(--olive);
+  background: var(--terracotta);
   color: var(--paper);
   font-family: var(--font-label);
   font-weight: 700;
@@ -613,7 +623,7 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   gap: 10px;
   transition: background var(--dur-base) var(--ease-out);
 }
-.booking-cta:hover { background: var(--olive-700); }
+.booking-cta:hover { background: var(--terracotta-700); }
 @media (max-width: 900px) {
   .booking-cta { grid-column: 1 / -1; padding: 24px; }
 }
