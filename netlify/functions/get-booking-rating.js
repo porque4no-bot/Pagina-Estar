@@ -4,9 +4,11 @@ const https = require('https');
 // It retrieves the scraping URL from process.env.PROXY_URL.
 exports.handler = async (event, context) => {
   const PROXY_URL = process.env.PROXY_URL;
-  const FALLBACK_RATING = "9.6";
+  const FALLBACK_RATING = "9.0";
+  const FALLBACK_REVIEWS_COUNT = "126";
+  const FALLBACK_LOCATION_RATING = "9.4";
 
-  // If no proxy URL is configured, immediately return the fallback rating
+  // If no proxy URL is configured, immediately return the fallback values
   if (!PROXY_URL) {
     return {
       statusCode: 200,
@@ -14,33 +16,81 @@ exports.handler = async (event, context) => {
         'Content-Type': 'application/json',
         'Cache-Control': 'public, max-age=3600' // Cache fallback for 1 hour
       },
-      body: JSON.stringify({ rating: FALLBACK_RATING, note: 'fallback: PROXY_URL env var is missing' })
+      body: JSON.stringify({
+        rating: FALLBACK_RATING,
+        reviewsCount: FALLBACK_REVIEWS_COUNT,
+        locationRating: FALLBACK_LOCATION_RATING,
+        note: 'fallback: PROXY_URL env var is missing'
+      })
     };
   }
 
   try {
     const html = await fetchUrl(PROXY_URL);
     
-    // Attempt to match the rating score from schema JSON-LD or page scripts
-    const scoreMatch = html.match(/"reviewScore"\s*:\s*"([\d.]+)"/) || 
-                       html.match(/"ratingValue"\s*:\s*"?([\d.]+)"?/) ||
-                       html.match(/score_value[^>]*>([\d.]+)<\/span>/);
-    
-    if (scoreMatch && scoreMatch[1]) {
-      const rating = scoreMatch[1];
-      return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          // Cache in Netlify Edge CDN for 24 hours (86400 seconds)
-          // This keeps proxy requests to a minimum (only ~30 executions per month)
-          'Cache-Control': 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=7200'
-        },
-        body: JSON.stringify({ rating })
-      };
-    } else {
-      throw new Error('Rating value pattern not found in HTML response');
+    // 1. Overall Rating Score
+    const ratingMatches = [];
+    const ratingRegexes = [
+      /"reviewScore"\s*:\s*"([\d.]+)"/g,
+      /"ratingValue"\s*:\s*"?([\d.]+)"?/g
+    ];
+    for (const regex of ratingRegexes) {
+      let match;
+      while ((match = regex.exec(html)) !== null) {
+        ratingMatches.push(parseFloat(match[1]));
+      }
     }
+    const rating = ratingMatches.length > 0 ? ratingMatches[0].toFixed(1) : FALLBACK_RATING;
+
+    // 2. Review Count
+    const reviewsCountMatches = [];
+    const reviewsCountRegexes = [
+      /"reviewCount"\s*:\s*"(\d+)"/g,
+      /"reviewCount"\s*:\s*(\d+)/g,
+      /reviewsCount"\s*:\s*(\d+)/g
+    ];
+    for (const regex of reviewsCountRegexes) {
+      let match;
+      while ((match = regex.exec(html)) !== null) {
+        reviewsCountMatches.push(parseInt(match[1]));
+      }
+    }
+    const reviewsCount = reviewsCountMatches.length > 0 ? String(reviewsCountMatches[0]) : FALLBACK_REVIEWS_COUNT;
+
+    // 3. Location Score
+    const locationMatches = [];
+    const locationRegexes = [
+      /"name"\s*:\s*"hotel_location"[^}]*?"value"\s*:\s*([\d.]+)/g,
+      /"question"\s*:\s*"hotel_location"[^}]*?"score"\s*:\s*([\d.]+)/g,
+      /hotel_location[^}]*?scoreSegment[^}]*?score"\s*:\s*([\d.]+)/g
+    ];
+    for (const regex of locationRegexes) {
+      let match;
+      while ((match = regex.exec(html)) !== null) {
+        locationMatches.push(parseFloat(match[1]));
+      }
+    }
+    if (locationMatches.length === 0) {
+      const locIndex = html.indexOf('hotel_location');
+      if (locIndex !== -1) {
+        const snippet = html.substring(locIndex, locIndex + 500);
+        const scoreMatch = snippet.match(/"score"\s*:\s*([\d.]+)/) || snippet.match(/"value"\s*:\s*([\d.]+)/);
+        if (scoreMatch) {
+          locationMatches.push(parseFloat(scoreMatch[1]));
+        }
+      }
+    }
+    const locationRating = locationMatches.length > 0 ? locationMatches[0].toFixed(1) : FALLBACK_LOCATION_RATING;
+
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        // Cache in Netlify Edge CDN for 24 hours
+        'Cache-Control': 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=7200'
+      },
+      body: JSON.stringify({ rating, reviewsCount, locationRating })
+    };
   } catch (error) {
     console.error('Dynamic rating fetch error:', error.message);
     return {
@@ -49,7 +99,12 @@ exports.handler = async (event, context) => {
         'Content-Type': 'application/json',
         'Cache-Control': 'public, max-age=1800' // Cache error states for 30 minutes
       },
-      body: JSON.stringify({ rating: FALLBACK_RATING, error: error.message })
+      body: JSON.stringify({
+        rating: FALLBACK_RATING,
+        reviewsCount: FALLBACK_REVIEWS_COUNT,
+        locationRating: FALLBACK_LOCATION_RATING,
+        error: error.message
+      })
     };
   }
 };
@@ -68,3 +123,4 @@ function fetchUrl(url) {
     }).on('error', reject);
   });
 }
+

@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>estar · Apartaestudios en Manizales</title>
-<link rel="stylesheet" href="colors_and_type.css">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="colors_and_type.css?v=2">
+<link rel="stylesheet" href="styles.css?v=2">
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js"></script>
 </head>
 <body data-screen-label="01 Home">
@@ -15,7 +15,7 @@
   <div class="container">
     <a href="index.html" class="brand" aria-label="estar — inicio">
       <span class="star-mark" aria-hidden="true"></span>
-      <span>estar</span>
+      <img src="assets/logo.png" alt="estar" class="logo-img">
     </a>
 
     <nav aria-label="Principal">
@@ -51,9 +51,9 @@
     <p class="hero-eyebrow"><span class="dot"></span><span data-i18n="hero_eyebrow">Manizales · Caldas · Colombia</span></p>
 
     <h1 class="hero-title" data-headline>
-      <span class="voice-only voice-susurro">Quédate.<span class="italic">Manizales, lento.</span></span>
-      <span class="voice-only voice-conversacion">Un lugar para estar.<span class="italic">Manizales,<br>a su ritmo.</span></span>
-      <span class="voice-only voice-manifiesto">Esta ciudad es tuya.<span class="italic">Estar te recibe.</span></span>
+      <span class="voice-only voice-susurro">Quédate.</span>
+      <span class="voice-only voice-conversacion">Un lugar para estar.</span>
+      <span class="voice-only voice-manifiesto">Esta ciudad es tuya.</span>
     </h1>
   </div>
 
@@ -182,25 +182,97 @@
   </div>
 </section>
 
-
-<!-- ============================== FACTS STRIP ============================== -->
-<section class="facts-strip">
+<!-- ============================== LOCATION & RATINGS ============================== -->
+<section class="location-ratings" id="ubicacion">
   <div class="container">
-    <div class="fact" data-reveal>
-      <span class="num" data-i18n="fact_1_num">2025</span>
-      <span class="lbl" data-i18n="fact_1_lbl">Año de fundación</span>
-    </div>
-    <div class="fact" data-reveal>
-      <span class="num" data-i18n="fact_2_num">9.6</span>
-      <span class="lbl" data-i18n="fact_2_lbl">Calificación OTAs</span>
-    </div>
-    <div class="fact" data-reveal>
-      <span class="num" data-i18n="fact_3_num">100%</span>
-      <span class="lbl" data-i18n="fact_3_lbl">Check-in digital</span>
-    </div>
-    <div class="fact" data-reveal>
-      <span class="num" data-i18n="fact_4_num">4.8</span>
-      <span class="lbl" data-i18n="fact_4_lbl">Valoración huéspedes</span>
+    <div class="location-grid">
+      <!-- Left Column: Ratings & Reviews -->
+      <div class="ratings-column" data-reveal>
+        <p class="eyebrow terracotta" data-i18n="loc_eyebrow">Ubicación estratégica</p>
+        <h2 class="display-s" data-i18n="loc_title">En el corazón del sector Palogrande</h2>
+        
+        <div class="rating-cards">
+          <!-- Booking Card -->
+          <div class="rating-card booking-card">
+            <div class="card-header">
+              <span class="brand-name">Booking.com</span>
+              <div class="rating-badge" data-i18n="loc_booking_score">9.0</div>
+            </div>
+            <div class="card-body">
+              <h4 data-i18n="loc_booking_lbl">Calificación Booking</h4>
+              <p class="review-count" data-i18n="loc_booking_reviews">126 reseñas</p>
+            </div>
+          </div>
+          
+          <!-- Location Score Card -->
+          <div class="rating-card location-card">
+            <div class="card-header">
+              <span class="icon-wrap">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              </span>
+              <div class="rating-badge accent" data-i18n="loc_location_score">9.4</div>
+            </div>
+            <div class="card-body">
+              <h4 data-i18n="loc_location_lbl">Excelente ubicación</h4>
+              <p class="location-desc" data-i18n="loc_location_desc">No solo lo decimos nosotros, nuestros huéspedes también valoran de forma excelente nuestra cercanía a puntos clave de la ciudad.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Right Column: Proximity List & Map -->
+      <div class="map-column" data-reveal>
+        <div class="proximity-section">
+          <h3 class="places-title" data-i18n="loc_places_title">Lugares estratégicos cercanos</h3>
+          <ul class="places-list">
+            <li class="place-item">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-graduation-cap"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M6 18.8v-4L2 12v7a1 1 0 0 0 1 1h6v-2H6z"/><path d="M21.5 12v6h-1v-6z"/></svg>
+              <span data-i18n="loc_place_1">Universidad Católica · 200m / 3 min caminando</span>
+            </li>
+            <li class="place-item">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-graduation-cap"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M6 18.8v-4L2 12v7a1 1 0 0 0 1 1h6v-2H6z"/><path d="M21.5 12v6h-1v-6z"/></svg>
+              <span data-i18n="loc_place_2">Universidad de Caldas (Palogrande) · 400m / 5 min caminando</span>
+            </li>
+            <li class="place-item">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-graduation-cap"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M6 18.8v-4L2 12v7a1 1 0 0 0 1 1h6v-2H6z"/><path d="M21.5 12v6h-1v-6z"/></svg>
+              <span data-i18n="loc_place_3">Universidad Nacional (El Cable) · 500m / 7 min caminando</span>
+            </li>
+            <li class="place-item">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trophy"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34"/><path d="M12 2a6 6 0 0 0-6 6v4a6 6 0 0 0 6 6 6 6 0 0 0 6-6V8a6 6 0 0 0-6-6z"/></svg>
+              <span data-i18n="loc_place_4">Estadio Palogrande · 400m / 6 min caminando</span>
+            </li>
+            <li class="place-item">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span data-i18n="loc_place_5">Torre del Cable · 450m / 6 min caminando</span>
+            </li>
+          </ul>
+        </div>
+        
+        <!-- Map Section with Switcher -->
+        <div class="map-wrapper">
+          <div class="map-toggle-bar">
+            <button type="button" class="map-toggle-btn active" data-view="brochure" data-i18n="map_btn_illustrated">Mapa Ilustrado</button>
+            <button type="button" class="map-toggle-btn" data-view="interactive" data-i18n="map_btn_interactive">Mapa Interactivo</button>
+          </div>
+          <div class="map-views">
+            <div class="map-view view-brochure active">
+              <img src="assets/mapa_brochure.png" alt="Mapa Ilustrado Estar" class="brochure-map-img">
+            </div>
+            <div class="map-view view-interactive">
+              <iframe 
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3976.9427493202976!2d-75.49067482397193!3d5.05959803837424!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e476fe36fa4b84b%3A0xc17fa0088de45703!2sEstar%20Apartaestudios!5e0!3m2!1ses!2sco!4v1716342000000!5m2!1ses!2sco" 
+                width="100%" 
+                height="100%" 
+                style="border:0;" 
+                allowfullscreen="" 
+                loading="lazy" 
+                referrerpolicy="no-referrer-when-downgrade"
+                title="Estar Apartaestudios Google Maps Location">
+              </iframe>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -588,19 +660,84 @@
     "language": "es"
   }/*EDITMODE-END*/;
 </script>
-<script src="shell.js"></script>
+<script src="shell.js?v=2"></script>
 <script src="kunas.js"></script>
 <script>lucide.createIcons();</script>
 
-  <!-- Botón Flotante de WhatsApp -->
-  <a href="https://wa.me/573102490414" class="whatsapp-float" target="_blank" rel="noopener noreferrer" aria-label="Chat por WhatsApp">
-    <svg viewBox="0 0 175.216 175.552" xmlns="http://www.w3.org/2000/svg">
-      <!-- Chat Bubble Background (White) -->
-      <path fill="#FFFFFF" d="M87.184 25.227c-33.733 0-61.166 27.423-61.178 61.13a60.98 60.98 0 0 0 9.349 32.535l1.455 2.313-6.179 22.558 23.146-6.069 2.235 1.324c9.387 5.571 20.15 8.517 31.126 8.523h.023c33.707 0 61.14-27.426 61.153-61.135a60.75 60.75 0 0 0-17.895-43.251 60.75 60.75 0 0 0-43.235-17.928z"/>
-      <!-- Phone Handset Icon (WhatsApp Green, dynamically synced via CSS class) -->
-      <path class="whatsapp-phone-icon" fill="#25D366" fill-rule="evenodd" d="M68.772 55.603c-1.378-3.061-2.828-3.123-4.137-3.176l-3.524-.043c-1.226 0-3.218.46-4.902 2.3s-6.435 6.287-6.435 15.332 6.588 17.785 7.506 19.013 12.718 20.381 31.405 27.75c15.529 6.124 18.689 4.906 22.061 4.6s10.877-4.447 12.408-8.74 1.532-7.971 1.073-8.74-1.685-1.226-3.525-2.146-10.877-5.367-12.562-5.981-2.91-.919-4.137.921-4.746 5.979-5.819 7.206-2.144 1.381-3.984.462-7.76-2.861-14.784-9.124c-5.465-4.873-9.154-10.891-10.228-12.73s-.114-2.835.808-3.751c.825-.824 1.838-2.147 2.759-3.22s1.224-1.84 1.836-3.065.307-2.301-.153-3.22-4.032-10.011-5.666-13.647"/>
-    </svg>
-  </a>
+  <!-- Burbuja Flotante de Contacto -->
+  <div class="contact-float" id="contactFloat">
+    <button class="contact-trigger" aria-label="Abrir opciones de contacto">
+      <span class="contact-icon contact-icon-chat">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+      </span>
+      <span class="contact-icon contact-icon-close">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </span>
+    </button>
+    
+    <div class="contact-menu">
+      <div class="contact-menu-header">
+        <span class="contact-menu-title" data-i18n="contact_title">Escríbenos</span>
+        <span class="contact-menu-subtitle" data-i18n="contact_subtitle">Hospedaje contemporáneo</span>
+      </div>
+      <div class="contact-menu-list">
+        <!-- WhatsApp -->
+        <a href="https://api.whatsapp.com/send/?phone=573102490414&text&type=phone_number&app_absent=0" target="_blank" rel="noopener noreferrer" class="contact-item ci-whatsapp">
+          <div class="contact-item-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.709 1.457h.004c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+          </div>
+          <div class="contact-item-text">
+            <span class="contact-item-title">WhatsApp</span>
+            <span class="contact-item-desc" data-i18n="contact_wa_desc">Chatea con nosotros</span>
+          </div>
+        </a>
+        
+        <!-- Instagram -->
+        <a href="https://www.instagram.com/hotel.estar/" target="_blank" rel="noopener noreferrer" class="contact-item ci-instagram">
+          <div class="contact-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-instagram"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
+          </div>
+          <div class="contact-item-text">
+            <span class="contact-item-title">Instagram</span>
+            <span class="contact-item-desc">@hotel.estar</span>
+          </div>
+        </a>
+        
+        <!-- Correo -->
+        <a href="mailto:reservas@hotelestar.com" class="contact-item ci-email">
+          <div class="contact-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          </div>
+          <div class="contact-item-text">
+            <span class="contact-item-title" data-i18n="contact_email_title">Correo</span>
+            <span class="contact-item-desc">reservas@hotelestar.com</span>
+          </div>
+        </a>
+        
+        <!-- Google Maps -->
+        <a href="https://maps.app.goo.gl/QwDXDmpE7NwV4m1ZA" target="_blank" rel="noopener noreferrer" class="contact-item ci-maps">
+          <div class="contact-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+          <div class="contact-item-text">
+            <span class="contact-item-title">Google Maps</span>
+            <span class="contact-item-desc" data-i18n="contact_maps_desc">Cómo llegar</span>
+          </div>
+        </a>
+        
+        <!-- Waze -->
+        <a href="https://ul.waze.com/ul?place=ChIJT2vbCbBlR44Rbq4GbLKZIeU&ll=5.05957470%2C-75.48809350&navigate=yes&utm_campaign=default&utm_source=waze_website&utm_medium=lm_share_location" target="_blank" rel="noopener noreferrer" class="contact-item ci-waze">
+          <div class="contact-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-navigation"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          </div>
+          <div class="contact-item-text">
+            <span class="contact-item-title">Waze</span>
+            <span class="contact-item-desc" data-i18n="contact_waze_desc">Navegar con Waze</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>

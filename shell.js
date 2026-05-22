@@ -150,7 +150,29 @@
       fact_3_num: '100%',
       fact_3_lbl: 'Check-in digital',
       fact_4_num: '4.8',
-      fact_4_lbl: 'Valoración huéspedes'
+      fact_4_lbl: 'Valoración huéspedes',
+      loc_eyebrow: 'Ubicación estratégica',
+      loc_title: 'En el corazón del sector Palogrande',
+      loc_booking_lbl: 'Calificación Booking',
+      loc_booking_score: '9.0',
+      loc_booking_reviews: '126 reseñas',
+      loc_location_lbl: 'Excelente ubicación',
+      loc_location_score: '9.4',
+      loc_location_desc: 'No solo lo decimos nosotros, nuestros huéspedes también valoran de forma excelente nuestra cercanía a puntos clave de la ciudad.',
+      loc_places_title: 'Lugares estratégicos cercanos',
+      loc_place_1: 'Universidad Católica · 200m / 3 min caminando',
+      loc_place_2: 'Universidad de Caldas (Palogrande) · 400m / 5 min caminando',
+      loc_place_3: 'Universidad Nacional (El Cable) · 500m / 7 min caminando',
+      loc_place_4: 'Estadio Palogrande · 400m / 6 min caminando',
+      loc_place_5: 'Torre del Cable · 450m / 6 min caminando',
+      map_btn_illustrated: 'Mapa Ilustrado',
+      map_btn_interactive: 'Mapa Interactivo',
+      contact_title: 'Escríbenos',
+      contact_subtitle: 'Hospedaje contemporáneo',
+      contact_wa_desc: 'Chatea con nosotros',
+      contact_email_title: 'Correo',
+      contact_maps_desc: 'Cómo llegar',
+      contact_waze_desc: 'Navegar con Waze'
     },
     en: {
       nav_estadias: 'Stays',
@@ -183,7 +205,29 @@
       fact_3_num: '100%',
       fact_3_lbl: 'Digital check-in',
       fact_4_num: '4.8',
-      fact_4_lbl: 'Guest rating'
+      fact_4_lbl: 'Guest rating',
+      loc_eyebrow: 'Strategic location',
+      loc_title: 'In the heart of the Palogrande sector',
+      loc_booking_lbl: 'Booking rating',
+      loc_booking_score: '9.0',
+      loc_booking_reviews: '126 reviews',
+      loc_location_lbl: 'Excellent location',
+      loc_location_score: '9.4',
+      loc_location_desc: 'It\'s not just us saying it, our guests also rate our proximity to key city spots outstandingly.',
+      loc_places_title: 'Nearby strategic locations',
+      loc_place_1: 'Universidad Católica · 200m / 3 min walk',
+      loc_place_2: 'Universidad de Caldas (Palogrande) · 400m / 5 min walk',
+      loc_place_3: 'Universidad Nacional (El Cable) · 500m / 7 min walk',
+      loc_place_4: 'Estadio Palogrande · 400m / 6 min walk',
+      loc_place_5: 'Torre del Cable · 450m / 6 min walk',
+      map_btn_illustrated: 'Illustrated Map',
+      map_btn_interactive: 'Interactive Map',
+      contact_title: 'Contact Us',
+      contact_subtitle: 'Contemporary lodging',
+      contact_wa_desc: 'Chat with us',
+      contact_email_title: 'Email',
+      contact_maps_desc: 'Get directions',
+      contact_waze_desc: 'Navigate with Waze'
     }
   };
 
@@ -486,16 +530,137 @@
         return res.json();
       })
       .then(data => {
-        if (data && data.rating) {
-          const score = data.rating;
-          i18n.es.fact_2_num = score;
-          i18n.en.fact_2_num = score;
+        if (data) {
+          if (data.rating) {
+            i18n.es.fact_2_num = data.rating;
+            i18n.en.fact_2_num = data.rating;
+            i18n.es.loc_booking_score = data.rating;
+            i18n.en.loc_booking_score = data.rating;
+          }
+          if (data.reviewsCount) {
+            i18n.es.loc_booking_reviews = `${data.reviewsCount} reseñas`;
+            i18n.en.loc_booking_reviews = `${data.reviewsCount} reviews`;
+          }
+          if (data.locationRating) {
+            i18n.es.loc_location_score = data.locationRating;
+            i18n.en.loc_location_score = data.locationRating;
+          }
           applyTweaks();
         }
       })
       .catch(err => {
         console.warn('Could not fetch dynamic rating, using fallback:', err);
       });
+  }
+
+  /* ----- MAP SWITCHER & LIGHTBOX ----- */
+  function setupMapToggle() {
+    const toggleBtns = document.querySelectorAll('.map-toggle-btn');
+    const mapViews = document.querySelectorAll('.map-view');
+    
+    toggleBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetView = btn.getAttribute('data-view');
+        
+        toggleBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        mapViews.forEach(view => {
+          if (view.classList.contains(`view-${targetView}`)) {
+            view.classList.add('active');
+          } else {
+            view.classList.remove('active');
+          }
+        });
+      });
+    });
+
+    // Lightbox for the brochure map
+    const brochureMapImg = document.querySelector('.brochure-map-img');
+    if (brochureMapImg) {
+      brochureMapImg.addEventListener('click', () => {
+        const overlay = document.createElement('div');
+        overlay.className = 'map-lightbox-overlay';
+        overlay.innerHTML = `
+          <div class="lightbox-content">
+            <button class="lightbox-close" aria-label="Cerrar">&times;</button>
+            <img src="${brochureMapImg.getAttribute('src')}" alt="Mapa Ilustrado Estar" class="lightbox-img">
+          </div>
+        `;
+        document.body.appendChild(overlay);
+        document.body.style.overflow = 'hidden';
+
+        const closeLightbox = () => {
+          overlay.classList.add('fade-out');
+          setTimeout(() => {
+            overlay.remove();
+            document.body.style.overflow = '';
+          }, 300);
+        };
+
+        overlay.addEventListener('click', (e) => {
+          if (e.target === overlay || e.target.classList.contains('lightbox-close') || e.target.classList.contains('lightbox-content')) {
+            closeLightbox();
+          }
+        });
+
+        const escHandler = (e) => {
+          if (e.key === 'Escape') {
+            closeLightbox();
+            document.removeEventListener('keydown', escHandler);
+          }
+        };
+        document.addEventListener('keydown', escHandler);
+      });
+    }
+  }
+
+  /* ----- CONTACT HUB FLOATING WIDGET ----- */
+  function setupContactFloat() {
+    const contactFloat = document.getElementById('contactFloat');
+    if (!contactFloat) return;
+
+    const trigger = contactFloat.querySelector('.contact-trigger');
+    if (!trigger) return;
+
+    // Toggle menu active state on trigger click/tap
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      contactFloat.classList.toggle('active');
+    });
+
+    // Prevent click events inside the menu from closing the menu
+    const menu = contactFloat.querySelector('.contact-menu');
+    if (menu) {
+      menu.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    }
+
+    // Close menu when clicking anywhere else on the document
+    document.addEventListener('click', () => {
+      contactFloat.classList.remove('active');
+    });
+
+    // Close menu when pressing Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        contactFloat.classList.remove('active');
+      }
+    });
+  }
+
+  /* ----- BOOKING BAR SCROLL REVEAL ----- */
+  function setupBookingBarScroll() {
+    const bookingBar = document.querySelector('.booking-bar');
+    if (!bookingBar) return;
+
+    const onScroll = () => {
+      bookingBar.classList.toggle('is-visible', window.scrollY > 120);
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
   }
 
   /* ---------- INIT ---------- */
@@ -506,6 +671,9 @@
       setupHeaderLangToggle(); 
       setupMobileBookingScroll(); 
       setupRoomSliders();
+      setupMapToggle();
+      setupContactFloat();
+      setupBookingBarScroll();
       fetchDynamicRating();
     });
   } else {
@@ -514,6 +682,9 @@
     setupHeaderLangToggle();
     setupMobileBookingScroll();
     setupRoomSliders();
+    setupMapToggle();
+    setupContactFloat();
+    setupBookingBarScroll();
     fetchDynamicRating();
   }
 })();
