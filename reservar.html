@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="colors_and_type.css">
   <link rel="stylesheet" href="styles.css">
   <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js"></script>
+  <!-- Wompi Web Checkout Widget -->
+  <script type="text/javascript" src="https://checkout.wompi.co/widget.js"></script>
   <style>
     /* ─── Booking engine namespace ───────────────────────────────────────
        All rules live under .be-* so they never clash with styles.css.
@@ -452,6 +454,9 @@
 
 <!-- Datos y utilidades -->
 <script>
+  // Llave pública de Wompi (reemplazar con tu llave pub_test_... o pub_prod_...)
+  window.WOMPI_PUBLIC_KEY = 'pub_prod_Hg7duVIJOzWuU1fNYipC5rs0Hzet2BLL';
+
   const BE_ROOMS = [
     { id:'clasica', num:'01', name:'Clásica', area:28, capacity:2, bed:'1 Queen size', view:'Vista ciudad',
       desc:'Diseño eficiente y cálido. Todo lo esencial en 28 m² bien aprovechados.', priceFlexible:220000,
@@ -478,9 +483,7 @@
     { id:'tour', name:'Tour Manizales', desc:'4 horas con guía local certificado', price:80000, unit:'/persona', icon:'map-pin' }
   ];
   const BE_PAYMENTS = [
-    { id:'card', name:'Tarjeta crédito / débito', desc:'Visa, Mastercard, Amex', icon:'credit-card' },
-    { id:'pse', name:'PSE', desc:'Débito bancario en línea', icon:'building-2' },
-    { id:'nequi', name:'Nequi', desc:'Desde tu cuenta Nequi', icon:'smartphone' },
+    { id:'wompi', name:'Pago en línea seguro (Wompi)', desc:'Tarjeta de crédito, PSE, Nequi', icon:'credit-card' },
     { id:'hotel', name:'Pagar en el hotel', desc:'Reserva sin cargo previo, pago al llegar', icon:'home' },
     { id:'transfer', name:'Transferencia bancaria', desc:'Te enviamos los datos por correo', icon:'landmark' }
   ];

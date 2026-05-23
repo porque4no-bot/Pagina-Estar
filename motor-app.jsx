@@ -72,7 +72,9 @@ const i18nEngine = {
     paymentIntro: "Elige cómo quieres pagar.",
     paymentHotelInfo: "Tu reserva queda confirmada sin cargo previo. Pagas al hacer check-in. Cancelación gratuita hasta 24h antes.",
     paymentTransferInfo: "Recibirás los datos bancarios por correo. Tienes 24 horas para realizar la transferencia y confirmar tu reserva.",
-    paymentNequiInfo: "Te enviaremos el número Nequi al correo. Incluye el código de reserva en el mensaje de pago.",
+    paymentWompiInfo: "Paga de manera segura con tu tarjeta de crédito, PSE o cuenta Nequi a través de Wompi. Tu reserva se confirmará inmediatamente.",
+    paymentErrorDeclined: "La transacción fue declinada por la pasarela de pagos. Por favor, intenta de nuevo con otra tarjeta o medio de pago.",
+    paymentErrorFailed: "Ocurrió un error al procesar el pago con Wompi. Por favor intenta de nuevo.",
     confirmBooking: "Confirmar reserva →",
     emptySummary: "Elige tu habitación para ver el resumen aquí.",
     successTitle: "¡Reserva confirmada!",
@@ -172,16 +174,12 @@ const i18nEngine = {
     
     // Payments translations
     paymentNames: {
-      card: "Tarjeta crédito / débito",
-      pse: "PSE",
-      nequi: "Nequi",
+      wompi: "Pago en línea seguro (Wompi)",
       hotel: "Pagar en el hotel",
       transfer: "Transferencia bancaria"
     },
     paymentDescs: {
-      card: "Visa, Mastercard, Amex",
-      pse: "Débito bancario en línea",
-      nequi: "Desde tu cuenta Nequi",
+      wompi: "Tarjeta de crédito, PSE, Nequi",
       hotel: "Reserva sin cargo previo, pago al llegar",
       transfer: "Te enviamos los datos por correo"
     }
@@ -236,7 +234,9 @@ const i18nEngine = {
     paymentIntro: "Choose how you would like to pay.",
     paymentHotelInfo: "Your reservation is confirmed without prior charge. You pay upon check-in. Free cancellation up to 24 hours prior.",
     paymentTransferInfo: "You will receive bank details by email. You have 24 hours to complete the transfer and confirm your booking.",
-    paymentNequiInfo: "We will send you the Nequi number by email. Include the booking reference in the payment note.",
+    paymentWompiInfo: "Pay securely with your credit card, PSE, or Nequi via Wompi. Your booking will be confirmed instantly.",
+    paymentErrorDeclined: "The transaction was declined by the payment gateway. Please try again with another card or payment method.",
+    paymentErrorFailed: "An error occurred while processing the payment with Wompi. Please try again.",
     confirmBooking: "Confirm booking →",
     emptySummary: "Choose your apartaestudio to view the summary here.",
     successTitle: "Booking confirmed!",
@@ -336,16 +336,12 @@ const i18nEngine = {
     
     // Payments translations
     paymentNames: {
-      card: "Credit / debit card",
-      pse: "PSE (Online Bank Debit)",
-      nequi: "Nequi Mobile Pay",
+      wompi: "Secure online payment (Wompi)",
       hotel: "Pay at hotel",
       transfer: "Bank transfer"
     },
     paymentDescs: {
-      card: "Visa, Mastercard, Amex",
-      pse: "Online secure bank transaction",
-      nequi: "From your Nequi wallet",
+      wompi: "Credit card, PSE, Nequi",
       hotel: "Book now without prepay, pay upon check-in",
       transfer: "We will email you our bank details"
     }
@@ -696,8 +692,72 @@ function GuestForm({ guest, setGuest, onContinue, lang }) {
 function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, lang }) {
   const t = i18nEngine[lang];
   const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
+  const [loading, setLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState(null);
 
   const translatedRoomName = t.roomNames[booking.room.id] || booking.room.name;
+
+  const handlePayment = () => {
+    setPaymentError(null);
+
+    // If it's an offline method, proceed directly
+    if (paymentMethod === 'hotel' || paymentMethod === 'transfer') {
+      onConfirm(genCode());
+      return;
+    }
+
+    if (paymentMethod === 'wompi') {
+      if (typeof window.WidgetCheckout === 'undefined') {
+        setPaymentError(
+          lang === 'es'
+            ? 'La pasarela de pago Wompi no se cargó correctamente. Por favor recarga la página.'
+            : 'Wompi payment gateway failed to load. Please refresh the page.'
+        );
+        return;
+      }
+
+      setLoading(true);
+      const code = genCode();
+
+      const checkout = new window.WidgetCheckout({
+        currency: 'COP',
+        amountInCents: Math.round(calc.total * 100),
+        reference: `${code}-${Date.now().toString().slice(-4)}`,
+        publicKey: window.WOMPI_PUBLIC_KEY || 'pub_test_Q5yDA9xoEbjuF4GZRL9yH15Juxzz6J68',
+        customerData: {
+          email: booking.guest?.email || '',
+          fullName: `${booking.guest?.nombre || ''} ${booking.guest?.apellido || ''}`.trim(),
+          phoneNumber: booking.guest?.tel || '',
+          phoneNumberPrefix: '+57'
+        }
+      });
+
+      checkout.open(function (result) {
+        setLoading(false);
+        const transaction = result.transaction;
+        console.log('Wompi Transaction Callback:', transaction);
+
+        if (transaction.status === 'APPROVED' || transaction.status === 'PENDING') {
+          onConfirm(code, {
+            id: transaction.id,
+            status: transaction.status,
+            paymentMethod: transaction.payment_method_type,
+            reference: transaction.reference
+          });
+        } else if (transaction.status === 'DECLINED') {
+          setPaymentError(t.paymentErrorDeclined);
+        } else {
+          setPaymentError(t.paymentErrorFailed);
+        }
+      });
+
+      // Reset loading after opening so that the button is not permanently disabled
+      // if the user closes the checkout overlay manually.
+      setTimeout(() => {
+        setLoading(false);
+      }, 1000);
+    }
+  };
 
   return (
     <div>
@@ -736,7 +796,8 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
           return (
             <button key={pm.id} type="button"
               className={`be-payment-opt${paymentMethod === pm.id ? ' active' : ''}`}
-              onClick={() => setPaymentMethod(pm.id)}>
+              onClick={() => { setPaymentMethod(pm.id); setPaymentError(null); }}
+              disabled={loading}>
               <Icon name={pm.icon} size={20} />
               <div className="be-payment-info">
                 <span className="be-payment-name">{pmName}</span>
@@ -747,6 +808,20 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
           );
         })}
       </div>
+
+      {paymentError && (
+        <div className="be-info-box be-info-error" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Icon name="alert-triangle" size={18} style={{ color: 'var(--terracotta-700)', flexShrink: 0 }} />
+          <p style={{ margin: 0 }}>{paymentError}</p>
+        </div>
+      )}
+
+      {paymentMethod === 'wompi' && !paymentError && (
+        <div className="be-info-box">
+          <Icon name="credit-card" size={16} style={{ color: 'var(--sand-700)', marginTop: 1 }} />
+          <p>{t.paymentWompiInfo}</p>
+        </div>
+      )}
       {paymentMethod === 'hotel' && (
         <div className="be-info-box">
           <Icon name="info" size={16} style={{ color: 'var(--sand-700)', marginTop: 1 }} />
@@ -759,16 +834,17 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
           <p>{t.paymentTransferInfo}</p>
         </div>
       )}
-      {paymentMethod === 'nequi' && (
-        <div className="be-info-box">
-          <Icon name="smartphone" size={16} style={{ color: 'var(--sand-700)', marginTop: 1 }} />
-          <p>{t.paymentNequiInfo}</p>
-        </div>
-      )}
+
       <div className="be-step-footer">
-        <button className="be-btn-primary" style={{ padding: '14px 28px', fontSize: 13 }}
-          disabled={!paymentMethod} onClick={onConfirm}>
-          {t.confirmBooking}
+        <button className="be-btn-primary" style={{ padding: '14px 28px', fontSize: 13, minWidth: 180, justifyContent: 'center' }}
+          disabled={!paymentMethod || loading} onClick={handlePayment}>
+          {loading ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {lang === 'es' ? 'Procesando...' : 'Processing...'}
+            </span>
+          ) : (
+            t.confirmBooking
+          )}
         </button>
       </div>
     </div>
@@ -834,7 +910,7 @@ function BookingSummary({ booking, search, lang }) {
 }
 
 /* ── Confirmation ─────────────────────────────────── */
-function Confirmation({ booking, search, code, onManage, onNew, lang }) {
+function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, lang }) {
   const t = i18nEngine[lang];
   const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
 
@@ -872,6 +948,43 @@ function Confirmation({ booking, search, code, onManage, onNew, lang }) {
           <div className="be-confirm-row">
             <span className="be-eyebrow">{t.total}</span>
             <p className="be-confirm-total">{formatCOP(calc.total)}</p>
+          </div>
+        )}
+        {paymentDetails && (
+          <div className="be-confirm-row" style={{ backgroundColor: 'var(--paper-200)', borderTop: '1px solid var(--paper-400)' }}>
+            <span className="be-eyebrow" style={{ color: 'var(--olive)' }}>{lang === 'es' ? 'Detalles de Pago (Wompi)' : 'Payment Details (Wompi)'}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, flexWrap: 'wrap', gap: 10 }}>
+              <div>
+                <p className="be-confirm-val" style={{ fontSize: 13, margin: 0 }}>
+                  <strong>ID Transacción:</strong> {paymentDetails.id}
+                </p>
+                <p className="be-confirm-val" style={{ fontSize: 13, margin: '4px 0 0 0', opacity: 0.85 }}>
+                  <strong>Medio de pago:</strong> {paymentDetails.paymentMethod || 'Wompi'}
+                </p>
+              </div>
+              <span style={{
+                backgroundColor: paymentDetails.status === 'APPROVED' ? 'var(--olive-100)' : 'var(--terracotta-100)',
+                color: paymentDetails.status === 'APPROVED' ? 'var(--olive-700)' : 'var(--terracotta-700)',
+                padding: '4px 10px',
+                fontSize: 10,
+                fontWeight: 700,
+                borderRadius: 'var(--radius-pill)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                display: 'inline-block'
+              }}>
+                {paymentDetails.status === 'APPROVED' 
+                  ? (lang === 'es' ? 'Aprobado' : 'Approved') 
+                  : (lang === 'es' ? 'Pendiente' : 'Pending')}
+              </span>
+            </div>
+            {paymentDetails.status === 'PENDING' && (
+              <p style={{ fontSize: 11, color: 'var(--ink-500)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.4, margin: '8px 0 0 0' }}>
+                {lang === 'es' 
+                  ? '✶ Tu pago está pendiente de confirmación por tu banco. Te enviaremos un correo cuando se apruebe.' 
+                  : '✶ Your payment is pending confirmation by your bank. We will email you once approved.'}
+              </p>
+            )}
           </div>
         )}
         <div className="be-confirm-actions">
@@ -1021,6 +1134,7 @@ function BookingEngine() {
   const [guestData, setGuestData] = useState({});
   const [paymentMethod, setPaymentMethod] = useState(null);
   const [bookingCode, setBookingCode] = useState(null);
+  const [paymentDetails, setPaymentDetails] = useState(null);
 
   /* Listener for decoupled language changes from shell.js */
   useEffect(() => {
@@ -1065,6 +1179,12 @@ function BookingEngine() {
     setGuestData({});
     setPaymentMethod(null);
     setBookingCode(null);
+    setPaymentDetails(null);
+  }
+
+  function handleConfirmBooking(code, details = null) {
+    setBookingCode(code);
+    setPaymentDetails(details);
   }
 
   function goToStep(id) {
@@ -1081,7 +1201,7 @@ function BookingEngine() {
       <div className="be-app" data-theme="editorial">
         <div className="be-page-inner">
           <Confirmation
-            booking={booking} search={search} code={bookingCode} lang={lang}
+            booking={booking} search={search} code={bookingCode} paymentDetails={paymentDetails} lang={lang}
             onManage={() => { setMode('manage'); setBookingCode(null); }}
             onNew={() => handleSearch({ checkin: getOffset(1), checkout: getOffset(4), guests: 2 })}
           />
@@ -1164,7 +1284,7 @@ function BookingEngine() {
                 setPaymentMethod={setPaymentMethod}
                 booking={booking}
                 search={search}
-                onConfirm={() => setBookingCode(genCode())}
+                onConfirm={handleConfirmBooking}
                 lang={lang}
               />
             </StepWrapper>
