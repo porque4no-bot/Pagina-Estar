@@ -1,0 +1,130 @@
+{
+  "31348": {
+    "id": "clasica",
+    "num": "01",
+    "name": "Clásica",
+    "sub": "Compacto, cálido, todo a la mano.",
+    "description": "Cama queen, escritorio frente a la ventana, cocina equipada con menaje completo y baño privado con ducha. La esencia de estar, en 28 m².",
+    "capacity": 2,
+    "beds": "1 Queen size",
+    "area": 28,
+    "view": "Vista ciudad",
+    "basePrice": 220000,
+    "image": "assets/photos/tipo1/1.webp",
+    "gallery": [
+      "assets/photos/tipo1/1.webp",
+      "assets/photos/tipo1/2.webp",
+      "assets/photos/tipo1/3.webp"
+    ],
+    "amenities": [
+      {"icon": "wifi", "l": "WiFi fibra"},
+      {"icon": "tv", "l": "Smart TV 43\""},
+      {"icon": "cooking-pot", "l": "Cocina equipada"},
+      {"icon": "shower-head", "l": "Baño privado"},
+      {"icon": "sparkles", "l": "Aseo semanal"}
+    ]
+  },
+  "31349": {
+    "id": "seleccion",
+    "num": "02",
+    "name": "Selección",
+    "sub": "Un poco de afuera, adentro.",
+    "description": "Balcón privado con vistas a la cordillera. Ideal para el café de las mañanas. La luz natural cambia toda la sensación del espacio.",
+    "capacity": 2,
+    "beds": "1 Queen size",
+    "area": 32,
+    "view": "Cordillera + balcón",
+    "basePrice": 265000,
+    "image": "assets/photos/tipo2/1.webp",
+    "gallery": [
+      "assets/photos/tipo2/1.webp",
+      "assets/photos/tipo2/2.webp",
+      "assets/photos/tipo2/3.webp",
+      "assets/photos/tipo2/4.webp"
+    ],
+    "amenities": [
+      {"icon": "wind", "l": "Balcón privado"},
+      {"icon": "wifi", "l": "WiFi fibra"},
+      {"icon": "tv", "l": "Smart TV 43\""},
+      {"icon": "cooking-pot", "l": "Cocina equipada"},
+      {"icon": "shower-head", "l": "Baño privado"}
+    ]
+  },
+  "31350": {
+    "id": "reserva",
+    "num": "03",
+    "name": "Reserva",
+    "sub": "Zona de estar separada de la cama.",
+    "description": "Dormitorio privado separado de la zona social. Escritorio ergonómico. 42 m². Cuenta con ambientes definidos, cocina y Smart TV.",
+    "capacity": 2,
+    "beds": "1 King size",
+    "area": 42,
+    "view": "Vista ciudad",
+    "basePrice": 320000,
+    "image": "assets/photos/tipo3/1.webp",
+    "gallery": [
+      "assets/photos/tipo3/1.webp",
+      "assets/photos/tipo3/2.webp",
+      "assets/photos/tipo3/3.webp"
+    ],
+    "amenities": [
+      {"icon": "layout", "l": "Ambientes separados"},
+      {"icon": "wifi", "l": "WiFi fibra"},
+      {"icon": "tv", "l": "Smart TV 55\""},
+      {"icon": "cooking-pot", "l": "Cocina equipada"},
+      {"icon": "briefcase", "l": "Escritorio"}
+    ]
+  },
+  "31351": {
+    "id": "origen",
+    "num": "04",
+    "name": "Origen",
+    "sub": "Nuestra tipología más espaciosa.",
+    "description": "El más espacioso. Diseño con referencia cafetera. Vista panorámica de Manizales para relajarse tras un día de trabajo.",
+    "capacity": 2,
+    "beds": "1 King size",
+    "area": 52,
+    "view": "Panorámica",
+    "basePrice": 385000,
+    "image": "assets/photos/tipo4/1.webp",
+    "gallery": [
+      "assets/photos/tipo4/1.webp",
+      "assets/photos/tipo4/2.webp",
+      "assets/photos/tipo4/3.webp",
+      "assets/photos/tipo4/4.webp",
+      "assets/photos/tipo4/5.webp"
+    ],
+    "amenities": [
+      {"icon": "mountain", "l": "Vista panorámica"},
+      {"icon": "wifi", "l": "WiFi fibra"},
+      {"icon": "tv", "l": "Smart TV 65\""},
+      {"icon": "cooking-pot", "l": "Cocina equipada"},
+      {"icon": "bath", "l": "Bañera"}
+    ]
+  },
+  "31352": {
+    "id": "especial",
+    "num": "05",
+    "name": "Especial",
+    "sub": "Nuestra tipología más completa.",
+    "description": "Nuestra tipología más completa. Terraza privada, cama king + sofá cama. Ideal para viajes familiares o de negocios.",
+    "capacity": 3,
+    "beds": "King + sofacama",
+    "view": "Panorámica premium",
+    "basePrice": 450000,
+    "image": "assets/photos/tipo5/1.webp",
+    "gallery": [
+      "assets/photos/tipo5/1.webp",
+      "assets/photos/tipo5/2.webp",
+      "assets/photos/tipo5/3.webp",
+      "assets/photos/tipo5/4.webp"
+    ],
+    "amenities": [
+      {"icon": "sun", "l": "Terraza privada"},
+      {"icon": "wifi", "l": "WiFi fibra"},
+      {"icon": "tv", "l": "Smart TV 65\""},
+      {"icon": "cooking-pot", "l": "Cocina premium"},
+      {"icon": "users", "l": "Hasta 3 personas"}
+    ]
+  }
+}

@@ -1,5 +1,10 @@
 [build]
+  command = "npm run build"
+  publish = "."
   functions = "netlify/functions"
+
+[functions]
+  included_files = ["rooms_db.json"]
 
 # Configuration for Netlify deployment and serverless redirects
 [[redirects]]

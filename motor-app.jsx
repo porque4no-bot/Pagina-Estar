@@ -521,11 +521,58 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
   const roomBed = t.roomBeds[room.bed] || room.bed;
   const roomView = t.roomViews[room.view] || room.view;
 
+  const isAvailable = room.available !== false; // default to true
+
+  // Slideshow state
+  const [activeImgIdx, setActiveImgIdx] = useState(0);
+  const gallery = room.gallery || (room.image ? [room.image] : []);
+  const hasMultipleImgs = gallery.length > 1;
+
+  const nextImage = (e) => {
+    e.stopPropagation();
+    setActiveImgIdx((prev) => (prev + 1) % gallery.length);
+  };
+
+  const prevImage = (e) => {
+    e.stopPropagation();
+    setActiveImgIdx((prev) => (prev - 1 + gallery.length) % gallery.length);
+  };
+
   return (
-    <div className="be-room-card">
+    <div className={`be-room-card${!isAvailable ? ' be-room-unavailable' : ''}`}>
       <div className="be-room-photo">
-        <div className="be-room-badge">{lang === 'es' ? 'Tipología' : 'Typology'} {room.num}</div>
-        <span className="be-room-photo-name">{roomName}</span>
+        {gallery.length > 0 ? (
+          <img src={gallery[activeImgIdx]} alt={roomName} className="be-room-photo-img" />
+        ) : (
+          <span className="be-room-photo-name">{roomName}</span>
+        )}
+        <div className="be-room-badge" style={{ zIndex: 1 }}>{lang === 'es' ? 'Tipología' : 'Typology'} {room.num}</div>
+        {!isAvailable && (
+          <div className="be-room-status-badge">
+            {lang === 'es' ? 'No disponible' : 'Not available'}
+          </div>
+        )}
+
+        {/* Gallery Navigation Arrows */}
+        {hasMultipleImgs && (
+          <>
+            <button type="button" className="be-gallery-btn prev" onClick={prevImage} aria-label="Previous image">
+              ‹
+            </button>
+            <button type="button" className="be-gallery-btn next" onClick={nextImage} aria-label="Next image">
+              ›
+            </button>
+            <div className="be-gallery-dots">
+              {gallery.map((_, idx) => (
+                <span 
+                  key={idx} 
+                  className={`be-gallery-dot${idx === activeImgIdx ? ' active' : ''}`}
+                  onClick={(e) => { e.stopPropagation(); setActiveImgIdx(idx); }}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </div>
       <div className="be-room-info">
         <div>
@@ -564,9 +611,18 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
           </span>
           <span className="be-room-total">{formatCOP(activePrice * nights)} <span>{t.plusTax}</span></span>
         </div>
-        <button className="be-btn-primary be-room-select-btn" onClick={() => onSelect(room, rate)}>
-          {t.selectBtn}
-        </button>
+        {isAvailable ? (
+          <button className="be-btn-primary be-room-select-btn" onClick={() => onSelect(room, rate)}>
+            {t.selectBtn}
+          </button>
+        ) : (
+          <div className="be-room-unavailable-msg">
+            <p>{lang === 'es' ? 'No hay disponibilidad en Kunas PMS para este apartaestudio en las fechas seleccionadas.' : 'No availability in Kunas PMS for this apartaestudio on the selected dates.'}</p>
+            <button className="be-btn-primary" disabled style={{ opacity: 0.6, width: '100%', justifyContent: 'center' }}>
+              {lang === 'es' ? 'No disponible' : 'Not available'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -693,7 +749,7 @@ function GuestForm({ guest, setGuest, onContinue, lang }) {
 }
 
 /* ── PaymentPanel ─────────────────────────────────── */
-function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, lang }) {
+function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, loading, error, lang }) {
   const t = i18nEngine[lang];
   const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
 
@@ -765,10 +821,25 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
           <p>{t.paymentNequiInfo}</p>
         </div>
       )}
+      
+      {error && (
+        <div className="be-info-box be-info-error" style={{ marginTop: 16 }}>
+          <Icon name="alert-circle" size={16} style={{ marginTop: 1 }} />
+          <p>{error}</p>
+        </div>
+      )}
+
       <div className="be-step-footer">
-        <button className="be-btn-primary" style={{ padding: '14px 28px', fontSize: 13 }}
-          disabled={!paymentMethod} onClick={onConfirm}>
-          {t.confirmBooking}
+        <button className="be-btn-primary" style={{ padding: '14px 28px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}
+          disabled={!paymentMethod || loading} onClick={onConfirm}>
+          {loading ? (
+            <>
+              <div className="be-spinner-small"></div>
+              <span>{lang === 'es' ? 'Procesando...' : 'Processing...'}</span>
+            </>
+          ) : (
+            <span>{t.confirmBooking}</span>
+          )}
         </button>
       </div>
     </div>
@@ -1010,6 +1081,13 @@ function BookingEngine() {
     guests: initialParams.guests 
   });
   
+  // State for API integration
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState(null);
+  
   // Find room if pre-selected
   const matchingRoom = BE_ROOMS.find(r => r.id === initialParams.roomParam);
   
@@ -1021,6 +1099,124 @@ function BookingEngine() {
   const [guestData, setGuestData] = useState({});
   const [paymentMethod, setPaymentMethod] = useState(null);
   const [bookingCode, setBookingCode] = useState(null);
+
+  // Fetch availability from Netlify serverless function
+  const fetchAvailability = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/check-availability?checkin=${search.checkin}&checkout=${search.checkout}&guests=${search.guests}`);
+      if (!response.ok) {
+        throw new Error(lang === 'es' ? 'No se pudo obtener la disponibilidad desde Kunas PMS.' : 'Failed to retrieve availability from Kunas PMS.');
+      }
+      const data = await response.json();
+      
+      if (data && Array.isArray(data.rooms)) {
+        // Merge API availability & pricing with local BE_ROOMS rich metadata
+        const mapped = BE_ROOMS.map(localRoom => {
+          const apiRoom = data.rooms.find(r => r.id_room_types === localRoom.roomTypeId);
+          if (apiRoom) {
+            return {
+              ...localRoom,
+              priceFlexible: apiRoom.avgPrice,
+              available: apiRoom.available,
+              totalPrice: apiRoom.totalPrice,
+              image: apiRoom.image || localRoom.image
+            };
+          }
+          return {
+            ...localRoom,
+            available: false
+          };
+        });
+        setRooms(mapped);
+      } else {
+        throw new Error(lang === 'es' ? 'Respuesta de API de disponibilidad inválida.' : 'Invalid availability API response.');
+      }
+    } catch (err) {
+      console.error('Fetch availability error:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Trigger fetch on search parameters change
+  useEffect(() => {
+    fetchAvailability();
+  }, [search]);
+
+  // Sync selected room details (like real price) once rooms array updates from the API
+  useEffect(() => {
+    if (selectedRoom) {
+      const updated = rooms.find(r => r.id === selectedRoom.id);
+      if (updated) {
+        setSelectedRoom(updated);
+      }
+    }
+  }, [rooms]);
+
+  // Handle booking creation on payment confirm
+  const handleConfirmBooking = async () => {
+    setBookingLoading(true);
+    setBookingError(null);
+    
+    const calc = calcTotal(selectedRoom, selectedRate, extras, search);
+    const roomPrice = calc ? calc.roomSub : (selectedRoom.priceFlexible * dateDiff(search.checkin, search.checkout));
+    
+    // Format selected extra services into the notes parameter
+    const selectedExtrasList = Object.keys(extras)
+      .filter(id => extras[id])
+      .map(id => {
+        const ex = BE_EXTRAS.find(e => e.id === id);
+        return ex ? ex.name : id;
+      });
+    
+    let formattedNotes = guestData.notas || '';
+    if (selectedExtrasList.length > 0) {
+      const extrasStr = (lang === 'es' ? 'Servicios extras seleccionados: ' : 'Selected extra services: ') + selectedExtrasList.join(', ');
+      formattedNotes = formattedNotes ? `${formattedNotes} | ${extrasStr}` : extrasStr;
+    }
+    
+    const payload = {
+      checkin: search.checkin,
+      checkout: search.checkout,
+      guestsCount: search.guests,
+      roomTypeId: selectedRoom.roomTypeId,
+      roomName: selectedRoom.name,
+      roomPrice: roomPrice,
+      firstName: guestData.nombre,
+      lastName: guestData.apellido || '',
+      email: guestData.email,
+      phone: guestData.tel,
+      notes: formattedNotes
+    };
+    
+    try {
+      const response = await fetch('/api/create-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        throw new Error(lang === 'es' ? 'No se pudo registrar la reserva en Kunas. Por favor intenta de nuevo.' : 'Failed to register the booking in Kunas. Please try again.');
+      }
+      
+      const data = await response.json();
+      if (data && data.success) {
+        // Save the booking code returned from Kunas
+        setBookingCode(data.bookingCode);
+      } else {
+        throw new Error(data.error || (lang === 'es' ? 'Ocurrió un error al procesar la reserva.' : 'An error occurred while processing the reservation.'));
+      }
+    } catch (err) {
+      console.error('Create booking error:', err);
+      setBookingError(err.message);
+    } finally {
+      setBookingLoading(false);
+    }
+  };
 
   /* Listener for decoupled language changes from shell.js */
   useEffect(() => {
@@ -1128,18 +1324,33 @@ function BookingEngine() {
             <StepWrapper num="1" title={lang === 'es' ? "Elige tu apartaestudio" : "Choose your apartaestudio"}
               state={stepState('rooms')} summaryLine={roomSummary} lang={lang}
               onEdit={() => goToStep('rooms')}>
-              <div className="be-rooms-list">
-                {BE_ROOMS.map(room => (
-                  <RoomCard key={room.id} room={room}
-                    nights={dateDiff(search.checkin, search.checkout)}
-                    guests={search.guests}
-                    rate={ratePerRoom[room.id] || 'flexible'}
-                    onSelect={handleSelectRoom}
-                    onRateChange={r => setRatePerRoom(p => ({ ...p, [room.id]: r }))}
-                    lang={lang}
-                  />
-                ))}
-              </div>
+              {loading ? (
+                <div className="be-loading">
+                  <div className="be-spinner"></div>
+                  <p>{lang === 'es' ? 'Buscando apartaestudios disponibles en tiempo real...' : 'Searching available apartaestudios in real-time...'}</p>
+                </div>
+              ) : error ? (
+                <div className="be-error-box">
+                  <Icon name="alert-triangle" size={24} style={{ color: 'var(--terracotta)' }} />
+                  <p>{error}</p>
+                  <button type="button" className="be-btn-primary" onClick={fetchAvailability}>
+                    {lang === 'es' ? 'Intentar de nuevo' : 'Try again'}
+                  </button>
+                </div>
+              ) : (
+                <div className="be-rooms-list">
+                  {rooms.map(room => (
+                    <RoomCard key={room.id} room={room}
+                      nights={dateDiff(search.checkin, search.checkout)}
+                      guests={search.guests}
+                      rate={ratePerRoom[room.id] || 'flexible'}
+                      onSelect={handleSelectRoom}
+                      onRateChange={r => setRatePerRoom(p => ({ ...p, [room.id]: r }))}
+                      lang={lang}
+                    />
+                  ))}
+                </div>
+              )}
             </StepWrapper>
 
             <StepWrapper num="2" title={lang === 'es' ? "Extras y servicios" : "Extras & services"}
@@ -1164,7 +1375,9 @@ function BookingEngine() {
                 setPaymentMethod={setPaymentMethod}
                 booking={booking}
                 search={search}
-                onConfirm={() => setBookingCode(genCode())}
+                onConfirm={handleConfirmBooking}
+                loading={bookingLoading}
+                error={bookingError}
                 lang={lang}
               />
             </StepWrapper>
