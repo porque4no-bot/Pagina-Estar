@@ -121,93 +121,16 @@ exports.handler = async (event, context) => {
 
   const hasCredentials = token && username && password;
 
-  // ROOM DETAILS (Mock descriptions matching Estar style & metadata)
-  const roomDetails = {
-    "31348": {
-      name: "Clásica",
-      sub: "Compacto, cálido, todo a la mano.",
-      description: "Cama queen, escritorio frente a la ventana, cocina equipada con menaje completo y baño privado con ducha. La esencia de estar, en 28 m².",
-      capacity: 2,
-      beds: "1 queen",
-      area: "28 m²",
-      view: "Ciudad",
-      basePrice: 195000,
-      image: "assets/photos/tipo1/1.webp",
-      gallery: [
-        "assets/photos/tipo1/1.webp",
-        "assets/photos/tipo1/2.webp",
-        "assets/photos/tipo1/3.webp"
-      ]
-    },
-    "31349": {
-      name: "Selección",
-      sub: "Un poco de afuera, adentro.",
-      description: "Mismo plano del Clásica, ahora con balcón privado para tu café de la mañana. La luz natural cambia toda la sensación del espacio.",
-      capacity: 2,
-      beds: "1 queen",
-      area: "32 m²",
-      view: "Cordillera",
-      basePrice: 235000,
-      image: "assets/photos/tipo2/1.webp",
-      gallery: [
-        "assets/photos/tipo2/1.webp",
-        "assets/photos/tipo2/2.webp",
-        "assets/photos/tipo2/3.webp",
-        "assets/photos/tipo2/4.webp"
-      ]
-    },
-    "31350": {
-      name: "Reserva",
-      sub: "Zona de estar separada de la cama.",
-      description: "Espacios definidos: dormitorio, sala con sofá y zona de trabajo. Smart TV de 55\", cocina abierta y un baño más amplio con ventana al exterior.",
-      capacity: 2,
-      beds: "1 king",
-      area: "42 m²",
-      view: "Ciudad",
-      basePrice: 285000,
-      image: "assets/photos/tipo3/1.webp",
-      gallery: [
-        "assets/photos/tipo3/1.webp",
-        "assets/photos/tipo3/2.webp",
-        "assets/photos/tipo3/3.webp"
-      ]
-    },
-    "31351": {
-      name: "Origen",
-      sub: "Nuestra habitación más pedida.",
-      description: "El apartaestudio Origen con balcón al frente — el lugar donde la mayoría de huéspedes pasa la tarde leyendo o trabajando con el rumor de la ciudad de fondo.",
-      capacity: 2,
-      beds: "1 king",
-      area: "48 m²",
-      view: "Cordillera",
-      basePrice: 335000,
-      image: "assets/photos/tipo4/1.webp",
-      gallery: [
-        "assets/photos/tipo4/1.webp",
-        "assets/photos/tipo4/2.webp",
-        "assets/photos/tipo4/3.webp",
-        "assets/photos/tipo4/4.webp",
-        "assets/photos/tipo4/5.webp"
-      ]
-    },
-    "31352": {
-      name: "Especial",
-      sub: "Dos ambientes, una sola tarifa.",
-      description: "Cama king + sofá cama doble en zona de estar separada. Cocina completa con nevera grande. Ideal para familias o tres amigos viajando juntos.",
-      capacity: 4,
-      beds: "1 king + sofá cama",
-      area: "55 m²",
-      view: "Cordillera",
-      basePrice: 420000,
-      image: "assets/photos/tipo5/1.webp",
-      gallery: [
-        "assets/photos/tipo5/1.webp",
-        "assets/photos/tipo5/2.webp",
-        "assets/photos/tipo5/3.webp",
-        "assets/photos/tipo5/4.webp"
-      ]
+  // ROOM DETAILS (Load from rooms_db.json file)
+  let roomDetails = {};
+  try {
+    const dbPath = path.join(__dirname, '../../rooms_db.json');
+    if (fs.existsSync(dbPath)) {
+      roomDetails = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
     }
-  };
+  } catch (dbErr) {
+    console.error('Failed to load rooms_db.json database:', dbErr.message);
+  }
 
   // 1. MOCK DATA FALLBACK (If no credentials are set in Environment)
   if (!hasCredentials) {
@@ -260,32 +183,37 @@ exports.handler = async (event, context) => {
 
   // 2. REAL OTASYNC INTEGRATION
   try {
-    const pkey = await getSessionKey(token, username, password);
+    const payload = {
+      dfrom: checkin,
+      dto: checkout,
+      currency: "COP",
+      id_language: "es",
+      guests: [
+        {
+          guest_filter_id: 1,
+          adults: guests,
+          children: 0,
+          children_age: []
+        }
+      ],
+      id_properties: propertyId
+    };
 
-    // Call OTASync availability endpoint
-    const response = await fetch('https://app.otasync.me/api/room/data/availableRoomTypesAndRooms', {
+    const response = await fetch('https://app.otasync.me/api/engine/data/getRooms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        key: pkey,
-        id_properties: propertyId,
-        dfrom: checkin,
-        dto: checkout,
-        token: token,
-        real_only: 1,
-        check_restrictions: 1,
-        allow_overbookings: 0
-      })
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
       throw new Error(`Kunas API returned status ${response.status}`);
     }
 
-    const otaRooms = await response.json();
+    const otaData = await response.json();
+    const otaRooms = otaData.rooms;
     
     if (!Array.isArray(otaRooms)) {
-      throw new Error('Invalid response from Kunas API: expected an array of room types');
+      throw new Error('Invalid response from Kunas API: expected rooms list');
     }
 
     // Map Kunas response to Estar format
@@ -300,28 +228,58 @@ exports.handler = async (event, context) => {
         area: otaRoom.area ? `${otaRoom.area} m²` : "30 m²",
         view: "Ciudad",
         image: "assets/photos/tipo1/1.webp",
-        gallery: ["assets/photos/tipo1/1.webp"]
+        gallery: ["assets/photos/tipo1/1.webp"],
+        basePrice: 195000
       };
 
-      // Check room availability (Kunas returns rooms available)
-      const isAvailable = Array.isArray(otaRoom.rooms) && otaRoom.rooms.length > 0;
+      // Check room availability (avail is the units count)
+      const isAvailable = (parseInt(otaRoom.avail) || 0) > 0;
 
-      // Extract daily prices
+      // Extract daily prices from the first pricing plan if present
       const dailyPrices = [];
       let totalAmount = 0;
       let count = 0;
 
-      if (otaRoom.prices) {
-        Object.keys(otaRoom.prices).forEach(dateStr => {
-          const price = parseFloat(otaRoom.prices[dateStr]) || 0;
+      const plan = Array.isArray(otaRoom.pricing_plans) && otaRoom.pricing_plans.length > 0 ? otaRoom.pricing_plans[0] : null;
+      if (plan && Array.isArray(plan.prices) && plan.prices.length > 0 && plan.prices[0].prices) {
+        const datePrices = plan.prices[0].prices;
+        Object.keys(datePrices).forEach(dateStr => {
+          const price = parseFloat(datePrices[dateStr]) || 0;
           dailyPrices.push({ date: dateStr, price });
           totalAmount += price;
           count++;
         });
       }
 
-      const avgPrice = count > 0 ? (totalAmount / count) : (details.basePrice || 195000);
-      const totalPrice = count > 0 ? totalAmount : (avgPrice * nights);
+      // If we didn't find any specific prices, fallback to average/total price on the room object or details
+      let avgPrice = 0;
+      let totalPrice = 0;
+
+      if (count > 0) {
+        avgPrice = totalAmount / count;
+        totalPrice = totalAmount;
+      } else if (otaRoom.price) {
+        avgPrice = parseFloat(otaRoom.price);
+        totalPrice = avgPrice * nights;
+        
+        // Populate dummy daily prices for display consistency
+        for (let i = 0; i < nights; i++) {
+          const d = new Date(checkinDate);
+          d.setDate(d.getDate() + i);
+          const dateStr = d.toISOString().split('T')[0];
+          dailyPrices.push({ date: dateStr, price: avgPrice });
+        }
+      } else {
+        avgPrice = details.basePrice || 195000;
+        totalPrice = avgPrice * nights;
+        
+        for (let i = 0; i < nights; i++) {
+          const d = new Date(checkinDate);
+          d.setDate(d.getDate() + i);
+          const dateStr = d.toISOString().split('T')[0];
+          dailyPrices.push({ date: dateStr, price: avgPrice });
+        }
+      }
 
       return {
         id_room_types: id,

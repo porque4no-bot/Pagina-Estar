@@ -7,3 +7,6 @@ scratch/
 .env
 .env.local
 .env.*
+node_modules/
+motor-app.js
+
