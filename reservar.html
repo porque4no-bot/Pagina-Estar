@@ -265,6 +265,54 @@
       [data-theme="editorial"] .be-summary-col { display: none; }
       .be-page-inner { padding: 20px 16px 64px; }
     }
+
+    /* ─── room card slider customizations ─── */
+    .be-room-photo {
+      overflow: hidden;
+      display: block; /* Override default flex alignment for slider */
+      min-height: 220px;
+    }
+    .be-room-photo:hover .slider-arrow {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .be-room-photo .slider-arrow {
+      width: 32px;
+      height: 32px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all var(--dur-base) var(--ease-out);
+    }
+    .be-room-photo .slider-arrow svg {
+      width: 14px;
+      height: 14px;
+    }
+    .be-room-photo .slider-arrow.prev {
+      left: 8px;
+    }
+    .be-room-photo .slider-arrow.next {
+      right: 8px;
+    }
+    .be-room-photo .slider-indicators {
+      bottom: 8px;
+      padding: 3px 6px;
+      gap: 4px;
+    }
+    .be-room-photo .slider-indicators .indicator {
+      width: 5px;
+      height: 5px;
+    }
+    .be-room-photo .slider-indicators .indicator.active {
+      width: 12px;
+    }
+    .be-room-badge {
+      z-index: 11; /* Keep badge on top of slider images */
+    }
+    @media (min-width: 960px) {
+      .be-room-card {
+        grid-template-columns: 320px 1fr; /* Make photo much wider on desktop (original was 200px) */
+      }
+    }
   </style>
 </head>
 <template id="__bundler_thumbnail" data-bg-color="#9b9065">
@@ -460,18 +508,23 @@
   const BE_ROOMS = [
     { id:'clasica', num:'01', name:'Clásica', area:28, capacity:2, bed:'1 Queen size', view:'Vista ciudad',
       desc:'Diseño eficiente y cálido. Todo lo esencial en 28 m² bien aprovechados.', priceFlexible:220000,
+      images: ['assets/photos/tipo1/1.webp', 'assets/photos/tipo1/2.webp', 'assets/photos/tipo1/3.webp'],
       amenities:[{icon:'wifi',l:'WiFi fibra'},{icon:'tv',l:'Smart TV 43"'},{icon:'cooking-pot',l:'Cocina equipada'},{icon:'shower-head',l:'Baño privado'},{icon:'sparkles',l:'Aseo semanal'}]},
     { id:'seleccion', num:'02', name:'Selección', area:32, capacity:2, bed:'1 Queen size', view:'Cordillera + balcón',
       desc:'Balcón privado con vistas a la cordillera. Ideal para el café de las mañanas.', priceFlexible:265000,
+      images: ['assets/photos/tipo2/1.webp', 'assets/photos/tipo2/2.webp', 'assets/photos/tipo2/3.webp', 'assets/photos/tipo2/4.webp'],
       amenities:[{icon:'wind',l:'Balcón privado'},{icon:'wifi',l:'WiFi fibra'},{icon:'tv',l:'Smart TV 43"'},{icon:'cooking-pot',l:'Cocina equipada'},{icon:'shower-head',l:'Baño privado'}]},
     { id:'reserva', num:'03', name:'Reserva', area:42, capacity:2, bed:'1 King size', view:'Vista ciudad',
       desc:'Dormitorio privado separado de la zona social. Escritorio ergonómico. 42 m².', priceFlexible:320000,
+      images: ['assets/photos/tipo3/1.webp', 'assets/photos/tipo3/2.webp', 'assets/photos/tipo3/3.webp'],
       amenities:[{icon:'layout',l:'Ambientes separados'},{icon:'wifi',l:'WiFi fibra'},{icon:'tv',l:'Smart TV 55"'},{icon:'cooking-pot',l:'Cocina equipada'},{icon:'briefcase',l:'Escritorio'}]},
     { id:'origen', num:'04', name:'Origen', area:52, capacity:2, bed:'1 King size', view:'Panorámica',
       desc:'El más espacioso. Diseño con referencia cafetera. Vista panorámica de Manizales.', priceFlexible:385000,
+      images: ['assets/photos/tipo4/1.webp', 'assets/photos/tipo4/2.webp', 'assets/photos/tipo4/3.webp', 'assets/photos/tipo4/4.webp', 'assets/photos/tipo4/5.webp'],
       amenities:[{icon:'mountain',l:'Vista panorámica'},{icon:'wifi',l:'WiFi fibra'},{icon:'tv',l:'Smart TV 65"'},{icon:'cooking-pot',l:'Cocina equipada'},{icon:'bath',l:'Bañera'}]},
     { id:'especial', num:'05', name:'Especial', area:60, capacity:3, bed:'King + sofacama', view:'Panorámica premium',
       desc:'Nuestra tipología más completa. Terraza privada. Para quedar muy bien.', priceFlexible:450000,
+      images: ['assets/photos/tipo5/1.webp', 'assets/photos/tipo5/2.webp', 'assets/photos/tipo5/3.webp', 'assets/photos/tipo5/4.webp'],
       amenities:[{icon:'sun',l:'Terraza privada'},{icon:'wifi',l:'WiFi fibra'},{icon:'tv',l:'Smart TV 65"'},{icon:'cooking-pot',l:'Cocina premium'},{icon:'users',l:'Hasta 3 personas'}]}
   ];
   const BE_EXTRAS = [
@@ -483,9 +536,7 @@
     { id:'tour', name:'Tour Manizales', desc:'4 horas con guía local certificado', price:80000, unit:'/persona', icon:'map-pin' }
   ];
   const BE_PAYMENTS = [
-    { id:'wompi', name:'Pago en línea seguro (Wompi)', desc:'Tarjeta de crédito, PSE, Nequi', icon:'credit-card' },
-    { id:'hotel', name:'Pagar en el hotel', desc:'Reserva sin cargo previo, pago al llegar', icon:'home' },
-    { id:'transfer', name:'Transferencia bancaria', desc:'Te enviamos los datos por correo', icon:'landmark' }
+    { id:'wompi', name:'Pago en línea seguro (Wompi)', desc:'Tarjeta de crédito, PSE, Nequi', icon:'credit-card' }
   ];
   function dateDiff(a,b){const d1=new Date(a+'T00:00:00'),d2=new Date(b+'T00:00:00');return Math.max(1,Math.round((d2-d1)/86400000))}
   function formatCOP(n){return '$ '+Number(n).toLocaleString('es-CO').replace(/,/g,'.')}
@@ -496,7 +547,7 @@
   function calcTotal(room,rate,extras,search){
     if(!room)return null;
     const nights=dateDiff(search.checkin,search.checkout);
-    const nightly=rate==='best'?Math.round(room.priceFlexible*.9):room.priceFlexible;
+    const nightly=rate==='best'?room.priceFlexible:Math.round(room.priceFlexible/0.9);
     const roomSub=nightly*nights;
     let ex=0;
     if(extras.desayuno)ex+=28000*search.guests*nights;

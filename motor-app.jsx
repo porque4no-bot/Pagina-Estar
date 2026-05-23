@@ -507,8 +507,8 @@ function StepWrapper({ num, title, state, summaryLine, onEdit, children, lang })
 /* ── RoomCard ─────────────────────────────────────── */
 function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) {
   const t = i18nEngine[lang];
-  const priceFlex = room.priceFlexible;
-  const priceBest = Math.round(room.priceFlexible * 0.9);
+  const priceBest = room.priceFlexible;
+  const priceFlex = Math.round(room.priceFlexible / 0.9);
   const activePrice = rate === 'best' ? priceBest : priceFlex;
 
   // Translate details
@@ -517,11 +517,96 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
   const roomBed = t.roomBeds[room.bed] || room.bed;
   const roomView = t.roomViews[room.view] || room.view;
 
+  // Slider state
+  const [activePhoto, setActivePhoto] = useState(0);
+  const images = room.images || [];
+
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+
+  function handleTouchStart(e) {
+    touchStartX.current = e.changedTouches[0].screenX;
+  }
+
+  function handleTouchEnd(e) {
+    touchEndX.current = e.changedTouches[0].screenX;
+    const diff = touchStartX.current - touchEndX.current;
+    const threshold = 40;
+    if (diff > threshold) {
+      nextPhoto(e);
+    } else if (diff < -threshold) {
+      prevPhoto(e);
+    }
+  }
+
+  function nextPhoto(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setActivePhoto((prev) => (prev + 1) % images.length);
+  }
+
+  function prevPhoto(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setActivePhoto((prev) => (prev - 1 + images.length) % images.length);
+  }
+
   return (
     <div className="be-room-card">
-      <div className="be-room-photo">
+      <div 
+        className="be-room-photo"
+        onTouchStart={images.length > 1 ? handleTouchStart : undefined}
+        onTouchEnd={images.length > 1 ? handleTouchEnd : undefined}
+      >
+        {images.length > 0 ? (
+          <div className="slider-wrapper">
+            <div 
+              className="slider-track" 
+              style={{ transform: `translateX(-${activePhoto * 100}%)`, display: 'flex', width: '100%', height: '100%', transition: 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)' }}
+            >
+              {images.map((imgUrl, idx) => (
+                <div className="slider-slide" key={idx} style={{ width: '100%', height: '100%', flexShrink: 0 }}>
+                  <img src={imgUrl} alt={`${roomName} - ${idx + 1}`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <span className="be-room-photo-name">{roomName}</span>
+        )}
+
+        {images.length > 1 && (
+          <React.Fragment>
+            <button className="slider-arrow prev" aria-label="Imagen anterior" type="button" onClick={prevPhoto}>
+              <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            <button className="slider-arrow next" aria-label="Imagen siguiente" type="button" onClick={nextPhoto}>
+              <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+            <div className="slider-indicators">
+              {images.map((_, idx) => (
+                <span 
+                  key={idx} 
+                  className={`indicator${idx === activePhoto ? ' active' : ''}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setActivePhoto(idx);
+                  }}
+                />
+              ))}
+            </div>
+          </React.Fragment>
+        )}
         <div className="be-room-badge">{lang === 'es' ? 'Tipología' : 'Typology'} {room.num}</div>
-        <span className="be-room-photo-name">{roomName}</span>
       </div>
       <div className="be-room-info">
         <div>
@@ -664,6 +749,28 @@ function GuestForm({ guest, setGuest, onContinue, lang }) {
             ))}
           </select>
         </div>
+        <div className="be-field">
+          <label>{lang === 'es' ? 'Motivo del viaje' : 'Travel motive'}</label>
+          <select value={guest.motivo || (lang === 'es' ? 'Turismo / Vacaciones' : 'Tourism / Vacation')} onChange={e => set('motivo', e.target.value)}>
+            {lang === 'es' ? (
+              <>
+                <option value="Turismo / Vacaciones">Turismo / Vacaciones</option>
+                <option value="Trabajo / Negocios">Trabajo / Negocios</option>
+                <option value="Estudios / Educación">Estudios / Educación</option>
+                <option value="Tratamiento médico">Tratamiento médico</option>
+                <option value="Otro">Otro</option>
+              </>
+            ) : (
+              <>
+                <option value="Tourism / Vacation">Tourism / Vacation</option>
+                <option value="Work / Business">Work / Business</option>
+                <option value="Studies / Education">Studies / Education</option>
+                <option value="Medical treatment">Medical treatment</option>
+                <option value="Other">Other</option>
+              </>
+            )}
+          </select>
+        </div>
         <div className="be-field be-field-full">
           <label>{t.notes} <span style={{ fontWeight: 400, color: 'var(--ink-300)' }}>{t.notesOptional}</span></label>
           <textarea rows={3} placeholder={t.notesPlaceholder}
@@ -697,14 +804,12 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
 
   const translatedRoomName = t.roomNames[booking.room.id] || booking.room.name;
 
+  const isColombian = booking.guest?.pais === 'Colombia';
+  const isBusinessTrip = booking.guest?.motivo === 'Trabajo / Negocios' || booking.guest?.motivo === 'Work / Business';
+  const mustPayIVA = isColombian || isBusinessTrip;
+
   const handlePayment = () => {
     setPaymentError(null);
-
-    // If it's an offline method, proceed directly
-    if (paymentMethod === 'hotel' || paymentMethod === 'transfer') {
-      onConfirm(genCode());
-      return;
-    }
 
     if (paymentMethod === 'wompi') {
       if (typeof window.WidgetCheckout === 'undefined') {
@@ -721,7 +826,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
 
       const checkout = new window.WidgetCheckout({
         currency: 'COP',
-        amountInCents: Math.round(calc.total * 100),
+        amountInCents: Math.round(calc.subtotal * 100),
         reference: `${code}-${Date.now().toString().slice(-4)}`,
         publicKey: window.WOMPI_PUBLIC_KEY || 'pub_test_Q5yDA9xoEbjuF4GZRL9yH15Juxzz6J68',
         customerData: {
@@ -762,31 +867,80 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
   return (
     <div>
       {calc && (
-        <div className="be-inline-summary">
-          <span className="be-eyebrow" style={{ marginBottom: 10 }}>{t.summary}</span>
-          <div className="be-summary-line">
-            <span>{translatedRoomName} · {booking.rate === 'best' ? t.bestPrice : t.flexible}</span>
-            <span></span>
-          </div>
-          <div className="be-summary-line">
-            <span>{formatCOP(calc.nightly)} × {calc.nights} {calc.nights === 1 ? t.noche : t.noches}</span>
-            <span>{formatCOP(calc.roomSub)}</span>
-          </div>
-          {calc.extrasSub > 0 && (
+        <>
+          <div className="be-inline-summary">
+            <span className="be-eyebrow" style={{ marginBottom: 10 }}>{t.summary}</span>
             <div className="be-summary-line">
-              <span>{t.extrasSelected}</span>
-              <span>{formatCOP(calc.extrasSub)}</span>
+              <span>{translatedRoomName} · {booking.rate === 'best' ? t.bestPrice : t.flexible}</span>
+              <span></span>
+            </div>
+            <div className="be-summary-line">
+              <span>{formatCOP(calc.nightly)} × {calc.nights} {calc.nights === 1 ? t.noche : t.noches}</span>
+              <span>{formatCOP(calc.roomSub)}</span>
+            </div>
+            {calc.extrasSub > 0 && (
+              <div className="be-summary-line">
+                <span>{t.extrasSelected}</span>
+                <span>{formatCOP(calc.extrasSub)}</span>
+              </div>
+            )}
+            <div className="be-summary-line">
+              <span>{t.iva} (19%)*</span>
+              <span>{formatCOP(calc.iva)}</span>
+            </div>
+            <div className="be-summary-line be-summary-total">
+              <span>{lang === 'es' ? 'Total a pagar hoy' : 'Total to pay today'}</span>
+              <span>{formatCOP(calc.subtotal)}</span>
+            </div>
+          </div>
+
+          {/* IVA note box */}
+          {!mustPayIVA ? (
+            <div className="be-info-box" style={{ marginTop: -4, marginBottom: 16, backgroundColor: 'var(--olive-100)', borderColor: 'var(--olive-300)' }}>
+              <Icon name="sparkles" size={16} style={{ color: 'var(--olive-700)', marginTop: 2, flexShrink: 0 }} />
+              <div style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--olive-700)' }}>
+                <strong>{lang === 'es' ? '¡Estás exento de IVA!' : 'You are exempt from VAT!'}</strong>
+                <p style={{ margin: '4px 0 0 0', opacity: 0.9 }}>
+                  {lang === 'es' ? (
+                    <>
+                      Hoy solo cancelas el valor neto. Al ser residente extranjero (origen: <strong>{booking.guest?.pais || 'Otro'}</strong>) y viajar por motivos personales o turismo, estás exento del impuesto del IVA (¡te ahorras {formatCOP(calc.iva)}!).
+                    </>
+                  ) : (
+                    <>
+                      Today you only pay the net value. Since you reside abroad (origin: <strong>{booking.guest?.pais || 'Other'}</strong>) and are traveling for personal or tourism reasons, you are exempt from VAT (saving {formatCOP(calc.iva)}!).
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="be-info-box" style={{ marginTop: -4, marginBottom: 16, backgroundColor: 'var(--paper)', borderColor: 'var(--paper-400)' }}>
+              <Icon name="info" size={16} style={{ color: 'var(--olive)', marginTop: 2, flexShrink: 0 }} />
+              <div style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--ink)' }}>
+                <strong>{lang === 'es' ? 'Sobre el IVA (19%)' : 'About VAT (19%)'}</strong>
+                <p style={{ margin: '4px 0 0 0', opacity: 0.9 }}>
+                  {lang === 'es' ? (
+                    <>
+                      Hoy solo cancelas el valor neto. {isBusinessTrip ? (
+                        <>Como tu motivo de viaje es <strong>negocios/trabajo</strong> (a pesar de viajar desde el extranjero), debes pagar el IVA ({formatCOP(calc.iva)}) directamente en recepción al hacer check-in.</>
+                      ) : (
+                        <>Como tu país es <strong>Colombia</strong>, el IVA ({formatCOP(calc.iva)}) se pagará directamente en recepción durante el check-in.</>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      Today you only pay the net value. {isBusinessTrip ? (
+                        <>Since your travel motive is <strong>business/work</strong> (despite traveling from abroad), you are required to pay the VAT ({formatCOP(calc.iva)}) directly at the reception during check-in.</>
+                      ) : (
+                        <>Since your country is <strong>Colombia</strong>, the VAT ({formatCOP(calc.iva)}) will be paid directly at the reception during check-in.</>
+                      )}
+                    </>
+                  )}
+                </p>
+              </div>
             </div>
           )}
-          <div className="be-summary-line">
-            <span>{t.iva}</span>
-            <span>{formatCOP(calc.iva)}</span>
-          </div>
-          <div className="be-summary-line be-summary-total">
-            <span>{t.total}</span>
-            <span>{formatCOP(calc.total)}</span>
-          </div>
-        </div>
+        </>
       )}
       <p className="be-section-intro" style={{ marginTop: 20 }}>{t.paymentIntro}</p>
       <div className="be-payment-options">
@@ -822,18 +976,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
           <p>{t.paymentWompiInfo}</p>
         </div>
       )}
-      {paymentMethod === 'hotel' && (
-        <div className="be-info-box">
-          <Icon name="info" size={16} style={{ color: 'var(--sand-700)', marginTop: 1 }} />
-          <p>{t.paymentHotelInfo}</p>
-        </div>
-      )}
-      {paymentMethod === 'transfer' && (
-        <div className="be-info-box">
-          <Icon name="mail" size={16} style={{ color: 'var(--sand-700)', marginTop: 1 }} />
-          <p>{t.paymentTransferInfo}</p>
-        </div>
-      )}
+
 
       <div className="be-step-footer">
         <button className="be-btn-primary" style={{ padding: '14px 28px', fontSize: 13, minWidth: 180, justifyContent: 'center' }}
@@ -854,6 +997,9 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
 /* ── BookingSummary (sidebar editorial) ───────────── */
 function BookingSummary({ booking, search, lang }) {
   const t = i18nEngine[lang];
+  const isColombian = booking.guest?.pais === 'Colombia';
+  const isBusinessTrip = booking.guest?.motivo === 'Trabajo / Negocios' || booking.guest?.motivo === 'Work / Business';
+  const mustPayIVA = isColombian || isBusinessTrip;
   if (!booking.room) {
     return (
       <div style={{ background: 'var(--paper-200)', border: '1px solid var(--paper-400)', borderRadius: 'var(--radius-xl)', padding: 24, textAlign: 'center' }}>
@@ -901,8 +1047,13 @@ function BookingSummary({ booking, search, lang }) {
         <div className="be-summary-breakdown">
           <div className="be-summary-line sm"><span>{formatCOP(calc.nightly)} × {nights} {nights === 1 ? t.noche : t.noches}</span><span>{formatCOP(calc.roomSub)}</span></div>
           {calc.extrasSub > 0 && <div className="be-summary-line sm"><span>{t.extras}</span><span>{formatCOP(calc.extrasSub)}</span></div>}
-          <div className="be-summary-line sm"><span>{t.iva}</span><span>{formatCOP(calc.iva)}</span></div>
-          <div className="be-summary-line total"><span>{t.total}</span><span>{formatCOP(calc.total)}</span></div>
+          <div className="be-summary-line sm"><span>{t.iva} (19%)*</span><span>{formatCOP(calc.iva)}</span></div>
+          <div className="be-summary-line total"><span>{lang === 'es' ? 'Total online hoy' : 'Total online today'}</span><span>{formatCOP(calc.subtotal)}</span></div>
+          <p style={{ fontSize: 10, opacity: 0.8, fontStyle: 'italic', margin: '6px 0 0 0', lineHeight: 1.3 }}>
+            {lang === 'es' 
+              ? `* El IVA se paga en el hotel (${isBusinessTrip ? 'requerido por viaje de negocios' : 'solo residentes en Colombia'}).` 
+              : `* VAT is paid at the hotel (${isBusinessTrip ? 'required for business travel' : 'Colombian residents only'}).`}
+          </p>
         </div>
       )}
     </div>
@@ -916,6 +1067,10 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
 
   const roomName = t.roomNames[booking.room.id] || booking.room.name;
   const rateLabel = booking.rate === 'flexible' ? `${t.flexible} — ${t.refundable}` : `${t.bestPrice} — ${t.nonRefundable}`;
+
+  const isColombian = booking.guest?.pais === 'Colombia';
+  const isBusinessTrip = booking.guest?.motivo === 'Trabajo / Negocios' || booking.guest?.motivo === 'Work / Business';
+  const mustPayIVA = isColombian || isBusinessTrip;
 
   return (
     <div className="be-confirmation">
@@ -946,8 +1101,36 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
         </div>
         {calc && (
           <div className="be-confirm-row">
-            <span className="be-eyebrow">{t.total}</span>
-            <p className="be-confirm-total">{formatCOP(calc.total)}</p>
+            <span className="be-eyebrow">{lang === 'es' ? 'Pagado Hoy (Online)' : 'Paid Today (Online)'}</span>
+            <p className="be-confirm-total" style={{ fontSize: 20 }}>{formatCOP(calc.subtotal)}</p>
+          </div>
+        )}
+        {calc && mustPayIVA && (
+          <div className="be-confirm-row" style={{ backgroundColor: 'var(--sand-100)' }}>
+            <span className="be-eyebrow" style={{ color: 'var(--terracotta)' }}>{lang === 'es' ? 'IVA a pagar en Check-in' : 'VAT to pay at Check-in'}</span>
+            <p className="be-confirm-val" style={{ fontSize: 16, color: 'var(--terracotta-700)', margin: '4px 0 0 0' }}>{formatCOP(calc.iva)}</p>
+            <p style={{ fontSize: 11, color: 'var(--ink-500)', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+              {lang === 'es' ? (
+                isBusinessTrip 
+                  ? 'El IVA se cobrará en la recepción debido a que tu motivo de viaje es negocios o trabajo.' 
+                  : 'Como residente de Colombia, el IVA se cobrará en la recepción del hotel.'
+              ) : (
+                isBusinessTrip 
+                  ? 'VAT will be charged at reception because your travel motive is business or work.' 
+                  : 'As a resident of Colombia, the VAT will be charged at the hotel reception.'
+              )}
+            </p>
+          </div>
+        )}
+        {calc && !mustPayIVA && (
+          <div className="be-confirm-row" style={{ backgroundColor: 'var(--olive-100)' }}>
+            <span className="be-eyebrow" style={{ color: 'var(--olive-700)' }}>{lang === 'es' ? 'IVA (19%)' : 'VAT (19%)'}</span>
+            <p className="be-confirm-val" style={{ fontSize: 14, color: 'var(--olive-700)', margin: '4px 0 0 0', textDecoration: 'line-through' }}>{formatCOP(calc.iva)}</p>
+            <p style={{ fontSize: 11, color: 'var(--olive-700)', margin: '4px 0 0 0', lineHeight: 1.4, fontWeight: 'bold' }}>
+              {lang === 'es' 
+                ? '¡Estás exento de pagar IVA por ser extranjero viajando por turismo/ocio!' 
+                : 'You are exempt from paying VAT as a visitor from abroad traveling for tourism/leisure!'}
+            </p>
           </div>
         )}
         {paymentDetails && (
@@ -1132,7 +1315,7 @@ function BookingEngine() {
   const [ratePerRoom, setRatePerRoom] = useState({});
   const [extras, setExtras] = useState({});
   const [guestData, setGuestData] = useState({});
-  const [paymentMethod, setPaymentMethod] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('wompi');
   const [bookingCode, setBookingCode] = useState(null);
   const [paymentDetails, setPaymentDetails] = useState(null);
 
@@ -1177,7 +1360,7 @@ function BookingEngine() {
     setSelectedRate('flexible');
     setExtras({});
     setGuestData({});
-    setPaymentMethod(null);
+    setPaymentMethod('wompi');
     setBookingCode(null);
     setPaymentDetails(null);
   }
@@ -1185,6 +1368,49 @@ function BookingEngine() {
   function handleConfirmBooking(code, details = null) {
     setBookingCode(code);
     setPaymentDetails(details);
+
+    const isColombian = booking.guest?.pais === 'Colombia';
+    const isBusinessTrip = booking.guest?.motivo === 'Trabajo / Negocios' || booking.guest?.motivo === 'Work / Business';
+    const mustPayIVA = isColombian || isBusinessTrip;
+    const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
+    const roomPriceVal = mustPayIVA ? calc.total : calc.subtotal;
+
+    // Send the booking details to the Netlify serverless function to register it in Kunas PMS
+    fetch('/api/create-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        checkin: search.checkin,
+        checkout: search.checkout,
+        guestsCount: search.guests,
+        roomTypeId: {
+          clasica: "31348",
+          seleccion: "31349",
+          reserva: "31350",
+          origen: "31351",
+          especial: "31352"
+        }[booking.room.id] || "31349",
+        roomName: booking.room.name,
+        roomPrice: roomPriceVal,
+        paidAmount: calc.subtotal,
+        firstName: booking.guest?.nombre || '',
+        lastName: booking.guest?.apellido || '',
+        email: booking.guest?.email || '',
+        phone: booking.guest?.tel || '',
+        notes: `Motivo de viaje: ${booking.guest?.motivo || 'No especificado'}. IVA (19%): ${mustPayIVA ? 'POR COBRAR EN HOTEL (' + formatCOP(calc.iva) + ')' : 'EXENTO'}. Notas: ${booking.guest?.notas || 'Ninguna'}`,
+        paymentDetails: details
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      console.log('Kunas PMS Booking Response:', data);
+      if (data.success && data.bookingCode) {
+        setBookingCode(data.bookingCode);
+      }
+    })
+    .catch(err => {
+      console.error('Error saving booking to Kunas PMS:', err);
+    });
   }
 
   function goToStep(id) {

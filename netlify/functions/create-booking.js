@@ -87,11 +87,13 @@ exports.handler = async (event, context) => {
     roomTypeId,
     roomName,
     roomPrice,
+    paidAmount,
     firstName,
     lastName,
     email,
     phone,
-    notes
+    notes,
+    paymentDetails
   } = body;
 
   // Simple validation
@@ -168,6 +170,16 @@ exports.handler = async (event, context) => {
       });
     }
 
+    const paymentInfo = [];
+    if (paymentDetails && (paymentDetails.status === 'APPROVED' || paymentDetails.status === 'PENDING')) {
+      paymentInfo.push({
+        amount: parseFloat(paidAmount || roomPrice),
+        date_payment: new Date().toISOString().split('T')[0],
+        payment_method: 'card',
+        note: `Wompi ID: ${paymentDetails.id}, Ref: ${paymentDetails.reference}, Status: ${paymentDetails.status}`
+      });
+    }
+
     // Build Kunas / OTASync reservation payload
     const reservationPayload = {
       key: pkey,
@@ -188,7 +200,7 @@ exports.handler = async (event, context) => {
           adults: parseInt(guestsCount) || 1,
           seniors: 0,
           extras: [],
-          payments: [],
+          payments: paymentInfo,
           overbooking: 0,
           nights: nightsArray
         }
@@ -202,7 +214,7 @@ exports.handler = async (event, context) => {
         }
       ],
       extras: [],
-      payments: [],
+      payments: paymentInfo,
       children_1: 0,
       children_2: 0,
       children_3: 0,
