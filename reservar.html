@@ -116,9 +116,9 @@
 
     /* ─── room cards ────────────────────────────────────────────────── */
     .be-rooms-list { display: flex; flex-direction: column; gap: 16px; }
-    .be-room-card { border: 1px solid var(--paper-400); border-radius: var(--radius-lg); overflow: hidden; display: grid; grid-template-columns: 200px 1fr; transition: border-color 200ms; }
+    .be-room-card { border: 1px solid var(--paper-400); border-radius: var(--radius-lg); overflow: hidden; display: grid; grid-template-columns: 320px 1fr; transition: border-color 200ms; }
     .be-room-card:hover { border-color: var(--olive-300); }
-    .be-room-photo { position: relative; background: var(--sand-100); display: flex; align-items: center; justify-content: center; min-height: 220px; }
+    .be-room-photo { position: relative; background: var(--sand-100); display: flex; align-items: center; justify-content: center; min-height: 220px; overflow: hidden; }
     .be-room-card:nth-child(2) .be-room-photo { background: var(--terracotta-100); }
     .be-room-card:nth-child(3) .be-room-photo { background: var(--olive-100); }
     .be-room-card:nth-child(4) .be-room-photo { background: var(--ink); }
@@ -248,7 +248,91 @@
     [data-theme="editorial"] .be-app { background: var(--paper-200); }
     [data-theme="editorial"] .be-summary-card { background: var(--ink); }
 
+    /* ─── loader & spinner ──────────────────────────────────────────── */
+    .be-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 16px; color: var(--ink-500); font-family: var(--font-body); font-size: 14px; }
+    .be-spinner { width: 36px; height: 36px; border: 3px solid var(--paper-400); border-top-color: var(--olive); border-radius: 50%; animation: be-spin 1s linear infinite; }
+    .be-spinner-small { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: var(--white); border-radius: 50%; animation: be-spin 1s linear infinite; display: inline-block; margin-right: 8px; vertical-align: middle; }
+    @keyframes be-spin { to { transform: rotate(360deg); } }
 
+    /* ─── error box ─────────────────────────────────────────────────── */
+    .be-error-box { background: var(--terracotta-100); border: 1px solid var(--terracotta-300); border-radius: var(--radius-lg); padding: 24px; text-align: center; color: var(--terracotta-700); font-family: var(--font-body); font-size: 14px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+    /* ─── room unavailable & badge ──────────────────────────────────── */
+    .be-room-card.be-room-unavailable { opacity: 0.6; background: var(--paper-100); }
+    .be-room-card.be-room-unavailable .be-room-photo-img { filter: grayscale(90%); }
+    .be-room-card.be-room-unavailable .be-rate-opt,
+    .be-room-card.be-room-unavailable .be-btn-primary { pointer-events: none; }
+    .be-room-status-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(175, 109, 59, 0.9); color: var(--white); font-family: var(--font-label); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; padding: 6px 12px; border-radius: var(--radius-pill); z-index: 2; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .be-room-unavailable-msg { margin-top: 10px; padding: 12px; background: var(--paper-200); border-radius: var(--radius-md); font-family: var(--font-body); font-size: 12px; color: var(--ink-500); line-height: 1.5; border-left: 3px solid var(--terracotta); }
+
+    /* ─── room images ───────────────────────────────────────────────── */
+    .be-room-photo-img { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; transition: transform 0.4s ease; z-index: 0; }
+    .be-room-card:hover .be-room-photo-img { transform: scale(1.04); }
+
+    /* ─── gallery controls ──────────────────────────────────────────── */
+    .be-gallery-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.45);
+      color: var(--white);
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s, background-color 0.2s;
+      z-index: 2;
+      line-height: 1;
+    }
+    .be-room-photo:hover .be-gallery-btn {
+      opacity: 1;
+    }
+    .be-gallery-btn:hover {
+      background: rgba(0, 0, 0, 0.75);
+    }
+    .be-gallery-btn.prev {
+      left: 12px;
+    }
+    .be-gallery-btn.next {
+      right: 12px;
+    }
+    
+    .be-gallery-dots {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      z-index: 2;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 4px 8px;
+      border-radius: var(--radius-pill);
+    }
+    .be-gallery-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.5);
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.2s;
+    }
+    .be-gallery-dot.active {
+      background: var(--white);
+      transform: scale(1.2);
+    }
+
+    @media (max-width: 680px) {
+      .be-gallery-btn {
+        opacity: 0.8;
+      }
+    }
 
     /* ─── responsive ────────────────────────────────────────────────── */
     @media (max-width: 680px) {
@@ -495,10 +579,9 @@
 <script src="shell.js?v=2"></script>
 <script>lucide.createIcons();</script>
 
-<!-- React + Babel -->
+<!-- React + Redux / React DOM -->
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
 <!-- Datos y utilidades -->
 <script>
@@ -506,23 +589,23 @@
   window.WOMPI_PUBLIC_KEY = 'pub_prod_Hg7duVIJOzWuU1fNYipC5rs0Hzet2BLL';
 
   const BE_ROOMS = [
-    { id:'clasica', num:'01', name:'Clásica', area:28, capacity:2, bed:'1 Queen size', view:'Vista ciudad',
+    { id:'clasica', roomTypeId:'31348', num:'01', name:'Clásica', area:28, capacity:2, bed:'1 Queen size', view:'Vista ciudad',
       desc:'Diseño eficiente y cálido. Todo lo esencial en 28 m² bien aprovechados.', priceFlexible:220000,
       images: ['assets/photos/tipo1/1.webp', 'assets/photos/tipo1/2.webp', 'assets/photos/tipo1/3.webp'],
       amenities:[{icon:'wifi',l:'WiFi fibra'},{icon:'tv',l:'Smart TV 43"'},{icon:'cooking-pot',l:'Cocina equipada'},{icon:'shower-head',l:'Baño privado'},{icon:'sparkles',l:'Aseo semanal'}]},
-    { id:'seleccion', num:'02', name:'Selección', area:32, capacity:2, bed:'1 Queen size', view:'Cordillera + balcón',
+    { id:'seleccion', roomTypeId:'31349', num:'02', name:'Selección', area:32, capacity:2, bed:'1 Queen size', view:'Cordillera + balcón',
       desc:'Balcón privado con vistas a la cordillera. Ideal para el café de las mañanas.', priceFlexible:265000,
       images: ['assets/photos/tipo2/1.webp', 'assets/photos/tipo2/2.webp', 'assets/photos/tipo2/3.webp', 'assets/photos/tipo2/4.webp'],
       amenities:[{icon:'wind',l:'Balcón privado'},{icon:'wifi',l:'WiFi fibra'},{icon:'tv',l:'Smart TV 43"'},{icon:'cooking-pot',l:'Cocina equipada'},{icon:'shower-head',l:'Baño privado'}]},
-    { id:'reserva', num:'03', name:'Reserva', area:42, capacity:2, bed:'1 King size', view:'Vista ciudad',
+    { id:'reserva', roomTypeId:'31350', num:'03', name:'Reserva', area:42, capacity:2, bed:'1 King size', view:'Vista ciudad',
       desc:'Dormitorio privado separado de la zona social. Escritorio ergonómico. 42 m².', priceFlexible:320000,
       images: ['assets/photos/tipo3/1.webp', 'assets/photos/tipo3/2.webp', 'assets/photos/tipo3/3.webp'],
       amenities:[{icon:'layout',l:'Ambientes separados'},{icon:'wifi',l:'WiFi fibra'},{icon:'tv',l:'Smart TV 55"'},{icon:'cooking-pot',l:'Cocina equipada'},{icon:'briefcase',l:'Escritorio'}]},
-    { id:'origen', num:'04', name:'Origen', area:52, capacity:2, bed:'1 King size', view:'Panorámica',
+    { id:'origen', roomTypeId:'31351', num:'04', name:'Origen', area:52, capacity:2, bed:'1 King size', view:'Panorámica',
       desc:'El más espacioso. Diseño con referencia cafetera. Vista panorámica de Manizales.', priceFlexible:385000,
       images: ['assets/photos/tipo4/1.webp', 'assets/photos/tipo4/2.webp', 'assets/photos/tipo4/3.webp', 'assets/photos/tipo4/4.webp', 'assets/photos/tipo4/5.webp'],
       amenities:[{icon:'mountain',l:'Vista panorámica'},{icon:'wifi',l:'WiFi fibra'},{icon:'tv',l:'Smart TV 65"'},{icon:'cooking-pot',l:'Cocina equipada'},{icon:'bath',l:'Bañera'}]},
-    { id:'especial', num:'05', name:'Especial', area:60, capacity:3, bed:'King + sofacama', view:'Panorámica premium',
+    { id:'especial', roomTypeId:'31352', num:'05', name:'Especial', area:60, capacity:3, bed:'King + sofacama', view:'Panorámica premium',
       desc:'Nuestra tipología más completa. Terraza privada. Para quedar muy bien.', priceFlexible:450000,
       images: ['assets/photos/tipo5/1.webp', 'assets/photos/tipo5/2.webp', 'assets/photos/tipo5/3.webp', 'assets/photos/tipo5/4.webp'],
       amenities:[{icon:'sun',l:'Terraza privada'},{icon:'wifi',l:'WiFi fibra'},{icon:'tv',l:'Smart TV 65"'},{icon:'cooking-pot',l:'Cocina premium'},{icon:'users',l:'Hasta 3 personas'}]}
@@ -560,6 +643,6 @@
     return{nights,nightly,roomSub,extrasSub:ex,subtotal:sub,iva,total:sub+iva};
   }
 </script>
-<script type="text/babel" src="motor-app.jsx"></script>
+<script src="motor-app.js"></script>
 </body>
 </html>

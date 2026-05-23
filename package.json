@@ -1,0 +1,12 @@
+{
+  "name": "estar-booking-engine",
+  "version": "1.0.0",
+  "description": "Hotel Estar booking engine assets and build scripts.",
+  "scripts": {
+    "build": "esbuild motor-app.jsx --outfile=motor-app.js --minify",
+    "dev": "esbuild motor-app.jsx --outfile=motor-app.js --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.2"
+  }
+}
