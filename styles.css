@@ -4695,6 +4695,7 @@ html[lang="en"] .lang-es { display: none !important; }
   .location-grid           { gap: 32px; }
   .location-info-column h2 { margin: 12px 0 28px; }
   .location-stats          { gap: 20px; margin-bottom: 28px; }
+  .proximity-section       { display: none; }
 
   /* ── ROOMS ── */
   .rooms      { padding: 48px 0 52px; }
