@@ -4901,8 +4901,9 @@ html[lang="en"] .lang-es { display: none !important; }
     word-break: break-word;
   }
 
-  /* ── Carousel: habilita swipe horizontal nativo ── */
-  .room-list { touch-action: pan-x; }
+  /* ── Carousel: pan-x pan-y permite swipe horizontal en el carrusel
+     sin bloquear el scroll vertical de la página ── */
+  .room-list { touch-action: pan-x pan-y; }
 
   /* ── Pricing tiers 2×2 compact on mobile ── */
   .tier { padding: 20px 14px; gap: 8px; }
