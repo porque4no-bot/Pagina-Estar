@@ -479,6 +479,12 @@
     color: var(--terracotta);
     text-decoration: underline;
   }
+  @media (max-width: 600px) {
+    .form-card .field-row[style*="grid-template-columns"] {
+      grid-template-columns: 1fr !important;
+    }
+    .form-card button[type="submit"] { width: 100%; justify-content: center; }
+  }
 </style>
 
 <script>

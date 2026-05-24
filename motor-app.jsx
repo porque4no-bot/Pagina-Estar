@@ -637,12 +637,9 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
           <h3 className="be-room-name">{roomName}</h3>
           <p className="be-room-desc">{roomDesc}</p>
         </div>
-        <div className="be-room-specs">
-          <span><Icon name="maximize-2" size={13} />{room.area} m²</span>
-          <span><Icon name="moon" size={13} />{roomBed}</span>
-          <span><Icon name="users" size={13} />{room.capacity} {lang === 'es' ? 'pers.' : 'guests'}</span>
-          <span><Icon name="eye" size={13} />{roomView}</span>
-        </div>
+        <p className="be-room-specs-compact">
+          {room.area} m² · {roomBed} · {room.capacity} {lang === 'es' ? 'pers.' : 'guests'} · {roomView}
+        </p>
         <div className="be-rate-options">
           <button type="button" className={`be-rate-opt${rate === 'flexible' ? ' active' : ''}`}
             onClick={() => onRateChange('flexible')}>

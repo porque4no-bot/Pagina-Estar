@@ -18,6 +18,19 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="colors_and_type.css?v=2">
 <link rel="stylesheet" href="styles.css?v=3">
+<style>
+@media (max-width: 600px) {
+  .specs-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+  .specs-grid > div strong { font-size: 14px !important; }
+  .split .text ul { grid-template-columns: 1fr !important; }
+}
+.share-btn {
+  margin-top: 8px;
+  font-size: 12px;
+  padding: 8px 16px;
+  border-color: var(--ink-300);
+}
+</style>
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
 <script type="application/ld+json">
 {
@@ -100,7 +113,7 @@
       </div>
       
       <div class="text" data-reveal>
-        <p class="eyebrow terracotta">Detalles · Details</p>
+        <p class="eyebrow terracotta with-arrow">Detalles · Details</p>
         <h2>
           <span class="lang-es">Apartaestudio familiar y flexible en El Cable</span>
           <span class="lang-en">Flexible family studio apartment in El Cable</span>
@@ -157,6 +170,10 @@
             <span class="lang-es">Aplicar a largo plazo</span>
             <span class="lang-en">Apply for long term</span>
           </a>
+          <button class="btn-ghost share-btn" type="button" onclick="if(navigator.share){navigator.share({title:document.title,url:window.location.href}).catch(()=>{});}else{navigator.clipboard.writeText(window.location.href).then(()=>alert('Enlace copiado'));}">
+            <span class="lang-es">↑ Compartir</span>
+            <span class="lang-en">↑ Share</span>
+          </button>
         </div>
       </div>
     </div>

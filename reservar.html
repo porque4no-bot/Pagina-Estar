@@ -141,8 +141,7 @@
     .be-room-info { padding: 18px 18px 18px 20px; display: flex; flex-direction: column; gap: 10px; }
     .be-room-name { font-family: var(--font-heading); font-weight: 700; font-size: 20px; line-height: 1.1; color: var(--ink); }
     .be-room-desc { font-family: var(--font-body); font-size: 13px; color: var(--ink-500); line-height: 1.55; }
-    .be-room-specs { display: flex; flex-wrap: wrap; gap: 10px 16px; }
-    .be-room-specs span { display: flex; align-items: center; gap: 5px; font-family: var(--font-body); font-size: 12px; color: var(--ink-500); }
+    .be-room-specs-compact { font-family: var(--font-body); font-size: 12px; color: var(--ink-500); line-height: 1.4; margin: 0; }
 
     /* ─── rate options ──────────────────────────────────────────────── */
     .be-rate-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -348,8 +347,8 @@
     /* ─── responsive ────────────────────────────────────────────────── */
     @media (max-width: 680px) {
       .be-room-card { grid-template-columns: 1fr; }
-      .be-room-photo { min-height: 140px; }
-      .be-rate-options { grid-template-columns: 1fr; }
+      .be-room-photo { min-height: 200px; height: 52vw; max-height: 260px; }
+      .be-rate-options { grid-template-columns: 1fr 1fr; gap: 6px; }
       .be-form-grid { grid-template-columns: 1fr; }
       .be-searchform-fields { grid-template-columns: 1fr 1fr; }
       .be-searchform-fields .be-btn-primary { grid-column: 1 / -1; }
@@ -367,6 +366,12 @@
       .be-step-content { padding: 14px 14px 18px; }
       .be-step-summary { padding: 0 14px 12px 42px; }
       .be-step-footer  { margin-top: 16px; padding-top: 16px; }
+      .be-rate-opt { padding: 8px 10px; }
+      .be-rate-price { font-size: 14px; }
+      .be-rate-sub { font-size: 10px; }
+      .be-room-total-row { flex-direction: column; gap: 2px; align-items: flex-start; }
+      .be-room-total { font-size: 20px; }
+      .be-room-total-label { font-size: 11px; }
       .be-room-info    { padding: 14px 14px 14px 16px; }
       .be-searchbar-wrap { padding: 14px 14px; }
       .be-extra-row    { padding: 12px 12px; gap: 10px; }
