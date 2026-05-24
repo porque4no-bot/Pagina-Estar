@@ -798,6 +798,24 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- ============================== LIGHTBOX ============================== -->
+<div id="lightbox" role="dialog" aria-modal="true" aria-label="Vista ampliada de foto">
+  <button class="lb-close" aria-label="Cerrar">
+    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+  <button class="lb-prev" aria-label="Foto anterior">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+  </button>
+  <button class="lb-next" aria-label="Foto siguiente">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+  </button>
+  <div class="lb-canvas">
+    <img id="lb-img" src="" alt="" draggable="false">
+  </div>
+  <div class="lb-counter" id="lb-counter"></div>
+  <p class="lb-hint">Doble toque · Pinch · Scroll para zoom</p>
+</div>
+
   <!-- Burbuja Flotante de Contacto -->
   <div class="contact-float" id="contactFloat">
     <button class="contact-trigger" aria-label="Abrir opciones de contacto">
@@ -872,6 +890,197 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
   </div>
+
+<script>
+/* ── LIGHTBOX ─────────────────────────────────────────────────────────── */
+(function () {
+  var lb      = document.getElementById('lightbox');
+  var lbImg   = document.getElementById('lb-img');
+  var canvas  = lb.querySelector('.lb-canvas');
+  var btnClose= lb.querySelector('.lb-close');
+  var btnPrev = lb.querySelector('.lb-prev');
+  var btnNext = lb.querySelector('.lb-next');
+  var counter = document.getElementById('lb-counter');
+
+  var gallery = [], idx = 0;
+  var sc = 1, tx = 0, ty = 0;
+  var MIN = 1, MAX = 6;
+
+  function apply(animated) {
+    lbImg.style.transition = animated
+      ? 'transform 0.22s ease, opacity 0.15s ease'
+      : 'none';
+    lbImg.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + sc + ')';
+    canvas.classList.toggle('zoomed', sc > 1.05);
+  }
+
+  function clamp() {
+    var hw = Math.max(0, (lbImg.offsetWidth  * sc - canvas.clientWidth)  / 2);
+    var hh = Math.max(0, (lbImg.offsetHeight * sc - canvas.clientHeight) / 2);
+    tx = Math.max(-hw, Math.min(hw, tx));
+    ty = Math.max(-hh, Math.min(hh, ty));
+  }
+
+  function reset() {
+    sc = 1; tx = 0; ty = 0;
+    apply(true);
+    canvas.classList.remove('zoomed', 'dragging');
+  }
+
+  function show(i) {
+    i = Math.max(0, Math.min(i, gallery.length - 1));
+    idx = i;
+    reset();
+    lbImg.classList.add('fading');
+    setTimeout(function () {
+      lbImg.src = gallery[i].src;
+      lbImg.alt = gallery[i].alt;
+      lbImg.classList.remove('fading');
+    }, 140);
+    counter.textContent = gallery.length > 1 ? (i + 1) + ' / ' + gallery.length : '';
+    btnPrev.style.visibility = gallery.length > 1 ? '' : 'hidden';
+    btnNext.style.visibility = gallery.length > 1 ? '' : 'hidden';
+  }
+
+  function open(images, i) {
+    gallery = images;
+    show(i);
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function close() {
+    lb.classList.remove('open');
+    document.body.style.overflow = '';
+    reset();
+  }
+
+  /* ── Wheel zoom ── */
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var f = e.deltaY < 0 ? 1.18 : 0.85;
+    var prev = sc;
+    sc = Math.max(MIN, Math.min(MAX, sc * f));
+    var cx = e.clientX - canvas.clientWidth  / 2;
+    var cy = e.clientY - canvas.clientHeight / 2;
+    tx = cx - (cx - tx) * (sc / prev);
+    ty = cy - (cy - ty) * (sc / prev);
+    clamp();
+    apply(false);
+  }, { passive: false });
+
+  /* ── Mouse drag ── */
+  var drag = false, dsx, dsy, dtx, dty;
+  canvas.addEventListener('mousedown', function (e) {
+    if (sc <= 1 || e.button !== 0) return;
+    drag = true; dsx = e.clientX; dsy = e.clientY; dtx = tx; dty = ty;
+    canvas.classList.add('dragging');
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', function (e) {
+    if (!drag) return;
+    tx = dtx + e.clientX - dsx;
+    ty = dty + e.clientY - dsy;
+    clamp();
+    apply(false);
+  });
+  window.addEventListener('mouseup', function () {
+    drag = false;
+    canvas.classList.remove('dragging');
+  });
+
+  /* ── Double-click / double-tap toggle zoom ── */
+  var lastClick = 0;
+  canvas.addEventListener('click', function (e) {
+    var now = Date.now();
+    if (now - lastClick < 320) {
+      if (sc > 1.5) {
+        reset();
+      } else {
+        var prev = sc; sc = 2.5;
+        var cx = e.clientX - canvas.clientWidth  / 2;
+        var cy = e.clientY - canvas.clientHeight / 2;
+        tx = cx - (cx - tx) * (sc / prev);
+        ty = cy - (cy - ty) * (sc / prev);
+        clamp();
+        apply(true);
+      }
+      lastClick = 0;
+    } else {
+      lastClick = now;
+    }
+  });
+
+  /* ── Touch pinch + pan ── */
+  var tpts = {}, pinchDist = 0, pinchMx = 0, pinchMy = 0;
+  var panSx, panSy, panTx, panTy;
+
+  canvas.addEventListener('touchstart', function (e) {
+    Array.from(e.changedTouches).forEach(function (t) { tpts[t.identifier] = t; });
+    var pts = Object.values(tpts);
+    if (pts.length === 2) {
+      pinchDist = Math.hypot(pts[1].clientX - pts[0].clientX, pts[1].clientY - pts[0].clientY);
+      pinchMx = (pts[0].clientX + pts[1].clientX) / 2;
+      pinchMy = (pts[0].clientY + pts[1].clientY) / 2;
+    } else if (pts.length === 1) {
+      panSx = pts[0].clientX; panSy = pts[0].clientY; panTx = tx; panTy = ty;
+    }
+  }, { passive: true });
+
+  canvas.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(function (t) { tpts[t.identifier] = t; });
+    var pts = Object.values(tpts);
+    if (pts.length === 2) {
+      var dist = Math.hypot(pts[1].clientX - pts[0].clientX, pts[1].clientY - pts[0].clientY);
+      var mx = (pts[0].clientX + pts[1].clientX) / 2;
+      var my = (pts[0].clientY + pts[1].clientY) / 2;
+      var prev = sc;
+      sc = Math.max(MIN, Math.min(MAX, sc * dist / pinchDist));
+      var cx = mx - canvas.clientWidth  / 2;
+      var cy = my - canvas.clientHeight / 2;
+      tx = cx - (cx - tx) * (sc / prev) + (mx - pinchMx);
+      ty = cy - (cy - ty) * (sc / prev) + (my - pinchMy);
+      clamp(); apply(false);
+      pinchDist = dist; pinchMx = mx; pinchMy = my;
+    } else if (pts.length === 1 && sc > 1) {
+      tx = panTx + (pts[0].clientX - panSx);
+      ty = panTy + (pts[0].clientY - panSy);
+      clamp(); apply(false);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', function (e) {
+    Array.from(e.changedTouches).forEach(function (t) { delete tpts[t.identifier]; });
+    if (sc < 1) reset();
+  }, { passive: true });
+
+  /* ── Controls ── */
+  btnClose.addEventListener('click', close);
+  btnPrev.addEventListener('click', function () { show(idx - 1); });
+  btnNext.addEventListener('click', function () { show(idx + 1); });
+  lb.addEventListener('click', function (e) { if (e.target === lb) close(); });
+  document.addEventListener('keydown', function (e) {
+    if (!lb.classList.contains('open')) return;
+    if (e.key === 'Escape')     close();
+    if (e.key === 'ArrowLeft')  show(idx - 1);
+    if (e.key === 'ArrowRight') show(idx + 1);
+  });
+
+  /* ── Wire room slider images ── */
+  document.querySelectorAll('.room').forEach(function (room) {
+    var imgs = Array.from(room.querySelectorAll('.slider-slide img'));
+    var images = imgs.map(function (img) { return { src: img.src, alt: img.alt }; });
+    imgs.forEach(function (img, i) {
+      img.style.cursor = 'zoom-in';
+      img.addEventListener('click', function (e) {
+        e.stopPropagation();
+        open(images, i);
+      });
+    });
+  });
+})();
+</script>
 
 </body>
 </html>
