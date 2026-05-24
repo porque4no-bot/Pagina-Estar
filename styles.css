@@ -5,7 +5,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: clip; }
 
 body {
   margin: 0;
@@ -4619,14 +4619,11 @@ html[lang="en"] .lang-es { display: none !important; }
   .rooms      { padding: 48px 0 52px; }
   .rooms-head { margin-bottom: 28px; }
 
-  /* Fix page-level horizontal overflow from room cards */
-  .room-list-container { overflow: hidden; }
+  /* Clip overflow from room cards without creating a scroll context */
+  .rooms { overflow-x: clip; }
 
-  /* Peek ~60px of next card to signal swipability */
+  /* Peek ~50px of next card to signal swipability */
   .room { max-width: 78vw; }
-
-  /* Room list scroll adjusted for the narrower peek */
-  .room-list { padding-left: 0; }
 
   /* Mobile pagination dots */
   .room-list-nav {
@@ -4716,7 +4713,9 @@ html[lang="en"] .lang-es { display: none !important; }
   /* Body padding so footer isn't hidden behind the bar */
   body[data-booking] { padding-bottom: 58px; }
 
-  /* The bar itself: 3 equal fields + fixed CTA column */
+  /* The bar itself: 3 equal fields + fixed CTA column.
+     minmax(0,Xfr) prevents 1fr from expanding to min-content
+     of the text inside, which would push the bar past 100vw. */
   .booking-bar {
     position: fixed !important;
     bottom: 0 !important;
@@ -4726,19 +4725,26 @@ html[lang="en"] .lang-es { display: none !important; }
     border-top: 1px solid var(--paper-400);
     box-shadow: 0 -4px 20px rgba(40, 41, 43, 0.13);
     z-index: 150;
-    grid-template-columns: 1fr 1fr 0.75fr 80px;
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,0.75fr) 80px;
     background: rgba(250, 246, 239, 0.98);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    width: 100%;
   }
 
   /* Compact fields */
   .booking-field {
     padding: 10px 12px !important;
     border-bottom: none !important;
+    min-width: 0;
   }
   .booking-field .label { font-size: 8px; letter-spacing: 0.2em; }
-  .booking-field .value { font-size: 13px; }
+  .booking-field .value {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   /* Guests: restore to single auto column (override the 1/-1 from 900px block) */
   #guests-field {
