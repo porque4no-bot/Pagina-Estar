@@ -4902,6 +4902,12 @@ html[lang="en"] .lang-es { display: none !important; }
     word-break: break-word;
   }
 
+  /* ── Video hero: en móvil se oculta el video y se muestra el frame
+     poster como imagen estática. Chrome Android bloquea capturas de
+     pantalla cuando detecta un <video> activo (protección DRM). ── */
+  .hero-media video { display: none; }
+  .hero-media { background: url('assets/photos/hero_first_frame.webp') center/cover no-repeat; }
+
   /* ── Carousel: pan-x pan-y permite swipe horizontal en el carrusel
      sin bloquear el scroll vertical de la página ── */
   .room-list { touch-action: pan-x pan-y; }
