@@ -586,6 +586,17 @@
         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
     </div>
+    <!-- Mobile pagination: dots + swipe hint -->
+    <div class="room-list-nav" aria-hidden="true">
+      <div class="room-list-dots">
+        <span class="rld active"></span>
+        <span class="rld"></span>
+        <span class="rld"></span>
+        <span class="rld"></span>
+        <span class="rld"></span>
+      </div>
+      <p class="room-list-hint">Desliza para ver más</p>
+    </div>
   </div>
 </section>
 
@@ -745,6 +756,23 @@
 <script src="shell.js?v=2" defer></script>
 <script src="kunas.js" defer></script>
 <script>document.addEventListener('DOMContentLoaded',function(){lucide.createIcons();});</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const list = document.getElementById('room-list');
+  const dots = document.querySelectorAll('.rld');
+  const hint = document.querySelector('.room-list-hint');
+  if (!list || !dots.length) return;
+  list.addEventListener('scroll', function() {
+    const card = list.querySelector('.room');
+    if (!card) return;
+    const cardW = card.offsetWidth + 32; // card + gap
+    const idx = Math.min(Math.round(list.scrollLeft / cardW), dots.length - 1);
+    dots.forEach(function(d, i) { d.classList.toggle('active', i === idx); });
+    // Hide hint once user swipes
+    if (list.scrollLeft > 20 && hint) hint.style.opacity = '0';
+  }, { passive: true });
+});
+</script>
 
   <!-- Burbuja Flotante de Contacto -->
   <div class="contact-float" id="contactFloat">

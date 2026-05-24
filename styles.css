@@ -884,6 +884,7 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   position: relative;
   width: 100%;
 }
+.room-list-nav { display: none; }
 
 /* Room List Navigation Buttons */
 .room-list-btn {
@@ -4617,6 +4618,51 @@ html[lang="en"] .lang-es { display: none !important; }
   /* ── ROOMS ── */
   .rooms      { padding: 48px 0 52px; }
   .rooms-head { margin-bottom: 28px; }
+
+  /* Fix page-level horizontal overflow from room cards */
+  .room-list-container { overflow: hidden; }
+
+  /* Peek ~60px of next card to signal swipability */
+  .room { max-width: 78vw; }
+
+  /* Room list scroll adjusted for the narrower peek */
+  .room-list { padding-left: 0; }
+
+  /* Mobile pagination dots */
+  .room-list-nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .room-list-dots {
+    display: flex;
+    gap: 6px;
+  }
+  .rld {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--paper-400);
+    transition: background 0.3s, transform 0.3s;
+  }
+  .rld.active {
+    background: var(--terracotta);
+    transform: scale(1.3);
+  }
+
+  /* Swipe hint label */
+  .room-list-hint {
+    font-family: var(--font-label);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-500);
+    margin: 0;
+    transition: opacity 0.4s;
+  }
+  .room-list-hint::before { content: "← "; }
+  .room-list-hint::after  { content: " →"; }
 
   /* ── FEATURE BAND ── */
   .feature-band            { padding: 64px 0; }
