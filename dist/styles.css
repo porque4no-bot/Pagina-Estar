@@ -361,9 +361,11 @@ h1, h2, h3, h4, h5, h6 {
     z-index: 100;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 32px;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 0;
+    padding-top: 68px;
+    overflow-y: auto;
     opacity: 0;
     pointer-events: none;
     transform: translateY(-20px);
@@ -376,28 +378,30 @@ h1, h2, h3, h4, h5, h6 {
   }
   .site-header .nav-list a {
     color: var(--ink);
-    font-size: 24px;
+    font-size: 22px;
     font-family: var(--font-heading);
     font-weight: 700;
-    letter-spacing: 0.16em;
-    border-bottom: 0;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--paper-400);
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 12px;
+    padding: 22px 24px;
   }
-  .site-header .nav-list a::before {
-    content: "→";
+  .site-header .nav-list a::before { content: none; }
+  .site-header .nav-list a::after {
+    content: "›";
     font-family: var(--font-body);
-    font-size: 18px;
-    font-weight: 400;
-    color: var(--terracotta);
+    font-size: 26px;
+    font-weight: 300;
+    color: var(--ink-500);
     flex-shrink: 0;
-    align-self: flex-start;
-    transition: transform 0.15s ease;
+    transition: transform 0.15s ease, color 0.15s ease;
   }
-  .site-header .nav-list a:hover::before,
-  .site-header .nav-list a.is-current::before {
-    transform: translateX(4px);
+  .site-header .nav-list a:hover::after,
+  .site-header .nav-list a.is-current::after {
+    transform: translateX(3px);
+    color: var(--terracotta);
   }
   .site-header.menu-open .brand {
     position: relative;
