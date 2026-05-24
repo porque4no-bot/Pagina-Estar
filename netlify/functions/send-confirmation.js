@@ -3,6 +3,9 @@ const path = require('path');
 
 // Helper to load local .env variables if not already set
 function loadEnv() {
+  if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') {
+    return;
+  }
   try {
     const envPath = path.join(__dirname, '../../.env');
     if (fs.existsSync(envPath)) {
@@ -54,6 +57,18 @@ function formatDateES(dateStr) {
   const month = parseInt(parts[1], 10) - 1;
   const year = parts[0];
   return `${day} de ${months[month]} de ${year}`;
+}
+
+/**
+ * Obfuscates an email address for logging purposes.
+ */
+function obfuscateEmail(email) {
+  if (!email || typeof email !== 'string') return '';
+  const parts = email.split('@');
+  if (parts.length !== 2) return '***';
+  const name = parts[0];
+  const domain = parts[1];
+  return name.length > 2 ? `${name[0]}***${name[name.length - 1]}@${domain}` : `***@${domain}`;
 }
 
 /**
@@ -281,12 +296,15 @@ function buildEmailHtml({
 
 exports.handler = async (event, context) => {
   // CORS Headers
+  const allowedOrigin = process.env.ALLOWED_ORIGIN;
   const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Content-Type': 'application/json'
   };
+  if (allowedOrigin) {
+    corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
+  }
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders, body: '' };
@@ -380,26 +398,25 @@ exports.handler = async (event, context) => {
     const resendData = await resendResponse.json();
 
     if (!resendResponse.ok) {
-      console.error('[send-confirmation] Resend API error:', resendData);
+      console.error('[send-confirmation] Resend API error status:', resendResponse.status, resendData?.message || '');
       return {
         statusCode: 502,
         headers: corsHeaders,
         body: JSON.stringify({
           sent: false,
-          error: 'Failed to send email via Resend',
-          details: resendData
+          error: 'Failed to send email'
         })
       };
     }
 
-    console.log(`[send-confirmation] Email sent to ${guestEmail} for booking ${bookingCode}. Resend ID: ${resendData.id}`);
+    console.log(`[send-confirmation] Email sent to ${obfuscateEmail(guestEmail)} for booking ${bookingCode}. Resend ID: ${resendData.id}`);
     return {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
         sent: true,
         resendId: resendData.id,
-        to: guestEmail,
+        to: obfuscateEmail(guestEmail),
         bookingCode
       })
     };
@@ -411,8 +428,7 @@ exports.handler = async (event, context) => {
       headers: corsHeaders,
       body: JSON.stringify({
         sent: false,
-        error: 'Internal server error while sending email',
-        message: err.message
+        error: 'Internal server error while sending email'
       })
     };
   }

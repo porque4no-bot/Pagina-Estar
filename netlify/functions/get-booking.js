@@ -3,6 +3,9 @@ const path = require('path');
 
 // Helper to load local .env variables if not already set
 function loadEnv() {
+  if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') {
+    return;
+  }
   try {
     const envPath = path.join(__dirname, '../../.env');
     if (fs.existsSync(envPath)) {
@@ -122,12 +125,15 @@ function normalizeReservation(raw) {
 
 exports.handler = async (event, context) => {
   // CORS Headers
+  const allowedOrigin = process.env.ALLOWED_ORIGIN;
   const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Content-Type': 'application/json'
   };
+  if (allowedOrigin) {
+    corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
+  }
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders, body: '' };
@@ -243,7 +249,7 @@ exports.handler = async (event, context) => {
       headers: corsHeaders,
       body: JSON.stringify({
         error: 'Failed to retrieve booking from PMS',
-        message: error.message
+        message: 'An unexpected error occurred while retrieving the booking.'
       })
     };
   }

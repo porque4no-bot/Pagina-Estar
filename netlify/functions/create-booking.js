@@ -3,6 +3,9 @@ const path = require('path');
 
 // Helper to load local .env variables if not already set
 function loadEnv() {
+  if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') {
+    return;
+  }
   try {
     const envPath = path.join(__dirname, '../../.env');
     if (fs.existsSync(envPath)) {
@@ -30,22 +33,54 @@ function loadEnv() {
 
 loadEnv();
 
+// In-memory cache for the authentication session key (pkey)
+let sessionCache = {
+  pkey: null,
+  expiresAt: null,
+  promise: null
+};
+
 async function getSessionKey(token, username, password) {
-  const response = await fetch('https://app.otasync.me/api/user/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token, username, password, remember: 0 })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Authentication failed with status ${response.status}`);
+  const now = Date.now();
+  if (sessionCache.pkey && sessionCache.expiresAt && sessionCache.expiresAt > now) {
+    return sessionCache.pkey;
   }
 
-  const data = await response.json();
-  if (!data.pkey) {
-    throw new Error('Authentication response did not contain a session key (pkey)');
+  if (sessionCache.promise) {
+    try {
+      return await sessionCache.promise;
+    } catch (err) {
+      sessionCache.promise = null;
+    }
   }
-  return data.pkey;
+
+  sessionCache.promise = (async () => {
+    const response = await fetch('https://app.otasync.me/api/user/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, username, password, remember: 0 })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Authentication failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.pkey) {
+      throw new Error('Authentication response did not contain a session key (pkey)');
+    }
+
+    // Cache session key for 30 minutes
+    sessionCache.pkey = data.pkey;
+    sessionCache.expiresAt = Date.now() + 30 * 60 * 1000;
+    return data.pkey;
+  })();
+
+  try {
+    return await sessionCache.promise;
+  } finally {
+    sessionCache.promise = null;
+  }
 }
 
 function decodeReference(ref) {
@@ -97,13 +132,15 @@ function decodeReference(ref) {
 
 exports.handler = async (event, context) => {
   // CORS Headers
-  const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
+  const allowedOrigin = process.env.ALLOWED_ORIGIN;
   const corsHeaders = {
-    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Content-Type': 'application/json'
   };
+  if (allowedOrigin && allowedOrigin !== '*') {
+    corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
+  }
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders, body: '' };
@@ -370,7 +407,7 @@ exports.handler = async (event, context) => {
       headers: corsHeaders,
       body: JSON.stringify({
         error: 'Failed to create reservation',
-        message: error.message
+        message: 'An unexpected error occurred while creating your reservation. Please contact the hotel.'
       })
     };
   }

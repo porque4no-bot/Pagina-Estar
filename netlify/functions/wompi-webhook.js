@@ -4,6 +4,9 @@ const crypto = require('crypto');
 
 // Helper to load local .env variables if not already set (e.g. local development)
 function loadEnv() {
+  if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') {
+    return;
+  }
   try {
     const envPath = path.join(__dirname, '../../.env');
     if (fs.existsSync(envPath)) {
@@ -31,8 +34,22 @@ function loadEnv() {
 
 loadEnv();
 
+// In-memory cache for the authentication session key (pkey)
+let sessionCache = {
+  pkey: null,
+  expiresAt: null
+};
+
+// In-memory simple processed transaction ID deduplicator (warm instances)
+const processedTransactionIds = new Set();
+
 // Helper to get session key from Kunas PMS
 async function getSessionKey(token, username, password) {
+  const now = Date.now();
+  if (sessionCache.pkey && sessionCache.expiresAt && sessionCache.expiresAt > now) {
+    return sessionCache.pkey;
+  }
+
   const response = await fetch('https://app.otasync.me/api/user/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -47,6 +64,10 @@ async function getSessionKey(token, username, password) {
   if (!data.pkey) {
     throw new Error('Authentication response did not contain a session key (pkey)');
   }
+
+  // Cache session key for 30 minutes
+  sessionCache.pkey = data.pkey;
+  sessionCache.expiresAt = now + 30 * 60 * 1000;
   return data.pkey;
 }
 
@@ -124,18 +145,23 @@ function decodeReference(ref) {
   }
 }
 
-// In-memory simple processed transaction ID deduplicator (warm instances)
-const processedTransactionIds = new Set();
+// Helper to obfuscate base64 references for logs
+function obfuscateReference(ref) {
+  if (!ref || typeof ref !== 'string') return '';
+  return ref.length > 8 ? `${ref.substring(0, 4)}...${ref.substring(ref.length - 4)}` : '***';
+}
 
 exports.handler = async (event, context) => {
   // CORS Headers
-  const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
+  const allowedOrigin = process.env.ALLOWED_ORIGIN;
   const corsHeaders = {
-    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'Content-Type, X-Event-Checksum',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
   };
+  if (allowedOrigin) {
+    corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
+  }
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders, body: '' };
@@ -173,44 +199,51 @@ exports.handler = async (event, context) => {
     };
   }
 
-  if (body.signature && body.signature.properties) {
-    try {
-      const properties = body.signature.properties;
-      let dataToSign = "";
-      properties.forEach(prop => {
-        const keys = prop.split('.');
-        let value = body.data;
-        keys.forEach(k => {
-          if (value) value = value[k];
-        });
-        dataToSign += value;
+  if (!body.signature || !body.signature.properties || !receivedSignature) {
+    console.error("Wompi signature verification failed: signature, properties, or checksum is missing.");
+    return {
+      statusCode: 401,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Unauthorized. Missing signature components.' })
+    };
+  }
+
+  try {
+    const properties = body.signature.properties;
+    let dataToSign = "";
+    properties.forEach(prop => {
+      const keys = prop.split('.');
+      let value = body.data;
+      keys.forEach(k => {
+        if (value) value = value[k];
       });
+      dataToSign += value;
+    });
 
-      dataToSign += body.timestamp;
-      dataToSign += WOMPI_WEBHOOK_SECRET;
+    dataToSign += body.timestamp;
+    dataToSign += WOMPI_WEBHOOK_SECRET;
 
-      const expectedSignature = crypto
-        .createHash('sha256')
-        .update(dataToSign)
-        .digest('hex');
+    const expectedSignature = crypto
+      .createHash('sha256')
+      .update(dataToSign)
+      .digest('hex');
 
-      if (receivedSignature !== expectedSignature) {
-        console.error("Wompi signature verification failed");
-        return {
-          statusCode: 401,
-          headers: corsHeaders,
-          body: JSON.stringify({ error: 'Unauthorized. Invalid signature.' })
-        };
-      }
-      console.log("Wompi signature successfully verified");
-    } catch (sigErr) {
-      console.error("Error verifying Wompi signature:", sigErr.message);
+    if (receivedSignature !== expectedSignature) {
+      console.error("Wompi signature verification failed");
       return {
-        statusCode: 400,
+        statusCode: 401,
         headers: corsHeaders,
-        body: JSON.stringify({ error: 'Signature verification processing error' })
+        body: JSON.stringify({ error: 'Unauthorized. Invalid signature.' })
       };
     }
+    console.log("Wompi signature successfully verified");
+  } catch (sigErr) {
+    console.error("Error verifying Wompi signature:", sigErr.message);
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Signature verification processing error' })
+    };
   }
 
   const { event: eventName, data } = body;
@@ -233,12 +266,12 @@ exports.handler = async (event, context) => {
     };
   }
 
-  console.log(`Processing Wompi webhook: transaction.id=${transaction.id}, reference=${transaction.reference}, status=${transaction.status}`);
+  console.log(`Processing Wompi webhook: transaction.id=${transaction.id}, reference=${obfuscateReference(transaction.reference)}, status=${transaction.status}`);
 
   if (transaction.status === 'DECLINED' || transaction.status === 'VOIDED' || transaction.status === 'ERROR') {
     const failedDecoded = decodeReference(transaction.reference);
     const bookingCodeForLog = failedDecoded ? failedDecoded.bookingCode : transaction.reference;
-    console.error(`FAILED PAYMENT — status=${transaction.status}, transactionId=${transaction.id}, bookingCode=${bookingCodeForLog}, amount_cents=${transaction.amount_in_cents}, reference=${transaction.reference}. Manual follow-up required.`);
+    console.error(`FAILED PAYMENT — status=${transaction.status}, transactionId=${transaction.id}, bookingCode=${bookingCodeForLog}, amount_cents=${transaction.amount_in_cents}, reference=${obfuscateReference(transaction.reference)}. Manual follow-up required.`);
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -268,7 +301,7 @@ exports.handler = async (event, context) => {
   // Decode the reservation details from the transaction reference
   const decoded = decodeReference(transaction.reference);
   if (!decoded) {
-    console.warn(`Wompi transaction reference ${transaction.reference} is not a valid encoded reservation. Skipping PMS insertion.`);
+    console.warn(`Wompi transaction reference ${obfuscateReference(transaction.reference)} is not a valid encoded reservation. Skipping PMS insertion.`);
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -452,7 +485,7 @@ exports.handler = async (event, context) => {
     }
 
     const data = await response.json();
-    console.log("Kunas API webhook insertion successful:", data);
+    console.log("Kunas API webhook insertion successful, reservation ID:", data.id_reservations || decoded.bookingCode);
 
     return {
       statusCode: 200,
@@ -469,7 +502,7 @@ exports.handler = async (event, context) => {
       headers: corsHeaders,
       body: JSON.stringify({
         error: 'Failed to create booking in PMS',
-        message: err.message
+        message: 'An unexpected error occurred while processing the webhook.'
       })
     };
   }

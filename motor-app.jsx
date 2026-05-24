@@ -4,19 +4,17 @@ const { useState, useEffect, useRef } = React;
 function Icon({ name, size = 20, style, className }) {
   const ref = useRef(null);
   useEffect(() => {
-    if (!ref.current) return;
-    ref.current.innerHTML = '';
-    const el = document.createElement('i');
-    el.setAttribute('data-lucide', name);
-    ref.current.appendChild(el);
-    if (window.lucide) window.lucide.createIcons({ nodes: [el] });
+    if (ref.current && window.lucide) {
+      window.lucide.createIcons({ nodes: [ref.current] });
+    }
   }, [name]);
   return (
     <span
-      ref={ref}
       style={{ display: 'inline-flex', alignItems: 'center', width: size, height: size, flexShrink: 0, ...style }}
       className={className}
-    ></span>
+    >
+      <i key={name} ref={ref} data-lucide={name} />
+    </span>
   );
 }
 
@@ -144,7 +142,7 @@ const i18nEngine = {
       "Vista panorámica": "Vista panorámica",
       "Bañera": "Bañera",
       "Terraza privada": "Terraza privada",
-      "Hasta 3 personas": "Hasta 3 personas"
+      "Hasta 4 personas": "Hasta 4 personas"
     },
     
     // Extras mapping translations
@@ -306,7 +304,7 @@ const i18nEngine = {
       "Vista panorámica": "Panoramic view",
       "Bañera": "Bathtub",
       "Terraza privada": "Private terrace",
-      "Hasta 3 personas": "Up to 3 guests"
+      "Hasta 4 personas": "Up to 4 guests"
     },
     
     // Extras mapping translations
@@ -368,6 +366,10 @@ function SearchBar({ search, onSearch, lang }) {
   const [expanded, setExpanded] = useState(false);
   const t = i18nEngine[lang];
 
+  useEffect(() => {
+    setS(search);
+  }, [expanded, search]);
+
   function submit(e) {
     e.preventDefault();
     onSearch(s);
@@ -412,7 +414,20 @@ function SearchBar({ search, onSearch, lang }) {
           <div className="be-field">
             <label>{t.checkin}</label>
             <input type="date" value={s.checkin} min={getToday()} required
-              onChange={e => setS({ ...s, checkin: e.target.value })} />
+              onChange={e => {
+                const newCheckin = e.target.value;
+                let newCheckout = s.checkout;
+                if (newCheckout && newCheckin >= newCheckout) {
+                  const parts = newCheckin.split('-');
+                  const d = new Date(parts[0], parts[1] - 1, parts[2]);
+                  d.setDate(d.getDate() + 1);
+                  const year = d.getFullYear();
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  newCheckout = `${year}-${month}-${day}`;
+                }
+                setS({ ...s, checkin: newCheckin, checkout: newCheckout });
+              }} />
           </div>
           <div className="be-field">
             <label>{t.checkout}</label>
@@ -425,6 +440,7 @@ function SearchBar({ search, onSearch, lang }) {
               <option value={1}>{t["1"]}</option>
               <option value={2}>{t["2"]}</option>
               <option value={3}>{t["3"]}</option>
+              <option value={4}>{t["4"]}</option>
             </select>
           </div>
           <button type="submit" className="be-btn-primary">{t.searchBtn}</button>
@@ -739,36 +755,36 @@ function GuestForm({ guest, setGuest, onContinue, lang }) {
       <p className="be-section-intro">{t.guestIntro}</p>
       <div className="be-form-grid">
         <div className="be-field">
-          <label>{t.firstName}</label>
-          <input type="text" required placeholder={t.firstName}
+          <label htmlFor="guest-nombre">{t.firstName}</label>
+          <input id="guest-nombre" type="text" required placeholder={t.firstName}
             value={guest.nombre || ''} onChange={e => set('nombre', e.target.value)} />
         </div>
         <div className="be-field">
-          <label>{t.lastName}</label>
-          <input type="text" required placeholder={t.lastName}
+          <label htmlFor="guest-apellido">{t.lastName}</label>
+          <input id="guest-apellido" type="text" required placeholder={t.lastName}
             value={guest.apellido || ''} onChange={e => set('apellido', e.target.value)} />
         </div>
         <div className="be-field be-field-full">
-          <label>{t.email}</label>
-          <input type="email" required placeholder="correo@ejemplo.com"
+          <label htmlFor="guest-email">{t.email}</label>
+          <input id="guest-email" type="email" required placeholder="correo@ejemplo.com"
             value={guest.email || ''} onChange={e => set('email', e.target.value)} />
         </div>
         <div className="be-field">
-          <label>{t.phone}</label>
-          <input type="tel" required placeholder="+57 300 000 0000"
+          <label htmlFor="guest-tel">{t.phone}</label>
+          <input id="guest-tel" type="tel" required placeholder="+57 300 000 0000"
             value={guest.tel || ''} onChange={e => set('tel', e.target.value)} />
         </div>
         <div className="be-field">
-          <label>{t.country}</label>
-          <select value={guest.pais || 'Colombia'} onChange={e => set('pais', e.target.value)}>
+          <label htmlFor="guest-pais">{t.country}</label>
+          <select id="guest-pais" value={guest.pais || 'Colombia'} onChange={e => set('pais', e.target.value)}>
             {countries.map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
         </div>
         <div className="be-field">
-          <label>{lang === 'es' ? 'Motivo del viaje' : 'Travel motive'}</label>
-          <select value={guest.motivo || (lang === 'es' ? 'Turismo / Vacaciones' : 'Tourism / Vacation')} onChange={e => set('motivo', e.target.value)}>
+          <label htmlFor="guest-motivo">{lang === 'es' ? 'Motivo del viaje' : 'Travel motive'}</label>
+          <select id="guest-motivo" value={guest.motivo || (lang === 'es' ? 'Turismo / Vacaciones' : 'Tourism / Vacation')} onChange={e => set('motivo', e.target.value)}>
             {lang === 'es' ? (
               <>
                 <option value="Turismo / Vacaciones">Turismo / Vacaciones</option>
@@ -789,13 +805,13 @@ function GuestForm({ guest, setGuest, onContinue, lang }) {
           </select>
         </div>
         <div className="be-field be-field-full">
-          <label>{t.notes} <span style={{ fontWeight: 400, color: 'var(--ink-300)' }}>{t.notesOptional}</span></label>
-          <textarea rows={3} placeholder={t.notesPlaceholder}
+          <label htmlFor="guest-notas">{t.notes} <span style={{ fontWeight: 400, color: 'var(--ink-300)' }}>{t.notesOptional}</span></label>
+          <textarea id="guest-notas" rows={3} placeholder={t.notesPlaceholder}
             value={guest.notas || ''} onChange={e => set('notas', e.target.value)} />
         </div>
         <div className="be-field be-field-full">
-          <label className="be-checkbox-label">
-            <input type="checkbox" required />
+          <label htmlFor="guest-privacy" className="be-checkbox-label">
+            <input id="guest-privacy" type="checkbox" required />
             <span>{t.privacyAgreement}</span>
           </label>
         </div>
@@ -862,7 +878,9 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
         (booking.guest?.email || '').trim().replace(/\|/g, ''),
         (booking.guest?.tel || '').trim().replace(/\|/g, ''),
         extrasMask,
-        code
+        code,
+        isColombian ? '1' : '0',
+        isBusinessTrip ? '1' : '0'
       ].join('|');
 
       const encodedRef = btoa(unescape(encodeURIComponent(serialized)))
@@ -907,6 +925,10 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       setTimeout(() => {
         setLoading(false);
       }, 1000);
+    } else {
+      setLoading(true);
+      const code = genCode();
+      onConfirm(code, null);
     }
   };
 
@@ -1437,10 +1459,11 @@ function BookingEngine() {
       const data = await response.json();
       
       if (data && Array.isArray(data.rooms)) {
-        // Merge API availability & pricing with local BE_ROOMS rich metadata
-        const mapped = BE_ROOMS.map(localRoom => {
-          const apiRoom = data.rooms.find(r => r.id_room_types === localRoom.roomTypeId);
-          if (apiRoom) {
+        // Render the list of rooms dynamically from the check-availability output array.
+        // Use local static BE_ROOMS for secondary metadata lookup (images, icons).
+        const mapped = data.rooms.map(apiRoom => {
+          const localRoom = BE_ROOMS.find(r => String(r.roomTypeId) === String(apiRoom.id_room_types));
+          if (localRoom) {
             return {
               ...localRoom,
               priceFlexible: apiRoom.avgPrice,
@@ -1450,8 +1473,20 @@ function BookingEngine() {
             };
           }
           return {
-            ...localRoom,
-            available: false
+            id: apiRoom.id_room_types,
+            roomTypeId: apiRoom.id_room_types,
+            num: "0",
+            name: apiRoom.name,
+            area: 30,
+            capacity: apiRoom.capacity || 2,
+            bed: apiRoom.beds || "1 Queen size",
+            view: apiRoom.view || "Vista ciudad",
+            desc: apiRoom.description || "",
+            priceFlexible: apiRoom.avgPrice,
+            available: apiRoom.available,
+            totalPrice: apiRoom.totalPrice,
+            images: apiRoom.image ? [apiRoom.image] : [],
+            amenities: []
           };
         });
         setRooms(mapped);
@@ -1480,6 +1515,17 @@ function BookingEngine() {
       }
     }
   }, [rooms]);
+
+  // Scroll to the top of the booking steps whenever the active step changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const steps = document.querySelector('.be-steps');
+      const target = steps || document.querySelector('.be-progress') || document.body;
+      const offsetTop = target.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top: Math.max(0, offsetTop), behavior: 'smooth' });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [currentStep]);
 
   /* Listener for decoupled language changes from shell.js */
   useEffect(() => {

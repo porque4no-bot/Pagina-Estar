@@ -3,6 +3,18 @@ const https = require('https');
 // Service-agnostic Netlify serverless function to fetch Booking.com rating.
 // It retrieves the scraping URL from process.env.PROXY_URL.
 exports.handler = async (event, context) => {
+  const allowedOrigin = process.env.ALLOWED_ORIGIN;
+  const corsHeaders = {
+    'Content-Type': 'application/json'
+  };
+  if (allowedOrigin) {
+    corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
+  }
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers: corsHeaders, body: '' };
+  }
+
   const PROXY_URL = process.env.PROXY_URL;
   const FALLBACK_RATING = "9.0";
   const FALLBACK_REVIEWS_COUNT = "126";
@@ -13,7 +25,7 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': 'application/json',
+        ...corsHeaders,
         'Cache-Control': 'public, max-age=3600' // Cache fallback for 1 hour
       },
       body: JSON.stringify({
@@ -85,7 +97,7 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': 'application/json',
+        ...corsHeaders,
         // Cache in Netlify Edge CDN for 24 hours
         'Cache-Control': 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=7200'
       },
@@ -96,14 +108,14 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': 'application/json',
+        ...corsHeaders,
         'Cache-Control': 'public, max-age=1800' // Cache error states for 30 minutes
       },
       body: JSON.stringify({
         rating: FALLBACK_RATING,
         reviewsCount: FALLBACK_REVIEWS_COUNT,
         locationRating: FALLBACK_LOCATION_RATING,
-        error: error.message
+        error: 'An error occurred while fetching ratings'
       })
     };
   }
