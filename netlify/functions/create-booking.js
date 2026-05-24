@@ -48,6 +48,53 @@ async function getSessionKey(token, username, password) {
   return data.pkey;
 }
 
+function decodeReference(ref) {
+  try {
+    if (!ref || !/^[a-zA-Z0-9\-_]+$/.test(ref)) {
+      return null;
+    }
+    let base64 = ref.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+    const decoded = Buffer.from(base64, 'base64').toString('utf8');
+    if (!decoded.startsWith('1|')) {
+      return null;
+    }
+    const parts = decoded.split('|');
+    if (parts.length < 11) {
+      return null;
+    }
+    const [
+      version,
+      checkinYYMMDD,
+      checkoutYYMMDD,
+      guestsCount,
+      roomTypeId,
+      firstName,
+      lastName,
+      email,
+      phone,
+      extrasMask,
+      bookingCode
+    ] = parts;
+    return {
+      bookingCode,
+      checkin: `20${checkinYYMMDD.substring(0, 2)}-${checkinYYMMDD.substring(2, 4)}-${checkinYYMMDD.substring(4, 6)}`,
+      checkout: `20${checkoutYYMMDD.substring(0, 2)}-${checkoutYYMMDD.substring(2, 4)}-${checkoutYYMMDD.substring(4, 6)}`,
+      guestsCount: parseInt(guestsCount) || 1,
+      roomTypeId,
+      firstName,
+      lastName,
+      email,
+      phone,
+      extrasMask
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
 exports.handler = async (event, context) => {
   // CORS Headers
   const corsHeaders = {
@@ -170,13 +217,22 @@ exports.handler = async (event, context) => {
       });
     }
 
+    let cleanReference = paymentDetails?.reference || '';
+    let decodedRef = null;
+    if (paymentDetails && paymentDetails.reference) {
+      decodedRef = decodeReference(paymentDetails.reference);
+      if (decodedRef) {
+        cleanReference = decodedRef.bookingCode;
+      }
+    }
+
     const paymentInfo = [];
     if (paymentDetails && (paymentDetails.status === 'APPROVED' || paymentDetails.status === 'PENDING')) {
       paymentInfo.push({
         amount: parseFloat(paidAmount || roomPrice),
         date_payment: new Date().toISOString().split('T')[0],
         payment_method: 'card',
-        note: `Wompi ID: ${paymentDetails.id}, Ref: ${paymentDetails.reference}, Status: ${paymentDetails.status}`
+        note: `Wompi ID: ${paymentDetails.id}, Ref: ${cleanReference}, Status: ${paymentDetails.status}`
       });
     }
 
@@ -238,7 +294,7 @@ exports.handler = async (event, context) => {
       reservation_type: "web",
       active_id_room_types: String(roomTypeId),
       preselected_id_rooms: 0,
-      reference: "Hotel Estar Custom Booking Engine",
+      reference: cleanReference || "Hotel Estar Custom Booking Engine",
       id_contigents: 0,
       date_arrival: checkin,
       date_departure: checkout,
@@ -260,8 +316,7 @@ exports.handler = async (event, context) => {
     const data = await response.json();
 
     // Check if reservation insertion was successful in Kunas response
-    // Kunas typically returns the inserted reservation details including its ID.
-    const bookingCode = data.id_reservations || `ESTAR-PMS-${Date.now().toString().slice(-6)}`;
+    const bookingCode = data.id_reservations || cleanReference || `ESTAR-PMS-${Date.now().toString().slice(-6)}`;
 
     return {
       statusCode: 200,

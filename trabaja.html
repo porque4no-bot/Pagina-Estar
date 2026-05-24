@@ -135,7 +135,7 @@
     </a>
     <nav><ul class="nav-list">
       <li><a href="index.html" data-i18n="nav_estadias">Estadías</a></li>
-      <li><a href="vivir.html" data-i18n="nav_vivir">Vivir en estar</a></li>
+      <li><a href="vivir.html" data-i18n="nav_vivir">Extended Stay</a></li>
       <li><a href="explora.html" data-i18n="nav_explorar">Explorar Manizales</a></li>
       <li><a href="empresas.html" data-i18n="nav_empresas">Empresas</a></li>
       <li><a href="grupos.html" data-i18n="nav_grupos">Grupos</a></li>
@@ -209,21 +209,22 @@
           <span class="lang-es">Postúlate aquí</span>
           <span class="lang-en">Apply here</span>
         </h2>
-        <form class="apply-form" onsubmit="event.preventDefault(); this.style.opacity='0.6'; this.innerHTML='<div style=&quot;padding: 40px 0; text-align: center; font-family: var(--font-heading); font-size: 18px; color: var(--fg);&quot;>✶ Postulación enviada. / Application sent.</div>';">
+        <form class="apply-form" name="vacantes-empleo" data-netlify="true">
+          <input type="hidden" name="form-name" value="vacantes-empleo">
           <div class="form-field">
             <label class="lang-es">Nombre Completo</label>
             <label class="lang-en">Full Name</label>
-            <input type="text" placeholder="Ej. Carlos Giraldo" required>
+            <input type="text" name="nombre" placeholder="Ej. Carlos Giraldo" required>
           </div>
           <div class="form-field">
             <label class="lang-es">Correo Electrónico</label>
             <label class="lang-en">Email Address</label>
-            <input type="email" placeholder="tu@correo.com" required>
+            <input type="email" name="email" placeholder="tu@correo.com" required>
           </div>
           <div class="form-field">
             <label class="lang-es">Área de Interés</label>
             <label class="lang-en">Area of Interest</label>
-            <select required>
+            <select name="area" required>
               <option value="" disabled selected class="lang-es">Selecciona un área...</option>
               <option value="" disabled selected class="lang-en">Select an area...</option>
               <option value="operations" class="lang-es">Operaciones / Huéspedes</option>
@@ -239,15 +240,15 @@
           <div class="form-field">
             <label class="lang-es">Enlace a Hoja de Vida / Portafolio</label>
             <label class="lang-en">Link to CV / Portfolio</label>
-            <input type="url" placeholder="https://drive.google.com/... o Linkedin" required>
+            <input type="url" name="hoja_vida" placeholder="https://drive.google.com/... o Linkedin" required>
           </div>
           <div class="form-field">
             <label class="lang-es">Cuéntanos sobre ti</label>
             <label class="lang-en">Tell us about yourself</label>
-            <textarea placeholder="..." required></textarea>
+            <textarea name="mensaje" placeholder="..." required></textarea>
           </div>
           <label class="form-checkbox">
-            <input type="checkbox" required>
+            <input type="checkbox" name="habeas_data" required>
             <span>
               <span class="lang-es">Acepto el uso de mis datos para procesos de selección según la <a href="privacidad.html" target="_blank">Política de Privacidad</a>.</span>
               <span class="lang-en">I accept the processing of my data for selection processes per the <a href="privacidad.html" target="_blank">Privacy Policy</a>.</span>
@@ -274,7 +275,7 @@
         <h5 data-i18n="footer_estadias">Estadías</h5>
         <ul>
           <li><a href="index.html" data-i18n="footer_apartaestudios">Apartaestudios</a></li>
-          <li><a href="vivir.html" data-i18n="footer_vivir">Vivir en estar</a></li>
+          <li><a href="vivir.html" data-i18n="footer_vivir">Extended Stay</a></li>
           <li><a href="grupos.html" data-i18n="footer_grupos">Grupos y eventos</a></li>
         </ul>
       </div>
@@ -392,3 +393,4 @@
 
 </body>
 </html>
+

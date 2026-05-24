@@ -19,7 +19,7 @@
     </a>
     <nav><ul class="nav-list">
       <li><a href="index.html" data-i18n="nav_estadias">Estadías</a></li>
-      <li><a href="vivir.html" data-i18n="nav_vivir">Vivir en estar</a></li>
+      <li><a href="vivir.html" data-i18n="nav_vivir">Extended Stay</a></li>
       <li><a href="explora.html" data-i18n="nav_explorar">Explorar Manizales</a></li>
       <li><a href="empresas.html" class="is-current" data-i18n="nav_empresas">Empresas</a></li>
       <li><a href="grupos.html" data-i18n="nav_grupos">Grupos</a></li>
@@ -135,25 +135,26 @@
         </div>
       </div>
 
-      <form class="form" onsubmit="event.preventDefault(); const btn=this.querySelector('button'); btn.disabled=true; const lang=document.documentElement.lang || 'es'; btn.textContent = (lang === 'en' ? 'Received ✶ — we will write you soon' : 'Recibido ✶ — te escribimos pronto');">
+      <form class="form" name="convenios-empresas" data-netlify="true">
+        <input type="hidden" name="form-name" value="convenios-empresas">
         <div class="field-row">
           <div class="field">
             <label data-i18n="form_empresa">Empresa</label>
-            <input type="text" data-i18n-placeholder="form_empresa_placeholder" placeholder="Ej. Hospital de Caldas" required>
+            <input type="text" name="empresa" data-i18n-placeholder="form_empresa_placeholder" placeholder="Ej. Hospital de Caldas" required>
           </div>
           <div class="field">
             <label data-i18n="form_contacto">Nombre del contacto</label>
-            <input type="text" data-i18n-placeholder="form_contacto_placeholder" placeholder="María Restrepo" required>
+            <input type="text" name="contacto" data-i18n-placeholder="form_contacto_placeholder" placeholder="María Restrepo" required>
           </div>
         </div>
         <div class="field-row">
           <div class="field">
             <label data-i18n="form_correo">Correo corporativo</label>
-            <input type="email" data-i18n-placeholder="form_correo_placeholder" placeholder="m.restrepo@empresa.co" required>
+            <input type="email" name="email" data-i18n-placeholder="form_correo_placeholder" placeholder="m.restrepo@empresa.co" required>
           </div>
           <div class="field">
             <label data-i18n="form_whatsapp">WhatsApp</label>
-            <input type="tel" data-i18n-placeholder="form_whatsapp_placeholder" placeholder="+57 300 000 0000" required>
+            <input type="tel" name="whatsapp" data-i18n-placeholder="form_whatsapp_placeholder" placeholder="+57 300 000 0000" required>
           </div>
         </div>
         <div class="field checkbox-field">
@@ -184,7 +185,7 @@
       <a href="vivir.html" class="cross-link">
         <div>
           <p class="eyebrow">¿Estancias largas?</p>
-          <h5>Vivir en estar</h5>
+          <h5>Extended Stay</h5>
           <p>Tarifas mensuales para colaboradores que se quedan 3+ meses.</p>
         </div>
         <span class="arr">→</span>
@@ -205,7 +206,7 @@
         <h5 data-i18n="footer_estadias">Estadías</h5>
         <ul>
           <li><a href="index.html" data-i18n="footer_apartaestudios">Apartaestudios</a></li>
-          <li><a href="vivir.html" data-i18n="footer_vivir">Vivir en estar</a></li>
+          <li><a href="vivir.html" data-i18n="footer_vivir">Extended Stay</a></li>
           <li><a href="grupos.html" data-i18n="footer_grupos">Grupos y eventos</a></li>
         </ul>
       </div>
@@ -331,3 +332,4 @@
 
 </body>
 </html>
+
