@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="manifest" href="/manifest.json">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grupos y Eventos · Apartaestudios en Manizales — estar</title>
@@ -196,23 +197,23 @@
         <input type="hidden" name="form-name" value="cotizacion-grupos">
         <div class="field-row">
           <div class="field">
-            <label>Nombre del organizador</label>
-            <input type="text" name="organizador" placeholder="Carlos Mendoza" required>
+            <label for="grupos-organizador">Nombre del organizador</label>
+            <input type="text" id="grupos-organizador" name="organizador" placeholder="Carlos Mendoza" required>
           </div>
           <div class="field">
-            <label>Correo electrónico</label>
-            <input type="email" name="email" placeholder="tu@correo.com" required>
+            <label for="grupos-email">Correo electrónico</label>
+            <input type="email" id="grupos-email" name="email" placeholder="tu@correo.com" required>
           </div>
         </div>
         <div class="field">
-          <label>Teléfono de contacto (WhatsApp)</label>
-          <input type="tel" name="whatsapp" placeholder="+57 300 000 0000" required>
+          <label for="grupos-whatsapp">Teléfono de contacto (WhatsApp)</label>
+          <input type="tel" id="grupos-whatsapp" name="whatsapp" placeholder="+57 300 000 0000" required>
         </div>
 
         <div class="field-row" style="grid-template-columns: 1fr 1fr 1fr;">
           <div class="field">
-            <label>Motivo del grupo</label>
-            <select name="motivo" required>
+            <label for="grupos-motivo">Motivo del grupo</label>
+            <select id="grupos-motivo" name="motivo" required>
               <option value="" disabled selected>Selecciona una opción</option>
               <option value="boda">Boda / Celebración</option>
               <option value="corporativo">Retiro Corporativo</option>
@@ -223,29 +224,29 @@
             </select>
           </div>
           <div class="field">
-            <label>Huéspedes</label>
-            <input type="number" name="huespedes" min="1" placeholder="Ej. 15" required>
+            <label for="grupos-huespedes">Huéspedes</label>
+            <input type="number" id="grupos-huespedes" name="huespedes" min="1" placeholder="Ej. 15" required>
           </div>
           <div class="field">
-            <label>Apartaestudios</label>
-            <input type="number" name="apartaestudios" min="4" max="13" placeholder="Ej. 6" required>
+            <label for="grupos-apartaestudios">Apartaestudios</label>
+            <input type="number" id="grupos-apartaestudios" name="apartaestudios" min="4" max="13" placeholder="Ej. 6" required>
           </div>
         </div>
 
         <div class="field-row">
           <div class="field">
-            <label>Fecha de llegada</label>
-            <input type="date" name="llegada" required>
+            <label for="grupos-llegada">Fecha de llegada</label>
+            <input type="date" id="grupos-llegada" name="llegada" required>
           </div>
           <div class="field">
-            <label>Fecha de salida</label>
-            <input type="date" name="salida" required>
+            <label for="grupos-salida">Fecha de salida</label>
+            <input type="date" id="grupos-salida" name="salida" required>
           </div>
         </div>
 
         <div class="field-row">
           <div class="field custom-select-field" id="unit-field">
-            <label data-i18n="unit_label">Unidad de interés</label>
+            <label for="unit-input" data-i18n="unit_label">Unidad de interés</label>
             <div class="custom-select-trigger" tabindex="0">
               <span class="value" id="unit-display" data-i18n="unit_select_placeholder">Selecciona una unidad</span>
               <span class="arrow-icon">
@@ -306,8 +307,8 @@
         </div>
 
         <div class="field">
-          <label>Requerimientos adicionales (opcional)</label>
-          <textarea name="requerimientos" placeholder="Ej. Habitaciones continuas, check-in temprano, facilidades especiales..."></textarea>
+          <label for="grupos-requerimientos">Requerimientos adicionales (opcional)</label>
+          <textarea id="grupos-requerimientos" name="requerimientos" placeholder="Ej. Habitaciones continuas, check-in temprano, facilidades especiales..."></textarea>
         </div>
 
         <label class="form-checkbox">

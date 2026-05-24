@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="manifest" href="/manifest.json">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Contáctanos · estar</title>
@@ -241,24 +242,24 @@
         <form class="contact-form" name="contacto" data-netlify="true">
           <input type="hidden" name="form-name" value="contacto">
           <div class="form-field">
-            <label class="lang-es">Nombre Completo</label>
-            <label class="lang-en">Full Name</label>
-            <input type="text" name="nombre" placeholder="Ej. Sofía Restrepo" required>
+            <label for="contact-nombre" class="lang-es">Nombre Completo</label>
+            <label for="contact-nombre" class="lang-en">Full Name</label>
+            <input type="text" id="contact-nombre" name="nombre" placeholder="Ej. Sofía Restrepo" autocomplete="name" required>
           </div>
           <div class="form-field">
-            <label class="lang-es">Correo Electrónico</label>
-            <label class="lang-en">Email Address</label>
-            <input type="email" name="email" placeholder="tu@correo.com" required>
+            <label for="contact-email" class="lang-es">Correo Electrónico</label>
+            <label for="contact-email" class="lang-en">Email Address</label>
+            <input type="email" id="contact-email" name="email" placeholder="tu@correo.com" autocomplete="email" required>
           </div>
           <div class="form-field">
-            <label class="lang-es">Teléfono de Contacto</label>
-            <label class="lang-en">Phone Number</label>
-            <input type="tel" name="telefono" placeholder="+57 300 123 4567" required>
+            <label for="contact-telefono" class="lang-es">Teléfono de Contacto</label>
+            <label for="contact-telefono" class="lang-en">Phone Number</label>
+            <input type="tel" id="contact-telefono" name="telefono" placeholder="+57 300 123 4567" autocomplete="tel" required>
           </div>
           <div class="form-field">
-            <label class="lang-es">Mensaje o Consulta</label>
-            <label class="lang-en">Message or Inquiry</label>
-            <textarea name="mensaje" placeholder="..." required></textarea>
+            <label for="contact-mensaje" class="lang-es">Mensaje o Consulta</label>
+            <label for="contact-mensaje" class="lang-en">Message or Inquiry</label>
+            <textarea id="contact-mensaje" name="mensaje" placeholder="..." required></textarea>
           </div>
           <label class="form-checkbox">
             <input type="checkbox" name="habeas_data" required>

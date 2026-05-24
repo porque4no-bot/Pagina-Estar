@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /.netlify/
+Disallow: /node_modules/
+Disallow: /uploads/
+
+Sitemap: https://estar.com.co/sitemap.xml

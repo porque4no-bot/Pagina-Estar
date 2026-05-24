@@ -15,6 +15,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://estar.com.co/assets/photos/coworking.webp">
 <link rel="canonical" href="https://estar.com.co/empresas.html">
+<link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="colors_and_type.css?v=2">
 <link rel="stylesheet" href="styles.css?v=3">
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
@@ -125,7 +126,7 @@
     <div class="feature-media">
       <picture>
         <source srcset="assets/photos/Mzl648.webp" type="image/webp">
-        <img src="assets/photos/Mzl648.jpg" alt="Apartaestudio listo para huéspedes corporativos" loading="lazy">
+        <img src="assets/photos/Mzl648.jpg" alt="Apartaestudio listo para huéspedes corporativos" loading="lazy" width="800" height="600">
       </picture>
       <div class="feature-stamp" aria-hidden="true"></div>
     </div>
@@ -152,22 +153,22 @@
         <input type="hidden" name="form-name" value="convenios-empresas">
         <div class="field-row">
           <div class="field">
-            <label data-i18n="form_empresa">Empresa</label>
-            <input type="text" name="empresa" data-i18n-placeholder="form_empresa_placeholder" placeholder="Ej. Hospital de Caldas" required>
+            <label for="empresas-empresa" data-i18n="form_empresa">Empresa</label>
+            <input id="empresas-empresa" type="text" name="empresa" data-i18n-placeholder="form_empresa_placeholder" placeholder="Ej. Hospital de Caldas" required>
           </div>
           <div class="field">
-            <label data-i18n="form_contacto">Nombre del contacto</label>
-            <input type="text" name="contacto" data-i18n-placeholder="form_contacto_placeholder" placeholder="María Restrepo" required>
+            <label for="empresas-contacto" data-i18n="form_contacto">Nombre del contacto</label>
+            <input id="empresas-contacto" type="text" name="contacto" data-i18n-placeholder="form_contacto_placeholder" placeholder="María Restrepo" required>
           </div>
         </div>
         <div class="field-row">
           <div class="field">
-            <label data-i18n="form_correo">Correo corporativo</label>
-            <input type="email" name="email" data-i18n-placeholder="form_correo_placeholder" placeholder="m.restrepo@empresa.co" required>
+            <label for="empresas-email" data-i18n="form_correo">Correo corporativo</label>
+            <input id="empresas-email" type="email" name="email" data-i18n-placeholder="form_correo_placeholder" placeholder="m.restrepo@empresa.co" required>
           </div>
           <div class="field">
-            <label data-i18n="form_whatsapp">WhatsApp</label>
-            <input type="tel" name="whatsapp" data-i18n-placeholder="form_whatsapp_placeholder" placeholder="+57 300 000 0000" required>
+            <label for="empresas-whatsapp" data-i18n="form_whatsapp">WhatsApp</label>
+            <input id="empresas-whatsapp" type="tel" name="whatsapp" data-i18n-placeholder="form_whatsapp_placeholder" placeholder="+57 300 000 0000" required>
           </div>
         </div>
         <div class="field checkbox-field">

@@ -15,6 +15,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://estar.com.co/assets/photos/fachada.webp">
 <link rel="canonical" href="https://estar.com.co/explora.html">
+<link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="colors_and_type.css?v=2">
 <link rel="stylesheet" href="styles.css?v=3">
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
@@ -101,14 +102,14 @@
         </h2>
       </div>
       <div class="filter-row">
-        <button class="filter-pill active" data-category="all" data-i18n="cat_todo">Todo</button>
-        <button class="filter-pill" data-category="escapadas" data-i18n="cat_escapadas">Escapadas</button>
-        <button class="filter-pill" data-category="birding" data-i18n="cat_birding">Birding</button>
-        <button class="filter-pill" data-category="restaurantes" data-i18n="cat_restaurantes">Restaurantes</button>
-        <button class="filter-pill" data-category="cafes" data-i18n="cat_cafes">Cafés</button>
-        <button class="filter-pill" data-category="universidades" data-i18n="cat_universidades">Universidades</button>
-        <button class="filter-pill" data-category="deportivo" data-i18n="cat_deportivo">Deportivo</button>
-        <button class="filter-pill" data-category="turismo" data-i18n="cat_turismo">Turismo</button>
+        <button type="button" class="filter-pill active" data-category="all" data-i18n="cat_todo" aria-pressed="true">Todo</button>
+        <button type="button" class="filter-pill" data-category="escapadas" data-i18n="cat_escapadas" aria-pressed="false">Escapadas</button>
+        <button type="button" class="filter-pill" data-category="birding" data-i18n="cat_birding" aria-pressed="false">Birding</button>
+        <button type="button" class="filter-pill" data-category="restaurantes" data-i18n="cat_restaurantes" aria-pressed="false">Restaurantes</button>
+        <button type="button" class="filter-pill" data-category="cafes" data-i18n="cat_cafes" aria-pressed="false">Cafés</button>
+        <button type="button" class="filter-pill" data-category="universidades" data-i18n="cat_universidades" aria-pressed="false">Universidades</button>
+        <button type="button" class="filter-pill" data-category="deportivo" data-i18n="cat_deportivo" aria-pressed="false">Deportivo</button>
+        <button type="button" class="filter-pill" data-category="turismo" data-i18n="cat_turismo" aria-pressed="false">Turismo</button>
       </div>
     </div>
 
@@ -134,7 +135,7 @@
         </div>
         <a href="index.html#reservar" class="btn btn-ghost-light">Reserva tu estadía <span aria-hidden="true">→</span></a>
       </div>
-      <div class="media" style="background: var(--sand);"><img src="assets/photos/recepcion.webp" alt="Recepción digital"></div>
+      <div class="media" style="background: var(--sand);"><img src="assets/photos/recepcion.webp" alt="Recepción digital" width="800" height="600"></div>
     </div>
   </div>
 </section>
@@ -1137,8 +1138,9 @@
     // Set up filter click handlers
     filterPills.forEach(pill => {
       pill.addEventListener('click', () => {
-        filterPills.forEach(p => p.classList.remove('active'));
+        filterPills.forEach(p => { p.classList.remove('active'); p.setAttribute('aria-pressed', 'false'); });
         pill.classList.add('active');
+        pill.setAttribute('aria-pressed', 'true');
         activeCategory = pill.getAttribute('data-category');
         renderPOIs(activeCategory, getActiveLanguage());
       });

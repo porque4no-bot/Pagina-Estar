@@ -1,0 +1,25 @@
+{
+  "name": "Estar — Apartaestudios y Hotel Boutique en Manizales",
+  "short_name": "Estar",
+  "description": "Apartaestudios amoblados en Manizales. WiFi fibra, check-in digital, Eje Cafetero.",
+  "start_url": "https://estar.com.co/index.html",
+  "scope": "https://estar.com.co/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#B85A47",
+  "icons": [
+    {
+      "src": "/assets/badge-circle-taupe.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/badge-circle-taupe.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

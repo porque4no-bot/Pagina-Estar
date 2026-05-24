@@ -190,6 +190,24 @@ exports.handler = async (event, context) => {
     };
   }
 
+  // Email format validation
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Invalid email address format' })
+    };
+  }
+
+  // Date order validation: checkin must be before checkout
+  if (new Date(checkin) >= new Date(checkout)) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Check-in date must be before check-out date' })
+    };
+  }
+
   // Server-side pricing: always compute from rooms_db, never trust client-provided price
   let roomsDb = {};
   try {

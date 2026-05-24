@@ -379,6 +379,14 @@
       const k = el.getAttribute('data-i18n-placeholder');
       if (i18n[lang] && i18n[lang][k]) el.setAttribute('placeholder', i18n[lang][k]);
     });
+
+    // Accesibilidad: aria-hidden en elementos de idioma
+    document.querySelectorAll('.lang-es').forEach(function(el) {
+      el.setAttribute('aria-hidden', lang !== 'es' ? 'true' : 'false');
+    });
+    document.querySelectorAll('.lang-en').forEach(function(el) {
+      el.setAttribute('aria-hidden', lang !== 'en' ? 'true' : 'false');
+    });
   }
 
   function persist() {
@@ -925,14 +933,39 @@
     });
   }
 
+  /* ---------- ACCESSIBILITY HELPERS ---------- */
+
+  // Accesibilidad: inyectar skip link
+  function injectSkipLink() {
+    if (document.getElementById('skip-to-content')) return;
+    var skip = document.createElement('a');
+    skip.id = 'skip-to-content';
+    skip.href = '#main-content';
+    skip.className = 'skip-link';
+    skip.textContent = 'Saltar al contenido principal';
+    document.body.insertBefore(skip, document.body.firstChild);
+  }
+
+  // Accesibilidad: marcar contenido principal
+  function markMainContent() {
+    if (document.getElementById('main-content')) return;
+    var main = document.querySelector('main') ||
+                document.querySelector('.hero') ||
+                document.querySelector('section:not(header section)') ||
+                document.querySelector('.sub-hero');
+    if (main && !main.id) main.id = 'main-content';
+  }
+
   /* ---------- INIT ---------- */
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { 
+    document.addEventListener('DOMContentLoaded', () => {
+      injectSkipLink();
+      markMainContent();
       setupCookieConsent();
-      applyTweaks(); 
-      setupPanel(); 
-      setupHeaderLangToggle(); 
-      setupMobileBookingScroll(); 
+      applyTweaks();
+      setupPanel();
+      setupHeaderLangToggle();
+      setupMobileBookingScroll();
       setupRoomSliders();
       setupRoomListCarousel();
       setupContactFloat();
@@ -941,6 +974,8 @@
       setupNetlifyForms();
     });
   } else {
+    injectSkipLink();
+    markMainContent();
     setupCookieConsent();
     applyTweaks();
     setupPanel();
