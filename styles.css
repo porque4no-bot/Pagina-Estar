@@ -4696,12 +4696,20 @@ html[lang="en"] .lang-es { display: none !important; }
   /* Clip overflow from room cards without creating a scroll context */
   .rooms { overflow-x: clip; }
 
-  /* Peek ~50px of next card to signal swipability.
-   * max-width: 78vw at 390px ≈ 304px wide.
-   * aspect-ratio: 2 → image ≈ 152px (vs 203px at 1.5) saves ~51px.
-   * Combined with tighter info padding and 2-line body clamp,
-   * full card + swipe nav fits in a 609px visible viewport (iPhone SE). */
-  .room { max-width: 78vw; }
+  /* Full-bleed carousel: break room-list-container out of container padding
+   * so cards run edge-to-edge. Card width = 100vw - 80px leaves a consistent
+   * ~24px peek of the next card at every snap position (scroll-padding-left
+   * compensates for the 24px left offset so peeks stay equal across snaps). */
+  .rooms .room-list-container {
+    margin: 0 -24px;
+    width: calc(100% + 48px);
+  }
+  .room-list {
+    padding-left: 24px;
+    padding-right: 24px;
+    scroll-padding-left: 24px;
+  }
+  .room { width: calc(100vw - 80px); max-width: none; }
   .room-media { aspect-ratio: 2; }
   .room-info { padding: 16px; }
   .room-info .sub { margin-bottom: 8px; }
