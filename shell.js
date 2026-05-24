@@ -128,7 +128,7 @@
     es: {
       nav_estadias: 'Estadías',
       nav_vivir: 'Estadía larga',
-      nav_explorar: 'Explorar Manizales',
+      nav_explorar: 'Explorar',
       nav_empresas: 'Empresas',
       nav_grupos: 'Grupos',
       map_eyebrow: 'Explora Manizales',
@@ -244,7 +244,7 @@
     en: {
       nav_estadias: 'Stays',
       nav_vivir: 'Extended Stay',
-      nav_explorar: 'Explore Manizales',
+      nav_explorar: 'Explore',
       nav_empresas: 'Companies',
       nav_grupos: 'Groups',
       map_eyebrow: 'Explore Manizales',
