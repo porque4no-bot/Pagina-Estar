@@ -4902,9 +4902,10 @@ html[lang="en"] .lang-es { display: none !important; }
     word-break: break-word;
   }
 
-  /* ── Header: ocultar botón Reservar — en móvil ya existe la barra
-     flotante de reserva, así el logo + estrella + hamburguesa caben ── */
-  .site-header .book-btn { display: none; }
+  /* ── Header móvil: ocultar estrella, mantener logo + idioma + reservar + hamburguesa ── */
+  .site-header .brand .star-mark { display: none; }
+  .site-header .book-btn { display: inline-flex; padding: 7px 10px; font-size: 10px; }
+  .site-header .header-actions { gap: 8px; }
 
   /* ── Video hero: en móvil se oculta el video y se muestra el frame
      poster como imagen estática. Chrome Android bloquea capturas de
@@ -4919,6 +4920,24 @@ html[lang="en"] .lang-es { display: none !important; }
   /* ── Pricing tiers 2×2 compact on mobile ── */
   .tier { padding: 20px 14px; gap: 8px; }
   .tier .amount { font-size: clamp(17px, 4.5vw, 32px); }
+
+  /* ── Value-grid (vivir.html — "Cómo funciona"): compactar celdas ── */
+  .value-cell { padding: 20px 24px; gap: 10px; }
+  .value-cell h4 { font-size: 18px; }
+  .value-cell p { font-size: 14px; line-height: 1.5; }
+
+  /* ── Tarifas (vivir.html): mostrar tabla de precios ANTES del carrusel ── */
+  #tarifas .container { display: flex; flex-direction: column; }
+  #tarifas .section-head { order: 1; margin-bottom: 32px; }
+  #tarifas .tier-table   { order: 2; }
+  #tarifas .container > p.body { order: 3; }
+  #tarifas .room-list-container {
+    order: 4;
+    margin-top: 32px;
+    margin-left: -24px;
+    margin-right: -24px;
+    width: calc(100% + 48px);
+  }
 
   /* ── SPLIT blocks (text + image) ── */
   .split { gap: 36px; }
