@@ -112,6 +112,14 @@
       </p>
     </div>
 
+    <!-- Swipe hint: dots + label (mobile only) -->
+    <div class="room-list-nav" aria-hidden="true">
+      <div class="room-list-dots">
+        <span class="rld"></span><span class="rld active"></span><span class="rld"></span><span class="rld"></span><span class="rld"></span>
+      </div>
+      <p class="room-list-hint">Desliza</p>
+    </div>
+
     <!-- Selector de Apartamentos (Carousel) -->
     <div class="room-list-container" data-reveal>
       <button type="button" class="room-list-btn prev" aria-label="Anterior tipología" aria-controls="room-list">
@@ -750,7 +758,11 @@
         card.classList.toggle('active', idx === activeIndex);
         card.setAttribute('aria-selected', idx === activeIndex ? 'true' : 'false');
       });
-      
+
+      // Update swipe dots
+      document.querySelectorAll('.room-list-dots .rld')
+        .forEach((d, i) => d.classList.toggle('active', i === activeIndex));
+
       // Update table display values
       updatePricingDisplay(typology);
       
@@ -804,6 +816,21 @@
     // Initialize display with Selección
     selectTypology(1);
 
+    // Peek animation: on first viewport entry, nudge right then snap back
+    if (viewport && 'IntersectionObserver' in window) {
+      const peekObs = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+          peekObs.disconnect();
+          setTimeout(() => {
+            const orig = viewport.scrollLeft;
+            viewport.scrollTo({ left: orig + 55, behavior: 'smooth' });
+            setTimeout(() => viewport.scrollTo({ left: orig, behavior: 'smooth' }), 700);
+          }, 600);
+        }
+      }, { threshold: 0.6 });
+      peekObs.observe(viewport);
+    }
+
     // Detect swipe on mobile: IntersectionObserver watches which card is centered
     const swipeObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
@@ -816,6 +843,8 @@
               card.classList.toggle('active', i === activeIndex);
               card.setAttribute('aria-selected', i === activeIndex ? 'true' : 'false');
             });
+            document.querySelectorAll('.room-list-dots .rld')
+              .forEach((d, i) => d.classList.toggle('active', i === activeIndex));
             updatePricingDisplay(typology);
             if (prevBtn) prevBtn.disabled = activeIndex === 0;
             if (nextBtn) nextBtn.disabled = activeIndex === typologies.length - 1;
