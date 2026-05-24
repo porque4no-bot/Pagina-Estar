@@ -209,7 +209,7 @@
           <input type="tel" name="whatsapp" placeholder="+57 300 000 0000" required>
         </div>
 
-        <div class="field-row">
+        <div class="field-row" style="grid-template-columns: 1fr 1fr 1fr;">
           <div class="field">
             <label>Motivo del grupo</label>
             <select name="motivo" required>
@@ -222,15 +222,13 @@
               <option value="otro">Otro</option>
             </select>
           </div>
-          <div class="field-row" style="gap: 12px; margin: 0;">
-            <div class="field" style="flex: 1;">
-              <label>Huéspedes</label>
-              <input type="number" name="huespedes" min="1" placeholder="Ej. 15" required>
-            </div>
-            <div class="field" style="flex: 1;">
-              <label>Apartaestudios</label>
-              <input type="number" name="apartaestudios" min="4" max="13" placeholder="Ej. 6" required>
-            </div>
+          <div class="field">
+            <label>Huéspedes</label>
+            <input type="number" name="huespedes" min="1" placeholder="Ej. 15" required>
+          </div>
+          <div class="field">
+            <label>Apartaestudios</label>
+            <input type="number" name="apartaestudios" min="4" max="13" placeholder="Ej. 6" required>
           </div>
         </div>
 

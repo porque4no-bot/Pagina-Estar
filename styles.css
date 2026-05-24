@@ -4860,6 +4860,16 @@ html[lang="en"] .lang-es { display: none !important; }
 
   /* Contact float: lift above the sticky bar */
   body[data-booking] .contact-float { bottom: 70px; }
+
+  /* ── FORM CARD (empresas, grupos, vivir) ── */
+  .form-card { padding: 24px; gap: 24px; }
+
+  /* ── ROOM DETAIL SPECS (clasica, seleccion, especial, origen, reserva) ── */
+  .specs-grid            { grid-template-columns: 1fr !important; }
+  .split .text ul        { grid-template-columns: 1fr !important; }
+
+  /* ── POLICY PAGES: replace justified text with left-align on narrow screens ── */
+  .policy-content p { text-align: left; }
 }
 
 /* ── Fallback sin JavaScript: revelar elementos con data-reveal ── */
