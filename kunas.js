@@ -761,6 +761,17 @@ const KUNAS_CONFIG = {
       });
     }
 
+    // Header "Reservar" button — go straight to the engine with current/default dates
+    document.querySelectorAll('.book-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const checkin  = (checkinInput  && checkinInput.value)  || getLocalDateString(0);
+        const checkout = (checkoutInput && checkoutInput.value) || getLocalDateString(1);
+        const guests   = (guestsInput   && guestsInput.value)   || '1';
+        openBookingEngine(checkin, checkout, guests);
+      });
+    });
+
     // Intercept clicks on individual room "Reservar" buttons
     document.querySelectorAll('.book-room-trigger').forEach(trigger => {
       trigger.addEventListener('click', (e) => {

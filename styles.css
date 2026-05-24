@@ -5,7 +5,13 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  /* overflow-x on html prevents horizontal scroll at the viewport level.
+   * overflow-x on body alone propagates to the viewport and leaves body
+   * as the scroll container — which still allows horizontal scroll. */
+  overflow-x: hidden;
+}
 
 body {
   margin: 0;
