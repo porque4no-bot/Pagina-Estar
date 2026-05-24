@@ -4976,24 +4976,16 @@ html[lang="en"] .lang-es { display: none !important; }
   /* ── Tarifas móvil: precios ya en cada tarjeta → ocultar tabla separada ── */
   #tarifas .tier-table { display: none; }
   #tarifas .container > p.body { display: none; }
-  /* El .container tiene overflow-x:hidden que cortaba las tarjetas al salirse
-     de sus 24px de padding. Movemos el clip al section (= 100vw) y quitamos
-     el clip del container para que la sangría negativa funcione libremente. */
-  #tarifas { overflow-x: hidden; }
-  #tarifas .container { overflow-x: visible; }
-  #tarifas .room-list-container {
-    margin-left: -24px;
-    margin-right: -24px;
-    width: calc(100% + 48px);
-  }
-  /* padding = (100vw − card_width) / 2 = (375 − 295) / 2 = 40px
-     → margen izquierdo = margen derecho = 40px en cualquier móvil */
+  /* Carrusel contenido dentro del container (sin sangría negativa).
+     Container inner = 100vw − 48px. Card = 100vw − 88px.
+     Padding = (container − card) / 2 = 20px → margen igual a cada lado. */
   #tarifas .room-list {
-    gap: 16px;
-    padding-left: 40px;
-    padding-right: 40px;
-    scroll-padding-left: 40px;
+    gap: 12px;
+    padding-left: 20px;
+    padding-right: 20px;
+    scroll-padding-left: 20px;
   }
+  #tarifas .room-list .room { width: calc(100vw - 88px); }
 
   /* ── SPLIT blocks (text + image) ── */
   .split { gap: 36px; }
