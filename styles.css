@@ -4981,6 +4981,14 @@ html[lang="en"] .lang-es { display: none !important; }
     margin-right: -24px;
     width: calc(100% + 48px);
   }
+  /* Centrado perfecto de tarjetas: padding = (viewport − card) / 2 = 40px
+     Con gap 16px, las 5 tarjetas quedan con 40px a cada lado en cualquier móvil */
+  #tarifas .room-list {
+    gap: 16px;
+    padding-left: 40px;
+    padding-right: 40px;
+    scroll-padding-left: 40px;
+  }
 
   /* ── SPLIT blocks (text + image) ── */
   .split { gap: 36px; }
