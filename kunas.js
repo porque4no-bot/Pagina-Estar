@@ -48,6 +48,14 @@ const KUNAS_CONFIG = {
   // Rates cache and overlay helpers
   window.estarRatesCache = window.estarRatesCache || {};
 
+  // ── Range picker state ───────────────────────────────────────────────────
+  // Phase 1 = selecting check-in, Phase 2 = selecting check-out.
+  // A single calendar handles both dates sequentially.
+  let rpPhase = 1;
+  let rpHover = null;   // ISO date string currently hovered (range preview)
+  let rpYear  = null;
+  let rpMonth = null;
+
   function updateOverlayState() {
     let overlay = document.querySelector('.calendar-overlay');
     if (!overlay) {
@@ -119,7 +127,7 @@ const KUNAS_CONFIG = {
           const currentYear = parseInt(calendarContainer.getAttribute('data-year'));
           const currentMonth = parseInt(calendarContainer.getAttribute('data-month'));
           if (currentYear === year && currentMonth === month) {
-            renderCalendar(calendarContainer, inputEl, isCheckOut);
+            renderRangePicker(calendarContainer);
           }
         }
       })
@@ -178,90 +186,132 @@ const KUNAS_CONFIG = {
   const WEEKDAYS_ES = ["Do", "Lu", "Ma", "Mi", "Ju", "Vi", "Sa"];
   const WEEKDAYS_EN = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-  function renderCalendar(calendarContainer, inputEl, isCheckOut) {
-    const lang = document.documentElement.lang || 'es';
-    const months = lang === 'es' ? MONTHS_ES : MONTHS_EN;
-    const weekdays = lang === 'es' ? WEEKDAYS_ES : WEEKDAYS_EN;
+  // ── Open range picker ────────────────────────────────────────────────────
+  function openRangePicker(startPhase) {
+    rpHover = null;
 
-    let year = parseInt(calendarContainer.getAttribute('data-year'));
-    let month = parseInt(calendarContainer.getAttribute('data-month'));
+    // Determine starting phase
+    const hasCheckin  = checkinInput  && checkinInput.value;
+    const hasCheckout = checkoutInput && checkoutInput.value;
 
-    if (isNaN(year) || isNaN(month)) {
-      const val = inputEl.value;
-      let d = new Date();
-      if (val) {
-        const parts = val.split('-');
-        d = new Date(parts[0], parts[1] - 1, parts[2]);
-      }
-      year = d.getFullYear();
-      month = d.getMonth();
-      calendarContainer.setAttribute('data-year', year);
-      calendarContainer.setAttribute('data-month', month);
+    if (startPhase != null) {
+      rpPhase = startPhase;
+    } else if (!hasCheckin) {
+      rpPhase = 1;
+    } else if (!hasCheckout || checkoutInput.value <= checkinInput.value) {
+      rpPhase = 2;
+    } else {
+      rpPhase = 1; // Both set — restart to pick new dates
     }
 
-    // Trigger fetching rates for this month
-    fetchMonthRates(year, month, calendarContainer, inputEl, isCheckOut);
+    // Position calendar at check-in month (phase 1) or check-in month (phase 2)
+    const anchorDate = (rpPhase === 2 && hasCheckin) ? checkinInput.value : null;
+    if (anchorDate) {
+      const p = anchorDate.split('-');
+      rpYear  = parseInt(p[0]);
+      rpMonth = parseInt(p[1]) - 1;
+    } else {
+      const today = new Date();
+      rpYear  = today.getFullYear();
+      rpMonth = today.getMonth();
+    }
 
-    const currentVal = inputEl.value;
+    // Activate the checkin-field calendar container
+    document.querySelectorAll('.custom-select-field').forEach(f => f.classList.remove('active'));
+    const checkinField    = document.getElementById('checkin-field');
+    const checkinCalendar = document.getElementById('checkin-calendar');
+    if (checkinField && checkinCalendar) {
+      checkinField.classList.add('active');
+      renderRangePicker(checkinCalendar);
+    }
+    updateOverlayState();
+  }
+
+  // ── Render unified range picker ──────────────────────────────────────────
+  function renderRangePicker(container) {
+    const lang     = document.documentElement.lang || 'es';
+    const months   = lang === 'es' ? MONTHS_ES : MONTHS_EN;
+    const weekdays = lang === 'es' ? WEEKDAYS_ES : WEEKDAYS_EN;
     const todayStr = getLocalDateString(0);
 
-    let minDateStr = todayStr;
-    if (isCheckOut && checkinInput && checkinInput.value) {
-      const parts = checkinInput.value.split('-');
-      const checkinDate = new Date(parts[0], parts[1] - 1, parts[2]);
-      checkinDate.setDate(checkinDate.getDate() + 1);
-      
-      const y = checkinDate.getFullYear();
-      const m = String(checkinDate.getMonth() + 1).padStart(2, '0');
-      const d = String(checkinDate.getDate()).padStart(2, '0');
-      minDateStr = `${y}-${m}-${d}`;
+    const checkinVal  = checkinInput  ? checkinInput.value  : '';
+    const checkoutVal = checkoutInput ? checkoutInput.value : '';
+
+    // Sync container attributes so fetchMonthRates can re-render correctly
+    container.setAttribute('data-year',  rpYear);
+    container.setAttribute('data-month', rpMonth);
+
+    // Pre-fetch prices for this month
+    fetchMonthRates(rpYear, rpMonth, container, checkinInput, rpPhase === 2);
+
+    container.innerHTML = '';
+
+    // ── Phase indicator (Llegada → Salida) ─────────────────────────────────
+    const indicator = document.createElement('div');
+    indicator.className = 'rp-indicator';
+
+    function makeStep(labelEs, labelEn, dateVal, isActive) {
+      const step = document.createElement('div');
+      step.className = 'rp-step' +
+        (isActive  ? ' rp-step--active' : '') +
+        (dateVal   ? ' rp-step--done'   : '');
+      step.innerHTML =
+        `<span class="rp-step-label">${lang === 'es' ? labelEs : labelEn}</span>` +
+        `<span class="rp-step-value">${dateVal ? formatDate(dateVal, lang) : (lang === 'es' ? 'Elige' : 'Select')}</span>`;
+      return step;
     }
 
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    // In phase 2, show current checkin and blank checkout (user is picking it)
+    const indicatorCheckin  = rpPhase === 1 ? '' : checkinVal;
+    const indicatorCheckout = rpPhase === 2 ? '' : checkoutVal;
 
-    calendarContainer.innerHTML = '';
+    indicator.appendChild(makeStep('Llegada', 'Check-in',  indicatorCheckin,  rpPhase === 1));
+    const arrow = document.createElement('span');
+    arrow.className = 'rp-arrow';
+    arrow.textContent = '→';
+    indicator.appendChild(arrow);
+    indicator.appendChild(makeStep('Salida', 'Check-out', indicatorCheckout, rpPhase === 2));
 
+    container.appendChild(indicator);
+
+    // ── Month navigation header ────────────────────────────────────────────
     const headerDiv = document.createElement('div');
     headerDiv.className = 'calendar-header';
+
+    // minDate: phase 1 = today; phase 2 = checkin + 1 day
+    let minDateStr = todayStr;
+    if (rpPhase === 2 && checkinVal) {
+      const p        = checkinVal.split('-');
+      const nextDay  = new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]));
+      nextDay.setDate(nextDay.getDate() + 1);
+      minDateStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2,'0')}-${String(nextDay.getDate()).padStart(2,'0')}`;
+    }
 
     const prevBtn = document.createElement('button');
     prevBtn.type = 'button';
     prevBtn.className = 'calendar-nav-btn';
     prevBtn.innerHTML = '←';
 
-    // Determinar si el botón prev debe estar deshabilitado
-    let prevMonth = month - 1;
-    let prevYear = year;
-    if (prevMonth < 0) {
-      prevMonth = 11;
-      prevYear -= 1;
-    }
-    const limitDate = new Date(minDateStr);
-    const limitMonthStart = new Date(limitDate.getFullYear(), limitDate.getMonth(), 1);
-    const prevMonthEnd = new Date(prevYear, prevMonth + 1, 0);
-    if (prevMonthEnd < limitMonthStart) {
-      prevBtn.disabled = true;
-    }
+    const limitMonthStart = new Date(
+      new Date(minDateStr).getFullYear(),
+      new Date(minDateStr).getMonth(), 1
+    );
+    let pm = rpMonth - 1, py = rpYear;
+    if (pm < 0) { pm = 11; py -= 1; }
+    if (new Date(py, pm + 1, 0) < limitMonthStart) prevBtn.disabled = true;
 
     prevBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      let prevMonth = month - 1;
-      let prevYear = year;
-      if (prevMonth < 0) {
-        prevMonth = 11;
-        prevYear -= 1;
-      }
-      const limitDate = new Date(minDateStr);
-      if (new Date(prevYear, prevMonth + 1, 0) >= new Date(limitDate.getFullYear(), limitDate.getMonth(), 1)) {
-        calendarContainer.setAttribute('data-month', prevMonth);
-        calendarContainer.setAttribute('data-year', prevYear);
-        renderCalendar(calendarContainer, inputEl, isCheckOut);
+      let pm = rpMonth - 1, py = rpYear;
+      if (pm < 0) { pm = 11; py -= 1; }
+      if (new Date(py, pm + 1, 0) >= limitMonthStart) {
+        rpMonth = pm; rpYear = py;
+        renderRangePicker(container);
       }
     });
 
     const titleSpan = document.createElement('span');
-    titleSpan.textContent = `${months[month]} ${year}`;
+    titleSpan.textContent = `${months[rpMonth]} ${rpYear}`;
 
     const nextBtn = document.createElement('button');
     nextBtn.type = 'button';
@@ -269,80 +319,72 @@ const KUNAS_CONFIG = {
     nextBtn.innerHTML = '→';
     nextBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      let nextMonth = month + 1;
-      let nextYear = year;
-      if (nextMonth > 11) {
-        nextMonth = 0;
-        nextYear += 1;
-      }
-      calendarContainer.setAttribute('data-month', nextMonth);
-      calendarContainer.setAttribute('data-year', nextYear);
-      renderCalendar(calendarContainer, inputEl, isCheckOut);
+      let nm = rpMonth + 1, ny = rpYear;
+      if (nm > 11) { nm = 0; ny += 1; }
+      rpMonth = nm; rpYear = ny;
+      renderRangePicker(container);
     });
 
     headerDiv.appendChild(prevBtn);
     headerDiv.appendChild(titleSpan);
     headerDiv.appendChild(nextBtn);
-    calendarContainer.appendChild(headerDiv);
+    container.appendChild(headerDiv);
 
+    // ── Day grid ───────────────────────────────────────────────────────────
     const gridDiv = document.createElement('div');
     gridDiv.className = 'calendar-grid';
 
-    weekdays.forEach(day => {
-      const wkDiv = document.createElement('div');
-      wkDiv.className = 'calendar-weekday';
-      wkDiv.textContent = day;
-      gridDiv.appendChild(wkDiv);
+    weekdays.forEach(wd => {
+      const d = document.createElement('div');
+      d.className = 'calendar-weekday';
+      d.textContent = wd;
+      gridDiv.appendChild(d);
     });
 
-    for (let i = 0; i < firstDay; i++) {
-      const emptyDiv = document.createElement('div');
-      gridDiv.appendChild(emptyDiv);
-    }
+    const firstDay    = new Date(rpYear, rpMonth, 1).getDay();
+    const daysInMonth = new Date(rpYear, rpMonth + 1, 0).getDate();
+    for (let i = 0; i < firstDay; i++) gridDiv.appendChild(document.createElement('div'));
 
-    const selectedCheckin = checkinInput ? checkinInput.value : '';
-    const selectedCheckout = checkoutInput ? checkoutInput.value : '';
+    const cacheKey   = `${rpYear}-${rpMonth}`;
+    const cached     = window.estarRatesCache[cacheKey];
+    const ratesReady = cached && typeof cached === 'object';
 
-    const cacheKey = `${year}-${month}`;
-    const cachedRates = window.estarRatesCache[cacheKey];
-    const ratesLoaded = cachedRates && typeof cachedRates === 'object';
-
-    for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
-      const dayDiv = document.createElement('div');
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateVal = `${rpYear}-${String(rpMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dayDiv  = document.createElement('div');
       dayDiv.className = 'calendar-day';
-
-      const dateVal = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
       dayDiv.setAttribute('data-date', dateVal);
 
-      // Structure day inner content to support styling day-number and price
       const dayNumSpan = document.createElement('span');
       dayNumSpan.className = 'day-number';
-      dayNumSpan.textContent = dayNum;
+      dayNumSpan.textContent = d;
       dayDiv.appendChild(dayNumSpan);
 
-      // Append dynamic price if available in cache
-      if (ratesLoaded && cachedRates[dateVal]) {
-        const price = cachedRates[dateVal];
-        const formattedPrice = price >= 1000 ? `${Math.round(price / 1000)}K` : price;
-        const priceSpan = document.createElement('span');
-        priceSpan.className = 'calendar-day-price';
-        priceSpan.textContent = `$${formattedPrice}`;
-        dayDiv.appendChild(priceSpan);
+      if (ratesReady && cached[dateVal]) {
+        const price = cached[dateVal];
+        const fp    = price >= 1000 ? `${Math.round(price / 1000)}K` : price;
+        const ps    = document.createElement('span');
+        ps.className = 'calendar-day-price';
+        ps.textContent = `$${fp}`;
+        dayDiv.appendChild(ps);
       }
 
-      // Highlight actual ranges
-      if (dateVal === todayStr) {
-        dayDiv.classList.add('is-today');
-      }
+      if (dateVal === todayStr) dayDiv.classList.add('is-today');
 
-      if (selectedCheckin && dateVal === selectedCheckin) {
-        dayDiv.classList.add('range-start');
-        dayDiv.classList.add('active');
-      } else if (selectedCheckout && dateVal === selectedCheckout) {
-        dayDiv.classList.add('range-end');
-        dayDiv.classList.add('active');
-      } else if (selectedCheckin && selectedCheckout && dateVal > selectedCheckin && dateVal < selectedCheckout) {
+      // Static range highlighting (visible between phases or after selection)
+      if (dateVal === checkinVal) {
+        dayDiv.classList.add('range-start', 'active');
+      } else if (rpPhase !== 1 && dateVal === checkoutVal) {
+        dayDiv.classList.add('range-end', 'active');
+      } else if (rpPhase !== 1 && checkinVal && checkoutVal && dateVal > checkinVal && dateVal < checkoutVal) {
         dayDiv.classList.add('range-between');
+      }
+
+      // Hover preview overrides (phase 2 only, applied inline via updateRangeClasses)
+      if (rpPhase === 2 && rpHover && rpHover > checkinVal) {
+        dayDiv.classList.remove('range-end', 'range-between', 'range-hover-end', 'range-hover-between');
+        if (dateVal === rpHover) dayDiv.classList.add('range-hover-end');
+        else if (dateVal > checkinVal && dateVal < rpHover) dayDiv.classList.add('range-hover-between');
       }
 
       if (dateVal < minDateStr) {
@@ -350,46 +392,29 @@ const KUNAS_CONFIG = {
       } else {
         dayDiv.addEventListener('click', (e) => {
           e.stopPropagation();
-          inputEl.value = dateVal;
-          inputEl.dispatchEvent(new Event('change'));
-          const field = calendarContainer.closest('.custom-select-field');
-          if (field) field.classList.remove('active');
-          updateOverlayState();
 
-          // Auto-open check-out calendar if check-in was selected
-          if (!isCheckOut) {
-            const checkoutField = document.getElementById('checkout-field');
-            if (checkoutField && isDesktop()) {
-              setTimeout(() => {
-                checkoutField.classList.add('active');
-                const checkoutCalendar = document.getElementById('checkout-calendar');
-                if (checkoutCalendar) {
-                  checkoutCalendar.removeAttribute('data-year');
-                  checkoutCalendar.removeAttribute('data-month');
-                  renderCalendar(checkoutCalendar, checkoutInput, true);
-                }
-              }, 180);
-            }
+          if (rpPhase === 1) {
+            // First tap: set check-in, stay open in phase 2
+            checkinInput.value = dateVal;
+            checkinInput.dispatchEvent(new Event('change')); // auto-adjusts checkout min
+            rpPhase = 2;
+            rpHover = null;
+            renderRangePicker(container);
+          } else {
+            // Second tap: set check-out, close calendar
+            checkoutInput.value = dateVal;
+            checkoutInput.dispatchEvent(new Event('change'));
+            const field = document.getElementById('checkin-field');
+            if (field) field.classList.remove('active');
+            updateOverlayState();
           }
         });
 
-        // Hover highlight range logic in check-out calendar
-        if (isCheckOut && selectedCheckin) {
+        // Hover range preview in phase 2
+        if (rpPhase === 2 && checkinVal) {
           dayDiv.addEventListener('mouseenter', () => {
-            const allDays = gridDiv.querySelectorAll('.calendar-day');
-            allDays.forEach(dDiv => {
-              const dVal = dDiv.getAttribute('data-date');
-              if (!dVal || dDiv.classList.contains('disabled')) return;
-
-              // Reset hover class
-              dDiv.classList.remove('range-hover-between', 'range-hover-end');
-
-              if (dVal > selectedCheckin && dVal < dateVal) {
-                dDiv.classList.add('range-hover-between');
-              } else if (dVal === dateVal && dateVal !== selectedCheckout) {
-                dDiv.classList.add('range-hover-end');
-              }
-            });
+            rpHover = dateVal;
+            updateRangeClasses(gridDiv, checkinVal, dateVal);
           });
         }
       }
@@ -397,17 +422,27 @@ const KUNAS_CONFIG = {
       gridDiv.appendChild(dayDiv);
     }
 
-    // Reset hover highlight when leaving the grid
-    if (isCheckOut && selectedCheckin) {
+    if (rpPhase === 2 && checkinVal) {
       gridDiv.addEventListener('mouseleave', () => {
-        const allDays = gridDiv.querySelectorAll('.calendar-day');
-        allDays.forEach(dDiv => {
-          dDiv.classList.remove('range-hover-between', 'range-hover-end');
-        });
+        rpHover = null;
+        updateRangeClasses(gridDiv, checkinVal, null);
       });
     }
 
-    calendarContainer.appendChild(gridDiv);
+    container.appendChild(gridDiv);
+  }
+
+  // ── Live range-class update (hover preview without full re-render) ────────
+  function updateRangeClasses(gridDiv, checkinVal, hoverDate) {
+    gridDiv.querySelectorAll('.calendar-day').forEach(dDiv => {
+      const dVal = dDiv.getAttribute('data-date');
+      if (!dVal || dDiv.classList.contains('disabled')) return;
+      dDiv.classList.remove('range-hover-between', 'range-hover-end', 'range-between', 'range-end');
+      if (hoverDate && hoverDate > checkinVal) {
+        if (dVal === hoverDate)                              dDiv.classList.add('range-hover-end');
+        else if (dVal > checkinVal && dVal < hoverDate)     dDiv.classList.add('range-hover-between');
+      }
+    });
   }
 
   /**
@@ -481,30 +516,43 @@ const KUNAS_CONFIG = {
 
       // Evento click en el contenedor (cabecera del select/datepicker)
       field.addEventListener('click', (e) => {
-        // Si el clic fue en el select nativo, en el input de fecha, o dentro del menú del dropdown (por ejemplo, navegando el calendario), no togglear
-        if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.closest('.calendar-header') || e.target.closest('.calendar-grid')) return;
+        // Ignore clicks inside the calendar UI — those are handled by the calendar itself
+        if (
+          e.target.tagName === 'SELECT'  ||
+          e.target.tagName === 'INPUT'   ||
+          e.target.closest('.calendar-header') ||
+          e.target.closest('.calendar-grid')   ||
+          e.target.closest('.rp-indicator')
+        ) return;
 
-        const isActive = field.classList.contains('active');
+        if (inputDateEl) {
+          // ── Date fields: unified range picker ─────────────────────────────
+          // Both checkin-field and checkout-field open the same calendar.
+          const checkinField = document.getElementById('checkin-field');
+          const isOpen = checkinField && checkinField.classList.contains('active');
 
-        // Cerrar los otros primero
-        selectFields.forEach(otherField => {
-          if (otherField !== field) {
-            otherField.classList.remove('active');
+          if (isOpen) {
+            // Clicking the field header again closes the picker
+            checkinField.classList.remove('active');
+            updateOverlayState();
+          } else {
+            // Start in phase 2 if clicking Salida when check-in is already set
+            const startPhase = (field.id === 'checkout-field' && checkinInput && checkinInput.value) ? 2 : 1;
+            openRangePicker(startPhase);
           }
-        });
-
-        // Alternar el dropdown actual
-        if (isActive) {
-          field.classList.remove('active');
         } else {
-          field.classList.add('active');
-          // Si es un datepicker, renderizar el calendario al abrir
-          if (inputDateEl) {
-            const isCheckout = field.id === 'checkout-field';
-            renderCalendar(dropdownMenu, inputDateEl, isCheckout);
+          // ── Non-date fields (Huéspedes): original toggle logic ─────────────
+          const isActive = field.classList.contains('active');
+          selectFields.forEach(otherField => {
+            if (otherField !== field) otherField.classList.remove('active');
+          });
+          if (isActive) {
+            field.classList.remove('active');
+          } else {
+            field.classList.add('active');
           }
+          updateOverlayState();
         }
-        updateOverlayState();
       });
 
       // Solo si es un campo select, configurar opciones y navegación de teclado

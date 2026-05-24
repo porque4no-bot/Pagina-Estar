@@ -2974,6 +2974,52 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
   display: block;
 }
 
+/* ── Range picker phase indicator ──────────────────────────────────────── */
+.rp-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1.5px solid var(--paper-400);
+}
+.rp-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1.5px solid transparent;
+  transition: background 0.2s, border-color 0.2s;
+  cursor: pointer;
+}
+.rp-step-label {
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--ink-500);
+}
+.rp-step-value {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.rp-step--active {
+  background: var(--paper-200);
+  border-color: var(--terracotta);
+}
+.rp-step--active .rp-step-label { color: var(--terracotta-700); }
+.rp-step--done .rp-step-value   { color: var(--terracotta); }
+.rp-arrow {
+  color: var(--ink-500);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
 .calendar-header {
   display: flex;
   justify-content: space-between;
