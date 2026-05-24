@@ -532,6 +532,10 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
 }
 .hero-meta .sep { opacity: 0.5; }
 
+/* Mobile-only booking bar elements (hidden on desktop, shown via mobile media query) */
+.mb-dates-lbl { display: none; }
+#dates-display { display: none; }
+
 /* ---------- BOOKING BAR (hero bottom) ---------- */
 
 .booking-bar {
@@ -4797,42 +4801,47 @@ html[lang="en"] .lang-es { display: none !important; }
   .logo-strip { padding: 36px 0; }
 
   /* ─────────────────────────────────────────
-     COMPACT FIXED BOTTOM BOOKING BAR
-     Replaces the tall hero-embedded form with
-     a single-row sticky strip at screen bottom.
+     FLOATING BOTTOM BOOKING BAR (mobile)
+     Pill that floats above the bottom edge.
+     Two fields (Fechas + Huéspedes) + CTA.
   ───────────────────────────────────────── */
 
-  /* Body padding so footer isn't hidden behind the bar */
-  body[data-booking] { padding-bottom: 58px; }
+  /* Body padding so footer isn't hidden behind the floating bar */
+  body[data-booking] { padding-bottom: 96px; }
 
-  /* The bar itself: 3 equal fields + fixed CTA column.
-     minmax(0,Xfr) prevents 1fr from expanding to min-content
-     of the text inside, which would push the bar past 100vw. */
+  /* Floating pill */
   .booking-bar {
     position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    border-radius: 0 !important;
-    border-top: 1px solid var(--paper-400);
-    box-shadow: 0 -4px 20px rgba(40, 41, 43, 0.13);
+    bottom: 16px !important;
+    left: 12px !important;
+    right: 12px !important;
+    border-radius: 20px !important;
+    border-top: none !important;
+    box-shadow: 0 8px 32px rgba(40, 41, 43, 0.22), 0 2px 8px rgba(40, 41, 43, 0.10) !important;
+    overflow: hidden;
     z-index: 150;
-    grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,0.75fr) 80px;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 72px;
     background: rgba(250, 246, 239, 0.98);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    /* No width:100% — position:fixed with left:0;right:0 is sufficient.
-     * width:100% resolves to window.innerWidth (includes scrollbar on desktop)
-     * which makes the bar wider than the CSS viewport and triggers overflow. */
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
-  /* Compact fields */
+  /* Hide checkout — range picker handles both dates from checkin-field */
+  #checkout-field { display: none !important; }
+
+  /* Switch checkin-field to show combined dates label + display */
+  #checkin-field > .label:not(.mb-dates-lbl) { display: none; }
+  #checkin-display                            { display: none !important; }
+  .mb-dates-lbl                               { display: block; }
+  #dates-display                              { display: block; }
+
+  /* Taller fields */
   .booking-field {
-    padding: 10px 12px !important;
+    padding: 14px 16px !important;
     border-bottom: none !important;
     min-width: 0;
   }
-  .booking-field .label { font-size: 8px; letter-spacing: 0.2em; }
+  .booking-field .label { font-size: 9px; letter-spacing: 0.18em; }
   .booking-field .value {
     font-size: 13px;
     white-space: nowrap;
@@ -4840,34 +4849,27 @@ html[lang="en"] .lang-es { display: none !important; }
     text-overflow: ellipsis;
   }
 
-  /* Guests: restore to single auto column (override the 1/-1 from 900px block) */
+  /* Guests divider */
   #guests-field {
     grid-column: auto !important;
     border-right: 1px solid var(--paper-400) !important;
   }
 
-  /* CTA: icon-only on mobile — hide text, enlarge arrow */
+  /* CTA: icon-only, fills the right column */
   .booking-cta {
     grid-column: auto !important;
     padding: 0 !important;
     flex-direction: column;
     gap: 2px;
-    font-size: 10px;
-    letter-spacing: 0.12em;
   }
-  .booking-cta > span:not([aria-hidden]) {
-    display: none;
-  }
-  .booking-cta > span[aria-hidden] {
-    font-size: 22px;
-    line-height: 1;
-  }
+  .booking-cta > span:not([aria-hidden]) { display: none; }
+  .booking-cta > span[aria-hidden]       { font-size: 24px; line-height: 1; }
 
   /* Hide the legal notice — too small to read at this size */
   .escnna-inline-notice { display: none !important; }
 
-  /* Contact float: lift above the sticky bar */
-  body[data-booking] .contact-float { bottom: 70px; }
+  /* Contact float: lift above the floating bar */
+  body[data-booking] .contact-float { bottom: 96px; }
 
   /* ── FORM CARD (empresas, grupos, vivir) ── */
   .form-card { padding: 24px; gap: 24px; }

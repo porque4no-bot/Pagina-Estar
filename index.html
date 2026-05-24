@@ -101,8 +101,12 @@
   <!-- Booking bar pinned to bottom of hero -->
   <form class="booking-bar" id="reservar">
     <div class="booking-field custom-select-field" id="checkin-field" tabindex="0">
+      <!-- Desktop: individual labels -->
       <span class="label" data-i18n="book_check_in">Llegada</span>
       <span class="value" id="checkin-display" data-i18n="book_pick_dates">Elige una fecha</span>
+      <!-- Mobile: combined dates label + display (shown via CSS, updated via JS) -->
+      <span class="label mb-dates-lbl"><span class="lang-es">Fechas</span><span class="lang-en">Dates</span></span>
+      <span class="value" id="dates-display"><span class="lang-es">Elige fechas</span><span class="lang-en">Pick dates</span></span>
       <input type="date" id="checkin-input" name="checkin" required style="display: none;">
       <div class="custom-dropdown-menu calendar-dropdown" id="checkin-calendar"></div>
     </div>

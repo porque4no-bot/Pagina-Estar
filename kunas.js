@@ -488,6 +488,20 @@ const KUNAS_CONFIG = {
       checkoutDisplay.textContent = formatDate(checkoutInput.value, lang);
     }
 
+    // Fechas combinadas (campo unificado en móvil)
+    const datesDisplay = document.getElementById('dates-display');
+    if (datesDisplay) {
+      const ci = checkinInput && checkinInput.value;
+      const co = checkoutInput && checkoutInput.value;
+      if (ci && co) {
+        datesDisplay.textContent = `${formatDate(ci, lang)} — ${formatDate(co, lang)}`;
+      } else if (ci) {
+        datesDisplay.textContent = `${formatDate(ci, lang)} →`;
+      } else {
+        datesDisplay.textContent = lang === 'es' ? 'Elige fechas' : 'Pick dates';
+      }
+    }
+
     // Huéspedes
     if (guestsDisplay && guestsInput) {
       const val = guestsInput.value;
