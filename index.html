@@ -360,6 +360,18 @@
       <p class="lead">Totalmente amoblados, con cocina equipada, baño privado y Wi-Fi de fibra. Trae solo tu maleta.</p>
     </div>
 
+    <!-- Mobile pagination: dots + swipe hint (top) -->
+    <div class="room-list-nav" aria-hidden="true">
+      <div class="room-list-dots">
+        <span class="rld active"></span>
+        <span class="rld"></span>
+        <span class="rld"></span>
+        <span class="rld"></span>
+        <span class="rld"></span>
+      </div>
+      <p class="room-list-hint">Desliza para ver más</p>
+    </div>
+
     <div class="room-list-container">
       <button type="button" class="room-list-btn prev" aria-label="Anterior apartamento" aria-controls="room-list">
         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
@@ -585,17 +597,6 @@
         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
     </div>
-    <!-- Mobile pagination: dots + swipe hint -->
-    <div class="room-list-nav" aria-hidden="true">
-      <div class="room-list-dots">
-        <span class="rld active"></span>
-        <span class="rld"></span>
-        <span class="rld"></span>
-        <span class="rld"></span>
-        <span class="rld"></span>
-      </div>
-      <p class="room-list-hint">Desliza para ver más</p>
-    </div>
   </div>
 </section>
 
@@ -761,15 +762,63 @@ document.addEventListener('DOMContentLoaded', function() {
   const dots = document.querySelectorAll('.rld');
   const hint = document.querySelector('.room-list-hint');
   if (!list || !dots.length) return;
-  list.addEventListener('scroll', function() {
+
+  function cardWidth() {
     const card = list.querySelector('.room');
-    if (!card) return;
-    const cardW = card.offsetWidth + 32; // card + gap
-    const idx = Math.min(Math.round(list.scrollLeft / cardW), dots.length - 1);
-    dots.forEach(function(d, i) { d.classList.toggle('active', i === idx); });
-    // Hide hint once user swipes
+    if (!card) return 0;
+    return card.offsetWidth + parseFloat(getComputedStyle(list).gap || 32);
+  }
+
+  function scrollToIndex(i) {
+    i = Math.max(0, Math.min(i, dots.length - 1));
+    list.scrollTo({ left: i * cardWidth(), behavior: 'smooth' });
+  }
+
+  function currentIndex() {
+    const w = cardWidth();
+    return w ? Math.round(list.scrollLeft / w) : 0;
+  }
+
+  // Keep dots in sync
+  list.addEventListener('scroll', function() {
+    const i = currentIndex();
+    dots.forEach(function(d, j) { d.classList.toggle('active', j === i); });
     if (list.scrollLeft > 20 && hint) hint.style.opacity = '0';
   }, { passive: true });
+
+  // One card per swipe — intercept touch, prevent momentum
+  var startX = 0, startY = 0, startScroll = 0, axis = null;
+
+  list.addEventListener('touchstart', function(e) {
+    startX      = e.touches[0].clientX;
+    startY      = e.touches[0].clientY;
+    startScroll = list.scrollLeft;
+    axis        = null;
+  }, { passive: true });
+
+  list.addEventListener('touchmove', function(e) {
+    var dx = e.touches[0].clientX - startX;
+    var dy = e.touches[0].clientY - startY;
+    if (axis === null) axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (axis === 'x') {
+      e.preventDefault();            // block native scroll momentum
+      list.scrollLeft = startScroll - dx;
+    }
+  }, { passive: false });
+
+  list.addEventListener('touchend', function(e) {
+    if (axis !== 'x') return;
+    var dx = e.changedTouches[0].clientX - startX;
+    var base = Math.round(startScroll / cardWidth());
+    if (Math.abs(dx) < 30) { scrollToIndex(base); return; } // too short → snap back
+    scrollToIndex(dx < 0 ? base + 1 : base - 1);
+  }, { passive: true });
+
+  // Prev/Next buttons (desktop)
+  var prevBtn = document.querySelector('.room-list-btn.prev');
+  var nextBtn = document.querySelector('.room-list-btn.next');
+  if (prevBtn) prevBtn.addEventListener('click', function() { scrollToIndex(currentIndex() - 1); });
+  if (nextBtn) nextBtn.addEventListener('click', function() { scrollToIndex(currentIndex() + 1); });
 });
 </script>
 

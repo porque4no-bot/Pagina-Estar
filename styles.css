@@ -977,19 +977,10 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
-  scrollbar-width: thin;
-  scrollbar-color: var(--terracotta-300) transparent;
+  scrollbar-width: none;
+  touch-action: pan-y; /* JS handles horizontal swipe one-card-at-a-time */
 }
-.room-list::-webkit-scrollbar {
-  height: 6px;
-}
-.room-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-.room-list::-webkit-scrollbar-thumb {
-  background-color: var(--terracotta-300);
-  border-radius: 3px;
-}
+.room-list::-webkit-scrollbar { display: none; }
 
 .room {
   display: flex;
@@ -4717,13 +4708,13 @@ html[lang="en"] .lang-es { display: none !important; }
   .room-info .body { display: none; }
   .room-specs { padding: 10px 0; margin-bottom: 10px; gap: 8px 16px; }
 
-  /* Mobile pagination dots */
+  /* Mobile pagination dots — above the carousel */
   .room-list-nav {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    margin-top: 20px;
+    margin-bottom: 16px;
   }
   .room-list-dots {
     display: flex;
