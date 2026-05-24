@@ -732,11 +732,16 @@ const KUNAS_CONFIG = {
   }
 
   function openBookingEngine(checkin, checkout, guests, preselectedRoomType = '') {
-    let url = `reservar.html?checkin=${checkin}&checkout=${checkout}&guests=${guests}`;
-    if (preselectedRoomType) {
-      url += `&room=${preselectedRoomType}`;
+    const lang = document.documentElement.lang === 'en' ? 'en' : 'es';
+    const qp   = KUNAS_CONFIG.queryParams;
+    let url = KUNAS_CONFIG.engineUrl.replace('{lang}', lang);
+    url += `?${qp.checkin}=${checkin}&${qp.checkout}=${checkout}`;
+    url += `&${qp.adults}=${guests}&${qp.currency}=${qp.currencyValue}`;
+    if (preselectedRoomType && KUNAS_CONFIG.roomMappings[preselectedRoomType]) {
+      const roomId = KUNAS_CONFIG.roomMappings[preselectedRoomType];
+      url += `&${qp.roomTypeId}=${roomId}&${qp.idRoomTypes}=${roomId}`;
     }
-    window.location.href = url;
+    window.open(url, '_blank');
   }
 
   function setupBookingBar() {
