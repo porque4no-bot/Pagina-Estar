@@ -732,16 +732,11 @@ const KUNAS_CONFIG = {
   }
 
   function openBookingEngine(checkin, checkout, guests, preselectedRoomType = '') {
-    const lang = document.documentElement.lang === 'en' ? 'en' : 'es';
-    const qp   = KUNAS_CONFIG.queryParams;
-    let url = KUNAS_CONFIG.engineUrl.replace('{lang}', lang);
-    url += `?${qp.checkin}=${checkin}&${qp.checkout}=${checkout}`;
-    url += `&${qp.adults}=${guests}&${qp.currency}=${qp.currencyValue}`;
-    if (preselectedRoomType && KUNAS_CONFIG.roomMappings[preselectedRoomType]) {
-      const roomId = KUNAS_CONFIG.roomMappings[preselectedRoomType];
-      url += `&${qp.roomTypeId}=${roomId}&${qp.idRoomTypes}=${roomId}`;
+    let url = `reservar.html?checkin=${checkin}&checkout=${checkout}&guests=${guests}`;
+    if (preselectedRoomType) {
+      url += `&room=${preselectedRoomType}`;
     }
-    window.open(url, '_blank');
+    window.location.href = url;
   }
 
   function setupBookingBar() {
@@ -760,17 +755,6 @@ const KUNAS_CONFIG = {
         openBookingEngine(checkin, checkout, guests);
       });
     }
-
-    // Header "Reservar" button — go straight to the engine with current/default dates
-    document.querySelectorAll('.book-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const checkin  = (checkinInput  && checkinInput.value)  || getLocalDateString(0);
-        const checkout = (checkoutInput && checkoutInput.value) || getLocalDateString(1);
-        const guests   = (guestsInput   && guestsInput.value)   || '1';
-        openBookingEngine(checkin, checkout, guests);
-      });
-    });
 
     // Intercept clicks on individual room "Reservar" buttons
     document.querySelectorAll('.book-room-trigger').forEach(trigger => {
