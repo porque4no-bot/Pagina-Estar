@@ -153,7 +153,7 @@ Actualizar la Sección 1 (Información General / Responsable) para detallar la i
 
 *Ejemplo de redacción corregida (Español):*
 > **1. Información General / Responsable del Tratamiento**  
-> En cumplimiento con la Ley 1480 de 2011 (Estatuto del Consumidor), las disposiciones vigentes del comercio electrónico y las leyes de turismo colombianas, se informa que este sitio web es operado por **[INSERTAR RAZÓN SOCIAL / NOMBRE COMPLETO PROPIETARIO]**, prestador de servicios turísticos identificado bajo el **NIT [INSERTAR NIT / CÉDULA]** y con Registro Nacional de Turismo número **RNT 276306**. Dirección física del establecimiento: Sector Palogrande, Manizales, Caldas, Colombia. Correo de contacto: reservas@hotelestar.com.
+> En cumplimiento con la Ley 1480 de 2011 (Estatuto del Consumidor), las disposiciones vigentes del comercio electrónico y las leyes de turismo colombianas, se informa que este sitio web es operado por **[INSERTAR RAZÓN SOCIAL / NOMBRE COMPLETO PROPIETARIO]**, prestador de servicios turísticos identificado bajo el **NIT [INSERTAR NIT / CÉDULA]** y con Registro Nacional de Turismo número **RNT 276306**. Dirección física del establecimiento: Sector Palogrande, Manizales, Caldas, Colombia. Correo de contacto: reservas@estar.com.co.
 
 #### B. En `cancelacion.html` (Sección 3 - Vivir en estar)
 Para evitar que se asimile a un contrato residencial urbano prohibido por la Ley 820 de 2003, se debe aclarar la naturaleza hotelera/comercial de la estancia prolongada.

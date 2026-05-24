@@ -1228,7 +1228,7 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
           {[
             { icon: 'map-pin', title: t.howToGet, body: t.howToGetDesc },
             { icon: 'clock', title: t.checkInOut, body: t.checkInOutDesc },
-            { icon: 'phone', title: t.directContact, body: '+57 310 249 0414 · reservas@hotelestar.com' },
+            { icon: 'phone', title: t.directContact, body: '+57 310 249 0414 · reservas@estar.com.co' },
           ].map(tip => (
             <div key={tip.icon} className="be-confirm-tip">
               <Icon name={tip.icon} size={18} style={{ color: 'var(--terracotta)', marginTop: 2 }} />

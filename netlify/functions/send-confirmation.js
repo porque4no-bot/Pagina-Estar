@@ -244,7 +244,7 @@ function buildEmailHtml({
                 style="display:inline-block;padding:12px 28px;background-color:#25D366;border-radius:6px;font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#FFFFFF;text-decoration:none;letter-spacing:0.04em;">
                 Contactar por WhatsApp
               </a>
-              <p style="margin:12px 0 0 0;font-family:Arial,sans-serif;font-size:12px;color:#9A9A8A;">+57 310 249 0414 · reservas@hotelestar.com</p>
+              <p style="margin:12px 0 0 0;font-family:Arial,sans-serif;font-size:12px;color:#9A9A8A;">+57 310 249 0414 · reservas@estar.com.co</p>
             </td>
           </tr>
 
@@ -369,8 +369,8 @@ exports.handler = async (event, context) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        // TODO: Replace 'reservas@hotelestar.com' with the verified sender domain in Resend
-        from: 'Estar Manizales <reservas@hotelestar.com>',
+        // TODO: Replace 'reservas@estar.com.co' with the verified sender domain in Resend
+        from: 'Estar Manizales <reservas@estar.com.co>',
         to: guestEmail,
         subject: `Confirmación de reserva ${bookingCode} — Estar Manizales`,
         html: emailHtml
