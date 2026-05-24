@@ -4,8 +4,9 @@
     {
       "name": "estar-static",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "-p", "3333", "-s", "."],
-      "port": 3333
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server.js"],
+      "port": 3400
     }
   ]
 }
