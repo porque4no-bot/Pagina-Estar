@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <link rel="icon" type="image/png" href="assets/favicon.png">
@@ -19,6 +19,11 @@
 <link rel="stylesheet" href="colors_and_type.css?v=2">
 <link rel="stylesheet" href="styles.css?v=3">
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
+<style>
+@media (max-width: 600px) {
+  .form-card button[type="submit"] { width: 100%; justify-content: center; }
+}
+</style>
 </head>
 <body data-screen-label="02 Vivir">
 
@@ -26,7 +31,7 @@
   <div class="container">
     <a href="index.html" class="brand" aria-label="estar — inicio">
       <span class="star-mark" aria-hidden="true"></span>
-      <img src="assets/logo.png" alt="estar" class="logo-img">
+      <img src="assets/logo.png" alt="estar" class="logo-img" width="120" height="32">
     </a>
     <nav><ul class="nav-list">
       <li><a href="index.html" data-i18n="nav_estadias">Estadías</a></li>
@@ -768,6 +773,27 @@
 
     // Initialize display with Selección
     selectTypology(1);
+
+    // Detect swipe on mobile: IntersectionObserver watches which card is centered
+    const swipeObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+          const idx = Array.from(cards).indexOf(entry.target);
+          if (idx !== -1 && idx !== activeIndex) {
+            activeIndex = idx;
+            const typology = typologies[activeIndex];
+            cards.forEach((card, i) => {
+              card.classList.toggle('active', i === activeIndex);
+              card.setAttribute('aria-selected', i === activeIndex ? 'true' : 'false');
+            });
+            updatePricingDisplay(typology);
+            if (prevBtn) prevBtn.disabled = activeIndex === 0;
+            if (nextBtn) nextBtn.disabled = activeIndex === typologies.length - 1;
+          }
+        }
+      });
+    }, { root: viewport, threshold: 0.5 });
+    cards.forEach(card => swipeObserver.observe(card));
 
     // Select typology in form when clicking 'Aplicar' on a room card
     const aplicarButtons = document.querySelectorAll('.btn-aplicar');
