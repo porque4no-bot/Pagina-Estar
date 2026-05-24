@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "estar-static",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "3333", "-s", "."],
+      "port": 3333
+    }
+  ]
+}

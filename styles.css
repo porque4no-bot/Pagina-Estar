@@ -1104,7 +1104,7 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
 .room-spec .k {
   font-family: var(--font-label);
   font-weight: 700;
-  font-size: 8.5px;
+  font-size: 12px;
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--ink-500);
@@ -2103,7 +2103,6 @@ body[data-density="compact"] .newsletter { padding: 80px 0; }
   font-size: 15px !important;
   letter-spacing: 0.25em;
   padding: 20px 32px;
-}
 }
 
 /* ---------- CROSS-LINK BOTTOM ---------- */
@@ -4588,6 +4587,87 @@ html[lang="en"] .lang-es { display: none !important; }
   .booking-room-specs {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--space-2);
+  }
+}
+
+/* ─────────────────────────────────────────
+   MOBILE SPACING — ≤ 767 px
+   Halves or reduces by ~40 % every section
+   padding, heading margin, and grid gap that
+   is over-sized on a 375 px viewport.
+───────────────────────────────────────── */
+@media (max-width: 767px) {
+
+  /* Layout container */
+  .container { padding: 0 24px; }
+
+  /* Generic section */
+  .section { padding: 52px 0; }
+
+  /* ── INTRO ── */
+  .intro            { padding: 52px 0 32px; }
+  .intro .container { gap: 36px; }
+
+  /* ── LOCATION / RATINGS ── */
+  .location-ratings        { padding: 52px 0; }
+  .location-grid           { gap: 32px; }
+  .location-info-column h2 { margin: 12px 0 28px; }
+  .location-stats          { gap: 20px; margin-bottom: 28px; }
+
+  /* ── ROOMS ── */
+  .rooms      { padding: 48px 0 52px; }
+  .rooms-head { margin-bottom: 28px; }
+
+  /* ── FEATURE BAND ── */
+  .feature-band            { padding: 64px 0; }
+  .feature-band .container { gap: 36px; }
+  .feature-band h2         { margin: 10px 0 18px; }
+  /* Prevent rotating badge from bleeding off-screen */
+  .feature-stamp           { display: none; }
+
+  /* ── SEGMENTS ── */
+  .segments      { padding: 64px 0; }
+  .segments-head { margin-bottom: 40px; }
+  .segment       { padding: 32px 24px; min-height: auto; gap: 16px; }
+
+  /* ── EXPLORE ── */
+  .explore            { padding: 64px 0; }
+  .explore .container { gap: 36px; }
+  /* Remove vertical offset — looks broken in single-column layout */
+  .explore-photo:first-child { transform: none; }
+
+  /* ── AMENITIES ── */
+  .amenities       { padding: 56px 0; }
+  .amenities .head { margin-bottom: 32px; }
+  .amenity         { padding: 28px 20px; }
+
+  /* ── NEWSLETTER ── */
+  .newsletter            { padding: 56px 0; }
+  .newsletter .container { gap: 24px; }
+
+  /* ── FOOTER ── */
+  .site-footer { padding: 60px 0 32px; }
+  .footer-top  { gap: 36px; padding-bottom: 40px; }
+
+  /* ── CROSS-LINKS (bottom of sub-pages) ── */
+  .cross-links { margin-top: 40px; }
+
+  /* ── SUB-HERO (interior pages) ── */
+  .sub-hero { padding: 100px 0 56px; min-height: 50vh; }
+
+  /* ── SPLIT blocks (text + image) ── */
+  .split { gap: 36px; }
+
+  /* ── LOGO STRIP ── */
+  .logo-strip { padding: 36px 0; }
+}
+
+/* ── Fallback sin JavaScript: revelar elementos con data-reveal ── */
+@media (scripting: none) {
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
   }
 }
 

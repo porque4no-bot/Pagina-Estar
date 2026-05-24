@@ -1246,13 +1246,37 @@ function ManageBooking({ onBack, lang }) {
   const t = i18nEngine[lang];
   const [code, setCode] = useState('');
   const [email, setEmail] = useState('');
+  // result: null | 'loading' | 'found' | 'not-found' | 'error'
   const [result, setResult] = useState(null);
+  const [bookingData, setBookingData] = useState(null);
   const [showCancel, setShowCancel] = useState(false);
+  const [searchError, setSearchError] = useState(null);
 
-  function doSearch(e) {
+  async function doSearch(e) {
     e.preventDefault();
-    setResult(code.toUpperCase().startsWith('EST-') ? 'found' : 'not-found');
+    setResult('loading');
+    setBookingData(null);
     setShowCancel(false);
+    setSearchError(null);
+
+    try {
+      const response = await fetch(`/api/get-booking?code=${encodeURIComponent(code.trim())}`);
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+      const data = await response.json();
+
+      if (data.found) {
+        setBookingData(data);
+        setResult('found');
+      } else {
+        setResult('not-found');
+      }
+    } catch (err) {
+      console.error('[ManageBooking] Error fetching booking:', err.message);
+      setSearchError(err.message);
+      setResult('error');
+    }
   }
 
   return (
@@ -1278,32 +1302,53 @@ function ManageBooking({ onBack, lang }) {
           <input type="email" placeholder="correo@ejemplo.com" value={email}
             onChange={e => setEmail(e.target.value)} required />
         </div>
-        <button type="submit" className="be-btn-primary">{t.searchBooking}</button>
+        <button type="submit" className="be-btn-primary" disabled={result === 'loading'}>
+          {result === 'loading' ? (
+            <><div className="be-spinner-small" style={{ display: 'inline-block', marginRight: 8 }}></div>{lang === 'es' ? 'Buscando...' : 'Searching...'}</>
+          ) : t.searchBooking}
+        </button>
       </form>
 
-      {result === 'found' && !showCancel && (
+      {result === 'found' && bookingData && !showCancel && (
         <div className="be-manage-result">
           <div className="be-manage-found-header">
             <span>✶</span>
             <div>
               <span className="be-eyebrow">{t.resFound}</span>
               <p style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 17, color: 'var(--white)' }}>
-                {code.toUpperCase()}
+                {bookingData.bookingCode}
               </p>
             </div>
           </div>
           <div className="be-manage-details">
-            <div><span className="be-eyebrow">{t.stepRoom}</span><p>{lang === 'es' ? 'Tipología 03 — Reserva' : 'Typology 03 — Reserva'}</p></div>
-            <div><span className="be-eyebrow">{t.resDates}</span><p>10 Jun → 13 Jun</p></div>
-            <div><span className="be-eyebrow">{t.total}</span><p>{formatCOP(1142400)}</p></div>
+            <div>
+              <span className="be-eyebrow">{lang === 'es' ? 'Habitación' : 'Room'}</span>
+              <p>{bookingData.roomName || (lang === 'es' ? 'Apartaestudio' : 'Apartaestudio')}</p>
+            </div>
+            <div>
+              <span className="be-eyebrow">{t.resDates}</span>
+              <p>{bookingData.checkIn} → {bookingData.checkOut}</p>
+            </div>
+            <div>
+              <span className="be-eyebrow">{t.total}</span>
+              <p>{formatCOP(bookingData.totalAmount)}</p>
+            </div>
+            {bookingData.guestName && (
+              <div>
+                <span className="be-eyebrow">{lang === 'es' ? 'Huésped' : 'Guest'}</span>
+                <p>{bookingData.guestName}</p>
+              </div>
+            )}
           </div>
           <div className="be-manage-actions">
             <button className="be-btn-secondary">
               <Icon name="calendar" size={14} /> {t.resModDates}
             </button>
-            <button className="be-btn-danger" onClick={() => setShowCancel(true)}>
-              {t.resCancel}
-            </button>
+            {bookingData.canCancel && (
+              <button className="be-btn-danger" onClick={() => setShowCancel(true)}>
+                {t.resCancel}
+              </button>
+            )}
           </div>
           <p style={{ padding: '0 22px 16px', fontSize: 12, color: 'var(--ink-300)', fontFamily: 'var(--font-body)' }}>
             {t.resCancelPolicy}
@@ -1321,7 +1366,7 @@ function ManageBooking({ onBack, lang }) {
           </p>
           <div style={{ display: 'flex', gap: 12 }}>
             <button className="be-btn-danger"
-              onClick={() => { setResult(null); setShowCancel(false); setCode(''); setEmail(''); }}>
+              onClick={() => { setResult(null); setBookingData(null); setShowCancel(false); setCode(''); setEmail(''); }}>
               {t.resCancelConfirmYes}
             </button>
             <button className="be-btn-secondary" onClick={() => setShowCancel(false)}>{t.back}</button>
@@ -1333,6 +1378,18 @@ function ManageBooking({ onBack, lang }) {
         <div className="be-info-box be-info-error" style={{ marginTop: 24 }}>
           <Icon name="alert-circle" size={16} />
           <p>{t.resCancelError}</p>
+        </div>
+      )}
+
+      {result === 'error' && (
+        <div className="be-info-box be-info-error" style={{ marginTop: 24 }}>
+          <Icon name="alert-triangle" size={16} />
+          <p>
+            {lang === 'es'
+              ? 'Error al consultar la reserva. Por favor intenta de nuevo o contáctanos por WhatsApp.'
+              : 'Error retrieving booking. Please try again or contact us on WhatsApp.'}
+            {searchError && <span style={{ fontSize: 11, opacity: 0.7, display: 'block', marginTop: 4 }}>{searchError}</span>}
+          </p>
         </div>
       )}
     </div>
@@ -1503,8 +1560,42 @@ function BookingEngine() {
     .then(res => res.json())
     .then(data => {
       console.log('Kunas PMS Booking Response:', data);
+      const finalCode = (data.success && data.bookingCode) ? data.bookingCode : code;
       if (data.success && data.bookingCode) {
         setBookingCode(data.bookingCode);
+      }
+
+      // Send confirmation email via Resend once the PMS booking is registered
+      const guestEmail = booking.guest?.email || '';
+      const guestName = `${booking.guest?.nombre || ''} ${booking.guest?.apellido || ''}`.trim();
+      const nights = dateDiff(search.checkin, search.checkout);
+      const roomName = booking.room.name || '';
+
+      if (guestEmail) {
+        fetch('/api/send-confirmation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            guestEmail,
+            guestName,
+            bookingCode: finalCode,
+            roomName,
+            checkIn: search.checkin,
+            checkOut: search.checkout,
+            nights,
+            totalAmount: roomPriceVal,
+            paidAmount: calc.subtotal,
+            phone: booking.guest?.tel || ''
+          })
+        })
+        .then(r => r.json())
+        .then(emailData => {
+          console.log('[send-confirmation] Result:', emailData);
+        })
+        .catch(emailErr => {
+          // Non-blocking: email failure should never prevent the booking confirmation screen
+          console.error('[send-confirmation] Error sending confirmation email:', emailErr);
+        });
       }
     })
     .catch(err => {

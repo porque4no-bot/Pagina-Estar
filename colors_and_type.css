@@ -9,21 +9,24 @@
 
 @font-face {
   font-family: "Libre Baskerville";
-  src: url("fonts/LibreBaskerville-Regular.ttf") format("truetype");
+  src: url("fonts/LibreBaskerville-Regular.woff2") format("woff2"),
+       url("fonts/LibreBaskerville-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Libre Baskerville";
-  src: url("fonts/LibreBaskerville-Italic.ttf") format("truetype");
+  src: url("fonts/LibreBaskerville-Italic.woff2") format("woff2"),
+       url("fonts/LibreBaskerville-Italic.ttf") format("truetype");
   font-weight: 400;
   font-style: italic;
   font-display: swap;
 }
 @font-face {
   font-family: "Libre Baskerville";
-  src: url("fonts/LibreBaskerville-Bold.ttf") format("truetype");
+  src: url("fonts/LibreBaskerville-Bold.woff2") format("woff2"),
+       url("fonts/LibreBaskerville-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -31,28 +34,32 @@
 
 @font-face {
   font-family: "Estar Arial";
-  src: url("fonts/Arial-Regular.ttf") format("truetype");
+  src: url("fonts/Arial-Regular.woff2") format("woff2"),
+       url("fonts/Arial-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Estar Arial";
-  src: url("fonts/Arial-Italic.ttf") format("truetype");
+  src: url("fonts/Arial-Italic.woff2") format("woff2"),
+       url("fonts/Arial-Italic.ttf") format("truetype");
   font-weight: 400;
   font-style: italic;
   font-display: swap;
 }
 @font-face {
   font-family: "Estar Arial";
-  src: url("fonts/Arial-Bold.ttf") format("truetype");
+  src: url("fonts/Arial-Bold.woff2") format("woff2"),
+       url("fonts/Arial-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Estar Arial";
-  src: url("fonts/Arial-Black.ttf") format("truetype");
+  src: url("fonts/Arial-Black.woff2") format("woff2"),
+       url("fonts/Arial-Black.ttf") format("truetype");
   font-weight: 900;
   font-style: normal;
   font-display: swap;
@@ -81,6 +88,8 @@
   --terracotta-100: #ecd9c6;
 
   --ink:          #28292b;   /* on-surface text / dark canvas */
+  --ink-900:      #1f2023;   /* highest-contrast text */
+  --ink-800:      #34353a;   /* dark body text */
   --ink-700:      #46474a;
   --ink-500:      #6b6c6f;
   --ink-300:      #b8b9bb;

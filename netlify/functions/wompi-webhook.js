@@ -50,6 +50,28 @@ async function getSessionKey(token, username, password) {
   return data.pkey;
 }
 
+// Sanitize phone: only digits, +, spaces
+function sanitizePhone(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw.replace(/[^\d+\s]/g, '').trim().substring(0, 20);
+}
+
+// Escape HTML special characters to prevent XSS in PMS notes
+function escapeHtml(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function sanitizeNotes(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  return escapeHtml(raw).substring(0, 500);
+}
+
 // Helper to decode the URL-safe base64 reference string
 function decodeReference(ref) {
   try {
@@ -91,7 +113,10 @@ function decodeReference(ref) {
       lastName,
       email,
       phone,
-      extrasMask
+      extrasMask,
+      // Optional flags encoded at positions 11 and 12
+      isColombian: parts[11] === '1' ? true : parts[11] === '0' ? false : undefined,
+      isBusiness:  parts[12] === '1' ? true : parts[12] === '0' ? false : undefined
     };
   } catch (err) {
     console.error("Error decoding reference:", err.message);
@@ -104,8 +129,9 @@ const processedTransactionIds = new Set();
 
 exports.handler = async (event, context) => {
   // CORS Headers
+  const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
   const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'Content-Type, X-Event-Checksum',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
@@ -134,11 +160,20 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Wompi Signature Verification
+  // Wompi Signature Verification — MANDATORY
   const receivedSignature = event.headers['x-event-checksum'] || (body.signature && body.signature.checksum);
   const WOMPI_WEBHOOK_SECRET = process.env.WOMPI_WEBHOOK_SECRET;
 
-  if (WOMPI_WEBHOOK_SECRET && body.signature && body.signature.properties) {
+  if (!WOMPI_WEBHOOK_SECRET) {
+    console.error('CRITICAL: WOMPI_WEBHOOK_SECRET is not configured. Rejecting webhook.');
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Webhook secret not configured on server' })
+    };
+  }
+
+  if (body.signature && body.signature.properties) {
     try {
       const properties = body.signature.properties;
       let dataToSign = "";
@@ -176,8 +211,6 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({ error: 'Signature verification processing error' })
       };
     }
-  } else {
-    console.warn("Wompi webhook signature checking skipped: WOMPI_WEBHOOK_SECRET environment variable is not defined");
   }
 
   const { event: eventName, data } = body;
@@ -201,6 +234,17 @@ exports.handler = async (event, context) => {
   }
 
   console.log(`Processing Wompi webhook: transaction.id=${transaction.id}, reference=${transaction.reference}, status=${transaction.status}`);
+
+  if (transaction.status === 'DECLINED' || transaction.status === 'VOIDED' || transaction.status === 'ERROR') {
+    const failedDecoded = decodeReference(transaction.reference);
+    const bookingCodeForLog = failedDecoded ? failedDecoded.bookingCode : transaction.reference;
+    console.error(`FAILED PAYMENT — status=${transaction.status}, transactionId=${transaction.id}, bookingCode=${bookingCodeForLog}, amount_cents=${transaction.amount_in_cents}, reference=${transaction.reference}. Manual follow-up required.`);
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({ message: `Transaction ${transaction.status}. Logged for manual follow-up.` })
+    };
+  }
 
   if (transaction.status !== 'APPROVED') {
     console.log(`Transaction status is not APPROVED: ${transaction.status}. Skipping PMS insertion.`);
@@ -280,10 +324,15 @@ exports.handler = async (event, context) => {
     // pricing math: paidAmount = Wompi paid amount (subtotal without IVA)
     const paidAmount = transaction.amount_in_cents / 100;
     
-    // Simple heuristic to determine if guest must pay IVA (Colombian residents or business travellers)
-    const cleanPhone = decoded.phone.replace(/\s+/g, '');
-    const isColombian = cleanPhone.startsWith('+57') || cleanPhone.startsWith('57') || (cleanPhone.length === 10 && (cleanPhone.startsWith('3')));
-    const mustPayIva = isColombian;
+    // Determine IVA: use flags encoded in reference first (set by front-end),
+    // then fall back to phone heuristic to match front-end logic exactly.
+    let mustPayIva;
+    if (decoded.isColombian !== undefined || decoded.isBusiness !== undefined) {
+      mustPayIva = !!(decoded.isColombian || decoded.isBusiness);
+    } else {
+      const cleanPhone = sanitizePhone(decoded.phone).replace(/\s+/g, '');
+      mustPayIva = cleanPhone.startsWith('+57') || cleanPhone.startsWith('57') || (cleanPhone.length === 10 && cleanPhone.startsWith('3'));
+    }
 
     const roomPrice = mustPayIva ? Math.round(paidAmount * 1.19) : paidAmount;
     const avgPrice = Math.round(roomPrice / nights);
@@ -389,7 +438,7 @@ exports.handler = async (event, context) => {
       date_departure: decoded.checkout,
       id_channels: "392", // Default channel ID for private/direct reservations
       channel: "Private reservation",
-      note: `Teléfono del huésped: ${decoded.phone}. Extras: ${extrasText}. IVA (19%): ${mustPayIva ? 'POR COBRAR EN HOTEL (' + Math.round(paidAmount * 0.19) + ')' : 'EXENTO'}. Notas: Creado por Webhook de Wompi. ID Transacción: ${transaction.id}`
+      note: `Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${mustPayIva ? 'POR COBRAR EN HOTEL (' + Math.round(paidAmount * 0.19) + ')' : 'EXENTO'}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
     };
 
     const response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {

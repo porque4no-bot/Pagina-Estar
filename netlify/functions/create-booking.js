@@ -97,8 +97,9 @@ function decodeReference(ref) {
 
 exports.handler = async (event, context) => {
   // CORS Headers
+  const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
   const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Content-Type': 'application/json'
@@ -133,13 +134,13 @@ exports.handler = async (event, context) => {
     guestsCount,
     roomTypeId,
     roomName,
-    roomPrice,
     paidAmount,
     firstName,
     lastName,
     email,
     phone,
     notes,
+    roomRate,
     paymentDetails
   } = body;
 
@@ -152,11 +153,34 @@ exports.handler = async (event, context) => {
     };
   }
 
+  // Server-side pricing: always compute from rooms_db, never trust client-provided price
+  let roomsDb = {};
+  try {
+    const dbPath = path.join(__dirname, '../../rooms_db.json');
+    if (fs.existsSync(dbPath)) {
+      roomsDb = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+    }
+  } catch (dbErr) {
+    console.error('Failed to load rooms_db.json:', dbErr.message);
+  }
+  const roomRecord = roomsDb[roomTypeId];
+  if (!roomRecord) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Invalid roomTypeId' })
+    };
+  }
+
   // Calculate nights
   const checkinDate = new Date(checkin);
   const checkoutDate = new Date(checkout);
   const diffTime = checkoutDate - checkinDate;
   const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+  // Apply rate: flexible adds 10% to base price
+  const basePrice = roomRecord.basePrice;
+  const roomPrice = roomRate === 'flexible' ? Math.round(basePrice * 1.10) * nights : basePrice * nights;
   const avgPrice = Math.round(roomPrice / nights);
 
   // Read environment variables
@@ -300,7 +324,7 @@ exports.handler = async (event, context) => {
       date_departure: checkout,
       id_channels: "392", // Default channel ID for private/direct reservations
       channel: "Private reservation",
-      note: `Teléfono del huésped: ${phone}. Notas adicionales: ${notes || 'Ninguna'}`
+      note: `Teléfono: ${phone.replace(/[^\d+\s]/g, '').trim().substring(0, 20)}. Notas: ${(notes || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0, 500) || 'Ninguna'}`
     };
 
     const response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
@@ -329,15 +353,13 @@ exports.handler = async (event, context) => {
           code: bookingCode,
           guestName: `${firstName} ${lastName}`,
           email,
-          phone,
-          roomName,
+          roomName: roomRecord.name,
           checkin,
           checkout,
           nights,
           totalPrice: roomPrice,
           status: 'Confirmed'
-        },
-        rawResponse: data
+        }
       })
     };
 

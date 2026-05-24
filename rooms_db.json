@@ -110,6 +110,7 @@
     "description": "Nuestra tipología más completa. Terraza privada, cama king + sofá cama. Ideal para viajes familiares o de negocios.",
     "capacity": 3,
     "beds": "King + sofacama",
+    "area": 60,
     "view": "Panorámica premium",
     "basePrice": 450000,
     "image": "assets/photos/tipo5/1.webp",

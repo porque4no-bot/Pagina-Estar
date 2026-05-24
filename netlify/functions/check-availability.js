@@ -66,8 +66,9 @@ async function getSessionKey(token, username, password) {
 
 exports.handler = async (event, context) => {
   // CORS Headers
+  const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
   const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Content-Type': 'application/json'
@@ -183,7 +184,10 @@ exports.handler = async (event, context) => {
 
   // 2. REAL OTASYNC INTEGRATION
   try {
+    const pkey = await getSessionKey(token, username, password);
+
     const payload = {
+      key: pkey,
       dfrom: checkin,
       dto: checkout,
       currency: "COP",

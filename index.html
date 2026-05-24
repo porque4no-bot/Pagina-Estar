@@ -4,10 +4,48 @@
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>estar · Apartaestudios en Manizales</title>
+<title>Estar — Apartaestudios y Hotel Boutique en Manizales, Eje Cafetero</title>
+<meta name="description" content="Apartaestudios amoblados en Manizales, Eje Cafetero. Check-in digital, cocina equipada y WiFi fibra. Estadías cortas y largas en El Cable y La Estrella.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Estar — Apartaestudios Manizales">
+<meta property="og:title" content="Estar — Apartaestudios y Hotel Boutique en Manizales, Eje Cafetero">
+<meta property="og:description" content="Apartaestudios amoblados en Manizales, Eje Cafetero. Check-in digital, cocina equipada y WiFi fibra. Estadías cortas y largas en El Cable y La Estrella.">
+<meta property="og:image" content="https://hotelestar.com/assets/photos/fachada.webp">
+<meta property="og:url" content="https://hotelestar.com/index.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://hotelestar.com/assets/photos/fachada.webp">
+<link rel="canonical" href="https://hotelestar.com/index.html">
+<link rel="preload" as="image" href="assets/photos/hero_first_frame.webp" fetchpriority="high">
 <link rel="stylesheet" href="colors_and_type.css?v=2">
 <link rel="stylesheet" href="styles.css?v=3">
-<script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LodgingBusiness",
+  "name": "Estar — Apartaestudios Manizales",
+  "url": "https://hotelestar.com",
+  "telephone": "+573102490414",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Manizales",
+    "addressRegion": "Caldas",
+    "addressCountry": "CO"
+  },
+  "priceRange": "$$",
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "9.0",
+    "reviewCount": "126",
+    "bestRating": "10"
+  },
+  "amenityFeature": [
+    {"@type": "LocationFeatureSpecification", "name": "WiFi fibra óptica", "value": true},
+    {"@type": "LocationFeatureSpecification", "name": "Cocina equipada", "value": true},
+    {"@type": "LocationFeatureSpecification", "name": "Check-in digital", "value": true}
+  ]
+}
+</script>
 </head>
 <body data-screen-label="01 Home">
 
@@ -43,6 +81,7 @@
 <section class="hero has-star-cursor" data-screen-label="01.1 Hero">
   <div class="hero-media">
     <video autoplay muted loop playsinline poster="assets/photos/hero_first_frame.webp">
+      <source src="assets/video/hero.webm" type="video/webm">
       <source src="assets/video/hero.mp4" type="video/mp4">
     </video>
   </div>
@@ -632,7 +671,8 @@
     </div>
     <form data-reveal name="newsletter" data-netlify="true">
       <input type="hidden" name="form-name" value="newsletter">
-      <input type="email" name="email" placeholder="tu@correo.com" required>
+      <label for="newsletter-email" class="visually-hidden">Tu correo electrónico</label>
+      <input type="email" name="email" id="newsletter-email" placeholder="tu@correo.com" required>
       <button type="submit">Suscribirme <span aria-hidden="true">→</span></button>
     </form>
     <p style="font-size: 11px; color: rgba(250,246,239,0.7); margin-top: 12px; line-height: 1.4;">
@@ -702,8 +742,8 @@
     "language": "es"
   }/*EDITMODE-END*/;
 </script>
-<script src="shell.js?v=2"></script>
-<script src="kunas.js"></script>
+<script src="shell.js?v=2" defer></script>
+<script src="kunas.js" defer></script>
 <script>lucide.createIcons();</script>
 
   <!-- Burbuja Flotante de Contacto -->
