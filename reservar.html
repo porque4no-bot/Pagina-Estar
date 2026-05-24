@@ -357,7 +357,19 @@
       .be-manage-details > div { border-right: none; }
       .be-progress-label { display: none; }
       [data-theme="editorial"] .be-summary-col { display: none; }
-      .be-page-inner { padding: 20px 16px 64px; }
+      /* Fix specificity: [data-theme] selector beats plain class in the
+         editorial theme override above, so we must repeat the attribute
+         selector here to win in the media query. */
+      [data-theme="editorial"] .be-page-inner { padding: 16px 12px 64px; }
+      .be-page-inner { padding: 16px 12px 64px; }
+      .be-step-header  { padding: 14px 16px; }
+      .be-step-content { padding: 14px 14px 18px; }
+      .be-step-summary { padding: 0 14px 12px 42px; }
+      .be-step-footer  { margin-top: 16px; padding-top: 16px; }
+      .be-room-info    { padding: 14px 14px 14px 16px; }
+      .be-searchbar-wrap { padding: 14px 14px; }
+      .be-extra-row    { padding: 12px 12px; gap: 10px; }
+      .be-step-num-wrap { gap: 10px; }
     }
 
     /* ─── room card slider customizations ─── */
@@ -654,6 +666,46 @@
   }
 </script>
 <script src="motor-app.js"></script>
+<script>
+// Scroll to the top of the booking steps whenever the active step changes.
+// React re-renders the .be-progress bar on every step transition, updating
+// the "active" class on the step dots — we observe that to detect changes.
+(function () {
+  var lastStep = null;
+
+  function scrollToSteps() {
+    var steps = document.querySelector('.be-steps');
+    var target = steps || document.querySelector('.be-progress') || document.body;
+    // Use the fixed header height as offset (~72px) so the step header is visible
+    var offsetTop = target.getBoundingClientRect().top + window.pageYOffset - 80;
+    window.scrollTo({ top: Math.max(0, offsetTop), behavior: 'smooth' });
+  }
+
+  function watchProgress() {
+    var progress = document.querySelector('.be-progress');
+    if (!progress) { setTimeout(watchProgress, 200); return; }
+
+    var observer = new MutationObserver(function () {
+      var active = progress.querySelector('.be-progress-step.active');
+      var stepId = active ? active.textContent.trim() : null;
+      if (stepId && stepId !== lastStep) {
+        lastStep = stepId;
+        // Small delay so React finishes rendering the new step content
+        setTimeout(scrollToSteps, 80);
+      }
+    });
+
+    observer.observe(progress, { attributes: true, subtree: true, childList: true, attributeFilter: ['class'] });
+  }
+
+  // Wait for React to render
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(watchProgress, 400); });
+  } else {
+    setTimeout(watchProgress, 400);
+  }
+})();
+</script>
 </body>
 </html>
 
