@@ -4902,6 +4902,10 @@ html[lang="en"] .lang-es { display: none !important; }
     word-break: break-word;
   }
 
+  /* ── Header: ocultar botón Reservar — en móvil ya existe la barra
+     flotante de reserva, así el logo + estrella + hamburguesa caben ── */
+  .site-header .book-btn { display: none; }
+
   /* ── Video hero: en móvil se oculta el video y se muestra el frame
      poster como imagen estática. Chrome Android bloquea capturas de
      pantalla cuando detecta un <video> activo (protección DRM). ── */
