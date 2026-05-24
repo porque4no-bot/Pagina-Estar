@@ -1173,6 +1173,53 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   margin-left: 4px;
 }
 
+/* ---------- ROOM INLINE PRICE GRID (vivir.html) ---------- */
+.room-price-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--paper-400);
+  border: 1px solid var(--paper-400);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 14px 0 0;
+}
+.rpg-cell {
+  background: var(--paper);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rpg-cell.rpg-featured {
+  background: var(--olive);
+  color: var(--paper);
+}
+.rpg-dur {
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+.rpg-featured .rpg-dur { color: rgba(250,246,239,0.72); }
+.rpg-amt {
+  font-family: var(--font-heading);
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.rpg-per {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 9px;
+  color: var(--ink-500);
+  line-height: 1.3;
+}
+.rpg-featured .rpg-per { color: rgba(250,246,239,0.65); }
+
 /* ---------- ROOM SLIDER ---------- */
 .room-media.slider-active {
   cursor: default; /* Allow buttons and swipes to work without confusing custom cursors */
@@ -4926,14 +4973,10 @@ html[lang="en"] .lang-es { display: none !important; }
   .value-cell h4 { font-size: 18px; }
   .value-cell p { font-size: 14px; line-height: 1.5; }
 
-  /* ── Tarifas (vivir.html): mostrar tabla de precios ANTES del carrusel ── */
-  #tarifas .container { display: flex; flex-direction: column; }
-  #tarifas .section-head { order: 1; margin-bottom: 32px; }
-  #tarifas .tier-table   { order: 2; }
-  #tarifas .container > p.body { order: 3; }
+  /* ── Tarifas móvil: precios ya en cada tarjeta → ocultar tabla separada ── */
+  #tarifas .tier-table { display: none; }
+  #tarifas .container > p.body { display: none; }
   #tarifas .room-list-container {
-    order: 4;
-    margin-top: 32px;
     margin-left: -24px;
     margin-right: -24px;
     width: calc(100% + 48px);
