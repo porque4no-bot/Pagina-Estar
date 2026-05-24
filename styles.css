@@ -4605,6 +4605,10 @@ html[lang="en"] .lang-es { display: none !important; }
   /* Generic section */
   .section { padding: 52px 0; }
 
+  /* Hero: reduce bottom padding — the booking bar is now a compact
+     fixed strip (58px), not a 260px block inside the hero layout. */
+  .hero-inner { padding-bottom: 88px; }
+
   /* ── INTRO ── */
   .intro            { padding: 52px 0 32px; }
   .intro .container { gap: 36px; }
