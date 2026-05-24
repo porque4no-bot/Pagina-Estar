@@ -234,6 +234,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .brand {
   display: flex; align-items: center; gap: 12px;
+  flex-shrink: 0;
 }
 .brand .star-mark {
   width: 38px; height: 38px;
