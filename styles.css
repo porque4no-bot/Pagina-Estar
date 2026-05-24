@@ -3228,9 +3228,7 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.45);
     z-index: 300;
     opacity: 0;
     visibility: hidden;
@@ -4605,9 +4603,15 @@ html[lang="en"] .lang-es { display: none !important; }
   /* Generic section */
   .section { padding: 52px 0; }
 
-  /* Hero: reduce bottom padding — the booking bar is now a compact
-     fixed strip (58px), not a 260px block inside the hero layout. */
-  .hero-inner { padding-bottom: 88px; }
+  /* Hero: size to what the user ACTUALLY sees (small viewport =
+     without browser chrome). min-height reduced so title never
+     gets pushed below the compact booking bar. */
+  .hero {
+    height: 100vh;   /* fallback */
+    height: 100svh;  /* modern: excludes dynamic browser chrome bar */
+    min-height: 600px;
+  }
+  .hero-inner { padding-bottom: 80px; }
 
   /* ── INTRO ── */
   .intro            { padding: 52px 0 32px; }
