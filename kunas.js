@@ -55,6 +55,26 @@ const KUNAS_CONFIG = {
   let rpHover = null;   // ISO date string currently hovered (range preview)
   let rpYear  = null;
   let rpMonth = null;
+  let calendarOriginalParent = null; // tracks home of #checkin-calendar when portaled
+
+  // ── Calendar portal helpers ──────────────────────────────────────────────
+  // Moving the calendar to document.body escapes the .booking-bar stacking
+  // context created by backdrop-filter, preventing the blur from covering it.
+  function portalCalendarToBody() {
+    const cal = document.getElementById('checkin-calendar');
+    if (!cal || cal.classList.contains('rp-portaled')) return;
+    calendarOriginalParent = cal.parentNode;
+    document.body.appendChild(cal);
+    cal.classList.add('rp-portaled');
+  }
+
+  function unportalCalendar() {
+    const cal = document.getElementById('checkin-calendar');
+    if (!cal || !cal.classList.contains('rp-portaled')) return;
+    if (calendarOriginalParent) calendarOriginalParent.appendChild(cal);
+    cal.classList.remove('rp-portaled');
+    calendarOriginalParent = null;
+  }
 
   function updateOverlayState() {
     let overlay = document.querySelector('.calendar-overlay');
@@ -66,12 +86,15 @@ const KUNAS_CONFIG = {
       overlay.addEventListener('click', () => {
         const selectFields = document.querySelectorAll('.custom-select-field');
         selectFields.forEach(f => f.classList.remove('active'));
+        unportalCalendar();
         updateOverlayState();
       });
     }
 
     const selectFields = document.querySelectorAll('.custom-select-field');
-    const anyActiveCalendar = Array.from(selectFields).some(f => f.classList.contains('active') && f.querySelector('.calendar-dropdown'));
+    const hasPortaledCalendar = !!document.querySelector('.calendar-dropdown.rp-portaled');
+    const anyActiveCalendar = hasPortaledCalendar ||
+      Array.from(selectFields).some(f => f.classList.contains('active') && f.querySelector('.calendar-dropdown'));
     
     if (anyActiveCalendar && !isDesktop()) {
       overlay.classList.add('active');
@@ -222,6 +245,9 @@ const KUNAS_CONFIG = {
     const checkinCalendar = document.getElementById('checkin-calendar');
     if (checkinField && checkinCalendar) {
       checkinField.classList.add('active');
+      // On mobile, move the calendar to document.body to escape the
+      // backdrop-filter stacking context on .booking-bar.
+      if (!isDesktop()) portalCalendarToBody();
       renderRangePicker(checkinCalendar);
     }
     updateOverlayState();
@@ -406,6 +432,7 @@ const KUNAS_CONFIG = {
             checkoutInput.dispatchEvent(new Event('change'));
             const field = document.getElementById('checkin-field');
             if (field) field.classList.remove('active');
+            unportalCalendar();
             updateOverlayState();
           }
         });

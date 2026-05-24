@@ -3333,6 +3333,19 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
     opacity: 1 !important;
     visibility: visible !important;
   }
+
+  /*
+   * Portaled calendar: moved to document.body to escape the .booking-bar
+   * backdrop-filter stacking context. Shown via class, not via parent .active.
+   * z-index: 200 → above overlay (120) and booking-bar (150).
+   */
+  .custom-dropdown-menu.calendar-dropdown.rp-portaled {
+    transform: translateY(0) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    z-index: 200 !important;
+  }
 }
 
 /* ---------- BURBUJA FLOTANTE DE CONTACTO ---------- */
@@ -4801,7 +4814,9 @@ html[lang="en"] .lang-es { display: none !important; }
     background: rgba(250, 246, 239, 0.98);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    width: 100%;
+    /* No width:100% — position:fixed with left:0;right:0 is sufficient.
+     * width:100% resolves to window.innerWidth (includes scrollbar on desktop)
+     * which makes the bar wider than the CSS viewport and triggers overflow. */
   }
 
   /* Compact fields */
