@@ -720,6 +720,38 @@
         contactFloat.classList.remove('active');
       }
     });
+
+    // ── Attention animation + tooltip (once per session) ──
+    if (!sessionStorage.getItem('estar-contact-seen')) {
+      const tooltip = document.createElement('div');
+      tooltip.className = 'contact-tooltip';
+      tooltip.innerHTML = '<span class="lang-es">¿Te podemos ayudar?</span><span class="lang-en">Can we help you?</span>';
+      contactFloat.appendChild(tooltip);
+
+      setTimeout(() => {
+        // Bounce the button
+        trigger.classList.add('attention');
+        trigger.addEventListener('animationend', () => {
+          trigger.classList.remove('attention');
+        }, { once: true });
+
+        // Show tooltip
+        tooltip.classList.add('visible');
+        sessionStorage.setItem('estar-contact-seen', '1');
+
+        // Auto-hide tooltip after 5 s
+        setTimeout(() => {
+          tooltip.classList.remove('visible');
+          setTimeout(() => { if (tooltip.parentNode) tooltip.remove(); }, 400);
+        }, 5000);
+      }, 4000);
+
+      // Hide tooltip immediately if user opens the menu
+      trigger.addEventListener('click', () => {
+        tooltip.classList.remove('visible');
+        setTimeout(() => { if (tooltip.parentNode) tooltip.remove(); }, 400);
+      }, { once: true });
+    }
   }
 
   /* ----- BOOKING BAR SCROLL REVEAL ----- */

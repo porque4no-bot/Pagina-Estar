@@ -3351,6 +3351,17 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
 }
 
 /* ---------- BURBUJA FLOTANTE DE CONTACTO ---------- */
+
+@keyframes contact-bounce {
+  0%   { transform: scale(1)    translateY(0); }
+  18%  { transform: scale(1.22) translateY(-12px); }
+  36%  { transform: scale(0.94) translateY(0); }
+  52%  { transform: scale(1.12) translateY(-6px); }
+  68%  { transform: scale(1)    translateY(0); }
+  82%  { transform: scale(1.06) translateY(-3px); }
+  100% { transform: scale(1)    translateY(0); }
+}
+
 .contact-float {
   position: fixed;
   bottom: 24px;
@@ -3362,8 +3373,8 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
 }
 
 .contact-trigger {
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   background-color: var(--olive);
   color: var(--white);
   border: none;
@@ -3371,7 +3382,7 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(155, 144, 101, 0.3), var(--shadow-md);
+  box-shadow: 0 4px 20px rgba(155, 144, 101, 0.38), var(--shadow-md);
   transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.3s, box-shadow 0.3s;
   cursor: pointer;
   position: relative;
@@ -3379,9 +3390,49 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
   outline: none;
 }
 
+.contact-trigger.attention {
+  animation: contact-bounce 0.9s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards;
+}
+
 .contact-trigger:hover {
   transform: scale(1.08);
-  box-shadow: 0 6px 20px rgba(155, 144, 101, 0.45), var(--shadow-lg);
+  box-shadow: 0 6px 24px rgba(155, 144, 101, 0.5), var(--shadow-lg);
+}
+
+/* Tooltip "¿Te podemos ayudar?" */
+.contact-tooltip {
+  position: absolute;
+  right: 76px;
+  bottom: 50%;
+  transform: translateY(50%) translateX(10px);
+  background-color: var(--ink);
+  color: var(--white);
+  padding: 9px 16px;
+  border-radius: 20px;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  box-shadow: 0 4px 16px rgba(40,41,43,0.22);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.contact-tooltip::after {
+  content: '';
+  position: absolute;
+  right: -7px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 7px solid var(--ink);
+}
+.contact-tooltip.visible {
+  opacity: 1;
+  transform: translateY(50%) translateX(0);
 }
 
 .contact-icon {
@@ -3418,7 +3469,7 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
 /* Dropdown Menu Container */
 .contact-menu {
   position: absolute;
-  bottom: 72px;
+  bottom: 80px;
   right: 0;
   width: 290px;
   background-color: color-mix(in srgb, var(--paper) 92%, transparent);
@@ -3587,12 +3638,17 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
   }
   
   .contact-trigger {
-    width: 48px;
-    height: 48px;
+    width: 58px;
+    height: 58px;
   }
-  
+
   .contact-trigger:hover {
     transform: none; /* Desactivar scale hover en móviles */
+  }
+
+  .contact-tooltip {
+    font-size: 12px;
+    padding: 8px 14px;
   }
 
   .contact-icon {
