@@ -4,7 +4,7 @@
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vivir en estar · Estadías por meses en Manizales</title>
+<title>Extended Stay · Estadías por meses en Manizales</title>
 <link rel="stylesheet" href="colors_and_type.css">
 <link rel="stylesheet" href="styles.css?v=3">
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js"></script>
@@ -19,7 +19,7 @@
     </a>
     <nav><ul class="nav-list">
       <li><a href="index.html" data-i18n="nav_estadias">Estadías</a></li>
-      <li><a href="vivir.html" class="is-current" data-i18n="nav_vivir">Vivir en estar</a></li>
+      <li><a href="vivir.html" class="is-current" data-i18n="nav_vivir">Extended Stay</a></li>
       <li><a href="explora.html" data-i18n="nav_explorar">Explorar Manizales</a></li>
       <li><a href="empresas.html" data-i18n="nav_empresas">Empresas</a></li>
       <li><a href="grupos.html" data-i18n="nav_grupos">Grupos</a></li>
@@ -462,15 +462,16 @@
         </div>
       </div>
 
-      <form class="form" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Solicitud enviada ✶'; this.querySelector('button').disabled=true;">
+      <form class="form" name="estancias-largas" data-netlify="true">
+        <input type="hidden" name="form-name" value="estancias-largas">
         <div class="field-row">
-          <div class="field"><label for="form-nombre">Nombre completo</label><input type="text" id="form-nombre" name="nombre" placeholder="Carlos Mendoza"></div>
-          <div class="field"><label for="form-correo">Correo</label><input type="email" id="form-correo" name="correo" placeholder="tu@correo.com"></div>
+          <div class="field"><label for="form-nombre">Nombre completo</label><input type="text" id="form-nombre" name="nombre" placeholder="Carlos Mendoza" required></div>
+          <div class="field"><label for="form-correo">Correo</label><input type="email" id="form-correo" name="correo" placeholder="tu@correo.com" required></div>
         </div>
         <div class="field-row">
-          <div class="field"><label for="form-fecha-mudanza">Fecha estimada de mudanza</label><input type="text" id="form-fecha-mudanza" name="fecha_mudanza" placeholder="Vie, 24 may"></div>
+          <div class="field"><label for="form-fecha-mudanza">Fecha estimada de mudanza</label><input type="text" id="form-fecha-mudanza" name="fecha_mudanza" placeholder="Vie, 24 may" required></div>
           <div class="field"><label for="form-tiempo-estimado">Tiempo estimado</label>
-            <select id="form-tiempo-estimado" name="tiempo_estimado">
+            <select id="form-tiempo-estimado" name="tiempo_estimado" required>
               <option>1 — 2 meses</option>
               <option>3 — 5 meses</option>
               <option selected>6 — 11 meses</option>
@@ -481,7 +482,7 @@
         <div class="field-row">
           <div class="field">
             <label for="tipologia-select" data-i18n="typology_label">Tipología de habitación</label>
-            <select id="tipologia-select" name="tipologia">
+            <select id="tipologia-select" name="tipologia" required>
               <option value="clasica" data-i18n="typology_clasica">Clásica</option>
               <option value="seleccion" data-i18n="typology_seleccion" selected>Selección</option>
               <option value="reserva" data-i18n="typology_reserva">Reserva</option>
@@ -490,7 +491,7 @@
             </select>
           </div>
           <div class="field"><label for="form-motivo">Motivo del viaje</label>
-            <select id="form-motivo" name="motivo_viaje">
+            <select id="form-motivo" name="motivo_viaje" required>
               <option>Trabajo remoto / Nómada digital</option>
               <option>Residencia médica / Hospital</option>
               <option>Posgrado / Universidad</option>
@@ -503,7 +504,7 @@
           <textarea id="form-mensaje" name="mensaje" placeholder="Mascotas, preferencias, fecha exacta de llegada..."></textarea>
         </div>
         <label class="form-checkbox">
-          <input type="checkbox" required>
+          <input type="checkbox" name="habeas_data" required>
           <span>
             <span class="lang-es">Acepto la verificación de perfil y la <a href="privacidad.html" target="_blank">Política de Privacidad</a>.</span>
             <span class="lang-en">I accept profile verification and the <a href="privacidad.html" target="_blank">Privacy Policy</a>.</span>
@@ -547,7 +548,7 @@
         <h5 data-i18n="footer_estadias">Estadías</h5>
         <ul>
           <li><a href="index.html" data-i18n="footer_apartaestudios">Apartaestudios</a></li>
-          <li><a href="vivir.html" data-i18n="footer_vivir">Vivir en estar</a></li>
+          <li><a href="vivir.html" data-i18n="footer_vivir">Extended Stay</a></li>
           <li><a href="grupos.html" data-i18n="footer_grupos">Grupos y eventos</a></li>
         </ul>
       </div>
@@ -850,3 +851,4 @@
 
 </body>
 </html>
+

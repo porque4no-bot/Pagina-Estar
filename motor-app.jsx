@@ -841,10 +841,39 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       setLoading(true);
       const code = genCode();
 
+      // Encode booking details into the Wompi reference (max 255 chars)
+      // Format: 1|checkinYYMMDD|checkoutYYMMDD|guests|roomTypeId|firstName|lastName|email|phone|extrasMask|code
+      const formatDateYYMMDD = (dStr) => {
+        if (!dStr) return '000000';
+        return dStr.replace(/-/g, '').substring(2);
+      };
+
+      const extrasKeys = ['desayuno', 'parqueadero', 'late', 'early', 'traslado', 'tour'];
+      const extrasMask = extrasKeys.map(k => booking.extras[k] ? '1' : '0').join('');
+
+      const serialized = [
+        '1', // version
+        formatDateYYMMDD(search.checkin),
+        formatDateYYMMDD(search.checkout),
+        search.guests,
+        booking.room.roomTypeId || "31349",
+        (booking.guest?.nombre || '').trim().replace(/\|/g, ''),
+        (booking.guest?.apellido || '').trim().replace(/\|/g, ''),
+        (booking.guest?.email || '').trim().replace(/\|/g, ''),
+        (booking.guest?.tel || '').trim().replace(/\|/g, ''),
+        extrasMask,
+        code
+      ].join('|');
+
+      const encodedRef = btoa(unescape(encodeURIComponent(serialized)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
       const checkout = new window.WidgetCheckout({
         currency: 'COP',
         amountInCents: Math.round(calc.subtotal * 100),
-        reference: `${code}-${Date.now().toString().slice(-4)}`,
+        reference: encodedRef,
         publicKey: window.WOMPI_PUBLIC_KEY || 'pub_test_Q5yDA9xoEbjuF4GZRL9yH15Juxzz6J68',
         customerData: {
           email: booking.guest?.email || '',
@@ -1556,6 +1585,47 @@ function BookingEngine() {
                   <button type="button" className="be-btn-primary" onClick={fetchAvailability}>
                     {lang === 'es' ? 'Intentar de nuevo' : 'Try again'}
                   </button>
+                </div>
+              ) : rooms.length === 0 || rooms.every(r => !r.available) ? (
+                <div className="be-no-availability" style={{ padding: '40px 24px', textAlign: 'center', background: 'var(--white)', border: '1px solid var(--paper-400)', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+                  <Icon name="calendar-off" size={40} style={{ color: 'var(--terracotta)' }} />
+                  <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--ink)' }}>
+                    {lang === 'es' ? 'No hay disponibilidad para las fechas seleccionadas' : 'No availability for selected dates'}
+                  </h3>
+                  <p style={{ fontSize: 13, color: 'var(--ink-500)', lineHeight: 1.6, margin: '0 0 8px 0', maxWidth: 480 }}>
+                    {lang === 'es' 
+                      ? 'No encontramos apartaestudios libres en Kunas PMS para estas fechas. Puedes intentar buscando una semana después o escribirnos directamente por WhatsApp para ver si contamos con alguna alternativa o cancelación de última hora.' 
+                      : 'We could not find free apartaestudios in Kunas PMS for these dates. You can try searching for a week later or write to us directly on WhatsApp to see if we have any alternatives or last-minute cancellations.'}
+                  </p>
+                  
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button className="be-btn-secondary" onClick={() => {
+                      const checkinDate = new Date(search.checkin + 'T00:00:00');
+                      const checkoutDate = new Date(search.checkout + 'T00:00:00');
+                      const diffDays = Math.max(1, Math.round((checkoutDate - checkinDate)/86400000));
+                      checkinDate.setDate(checkinDate.getDate() + 7);
+                      checkoutDate.setDate(checkoutDate.getDate() + 7);
+                      
+                      const fmt = (d) => d.toISOString().split('T')[0];
+                      handleSearch({
+                        checkin: fmt(checkinDate),
+                        checkout: fmt(checkoutDate),
+                        guests: search.guests
+                      });
+                    }} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Icon name="calendar-days" size={14} />
+                      <span>{lang === 'es' ? 'Buscar 1 semana después' : 'Search 1 week later'}</span>
+                    </button>
+
+                    <a href={`https://api.whatsapp.com/send/?phone=573102490414&text=${encodeURIComponent(
+                      lang === 'es' 
+                        ? `¡Hola! Estaba buscando disponibilidad en estar del ${search.checkin} al ${search.checkout} para ${search.guests} ${search.guests === 1 ? 'persona' : 'personas'} y el motor indica que no hay habitaciones libres. ¿Tienen alguna alternativa o cancelación?`
+                        : `Hi! I was looking for availability at estar from ${search.checkin} to ${search.checkout} for ${search.guests} ${search.guests === 1 ? 'guest' : 'guests'} and the booking engine shows no available rooms. Do you have any alternatives or cancellations?`
+                    )}`} target="_blank" rel="noopener noreferrer" className="be-btn-primary" style={{ backgroundColor: '#25D366', borderColor: '#25D366', color: 'var(--white)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      <Icon name="message-circle" size={14} />
+                      <span>{lang === 'es' ? 'Consultar por WhatsApp' : 'Inquire on WhatsApp'}</span>
+                    </a>
+                  </div>
                 </div>
               ) : (
                 <div className="be-rooms-list">

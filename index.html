@@ -22,7 +22,7 @@
     <nav aria-label="Principal">
       <ul class="nav-list">
         <li><a href="index.html" class="is-current" data-i18n="nav_estadias">Estadías</a></li>
-        <li><a href="vivir.html" data-i18n="nav_vivir">Vivir en estar</a></li>
+        <li><a href="vivir.html" data-i18n="nav_vivir">Extended Stay</a></li>
         <li><a href="explora.html" data-i18n="nav_explorar">Explorar Manizales</a></li>
         <li><a href="empresas.html" data-i18n="nav_empresas">Empresas</a></li>
         <li><a href="grupos.html" data-i18n="nav_grupos">Grupos</a></li>
@@ -576,7 +576,7 @@
       </a>
       <a href="vivir.html#aplicar" class="segment" data-reveal>
         <span class="num">03</span>
-        <h3>Vivir en estar</h3>
+        <h3>Extended Stay</h3>
         <p>De 3 a 12 meses. Para médicos residentes y posgrados. Una sola factura, sin fiadores.</p>
         <span class="arrow">Aplicar <span aria-hidden="true">→</span></span>
       </a>
@@ -630,8 +630,9 @@
       <h3>Una carta breve <span class="serif-italic">cada estación.</span></h3>
       <p>Recomendaciones locales, recetas con café de la región y disponibilidad antes que nadie.</p>
     </div>
-    <form data-reveal onsubmit="event.preventDefault(); this.querySelector('input').value=''; this.querySelector('button').textContent='Gracias ✶';">
-      <input type="email" placeholder="tu@correo.com" required>
+    <form data-reveal name="newsletter" data-netlify="true">
+      <input type="hidden" name="form-name" value="newsletter">
+      <input type="email" name="email" placeholder="tu@correo.com" required>
       <button type="submit">Suscribirme <span aria-hidden="true">→</span></button>
     </form>
     <p style="font-size: 11px; color: rgba(250,246,239,0.7); margin-top: 12px; line-height: 1.4;">
@@ -653,7 +654,7 @@
         <h5 data-i18n="footer_estadias">Estadías</h5>
         <ul>
           <li><a href="index.html" data-i18n="footer_apartaestudios">Apartaestudios</a></li>
-          <li><a href="vivir.html" data-i18n="footer_vivir">Vivir en estar</a></li>
+          <li><a href="vivir.html" data-i18n="footer_vivir">Extended Stay</a></li>
           <li><a href="grupos.html" data-i18n="footer_grupos">Grupos y eventos</a></li>
         </ul>
       </div>
@@ -782,3 +783,4 @@
 
 </body>
 </html>
+

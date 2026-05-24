@@ -45,6 +45,90 @@ const KUNAS_CONFIG = {
 };
 
 (function () {
+  // Rates cache and overlay helpers
+  window.estarRatesCache = window.estarRatesCache || {};
+
+  function updateOverlayState() {
+    let overlay = document.querySelector('.calendar-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'calendar-overlay';
+      document.body.appendChild(overlay);
+      
+      overlay.addEventListener('click', () => {
+        const selectFields = document.querySelectorAll('.custom-select-field');
+        selectFields.forEach(f => f.classList.remove('active'));
+        updateOverlayState();
+      });
+    }
+
+    const selectFields = document.querySelectorAll('.custom-select-field');
+    const anyActiveCalendar = Array.from(selectFields).some(f => f.classList.contains('active') && f.querySelector('.calendar-dropdown'));
+    
+    if (anyActiveCalendar && !isDesktop()) {
+      overlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    } else {
+      overlay.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+  }
+
+  function fetchMonthRates(year, month, calendarContainer, inputEl, isCheckOut) {
+    const cacheKey = `${year}-${month}`;
+    if (window.estarRatesCache[cacheKey]) {
+      return;
+    }
+    window.estarRatesCache[cacheKey] = 'loading';
+
+    const pad = (n) => String(n).padStart(2, '0');
+    const checkin = `${year}-${pad(month + 1)}-01`;
+    
+    let nextMonth = month + 2;
+    let nextYear = year;
+    if (nextMonth > 12) {
+      nextMonth = 1;
+      nextYear += 1;
+    }
+    const checkout = `${nextYear}-${pad(nextMonth)}-01`;
+
+    fetch(`/api/check-availability?checkin=${checkin}&checkout=${checkout}&guests=2`)
+      .then(res => {
+        if (!res.ok) throw new Error("Status " + res.status);
+        return res.json();
+      })
+      .then(data => {
+        if (data && Array.isArray(data.rooms)) {
+          const pricesMap = {};
+          data.rooms.forEach(room => {
+            if (Array.isArray(room.dailyPrices)) {
+              room.dailyPrices.forEach(dp => {
+                const dateStr = dp.date;
+                const price = parseFloat(dp.price);
+                if (!isNaN(price) && price > 0) {
+                  if (!pricesMap[dateStr] || price < pricesMap[dateStr]) {
+                    pricesMap[dateStr] = price;
+                  }
+                }
+              });
+            }
+          });
+          window.estarRatesCache[cacheKey] = pricesMap;
+
+          // Re-render only if the calendar container is still showing the same month
+          const currentYear = parseInt(calendarContainer.getAttribute('data-year'));
+          const currentMonth = parseInt(calendarContainer.getAttribute('data-month'));
+          if (currentYear === year && currentMonth === month) {
+            renderCalendar(calendarContainer, inputEl, isCheckOut);
+          }
+        }
+      })
+      .catch(err => {
+        console.warn("Error fetching rates for calendar:", err);
+        window.estarRatesCache[cacheKey] = {}; // Fallback empty object
+      });
+  }
+
   const checkinInput = document.getElementById('checkin-input');
   const checkoutInput = document.getElementById('checkout-input');
   const guestsInput = document.getElementById('guests-input');
@@ -114,6 +198,9 @@ const KUNAS_CONFIG = {
       calendarContainer.setAttribute('data-year', year);
       calendarContainer.setAttribute('data-month', month);
     }
+
+    // Trigger fetching rates for this month
+    fetchMonthRates(year, month, calendarContainer, inputEl, isCheckOut);
 
     const currentVal = inputEl.value;
     const todayStr = getLocalDateString(0);
@@ -216,13 +303,32 @@ const KUNAS_CONFIG = {
     const selectedCheckin = checkinInput ? checkinInput.value : '';
     const selectedCheckout = checkoutInput ? checkoutInput.value : '';
 
+    const cacheKey = `${year}-${month}`;
+    const cachedRates = window.estarRatesCache[cacheKey];
+    const ratesLoaded = cachedRates && typeof cachedRates === 'object';
+
     for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
       const dayDiv = document.createElement('div');
       dayDiv.className = 'calendar-day';
-      dayDiv.textContent = dayNum;
 
       const dateVal = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
       dayDiv.setAttribute('data-date', dateVal);
+
+      // Structure day inner content to support styling day-number and price
+      const dayNumSpan = document.createElement('span');
+      dayNumSpan.className = 'day-number';
+      dayNumSpan.textContent = dayNum;
+      dayDiv.appendChild(dayNumSpan);
+
+      // Append dynamic price if available in cache
+      if (ratesLoaded && cachedRates[dateVal]) {
+        const price = cachedRates[dateVal];
+        const formattedPrice = price >= 1000 ? `${Math.round(price / 1000)}K` : price;
+        const priceSpan = document.createElement('span');
+        priceSpan.className = 'calendar-day-price';
+        priceSpan.textContent = `$${formattedPrice}`;
+        dayDiv.appendChild(priceSpan);
+      }
 
       // Highlight actual ranges
       if (dateVal === todayStr) {
@@ -248,6 +354,7 @@ const KUNAS_CONFIG = {
           inputEl.dispatchEvent(new Event('change'));
           const field = calendarContainer.closest('.custom-select-field');
           if (field) field.classList.remove('active');
+          updateOverlayState();
 
           // Auto-open check-out calendar if check-in was selected
           if (!isCheckOut) {
@@ -374,9 +481,6 @@ const KUNAS_CONFIG = {
 
       // Evento click en el contenedor (cabecera del select/datepicker)
       field.addEventListener('click', (e) => {
-        // Si el click es en móvil, dejar que el comportamiento nativo tome el control
-        if (!isDesktop() && inputDateEl) return;
-
         // Si el clic fue en el select nativo, en el input de fecha, o dentro del menú del dropdown (por ejemplo, navegando el calendario), no togglear
         if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.closest('.calendar-header') || e.target.closest('.calendar-grid')) return;
 
@@ -400,6 +504,7 @@ const KUNAS_CONFIG = {
             renderCalendar(dropdownMenu, inputDateEl, isCheckout);
           }
         }
+        updateOverlayState();
       });
 
       // Solo si es un campo select, configurar opciones y navegación de teclado
@@ -489,6 +594,7 @@ const KUNAS_CONFIG = {
         selectFields.forEach(field => {
           field.classList.remove('active');
         });
+        updateOverlayState();
       }
     });
   }
@@ -510,35 +616,8 @@ const KUNAS_CONFIG = {
     checkoutInput.min = tomorrowStr;
     checkoutInput.value = tomorrowStr;
 
-    // Abrir el selector de fecha nativo al hacer clic en el campo o en el contenedor
-    const checkinField = checkinInput.closest('.booking-field');
-    const checkoutField = checkoutInput.closest('.booking-field');
-
-    const handleDatePickerOpen = (inputEl) => {
-      if (typeof inputEl.showPicker === 'function') {
-        try {
-          inputEl.showPicker();
-        } catch (err) {
-          console.warn("showPicker error:", err);
-        }
-      }
-    };
-
-    if (checkinField) {
-      checkinField.addEventListener('click', (e) => {
-        if (isDesktop()) return; // No abrir selector nativo en escritorio
-        checkinInput.focus();
-        handleDatePickerOpen(checkinInput);
-      });
-    }
-
-    if (checkoutField) {
-      checkoutField.addEventListener('click', (e) => {
-        if (isDesktop()) return; // No abrir selector nativo en escritorio
-        checkoutInput.focus();
-        handleDatePickerOpen(checkoutInput);
-      });
-    }
+    // No necesitamos listeners adicionales en móvil para abrir selectores nativos,
+    // ya que utilizaremos el selector de calendario personalizado también en dispositivos móviles.
 
     // Control de cambio en fecha de entrada
     checkinInput.addEventListener('change', () => {

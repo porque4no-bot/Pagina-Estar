@@ -127,7 +127,7 @@
   const i18n = {
     es: {
       nav_estadias: 'Estadías',
-      nav_vivir: 'Vivir en estar',
+      nav_vivir: 'Extended Stay',
       nav_explorar: 'Explorar Manizales',
       nav_empresas: 'Empresas',
       nav_grupos: 'Grupos',
@@ -190,7 +190,7 @@
       footer_desc: 'Hospedaje en el corazón de Manizales pensado para <span class="serif-italic">estar</span> en casa.',
       footer_estadias: 'Estadías',
       footer_apartaestudios: 'Apartaestudios',
-      footer_vivir: 'Vivir en estar',
+      footer_vivir: 'Extended Stay',
       footer_grupos: 'Grupos y eventos',
       footer_empresas: 'Empresas',
       footer_portal: 'Portal corporativo',
@@ -243,7 +243,7 @@
     },
     en: {
       nav_estadias: 'Stays',
-      nav_vivir: 'Live at estar',
+      nav_vivir: 'Extended Stay',
       nav_explorar: 'Explore Manizales',
       nav_empresas: 'Companies',
       nav_grupos: 'Groups',
@@ -306,7 +306,7 @@
       footer_desc: 'Lodging in the heart of Manizales, designed to <span class="serif-italic">estar</span> at home.',
       footer_estadias: 'Stays',
       footer_apartaestudios: 'Studio apartments',
-      footer_vivir: 'Live at estar',
+      footer_vivir: 'Extended Stay',
       footer_grupos: 'Groups & events',
       footer_empresas: 'Companies',
       footer_portal: 'Corporate portal',
@@ -819,6 +819,80 @@
     setTimeout(updateButtonStates, 100);
   }
 
+  /* ----- NETLIFY FORMS AJAX SUBMISSION INTERCEPTOR ----- */
+  function setupNetlifyForms() {
+    document.querySelectorAll('form[data-netlify="true"]').forEach(form => {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const submitButton = form.querySelector('button[type="submit"]');
+        let originalButtonHtml = '';
+        if (submitButton) {
+          submitButton.disabled = true;
+          originalButtonHtml = submitButton.innerHTML;
+          const lang = tweaks.language || 'es';
+          submitButton.textContent = lang === 'en' ? 'Sending...' : 'Enviando...';
+        }
+        
+        // Ensure form-name hidden field is set
+        let hiddenFormName = form.querySelector('input[name="form-name"]');
+        if (!hiddenFormName) {
+          hiddenFormName = document.createElement('input');
+          hiddenFormName.type = 'hidden';
+          hiddenFormName.name = 'form-name';
+          hiddenFormName.value = form.getAttribute('name');
+          form.appendChild(hiddenFormName);
+        }
+        
+        fetch("/", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams(new FormData(form)).toString()
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Server returned status ${response.status}`);
+          }
+          
+          const lang = tweaks.language || 'es';
+          
+          if (form.classList.contains('contact-form')) {
+            form.style.opacity = '0.6';
+            form.innerHTML = '<div style="padding: 40px 0; text-align: center; font-family: var(--font-heading); font-size: 18px; color: var(--fg);">✶ Gracias. Responderemos pronto. / Thank you. We will reply shortly.</div>';
+          } else if (form.classList.contains('apply-form')) {
+            form.style.opacity = '0.6';
+            form.innerHTML = '<div style="padding: 40px 0; text-align: center; font-family: var(--font-heading); font-size: 18px; color: var(--fg);">✶ Postulación enviada. / Application sent.</div>';
+          } else if (form.getAttribute('name') === 'newsletter') {
+            const emailInput = form.querySelector('input[type="email"]');
+            if (emailInput) emailInput.value = '';
+            if (submitButton) {
+              submitButton.textContent = lang === 'en' ? 'Thank you ✶' : 'Gracias ✶';
+            }
+          } else if (form.getAttribute('name') === 'convenios-empresas') {
+            if (submitButton) {
+              submitButton.textContent = lang === 'en' ? 'Received ✶ — we will write you soon' : 'Recibido ✶ — te escribimos pronto';
+            }
+          } else {
+            if (submitButton) {
+              submitButton.textContent = lang === 'en' ? 'Request sent ✶' : 'Solicitud enviada ✶';
+            }
+          }
+        })
+        .catch(error => {
+          console.error("Netlify form submission error:", error);
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalButtonHtml;
+          }
+          alert(tweaks.language === 'en' 
+            ? 'There was an error sending your message. Please try again or contact us via WhatsApp.' 
+            : 'Ocurrió un error al enviar tu mensaje. Por favor intenta de nuevo o escríbenos por WhatsApp.'
+          );
+        });
+      });
+    });
+  }
+
   /* ---------- INIT ---------- */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => { 
@@ -832,6 +906,7 @@
       setupContactFloat();
       setupBookingBarScroll();
       fetchDynamicRating();
+      setupNetlifyForms();
     });
   } else {
     setupCookieConsent();
@@ -844,5 +919,6 @@
     setupContactFloat();
     setupBookingBarScroll();
     fetchDynamicRating();
+    setupNetlifyForms();
   }
 })();

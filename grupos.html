@@ -22,7 +22,7 @@
     <nav aria-label="Principal">
       <ul class="nav-list">
         <li><a href="index.html" data-i18n="nav_estadias">Estadías</a></li>
-        <li><a href="vivir.html" data-i18n="nav_vivir">Vivir en estar</a></li>
+        <li><a href="vivir.html" data-i18n="nav_vivir">Extended Stay</a></li>
         <li><a href="explora.html" data-i18n="nav_explorar">Explorar Manizales</a></li>
         <li><a href="empresas.html" data-i18n="nav_empresas">Empresas</a></li>
         <li><a href="grupos.html" class="is-current" data-i18n="nav_grupos">Grupos</a></li>
@@ -182,26 +182,27 @@
         </div>
       </div>
 
-      <form class="form" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Solicitud enviada ✶'; this.querySelector('button').disabled=true;">
+      <form class="form" name="cotizacion-grupos" data-netlify="true">
+        <input type="hidden" name="form-name" value="cotizacion-grupos">
         <div class="field-row">
           <div class="field">
             <label>Nombre del organizador</label>
-            <input type="text" placeholder="Carlos Mendoza" required>
+            <input type="text" name="organizador" placeholder="Carlos Mendoza" required>
           </div>
           <div class="field">
             <label>Correo electrónico</label>
-            <input type="email" placeholder="tu@correo.com" required>
+            <input type="email" name="email" placeholder="tu@correo.com" required>
           </div>
         </div>
         <div class="field">
           <label>Teléfono de contacto (WhatsApp)</label>
-          <input type="tel" placeholder="+57 300 000 0000" required>
+          <input type="tel" name="whatsapp" placeholder="+57 300 000 0000" required>
         </div>
 
         <div class="field-row">
           <div class="field">
             <label>Motivo del grupo</label>
-            <select required>
+            <select name="motivo" required>
               <option value="" disabled selected>Selecciona una opción</option>
               <option value="boda">Boda / Celebración</option>
               <option value="corporativo">Retiro Corporativo</option>
@@ -214,11 +215,11 @@
           <div class="field-row" style="gap: 12px; margin: 0;">
             <div class="field" style="flex: 1;">
               <label>Huéspedes</label>
-              <input type="number" min="1" placeholder="Ej. 15" required>
+              <input type="number" name="huespedes" min="1" placeholder="Ej. 15" required>
             </div>
             <div class="field" style="flex: 1;">
               <label>Apartaestudios</label>
-              <input type="number" min="4" max="13" placeholder="Ej. 6" required>
+              <input type="number" name="apartaestudios" min="4" max="13" placeholder="Ej. 6" required>
             </div>
           </div>
         </div>
@@ -226,18 +227,18 @@
         <div class="field-row">
           <div class="field">
             <label>Fecha de llegada</label>
-            <input type="text" placeholder="Vie, 24 may" required>
+            <input type="text" name="llegada" placeholder="Vie, 24 may" required>
           </div>
           <div class="field">
             <label>Fecha de salida</label>
-            <input type="text" placeholder="Lun, 27 may" required>
+            <input type="text" name="salida" placeholder="Lun, 27 may" required>
           </div>
         </div>
 
         <div class="field-row">
           <div class="field">
             <label data-i18n="duration_label">Duración de la estadía</label>
-            <select id="duration-select" required>
+            <select id="duration-select" name="duracion" required>
               <option value="1-3" data-i18n="duration_1_3" selected>1 a 3 meses</option>
               <option value="3-6" data-i18n="duration_3_6">3 a 6 meses</option>
               <option value="6-11" data-i18n="duration_6_11">6 a 11 meses</option>
@@ -255,7 +256,7 @@
               </span>
             </div>
             
-            <select id="unit-input" name="unit" required style="display: none;">
+            <select id="unit-input" name="unidad" required style="display: none;">
               <option value="" disabled selected data-i18n="unit_select_placeholder">Selecciona una unidad</option>
               <option value="clasica">Clásica</option>
               <option value="seleccion">Selección</option>
@@ -307,11 +308,11 @@
 
         <div class="field">
           <label>Requerimientos adicionales (opcional)</label>
-          <textarea placeholder="Ej. Habitaciones continuas, check-in temprano, facilidades especiales..."></textarea>
+          <textarea name="requerimientos" placeholder="Ej. Habitaciones continuas, check-in temprano, facilidades especiales..."></textarea>
         </div>
 
         <label class="form-checkbox">
-          <input type="checkbox" required>
+          <input type="checkbox" name="habeas_data" required>
           <span data-i18n-html="privacy_agreement">Acepto el tratamiento de mis datos personales para cotización según la <a href="privacidad.html" target="_blank">Política de Privacidad</a>.</span>
         </label>
 
@@ -354,7 +355,7 @@
         <h5 data-i18n="footer_estadias">Estadías</h5>
         <ul>
           <li><a href="index.html" data-i18n="footer_apartaestudios">Apartaestudios</a></li>
-          <li><a href="vivir.html" data-i18n="footer_vivir">Vivir en estar</a></li>
+          <li><a href="vivir.html" data-i18n="footer_vivir">Extended Stay</a></li>
           <li><a href="grupos.html" data-i18n="footer_grupos">Grupos y eventos</a></li>
         </ul>
       </div>
@@ -789,3 +790,4 @@
 
 </body>
 </html>
+

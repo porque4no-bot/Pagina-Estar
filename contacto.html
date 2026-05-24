@@ -155,7 +155,7 @@
     </a>
     <nav><ul class="nav-list">
       <li><a href="index.html" data-i18n="nav_estadias">Estadías</a></li>
-      <li><a href="vivir.html" data-i18n="nav_vivir">Vivir en estar</a></li>
+      <li><a href="vivir.html" data-i18n="nav_vivir">Extended Stay</a></li>
       <li><a href="explora.html" data-i18n="nav_explorar">Explorar Manizales</a></li>
       <li><a href="empresas.html" data-i18n="nav_empresas">Empresas</a></li>
       <li><a href="grupos.html" data-i18n="nav_grupos">Grupos</a></li>
@@ -227,29 +227,30 @@
           <span class="lang-es">Envíanos un mensaje</span>
           <span class="lang-en">Send us a message</span>
         </h2>
-        <form class="contact-form" onsubmit="event.preventDefault(); this.style.opacity='0.6'; this.innerHTML='<div style=&quot;padding: 40px 0; text-align: center; font-family: var(--font-heading); font-size: 18px; color: var(--fg);&quot;>✶ Gracias. Responderemos pronto. / Thank you. We will reply shortly.</div>';">
+        <form class="contact-form" name="contacto" data-netlify="true">
+          <input type="hidden" name="form-name" value="contacto">
           <div class="form-field">
             <label class="lang-es">Nombre Completo</label>
             <label class="lang-en">Full Name</label>
-            <input type="text" placeholder="Ej. Sofía Restrepo" required>
+            <input type="text" name="nombre" placeholder="Ej. Sofía Restrepo" required>
           </div>
           <div class="form-field">
             <label class="lang-es">Correo Electrónico</label>
             <label class="lang-en">Email Address</label>
-            <input type="email" placeholder="tu@correo.com" required>
+            <input type="email" name="email" placeholder="tu@correo.com" required>
           </div>
           <div class="form-field">
             <label class="lang-es">Teléfono de Contacto</label>
             <label class="lang-en">Phone Number</label>
-            <input type="tel" placeholder="+57 300 123 4567" required>
+            <input type="tel" name="telefono" placeholder="+57 300 123 4567" required>
           </div>
           <div class="form-field">
             <label class="lang-es">Mensaje o Consulta</label>
             <label class="lang-en">Message or Inquiry</label>
-            <textarea placeholder="..." required></textarea>
+            <textarea name="mensaje" placeholder="..." required></textarea>
           </div>
           <label class="form-checkbox">
-            <input type="checkbox" required>
+            <input type="checkbox" name="habeas_data" required>
             <span>
               <span class="lang-es">Acepto la <a href="privacidad.html" target="_blank">Política de Privacidad</a> e información de Habeas Data.</span>
               <span class="lang-en">I accept the <a href="privacidad.html" target="_blank">Privacy Policy</a> and Habeas Data terms.</span>
@@ -276,7 +277,7 @@
         <h5 data-i18n="footer_estadias">Estadías</h5>
         <ul>
           <li><a href="index.html" data-i18n="footer_apartaestudios">Apartaestudios</a></li>
-          <li><a href="vivir.html" data-i18n="footer_vivir">Vivir en estar</a></li>
+          <li><a href="vivir.html" data-i18n="footer_vivir">Extended Stay</a></li>
           <li><a href="grupos.html" data-i18n="footer_grupos">Grupos y eventos</a></li>
         </ul>
       </div>
@@ -394,3 +395,4 @@
 
 </body>
 </html>
+
