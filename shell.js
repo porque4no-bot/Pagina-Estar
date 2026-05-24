@@ -127,7 +127,7 @@
   const i18n = {
     es: {
       nav_estadias: 'Estadías',
-      nav_vivir: 'Extended Stay',
+      nav_vivir: 'Estadía larga',
       nav_explorar: 'Explorar Manizales',
       nav_empresas: 'Empresas',
       nav_grupos: 'Grupos',

@@ -78,7 +78,7 @@ button { font: inherit; cursor: pointer; border: 0; background: none; color: inh
 .display-l {
   font-family: var(--font-heading);
   font-weight: 900;
-  font-size: clamp(40px, 5.5vw, 84px);
+  font-size: clamp(28px, 5.5vw, 84px);
   line-height: 0.98;
   letter-spacing: -0.02em;
   margin: 0;
@@ -381,6 +381,22 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 700;
     letter-spacing: 0.16em;
     border-bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .site-header .nav-list a::before {
+    content: "→";
+    font-family: var(--font-body);
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--terracotta);
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+  }
+  .site-header .nav-list a:hover::before,
+  .site-header .nav-list a.is-current::before {
+    transform: translateX(4px);
   }
   .site-header.menu-open .brand {
     position: relative;
@@ -1838,7 +1854,7 @@ body[data-density="compact"] .newsletter { padding: 80px 0; }
 /* ---------- TEXT-IMAGE blocks (used in sub-pages) ---------- */
 .split {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 56px;
   align-items: center;
 }
@@ -1857,11 +1873,13 @@ body[data-density="compact"] .newsletter { padding: 80px 0; }
 .split h2 {
   font-family: var(--font-heading);
   font-weight: 900;
-  font-size: clamp(36px, 4.4vw, 64px);
+  font-size: clamp(26px, 4.4vw, 64px);
   line-height: 1;
   letter-spacing: -0.022em;
   margin: 16px 0 24px;
   text-wrap: balance;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .split h2 .italic { font-family: var(--font-body); font-style: italic; font-weight: 400; }
 .split .body { font-size: 17px; margin-bottom: 24px; }
@@ -2196,7 +2214,7 @@ body[data-density="compact"] .newsletter { padding: 80px 0; }
 .tier .amount {
   font-family: var(--font-heading);
   font-weight: 900;
-  font-size: 32px;
+  font-size: clamp(22px, 5.5vw, 32px);
   letter-spacing: -0.015em;
   line-height: 1;
 }
@@ -2216,13 +2234,14 @@ body[data-density="compact"] .newsletter { padding: 80px 0; }
 /* ---------- SECTION HEAD generic ---------- */
 .section-head {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 32px;
   margin-bottom: 64px;
   align-items: end;
 }
-@media (min-width: 1024px) { .section-head { grid-template-columns: 1.4fr 1fr; } }
-.section-head h2 { margin: 12px 0 0; }
+@media (min-width: 1024px) { .section-head { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); } }
+.section-head > * { min-width: 0; }
+.section-head h2 { margin: 12px 0 0; overflow-wrap: break-word; word-break: break-word; }
 
 /* ---------- STAR CURSOR ---------- */
 .star-cursor {
@@ -4870,6 +4889,14 @@ html[lang="en"] .lang-es { display: none !important; }
 
   /* ── SUB-HERO (interior pages) ── */
   .sub-hero { padding: 100px 0 56px; min-height: 50vh; }
+  .sub-hero h1 {
+    font-size: clamp(32px, 9vw, 64px);
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  /* ── Carousel: habilita swipe horizontal nativo ── */
+  .room-list { touch-action: pan-x; }
 
   /* ── SPLIT blocks (text + image) ── */
   .split { gap: 36px; }

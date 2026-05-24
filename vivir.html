@@ -774,6 +774,27 @@
     // Initialize display with Selección
     selectTypology(1);
 
+    // Detect swipe on mobile: IntersectionObserver watches which card is centered
+    const swipeObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+          const idx = Array.from(cards).indexOf(entry.target);
+          if (idx !== -1 && idx !== activeIndex) {
+            activeIndex = idx;
+            const typology = typologies[activeIndex];
+            cards.forEach((card, i) => {
+              card.classList.toggle('active', i === activeIndex);
+              card.setAttribute('aria-selected', i === activeIndex ? 'true' : 'false');
+            });
+            updatePricingDisplay(typology);
+            if (prevBtn) prevBtn.disabled = activeIndex === 0;
+            if (nextBtn) nextBtn.disabled = activeIndex === typologies.length - 1;
+          }
+        }
+      });
+    }, { root: viewport, threshold: 0.5 });
+    cards.forEach(card => swipeObserver.observe(card));
+
     // Select typology in form when clicking 'Aplicar' on a room card
     const aplicarButtons = document.querySelectorAll('.btn-aplicar');
     const formTipologia = document.getElementById('tipologia-select');
