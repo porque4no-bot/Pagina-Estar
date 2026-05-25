@@ -1,5 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const { getStore } = require('@netlify/blobs');
+
+const bookingRateLimit = new Map(); // ip -> last request timestamp
 
 // Helper to load local .env variables if not already set
 function loadEnv() {
@@ -167,6 +170,27 @@ exports.handler = async (event, context) => {
     };
   }
 
+  // Rate limiter: 1 booking request per IP per 10 seconds
+  const clientIp = event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+                   event.headers['x-nf-client-connection-ip'] || 'unknown';
+  const now = Date.now();
+  const lastBooking = bookingRateLimit.get(clientIp);
+  if (lastBooking && now - lastBooking < 10000) {
+    return {
+      statusCode: 429,
+      headers: { ...corsHeaders, 'Retry-After': '10' },
+      body: JSON.stringify({ error: 'Too many requests. Please wait a moment.' })
+    };
+  }
+  bookingRateLimit.set(clientIp, now);
+  // Cleanup old entries periodically
+  if (bookingRateLimit.size > 500) {
+    const cutoff = now - 60000;
+    for (const [ip, ts] of bookingRateLimit) {
+      if (ts < cutoff) bookingRateLimit.delete(ip);
+    }
+  }
+
   const MAX_BODY_SIZE = 10000; // 10 KB
   if (event.body && event.body.length > MAX_BODY_SIZE) {
     return { statusCode: 413, body: JSON.stringify({ error: 'Payload too large' }) };
@@ -224,6 +248,25 @@ exports.handler = async (event, context) => {
       headers: corsHeaders,
       body: JSON.stringify({ error: 'Check-in date must be before check-out date' })
     };
+  }
+
+  // Idempotency check: prevent duplicate bookings from double-clicks or retries
+  const idempKey = `booking_${roomTypeId}_${checkin}_${checkout}_${String(email).toLowerCase().trim()}`;
+
+  let blobStore;
+  let cached;
+  try {
+    blobStore = getStore({ name: 'booking-idempotency', consistency: 'strong' });
+    const raw = await blobStore.get(idempKey);
+    if (raw) {
+      const existing = JSON.parse(raw);
+      console.log(`[idempotency] Returning cached booking ${existing.bookingCode}`);
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(existing) };
+    }
+  } catch (e) {
+    // Blobs unavailable locally or in misconfigured env — proceed without idempotency
+    console.warn('[idempotency] Blobs store unavailable, proceeding without deduplication:', e.message);
+    blobStore = null;
   }
 
   // Server-side pricing: always compute from rooms_db, never trust client-provided price
@@ -420,25 +463,35 @@ exports.handler = async (event, context) => {
     // Check if reservation insertion was successful in Kunas response
     const bookingCode = data.id_reservations || cleanReference || `ESTAR-PMS-${Date.now().toString().slice(-6)}`;
 
+    const successPayload = {
+      success: true,
+      bookingCode: bookingCode,
+      isMock: false,
+      reservation: {
+        code: bookingCode,
+        guestName: `${firstName} ${lastName}`,
+        email,
+        roomName: roomRecord.name,
+        checkin,
+        checkout,
+        nights,
+        totalPrice: roomPrice,
+        status: 'Confirmed'
+      }
+    };
+
+    if (blobStore) {
+      try {
+        await blobStore.set(idempKey, JSON.stringify(successPayload), { ttl: 86400 }); // 24h TTL
+      } catch (e) {
+        console.warn('[idempotency] Failed to cache booking result:', e.message);
+      }
+    }
+
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({
-        success: true,
-        bookingCode: bookingCode,
-        isMock: false,
-        reservation: {
-          code: bookingCode,
-          guestName: `${firstName} ${lastName}`,
-          email,
-          roomName: roomRecord.name,
-          checkin,
-          checkout,
-          nights,
-          totalPrice: roomPrice,
-          status: 'Confirmed'
-        }
-      })
+      body: JSON.stringify(successPayload)
     };
 
   } catch (error) {

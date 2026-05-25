@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { getStore } = require('@netlify/blobs');
 
 // Helper to load local .env variables if not already set (e.g. local development)
 function loadEnv() {
@@ -42,6 +43,15 @@ let sessionCache = {
 
 // In-memory simple processed transaction ID deduplicator (warm instances)
 const processedTransactionIds = new Set();
+
+// Persistent deduplication store (survives cold starts)
+let txStore;
+try {
+  txStore = getStore({ name: 'processed-transactions', consistency: 'strong' });
+} catch (e) {
+  console.warn('[dedup] Blobs unavailable, using in-memory dedup only:', e.message);
+  txStore = null;
+}
 
 // Helper to get session key from Kunas PMS
 async function getSessionKey(token, username, password) {
@@ -318,14 +328,27 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Check simple in-memory deduplication
+  // Check simple in-memory deduplication (fast path for warm instances)
   if (processedTransactionIds.has(transaction.id)) {
     console.log(`Transaction ${transaction.id} was already processed by this container. Skipping duplicate PMS insertion.`);
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({ message: 'Transaction already processed (duplicate)' })
+      body: JSON.stringify({ received: true, duplicate: true })
     };
+  }
+
+  // Check persistent store (definitive check for cold starts)
+  if (txStore) {
+    try {
+      const seen = await txStore.get(String(transaction.id));
+      if (seen) {
+        console.log(`[dedup] Transaction ${transaction.id} already processed (persistent)`);
+        return { statusCode: 200, body: JSON.stringify({ received: true, duplicate: true }) };
+      }
+    } catch (e) {
+      console.warn('[dedup] Failed to check persistent store:', e.message);
+    }
   }
 
   // Decode the reservation details from the transaction reference
@@ -339,7 +362,15 @@ exports.handler = async (event, context) => {
     };
   }
 
+  // Mark as processed in both in-memory and persistent store
   processedTransactionIds.add(transaction.id);
+  if (txStore) {
+    try {
+      await txStore.set(String(transaction.id), '1', { ttl: 86400 }); // 24h TTL
+    } catch (e) {
+      console.warn('[dedup] Failed to store transaction ID:', e.message);
+    }
+  }
 
   // Kunas Credentials from Environment
   const token = process.env.OTASYNC_TOKEN || '';
