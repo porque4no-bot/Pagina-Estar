@@ -956,6 +956,16 @@
     if (main && !main.id) main.id = 'main-content';
   }
 
+  /* ----- HERO VIDEO AUTOPLAY FALLBACK ----- */
+  function setupHeroVideoPlayback() {
+    const video = document.querySelector('.hero-media video');
+    if (!video) return;
+    const p = video.play();
+    if (p !== undefined) {
+      p.catch(() => {});
+    }
+  }
+
   /* ---------- INIT ---------- */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -972,6 +982,7 @@
       setupBookingBarScroll();
       fetchDynamicRating();
       setupNetlifyForms();
+      setupHeroVideoPlayback();
     });
   } else {
     injectSkipLink();
@@ -987,5 +998,6 @@
     setupBookingBarScroll();
     fetchDynamicRating();
     setupNetlifyForms();
+    setupHeroVideoPlayback();
   }
 })();
