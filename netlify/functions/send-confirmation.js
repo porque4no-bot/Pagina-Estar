@@ -359,7 +359,7 @@ exports.handler = async (event, context) => {
   // Check for Resend API key
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) {
-    console.log('[send-confirmation] RESEND_API_KEY not configured. Skipping email send.');
+    if (process.env.DEBUG) console.log('[send-confirmation] RESEND_API_KEY not configured. Skipping email send.');
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -427,7 +427,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    console.log(`[send-confirmation] Email sent to ${obfuscateEmail(guestEmail)} for booking ${bookingCode}. Resend ID: ${resendData.id}`);
+    if (process.env.DEBUG) console.log(`[send-confirmation] Email sent to ${obfuscateEmail(guestEmail)} for booking ${bookingCode}. Resend ID: ${resendData.id}`);
     return {
       statusCode: 200,
       headers: corsHeaders,

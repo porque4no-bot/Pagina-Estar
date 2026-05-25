@@ -49,7 +49,7 @@ let txStore;
 try {
   txStore = getStore({ name: 'processed-transactions', consistency: 'strong' });
 } catch (e) {
-  console.warn('[dedup] Blobs unavailable, using in-memory dedup only:', e.message);
+  if (process.env.DEBUG) console.warn('[dedup] Blobs unavailable, using in-memory dedup only:', e.message);
   txStore = null;
 }
 
@@ -276,7 +276,7 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({ error: 'Unauthorized. Invalid signature.' })
       };
     }
-    console.log("Wompi signature successfully verified");
+    if (process.env.DEBUG) console.log("Wompi signature successfully verified");
   } catch (sigErr) {
     console.error("Error verifying Wompi signature:", sigErr.message);
     return {
@@ -289,7 +289,7 @@ exports.handler = async (event, context) => {
   const { event: eventName, data } = body;
   
   if (eventName !== 'transaction.updated') {
-    console.log(`Ignoring unsupported Wompi event: ${eventName}`);
+    if (process.env.DEBUG) console.log(`Ignoring unsupported Wompi event: ${eventName}`);
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -306,7 +306,7 @@ exports.handler = async (event, context) => {
     };
   }
 
-  console.log(`Processing Wompi webhook: transaction.id=${transaction.id}, reference=${obfuscateReference(transaction.reference)}, status=${transaction.status}`);
+  if (process.env.DEBUG) console.log(`Processing Wompi webhook: transaction.id=${transaction.id}, reference=${obfuscateReference(transaction.reference)}, status=${transaction.status}`);
 
   if (transaction.status === 'DECLINED' || transaction.status === 'VOIDED' || transaction.status === 'ERROR') {
     const failedDecoded = decodeReference(transaction.reference);
@@ -320,7 +320,7 @@ exports.handler = async (event, context) => {
   }
 
   if (transaction.status !== 'APPROVED') {
-    console.log(`Transaction status is not APPROVED: ${transaction.status}. Skipping PMS insertion.`);
+    if (process.env.DEBUG) console.log(`Transaction status is not APPROVED: ${transaction.status}. Skipping PMS insertion.`);
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -330,7 +330,7 @@ exports.handler = async (event, context) => {
 
   // Check simple in-memory deduplication (fast path for warm instances)
   if (processedTransactionIds.has(transaction.id)) {
-    console.log(`Transaction ${transaction.id} was already processed by this container. Skipping duplicate PMS insertion.`);
+    if (process.env.DEBUG) console.log(`Transaction ${transaction.id} was already processed by this container. Skipping duplicate PMS insertion.`);
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -343,18 +343,18 @@ exports.handler = async (event, context) => {
     try {
       const seen = await txStore.get(String(transaction.id));
       if (seen) {
-        console.log(`[dedup] Transaction ${transaction.id} already processed (persistent)`);
+        if (process.env.DEBUG) console.log(`[dedup] Transaction ${transaction.id} already processed (persistent)`);
         return { statusCode: 200, body: JSON.stringify({ received: true, duplicate: true }) };
       }
     } catch (e) {
-      console.warn('[dedup] Failed to check persistent store:', e.message);
+      if (process.env.DEBUG) console.warn('[dedup] Failed to check persistent store:', e.message);
     }
   }
 
   // Decode the reservation details from the transaction reference
   const decoded = decodeReference(transaction.reference);
   if (!decoded) {
-    console.warn(`Wompi transaction reference ${obfuscateReference(transaction.reference)} is not a valid encoded reservation. Skipping PMS insertion.`);
+    if (process.env.DEBUG) console.warn(`Wompi transaction reference ${obfuscateReference(transaction.reference)} is not a valid encoded reservation. Skipping PMS insertion.`);
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -368,7 +368,7 @@ exports.handler = async (event, context) => {
     try {
       await txStore.set(String(transaction.id), '1', { ttl: 86400 }); // 24h TTL
     } catch (e) {
-      console.warn('[dedup] Failed to store transaction ID:', e.message);
+      if (process.env.DEBUG) console.warn('[dedup] Failed to store transaction ID:', e.message);
     }
   }
 
@@ -380,7 +380,7 @@ exports.handler = async (event, context) => {
 
   const hasCredentials = token && username && password;
   if (!hasCredentials) {
-    console.warn("Kunas credentials not configured. Simulating successful webhook insertion.");
+    if (process.env.DEBUG) console.warn("Kunas credentials not configured. Simulating successful webhook insertion.");
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -559,7 +559,7 @@ exports.handler = async (event, context) => {
     }
 
     const data = await response.json();
-    console.log("Kunas API webhook insertion successful, reservation ID:", data.id_reservations || decoded.bookingCode);
+    if (process.env.DEBUG) console.log("Kunas API webhook insertion successful, reservation ID:", data.id_reservations || decoded.bookingCode);
 
     return {
       statusCode: 200,

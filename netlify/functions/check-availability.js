@@ -215,6 +215,15 @@ exports.handler = async (event, context) => {
 
   // 1. MOCK DATA FALLBACK (If no credentials are set in Environment)
   if (!hasCredentials) {
+    if (process.env.NETLIFY) {
+      console.error('check-availability: OTASync credentials missing in production environment');
+      return {
+        statusCode: 503,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Service temporarily unavailable. Missing configuration.' })
+      };
+    }
+
     const mockRooms = Object.keys(roomDetails).map(id => {
       const details = roomDetails[id];
       const totalPrice = details.basePrice * nights;
