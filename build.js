@@ -17,6 +17,8 @@ function copyFolderSync(from, to) {
   fs.readdirSync(from).forEach(element => {
     const srcPath = path.join(from, element);
     const destPath = path.join(to, element);
+    // Skip drive_downloads directory
+    if (srcPath.includes('drive_downloads')) return false;
     const stat = fs.lstatSync(srcPath);
     if (stat.isFile()) {
       fs.copyFileSync(srcPath, destPath);
@@ -43,10 +45,8 @@ foldersToCopy.forEach(folder => {
   copyFolderSync(src, dest);
 });
 
-// Copy specific files
+// Copy specific non-CSS files
 const filesToCopy = [
-  'styles.css',
-  'colors_and_type.css',
   'shell.js',
   'kunas.js',
   'rooms_db.json',
@@ -64,16 +64,31 @@ fs.readdirSync(rootDir).forEach(file => {
   }
 });
 
-console.log('Compiling motor-app.jsx with esbuild...');
+async function build() {
+  // Minify CSS files with esbuild
+  console.log('Minifying CSS files...');
+  const cssFiles = ['styles.css', 'colors_and_type.css'];
+  for (const cssFile of cssFiles) {
+    const css = fs.readFileSync(path.join(rootDir, cssFile), 'utf8');
+    const result = await esbuild.transform(css, { loader: 'css', minify: true });
+    fs.writeFileSync(path.join(distDir, cssFile), result.code);
+  }
 
-try {
-  esbuild.buildSync({
-    entryPoints: [path.join(rootDir, 'motor-app.jsx')],
-    outfile: path.join(distDir, 'motor-app.js'),
-    minify: true,
-  });
-  console.log('Build completed successfully.');
-} catch (error) {
-  console.error('Esbuild compilation failed:', error);
-  process.exit(1);
+  console.log('Compiling motor-app.jsx with esbuild...');
+  try {
+    await esbuild.build({
+      entryPoints: [path.join(rootDir, 'motor-app.jsx')],
+      outfile: path.join(distDir, 'motor-app.js'),
+      minify: true,
+    });
+    console.log('Build completed successfully.');
+  } catch (error) {
+    console.error('Esbuild compilation failed:', error);
+    process.exit(1);
+  }
 }
+
+build().catch(err => {
+  console.error('Build failed:', err);
+  process.exit(1);
+});
