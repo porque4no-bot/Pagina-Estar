@@ -33,6 +33,9 @@ function loadEnv() {
 
 loadEnv();
 
+// In-memory rate limiter: max 10 requests per IP per minute
+const availRateLimit = new Map(); // ip -> [timestamps]
+
 // In-memory cache for the authentication session key (pkey)
 let sessionCache = {
   pkey: null,
@@ -111,6 +114,36 @@ exports.handler = async (event, context) => {
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders, body: '' };
+  }
+
+  // Rate limiting: max 10 requests per IP per minute
+  const clientIp = event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+                   event.headers['x-nf-client-connection-ip'] || 'unknown';
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 minute
+  const maxRequests = 10;
+
+  const timestamps = (availRateLimit.get(clientIp) || []).filter(t => now - t < windowMs);
+  if (timestamps.length >= maxRequests) {
+    return {
+      statusCode: 429,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': '60',
+        'X-RateLimit-Limit': String(maxRequests),
+        'X-RateLimit-Remaining': '0'
+      },
+      body: JSON.stringify({ error: 'Rate limit exceeded. Please try again in a minute.' })
+    };
+  }
+  timestamps.push(now);
+  availRateLimit.set(clientIp, timestamps);
+
+  // Cleanup stale entries
+  if (availRateLimit.size > 1000) {
+    for (const [ip, ts] of availRateLimit) {
+      if (ts.every(t => now - t > windowMs)) availRateLimit.delete(ip);
+    }
   }
 
   // Parse parameters (supports both query string and POST body)

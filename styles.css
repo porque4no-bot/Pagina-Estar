@@ -2424,6 +2424,7 @@ body[data-cinemagraph="off"] .cinemagraph .stars { animation: none; }
 
 /* ---------- VOICE COPY VARIANTS ---------- */
 .voice-only { display: none; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 body[data-voice="susurro"]      .voice-susurro      { display: contents; }
 body[data-voice="conversacion"] .voice-conversacion { display: contents; }
 body[data-voice="manifiesto"]   .voice-manifiesto   { display: contents; }
@@ -4995,10 +4996,9 @@ html[lang="en"] .lang-es { display: none !important; }
   .site-header .book-btn { display: inline-flex; padding: 7px 10px; font-size: 10px; }
   .site-header .header-actions { gap: 8px; }
 
-  /* ── Video hero: en móvil se oculta el video y se muestra el frame
-     poster como imagen estática. Chrome Android bloquea capturas de
-     pantalla cuando detecta un <video> activo (protección DRM). ── */
-  .hero-media video { display: none; }
+  /* ── Video hero en móvil: se mantiene visible. El bloqueo de
+     pantallazos de Chrome Android solo aplica a videos con DRM;
+     este MP4 es contenido libre, los pantallazos funcionan normal. ── */
   .hero-media { background: url('assets/photos/hero_first_frame.webp') center/cover no-repeat; }
 
   /* ── Carousel: pan-x pan-y permite swipe horizontal en el carrusel
@@ -5315,4 +5315,5 @@ textarea:focus-visible,
   outline: 2px solid var(--color-terracotta, #B85A47);
   outline-offset: 3px;
 }
+
 
