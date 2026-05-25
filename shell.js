@@ -371,9 +371,29 @@
       const k = el.getAttribute('data-i18n');
       if (i18n[lang] && i18n[lang][k]) el.textContent = i18n[lang][k];
     });
+    // [data-i18n-html] uses innerHTML only for keys whose values are trusted static HTML
+    // defined in this file — never user-supplied content. Safe keys:
+    //   footer_desc   — contains <span class="serif-italic">
+    //   map_title     — contains <span class="serif-italic">
+    //   loc_title     — contains <span class="serif-italic">
+    //   form_politica — contains <a href="privacidad.html"> (internal link)
+    //   form_enviar   — contains <span aria-hidden="true">
+    //   privacy_agreement — contains <a href="privacidad.html"> (internal link)
+    // Keys that contain plain text must use [data-i18n] (textContent) instead.
+    const SAFE_HTML_KEYS = new Set([
+      'footer_desc', 'map_title', 'loc_title',
+      'form_politica', 'form_enviar', 'privacy_agreement'
+    ]);
     document.querySelectorAll('[data-i18n-html]').forEach((el) => {
       const k = el.getAttribute('data-i18n-html');
-      if (i18n[lang] && i18n[lang][k]) el.innerHTML = i18n[lang][k];
+      if (i18n[lang] && i18n[lang][k]) {
+        if (SAFE_HTML_KEYS.has(k)) {
+          el.innerHTML = i18n[lang][k];
+        } else {
+          // Key not in safe list — fall back to textContent to avoid XSS
+          el.textContent = i18n[lang][k];
+        }
+      }
     });
     document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
       const k = el.getAttribute('data-i18n-placeholder');
