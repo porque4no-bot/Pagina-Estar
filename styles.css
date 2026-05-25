@@ -3544,9 +3544,9 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
 
 /* Dropdown Menu Container */
 .contact-menu {
-  position: absolute;
-  bottom: 80px;
-  right: 0;
+  position: fixed;
+  bottom: 104px; /* 24px (float) + 80px — viewport-relative to avoid overflow */
+  right: 24px;
   width: 290px;
   background-color: color-mix(in srgb, var(--paper) 92%, transparent);
   backdrop-filter: blur(16px);
@@ -3733,8 +3733,9 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
   }
   
   .contact-menu {
-    bottom: 60px;
-    width: 260px;
+    bottom: 80px; /* 20px (float mobile) + 60px */
+    right: 20px;
+    width: min(260px, calc(100vw - 40px));
   }
   
   .contact-menu-header {
@@ -5066,6 +5067,7 @@ html[lang="en"] .lang-es { display: none !important; }
 
   /* Contact float: lift above the floating bar */
   body[data-booking] .contact-float { bottom: 96px; }
+  body[data-booking] .contact-menu  { bottom: 156px; } /* 96px + 60px */
 
   /* ── FORM CARD (empresas, grupos, vivir) ── */
   .form-card {
