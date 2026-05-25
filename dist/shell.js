@@ -733,8 +733,23 @@
     if (!sessionStorage.getItem('estar-contact-seen')) {
       const tooltip = document.createElement('div');
       tooltip.className = 'contact-tooltip';
-      tooltip.innerHTML = '<span class="lang-es">¿Te podemos ayudar?</span><span class="lang-en">Can we help you?</span>';
-      contactFloat.appendChild(tooltip);
+      tooltip.innerHTML = `
+        <span><span class="lang-es">¿Te podemos ayudar?</span><span class="lang-en">Can we help you?</span></span>
+        <button class="contact-tooltip-close" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      `;
+      document.body.appendChild(tooltip);
+
+      const dismissTooltip = () => {
+        tooltip.classList.remove('visible');
+        setTimeout(() => { if (tooltip.parentNode) tooltip.remove(); }, 400);
+      };
+
+      tooltip.querySelector('.contact-tooltip-close').addEventListener('click', (e) => {
+        e.stopPropagation();
+        dismissTooltip();
+      });
 
       setTimeout(() => {
         // Bounce the button
@@ -747,18 +762,12 @@
         tooltip.classList.add('visible');
         sessionStorage.setItem('estar-contact-seen', '1');
 
-        // Auto-hide tooltip after 5 s
-        setTimeout(() => {
-          tooltip.classList.remove('visible');
-          setTimeout(() => { if (tooltip.parentNode) tooltip.remove(); }, 400);
-        }, 5000);
+        // Auto-hide tooltip after 8 s
+        setTimeout(dismissTooltip, 8000);
       }, 4000);
 
       // Hide tooltip immediately if user opens the menu
-      trigger.addEventListener('click', () => {
-        tooltip.classList.remove('visible');
-        setTimeout(() => { if (tooltip.parentNode) tooltip.remove(); }, 400);
-      }, { once: true });
+      trigger.addEventListener('click', dismissTooltip, { once: true });
     }
   }
 
@@ -956,6 +965,16 @@
     if (main && !main.id) main.id = 'main-content';
   }
 
+  /* ----- HERO VIDEO AUTOPLAY FALLBACK ----- */
+  function setupHeroVideoPlayback() {
+    const video = document.querySelector('.hero-media video');
+    if (!video) return;
+    const p = video.play();
+    if (p !== undefined) {
+      p.catch(() => {});
+    }
+  }
+
   /* ---------- INIT ---------- */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -972,6 +991,7 @@
       setupBookingBarScroll();
       fetchDynamicRating();
       setupNetlifyForms();
+      setupHeroVideoPlayback();
     });
   } else {
     injectSkipLink();
@@ -987,5 +1007,6 @@
     setupBookingBarScroll();
     fetchDynamicRating();
     setupNetlifyForms();
+    setupHeroVideoPlayback();
   }
 })();
