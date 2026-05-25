@@ -33,6 +33,9 @@ function loadEnv() {
 
 loadEnv();
 
+// In-memory rate limiter: max 15 requests per IP per minute
+const getBookingRateLimit = new Map(); // ip -> [timestamps]
+
 // In-memory cache for the authentication session key (pkey), matching check-availability.js pattern
 let sessionCache = {
   pkey: null,
@@ -150,6 +153,36 @@ exports.handler = async (event, context) => {
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders, body: '' };
+  }
+
+  // Rate limiting: max 15 requests per IP per minute
+  const clientIp = event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+                   event.headers['x-nf-client-connection-ip'] || 'unknown';
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 minute
+  const maxRequests = 15;
+
+  const timestamps = (getBookingRateLimit.get(clientIp) || []).filter(t => now - t < windowMs);
+  if (timestamps.length >= maxRequests) {
+    return {
+      statusCode: 429,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': '60',
+        'X-RateLimit-Limit': String(maxRequests),
+        'X-RateLimit-Remaining': '0'
+      },
+      body: JSON.stringify({ error: 'Rate limit exceeded. Please try again in a minute.' })
+    };
+  }
+  timestamps.push(now);
+  getBookingRateLimit.set(clientIp, timestamps);
+
+  // Cleanup stale entries
+  if (getBookingRateLimit.size > 1000) {
+    for (const [ip, ts] of getBookingRateLimit) {
+      if (ts.every(t => now - t > windowMs)) getBookingRateLimit.delete(ip);
+    }
   }
 
   if (event.httpMethod !== 'GET') {
