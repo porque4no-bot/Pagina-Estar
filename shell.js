@@ -7,6 +7,9 @@
    ============================================================ */
 
 (function () {
+  /* ----- SITE-WIDE CONSTANTS ----- */
+  const WHATSAPP_NUMBER = '573102490414'; // Change here to update all floating WhatsApp buttons
+
   /* ----- HEADER SCROLL ----- */
   const header = document.querySelector('.site-header');
   if (header) {
@@ -719,6 +722,12 @@
   function setupContactFloat() {
     const contactFloat = document.getElementById('contactFloat');
     if (!contactFloat) return;
+
+    // Dynamically set WhatsApp href from the central WHATSAPP_NUMBER constant
+    const waUrl = `https://api.whatsapp.com/send/?phone=${WHATSAPP_NUMBER}&text&type=phone_number&app_absent=0`;
+    contactFloat.querySelectorAll('.ci-whatsapp').forEach((el) => {
+      el.href = waUrl;
+    });
 
     const trigger = contactFloat.querySelector('.contact-trigger');
     if (!trigger) return;
