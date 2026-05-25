@@ -49,17 +49,30 @@ async function getSessionKey(token, username, password) {
     return sessionCache.pkey;
   }
 
-  const response = await fetch('https://app.otasync.me/api/user/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token, username, password, remember: 0 })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Authentication failed with status ${response.status}`);
+  const authController = new AbortController();
+  const authTimeoutId = setTimeout(() => authController.abort(), 10000);
+  let authResponse;
+  try {
+    authResponse = await fetch('https://app.otasync.me/api/user/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, username, password, remember: 0 }),
+      signal: authController.signal
+    });
+    clearTimeout(authTimeoutId);
+  } catch (err) {
+    clearTimeout(authTimeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Request timeout during authentication');
+    }
+    throw err;
   }
 
-  const data = await response.json();
+  if (!authResponse.ok) {
+    throw new Error(`Authentication failed with status ${authResponse.status}`);
+  }
+
+  const data = await authResponse.json();
   if (!data.pkey) {
     throw new Error('Authentication response did not contain a session key (pkey)');
   }
@@ -205,11 +218,24 @@ exports.handler = async (event, context) => {
     };
 
     // TODO: confirmar endpoint de búsqueda con Kunas
-    const response = await fetch('https://app.otasync.me/api/reservation/get/reservation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(searchPayload)
-    });
+    const getController = new AbortController();
+    const getTimeoutId = setTimeout(() => getController.abort(), 10000);
+    let response;
+    try {
+      response = await fetch('https://app.otasync.me/api/reservation/get/reservation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(searchPayload),
+        signal: getController.signal
+      });
+      clearTimeout(getTimeoutId);
+    } catch (err) {
+      clearTimeout(getTimeoutId);
+      if (err.name === 'AbortError') {
+        return { statusCode: 504, body: JSON.stringify({ error: 'Request timeout' }) };
+      }
+      throw err;
+    }
 
     // If the PMS returns 404 or a similar "not found" status
     if (response.status === 404) {

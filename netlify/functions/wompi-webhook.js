@@ -50,17 +50,30 @@ async function getSessionKey(token, username, password) {
     return sessionCache.pkey;
   }
 
-  const response = await fetch('https://app.otasync.me/api/user/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token, username, password, remember: 0 })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Authentication failed with status ${response.status}`);
+  const authController = new AbortController();
+  const authTimeoutId = setTimeout(() => authController.abort(), 10000);
+  let authResponse;
+  try {
+    authResponse = await fetch('https://app.otasync.me/api/user/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, username, password, remember: 0 }),
+      signal: authController.signal
+    });
+    clearTimeout(authTimeoutId);
+  } catch (err) {
+    clearTimeout(authTimeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Request timeout during authentication');
+    }
+    throw err;
   }
 
-  const data = await response.json();
+  if (!authResponse.ok) {
+    throw new Error(`Authentication failed with status ${authResponse.status}`);
+  }
+
+  const data = await authResponse.json();
   if (!data.pkey) {
     throw new Error('Authentication response did not contain a session key (pkey)');
   }
@@ -175,6 +188,11 @@ exports.handler = async (event, context) => {
     };
   }
 
+  const MAX_BODY_SIZE = 10000; // 10 KB
+  if (event.body && event.body.length > MAX_BODY_SIZE) {
+    return { statusCode: 413, body: JSON.stringify({ error: 'Payload too large' }) };
+  }
+
   let body;
   try {
     body = JSON.parse(event.body);
@@ -209,9 +227,21 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    const ALLOWED_SIGNATURE_PROPERTIES = [
+      'transaction.id',
+      'transaction.status',
+      'transaction.amount_in_cents',
+      'transaction.currency',
+      'transaction.payment_method_type',
+      'transaction.reference'
+    ];
     const properties = body.signature.properties;
     let dataToSign = "";
     properties.forEach(prop => {
+      if (!ALLOWED_SIGNATURE_PROPERTIES.includes(prop)) {
+        console.error(`Unexpected signature property: ${prop}`);
+        return; // skip unknown properties
+      }
       const keys = prop.split('.');
       let value = body.data;
       keys.forEach(k => {
@@ -474,11 +504,24 @@ exports.handler = async (event, context) => {
       note: `Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${mustPayIva ? 'POR COBRAR EN HOTEL (' + Math.round(paidAmount * 0.19) + ')' : 'EXENTO'}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
     };
 
-    const response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(reservationPayload)
-    });
+    const insertController = new AbortController();
+    const insertTimeoutId = setTimeout(() => insertController.abort(), 10000);
+    let response;
+    try {
+      response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reservationPayload),
+        signal: insertController.signal
+      });
+      clearTimeout(insertTimeoutId);
+    } catch (err) {
+      clearTimeout(insertTimeoutId);
+      if (err.name === 'AbortError') {
+        return { statusCode: 504, body: JSON.stringify({ error: 'Request timeout' }) };
+      }
+      throw err;
+    }
 
     if (!response.ok) {
       throw new Error(`Kunas API booking submission returned status ${response.status}`);
