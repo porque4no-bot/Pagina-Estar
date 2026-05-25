@@ -42,6 +42,8 @@ Three JavaScript files load on most pages:
 
 Pages use `.lang-es` / `.lang-en` HTML elements toggled by `shell.js`. `motor-app.jsx` has a full `i18nEngine` dictionary for both languages.
 
+**Any text change must be mirrored in both languages.** In HTML pages, update both the `.lang-es` and `.lang-en` elements. In `motor-app.jsx`, update both the `es` and `en` keys inside `i18nEngine`.
+
 ### Room data
 
 `rooms_db.json` is the canonical source of room metadata. Keys are OTASync room type IDs:
