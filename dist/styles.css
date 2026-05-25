@@ -1173,6 +1173,53 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   margin-left: 4px;
 }
 
+/* ---------- ROOM INLINE PRICE GRID (vivir.html) ---------- */
+.room-price-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--paper-400);
+  border: 1px solid var(--paper-400);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 14px 0 0;
+}
+.rpg-cell {
+  background: var(--paper);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rpg-cell.rpg-featured {
+  background: var(--olive);
+  color: var(--paper);
+}
+.rpg-dur {
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+.rpg-featured .rpg-dur { color: rgba(250,246,239,0.72); }
+.rpg-amt {
+  font-family: var(--font-heading);
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.rpg-per {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 9px;
+  color: var(--ink-500);
+  line-height: 1.3;
+}
+.rpg-featured .rpg-per { color: rgba(250,246,239,0.65); }
+
 /* ---------- ROOM SLIDER ---------- */
 .room-media.slider-active {
   cursor: default; /* Allow buttons and swipes to work without confusing custom cursors */
@@ -3430,15 +3477,14 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
 
 /* Tooltip "¿Te podemos ayudar?" */
 .contact-tooltip {
-  position: absolute;
-  right: 76px;
-  bottom: 50%;
-  transform: translateY(50%) translateX(10px);
+  position: fixed;
+  right: 100px;
+  bottom: 40px;
+  transform: translateX(10px);
   background-color: var(--ink);
   color: var(--white);
-  padding: 9px 16px;
+  padding: 10px 14px 10px 16px;
   border-radius: 20px;
-  white-space: nowrap;
   font-family: var(--font-body);
   font-size: 13px;
   letter-spacing: 0.01em;
@@ -3446,6 +3492,11 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.35s ease, transform 0.35s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 120px);
+  white-space: nowrap;
 }
 .contact-tooltip::after {
   content: '';
@@ -3461,7 +3512,39 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
 }
 .contact-tooltip.visible {
   opacity: 1;
-  transform: translateY(50%) translateX(0);
+  transform: translateX(0);
+  pointer-events: auto;
+}
+.contact-tooltip-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.15);
+  border: none;
+  border-radius: 50%;
+  color: var(--white);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s;
+}
+.contact-tooltip-close:hover {
+  background: rgba(255,255,255,0.3);
+}
+.contact-tooltip-close svg {
+  width: 12px;
+  height: 12px;
+}
+@media (max-width: 600px) {
+  .contact-tooltip {
+    right: 88px;
+    bottom: 30px;
+    font-size: 12px;
+    padding: 8px 10px 8px 14px;
+    max-width: calc(100vw - 108px);
+  }
 }
 
 .contact-icon {
@@ -3497,9 +3580,9 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
 
 /* Dropdown Menu Container */
 .contact-menu {
-  position: absolute;
-  bottom: 80px;
-  right: 0;
+  position: fixed;
+  bottom: 104px; /* 24px (float) + 80px — viewport-relative to avoid overflow */
+  right: 24px;
   width: 290px;
   background-color: color-mix(in srgb, var(--paper) 92%, transparent);
   backdrop-filter: blur(16px);
@@ -3519,8 +3602,7 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
   transition-delay: 0.8s;
 }
 
-/* Show menu on hover or active class */
-.contact-float:hover .contact-menu,
+/* Show menu only when active (click-toggled) */
 .contact-float.active .contact-menu {
   opacity: 1;
   visibility: visible;
@@ -3675,10 +3757,7 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
     transform: none; /* Desactivar scale hover en móviles */
   }
 
-  .contact-tooltip {
-    font-size: 12px;
-    padding: 8px 14px;
-  }
+
 
   .contact-icon {
     width: 20px;
@@ -3686,8 +3765,9 @@ body[data-texture="sello"] .site-footer > * { position: relative; z-index: 1; }
   }
   
   .contact-menu {
-    bottom: 60px;
-    width: 260px;
+    bottom: 80px; /* 20px (float mobile) + 60px */
+    right: 20px;
+    width: min(260px, calc(100vw - 40px));
   }
   
   .contact-menu-header {
@@ -4905,9 +4985,10 @@ html[lang="en"] .lang-es { display: none !important; }
     word-break: break-word;
   }
 
-  /* ── Header: ocultar botón Reservar — en móvil ya existe la barra
-     flotante de reserva, así el logo + estrella + hamburguesa caben ── */
-  .site-header .book-btn { display: none; }
+  /* ── Header móvil: ocultar estrella, mantener logo + idioma + reservar + hamburguesa ── */
+  .site-header .brand .star-mark { display: none; }
+  .site-header .book-btn { display: inline-flex; padding: 7px 10px; font-size: 10px; }
+  .site-header .header-actions { gap: 8px; }
 
   /* ── Video hero: en móvil se oculta el video y se muestra el frame
      poster como imagen estática. Chrome Android bloquea capturas de
@@ -4922,6 +5003,25 @@ html[lang="en"] .lang-es { display: none !important; }
   /* ── Pricing tiers 2×2 compact on mobile ── */
   .tier { padding: 20px 14px; gap: 8px; }
   .tier .amount { font-size: clamp(17px, 4.5vw, 32px); }
+
+  /* ── Value-grid (vivir.html — "Cómo funciona"): compactar celdas ── */
+  .value-cell { padding: 20px 24px; gap: 10px; }
+  .value-cell h4 { font-size: 18px; }
+  .value-cell p { font-size: 14px; line-height: 1.5; }
+
+  /* ── Tarifas móvil: precios ya en cada tarjeta → ocultar tabla separada ── */
+  #tarifas .tier-table { display: none; }
+  #tarifas .container > p.body { display: none; }
+  /* Carrusel contenido dentro del container (sin sangría negativa).
+     Container inner = 100vw − 48px. Card = 100vw − 88px.
+     Padding = (container − card) / 2 = 20px → margen igual a cada lado. */
+  #tarifas .room-list {
+    gap: 12px;
+    padding-left: 20px;
+    padding-right: 20px;
+    scroll-padding-left: 20px;
+  }
+  #tarifas .room-list .room { width: calc(100vw - 88px); }
 
   /* ── SPLIT blocks (text + image) ── */
   .split { gap: 36px; }
@@ -4999,6 +5099,7 @@ html[lang="en"] .lang-es { display: none !important; }
 
   /* Contact float: lift above the floating bar */
   body[data-booking] .contact-float { bottom: 96px; }
+  body[data-booking] .contact-menu  { bottom: 156px; } /* 96px + 60px */
 
   /* ── FORM CARD (empresas, grupos, vivir) ── */
   .form-card {
