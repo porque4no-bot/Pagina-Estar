@@ -759,7 +759,13 @@ const KUNAS_CONFIG = {
     checkoutInput.addEventListener('change', updateDisplayValues);
   }
 
+  // Whitelist of valid room slugs — prevents open-redirect via data-room attribute manipulation
+  const VALID_ROOMS = ['clasica', 'seleccion', 'reserva', 'origen', 'especial'];
+
   function openBookingEngine(checkin, checkout, guests, preselectedRoomType = '') {
+    if (preselectedRoomType && !VALID_ROOMS.includes(preselectedRoomType)) {
+      preselectedRoomType = '';
+    }
     let url = `reservar.html?checkin=${checkin}&checkout=${checkout}&guests=${guests}`;
     if (preselectedRoomType) {
       url += `&room=${preselectedRoomType}`;

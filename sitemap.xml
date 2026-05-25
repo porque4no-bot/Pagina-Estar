@@ -19,4 +19,23 @@
   <url><loc>https://estar.com.co/cookies.html</loc><lastmod>2026-05-24</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://estar.com.co/cancelacion.html</loc><lastmod>2026-05-24</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://estar.com.co/aviso-legal.html</loc><lastmod>2026-05-24</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <!-- English pages -->
+  <url><loc>https://estar.com.co/en/index.html</loc><lastmod>2026-05-25</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://estar.com.co/en/vivir.html</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://estar.com.co/en/empresas.html</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://estar.com.co/en/grupos.html</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.65</priority></url>
+  <url><loc>https://estar.com.co/en/explora.html</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.65</priority></url>
+  <url><loc>https://estar.com.co/en/origen.html</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://estar.com.co/en/especial.html</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://estar.com.co/en/clasica.html</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://estar.com.co/en/seleccion.html</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://estar.com.co/en/trabaja.html</loc><lastmod>2026-05-25</lastmod><changefreq>weekly</changefreq><priority>0.55</priority></url>
+  <url><loc>https://estar.com.co/en/faq.html</loc><lastmod>2026-05-25</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://estar.com.co/en/contacto.html</loc><lastmod>2026-05-25</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://estar.com.co/en/escnna.html</loc><lastmod>2026-05-25</lastmod><changefreq>monthly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://estar.com.co/en/reserva.html</loc><lastmod>2026-05-25</lastmod><changefreq>monthly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://estar.com.co/en/privacidad.html</loc><lastmod>2026-05-25</lastmod><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://estar.com.co/en/cookies.html</loc><lastmod>2026-05-25</lastmod><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://estar.com.co/en/cancelacion.html</loc><lastmod>2026-05-25</lastmod><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://estar.com.co/en/aviso-legal.html</loc><lastmod>2026-05-25</lastmod><changefreq>yearly</changefreq><priority>0.2</priority></url>
 </urlset>

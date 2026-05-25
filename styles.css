@@ -992,6 +992,11 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   .room-list-btn {
     display: none;
   }
+
+  .be-summary-col {
+    display: block;
+    width: 100%;
+  }
 }
 
 .room-list {
@@ -5280,17 +5285,16 @@ html[lang="en"] .lang-es { display: none !important; }
 /* ── Accesibilidad: Skip Link ─────────────────────────── */
 .skip-link {
   position: absolute;
-  top: -100%;
-  left: 1rem;
+  top: -40px;
+  left: 0;
+  background: var(--ink, #1a1a1a);
+  color: var(--white, #fff);
+  padding: var(--space-2) var(--space-3);
   z-index: 9999;
-  padding: 0.5rem 1rem;
-  background: var(--color-charcoal, #1a1a1a);
-  color: #fff;
   font-size: 0.875rem;
-  font-weight: 600;
-  border-radius: 0 0 4px 4px;
   text-decoration: none;
-  transition: top 0.2s;
+  border-radius: 0 0 4px 0;
+  transition: top 0.15s;
 }
 .skip-link:focus {
   top: 0;

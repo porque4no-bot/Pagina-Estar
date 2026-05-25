@@ -55,11 +55,24 @@ async function getSessionKey(token, username, password) {
   }
 
   sessionCache.promise = (async () => {
-    const response = await fetch('https://app.otasync.me/api/user/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, username, password, remember: 0 })
-    });
+    const authController = new AbortController();
+    const authTimeoutId = setTimeout(() => authController.abort(), 10000);
+    let response;
+    try {
+      response = await fetch('https://app.otasync.me/api/user/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, username, password, remember: 0 }),
+        signal: authController.signal
+      });
+      clearTimeout(authTimeoutId);
+    } catch (err) {
+      clearTimeout(authTimeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('Request timeout during authentication');
+      }
+      throw err;
+    }
 
     if (!response.ok) {
       throw new Error(`Authentication failed with status ${response.status}`);
@@ -154,6 +167,11 @@ exports.handler = async (event, context) => {
     };
   }
 
+  const MAX_BODY_SIZE = 10000; // 10 KB
+  if (event.body && event.body.length > MAX_BODY_SIZE) {
+    return { statusCode: 413, body: JSON.stringify({ error: 'Payload too large' }) };
+  }
+
   let body;
   try {
     body = JSON.parse(event.body);
@@ -191,11 +209,11 @@ exports.handler = async (event, context) => {
   }
 
   // Email format validation
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email) || email.length > 254) {
     return {
       statusCode: 400,
       headers: corsHeaders,
-      body: JSON.stringify({ error: 'Invalid email address format' })
+      body: JSON.stringify({ error: 'Invalid email address' })
     };
   }
 
@@ -209,23 +227,15 @@ exports.handler = async (event, context) => {
   }
 
   // Server-side pricing: always compute from rooms_db, never trust client-provided price
-  let roomsDb = {};
-  try {
-    const dbPath = path.join(__dirname, '../../rooms_db.json');
-    if (fs.existsSync(dbPath)) {
-      roomsDb = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-    }
-  } catch (dbErr) {
-    console.error('Failed to load rooms_db.json:', dbErr.message);
-  }
-  const roomRecord = roomsDb[roomTypeId];
-  if (!roomRecord) {
+  const roomsDb = JSON.parse(fs.readFileSync(path.join(__dirname, '../../rooms_db.json'), 'utf8'));
+  if (!Object.keys(roomsDb).includes(String(roomTypeId))) {
     return {
       statusCode: 400,
       headers: corsHeaders,
-      body: JSON.stringify({ error: 'Invalid roomTypeId' })
+      body: JSON.stringify({ error: 'Invalid room type' })
     };
   }
+  const roomRecord = roomsDb[roomTypeId];
 
   // Calculate nights
   const checkinDate = new Date(checkin);
@@ -382,11 +392,24 @@ exports.handler = async (event, context) => {
       note: `Teléfono: ${phone.replace(/[^\d+\s]/g, '').trim().substring(0, 20)}. Notas: ${(notes || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0, 500) || 'Ninguna'}`
     };
 
-    const response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(reservationPayload)
-    });
+    const insertController = new AbortController();
+    const insertTimeoutId = setTimeout(() => insertController.abort(), 10000);
+    let response;
+    try {
+      response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reservationPayload),
+        signal: insertController.signal
+      });
+      clearTimeout(insertTimeoutId);
+    } catch (err) {
+      clearTimeout(insertTimeoutId);
+      if (err.name === 'AbortError') {
+        return { statusCode: 504, body: JSON.stringify({ error: 'Request timeout' }) };
+      }
+      throw err;
+    }
 
     if (!response.ok) {
       throw new Error(`Kunas API booking submission returned status ${response.status}`);

@@ -318,6 +318,11 @@ exports.handler = async (event, context) => {
     };
   }
 
+  const MAX_BODY_SIZE = 10000; // 10 KB
+  if (event.body && event.body.length > MAX_BODY_SIZE) {
+    return { statusCode: 413, body: JSON.stringify({ error: 'Payload too large' }) };
+  }
+
   let body;
   try {
     body = JSON.parse(event.body);
@@ -380,20 +385,33 @@ exports.handler = async (event, context) => {
 
   // Send via Resend API
   try {
-    const resendResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        // TODO: Replace 'reservas@estar.com.co' with the verified sender domain in Resend
-        from: 'Estar Manizales <reservas@estar.com.co>',
-        to: guestEmail,
-        subject: `Confirmación de reserva ${bookingCode} — Estar Manizales`,
-        html: emailHtml
-      })
-    });
+    const resendController = new AbortController();
+    const resendTimeoutId = setTimeout(() => resendController.abort(), 10000);
+    let resendResponse;
+    try {
+      resendResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          // TODO: Replace 'reservas@estar.com.co' with the verified sender domain in Resend
+          from: 'Estar Manizales <reservas@estar.com.co>',
+          to: guestEmail,
+          subject: `Confirmación de reserva ${bookingCode} — Estar Manizales`,
+          html: emailHtml
+        }),
+        signal: resendController.signal
+      });
+      clearTimeout(resendTimeoutId);
+    } catch (err) {
+      clearTimeout(resendTimeoutId);
+      if (err.name === 'AbortError') {
+        return { statusCode: 504, body: JSON.stringify({ error: 'Request timeout' }) };
+      }
+      throw err;
+    }
 
     const resendData = await resendResponse.json();
 

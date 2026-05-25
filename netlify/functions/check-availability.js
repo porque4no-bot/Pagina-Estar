@@ -56,11 +56,24 @@ async function getSessionKey(token, username, password) {
   }
 
   sessionCache.promise = (async () => {
-    const response = await fetch('https://app.otasync.me/api/user/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, username, password, remember: 0 })
-    });
+    const authController = new AbortController();
+    const authTimeoutId = setTimeout(() => authController.abort(), 10000);
+    let response;
+    try {
+      response = await fetch('https://app.otasync.me/api/user/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, username, password, remember: 0 }),
+        signal: authController.signal
+      });
+      clearTimeout(authTimeoutId);
+    } catch (err) {
+      clearTimeout(authTimeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('Request timeout during authentication');
+      }
+      throw err;
+    }
 
     if (!response.ok) {
       throw new Error(`Authentication failed with status ${response.status}`);
@@ -106,6 +119,10 @@ exports.handler = async (event, context) => {
   let guests = 1;
 
   if (event.httpMethod === 'POST' && event.body) {
+    const MAX_BODY_SIZE = 10000; // 10 KB
+    if (event.body && event.body.length > MAX_BODY_SIZE) {
+      return { statusCode: 413, body: JSON.stringify({ error: 'Payload too large' }) };
+    }
     try {
       const body = JSON.parse(event.body);
       checkin = body.checkin;
@@ -128,6 +145,14 @@ exports.handler = async (event, context) => {
       headers: corsHeaders,
       body: JSON.stringify({ error: 'Missing checkin or checkout parameters' })
     };
+  }
+
+  if (new Date(checkin) >= new Date(checkout)) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Check-in must be before check-out' }) };
+  }
+
+  if (guests < 1 || guests > 10) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Guests must be between 1 and 10' }) };
   }
 
   // Calculate number of nights
@@ -225,11 +250,24 @@ exports.handler = async (event, context) => {
       id_properties: propertyId
     };
 
-    const response = await fetch('https://app.otasync.me/api/engine/data/getRooms', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    const getRoomsController = new AbortController();
+    const getRoomsTimeoutId = setTimeout(() => getRoomsController.abort(), 10000);
+    let response;
+    try {
+      response = await fetch('https://app.otasync.me/api/engine/data/getRooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: getRoomsController.signal
+      });
+      clearTimeout(getRoomsTimeoutId);
+    } catch (err) {
+      clearTimeout(getRoomsTimeoutId);
+      if (err.name === 'AbortError') {
+        return { statusCode: 504, body: JSON.stringify({ error: 'Request timeout' }) };
+      }
+      throw err;
+    }
 
     if (!response.ok) {
       throw new Error(`Kunas API returned status ${response.status}`);

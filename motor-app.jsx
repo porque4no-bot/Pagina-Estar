@@ -666,6 +666,9 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
           </span>
           <span className="be-room-total">{formatCOP(activePrice * nights)} <span>{t.plusTax}</span></span>
         </div>
+        <p style={{ fontSize: 11, color: 'var(--ink-300)', fontStyle: 'italic', margin: '4px 0 8px 0', lineHeight: 1.4 }}>
+          {lang === 'es' ? '* IVA (19%) se cobra en el hotel' : '* VAT (19%) collected at hotel'}
+        </p>
         {isAvailable ? (
           <button className="be-btn-primary be-room-select-btn" onClick={() => onSelect(room, rate)}>
             {t.selectBtn}
@@ -851,6 +854,17 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
         return;
       }
 
+      const wompiKey = window.WOMPI_PUBLIC_KEY;
+      if (!wompiKey) {
+        console.error('[PaymentPanel] WOMPI_PUBLIC_KEY is not set. Payment cannot be initialized.');
+        setPaymentError(
+          lang === 'es'
+            ? 'La llave pública de Wompi no está configurada. Por favor recarga la página o contáctanos.'
+            : 'Wompi public key is not configured. Please refresh the page or contact us.'
+        );
+        return;
+      }
+
       setLoading(true);
       const code = genCode();
 
@@ -889,7 +903,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
         currency: 'COP',
         amountInCents: Math.round(calc.subtotal * 100),
         reference: encodedRef,
-        publicKey: window.WOMPI_PUBLIC_KEY || 'pub_test_Q5yDA9xoEbjuF4GZRL9yH15Juxzz6J68',
+        publicKey: wompiKey,
         customerData: {
           email: booking.guest?.email || '',
           fullName: `${booking.guest?.nombre || ''} ${booking.guest?.apellido || ''}`.trim(),
@@ -1029,9 +1043,17 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       </div>
 
       {paymentError && (
-        <div className="be-info-box be-info-error" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Icon name="alert-triangle" size={18} style={{ color: 'var(--terracotta-700)', flexShrink: 0 }} />
-          <p style={{ margin: 0 }}>{paymentError}</p>
+        <div className="be-info-box be-info-error" style={{ flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Icon name="alert-triangle" size={18} style={{ color: 'var(--terracotta-700)', flexShrink: 0 }} />
+            <p style={{ margin: 0 }}>{paymentError}</p>
+          </div>
+          <button
+            className="be-btn-secondary"
+            style={{ alignSelf: 'flex-start' }}
+            onClick={() => setPaymentError(null)}>
+            {lang === 'es' ? 'Intentar de nuevo' : 'Try again'}
+          </button>
         </div>
       )}
 
@@ -1110,7 +1132,33 @@ function BookingSummary({ booking, search, lang }) {
       {calc && (
         <div className="be-summary-breakdown">
           <div className="be-summary-line sm"><span>{formatCOP(calc.nightly)} × {nights} {nights === 1 ? t.noche : t.noches}</span><span>{formatCOP(calc.roomSub)}</span></div>
-          {calc.extrasSub > 0 && <div className="be-summary-line sm"><span>{t.extras}</span><span>{formatCOP(calc.extrasSub)}</span></div>}
+          {calc.extrasSub > 0 && BE_EXTRAS.filter(ex => booking.extras && booking.extras[ex.id]).map(ex => {
+            const exName = t.extrasNames[ex.id] || ex.name;
+            let breakdown = '';
+            let exTotal = 0;
+            if (ex.id === 'desayuno') {
+              exTotal = ex.price * search.guests * nights;
+              breakdown = `${formatCOP(ex.price)} × ${search.guests} ${search.guests === 1 ? t.huesped : t.huespedes} × ${nights} ${nights === 1 ? t.noche : t.noches}`;
+            } else if (ex.id === 'parqueadero') {
+              exTotal = ex.price * nights;
+              breakdown = `${formatCOP(ex.price)} × ${nights} ${nights === 1 ? t.noche : t.noches}`;
+            } else if (ex.id === 'tour') {
+              exTotal = ex.price * search.guests;
+              breakdown = `${formatCOP(ex.price)} × ${search.guests} ${search.guests === 1 ? t.huesped : t.huespedes}`;
+            } else {
+              exTotal = ex.price;
+              breakdown = formatCOP(ex.price);
+            }
+            return (
+              <div key={ex.id} className="be-summary-line sm" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                  <span>{exName}</span>
+                  <span>{formatCOP(exTotal)}</span>
+                </div>
+                <span style={{ fontSize: 10, opacity: 0.65, fontStyle: 'italic' }}>{breakdown}</span>
+              </div>
+            );
+          })}
           <div className="be-summary-line sm"><span>{t.iva} (19%)*</span><span>{formatCOP(calc.iva)}</span></div>
           <div className="be-summary-line total"><span>{lang === 'es' ? 'Total online hoy' : 'Total online today'}</span><span>{formatCOP(calc.subtotal)}</span></div>
           <p style={{ fontSize: 10, opacity: 0.8, fontStyle: 'italic', margin: '6px 0 0 0', lineHeight: 1.3 }}>
