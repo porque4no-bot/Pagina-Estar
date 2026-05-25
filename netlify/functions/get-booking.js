@@ -230,32 +230,18 @@ exports.handler = async (event, context) => {
   try {
     const pkey = await getSessionKey(token, username, password);
 
-    // TODO: confirmar endpoint de búsqueda con Kunas.
-    // OTASync no documenta públicamente un endpoint de búsqueda por código de reserva.
-    // Los endpoints conocidos son:
-    //   POST /api/reservation/insert/reservation  → crear reserva
-    //   POST /api/engine/data/getRooms             → disponibilidad
-    //
-    // Candidatos más probables (a confirmar con soporte de OTASync/Kunas):
-    //   GET  /api/reservation/get/reservation?key=PKEY&id_reservations=ID
-    //   POST /api/reservation/search  con { key, token, id_properties, id_reservations }
-    //
-    // Se usa el patrón más conservador observado en create-booking.js:
     const searchPayload = {
       key: pkey,
       token: token,
       id_properties: propertyId,
-      // Pass the booking code both as a numeric ID (if numeric) and as a reference string
-      id_reservations: parseInt(bookingCode, 10) || 0,
-      reference: bookingCode
+      id_reservations: String(bookingCode)
     };
 
-    // TODO: confirmar endpoint de búsqueda con Kunas
     const getController = new AbortController();
     const getTimeoutId = setTimeout(() => getController.abort(), 10000);
     let response;
     try {
-      response = await fetch('https://app.otasync.me/api/reservation/get/reservation', {
+      response = await fetch('https://app.otasync.me/api/reservation/data/reservation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(searchPayload),
