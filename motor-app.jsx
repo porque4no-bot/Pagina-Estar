@@ -915,7 +915,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       checkout.open(function (result) {
         setLoading(false);
         const transaction = result.transaction;
-        console.log('Wompi Transaction Callback:', transaction);
+        if (process.env.NODE_ENV !== 'production') console.log('Wompi Transaction Callback:', transaction);
 
         if (transaction.status === 'APPROVED' || transaction.status === 'PENDING') {
           onConfirm(code, {
@@ -1650,7 +1650,7 @@ function BookingEngine() {
     })
     .then(res => res.json())
     .then(data => {
-      console.log('Kunas PMS Booking Response:', data);
+      if (process.env.NODE_ENV !== 'production') console.log('Kunas PMS Booking Response:', data);
       const finalCode = (data.success && data.bookingCode) ? data.bookingCode : code;
       if (data.success && data.bookingCode) {
         setBookingCode(data.bookingCode);
@@ -1681,7 +1681,7 @@ function BookingEngine() {
         })
         .then(r => r.json())
         .then(emailData => {
-          console.log('[send-confirmation] Result:', emailData);
+          if (process.env.NODE_ENV !== 'production') console.log('[send-confirmation] Result:', emailData);
         })
         .catch(emailErr => {
           // Non-blocking: email failure should never prevent the booking confirmation screen

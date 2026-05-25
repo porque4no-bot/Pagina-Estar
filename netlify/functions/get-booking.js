@@ -216,7 +216,7 @@ exports.handler = async (event, context) => {
   // If no credentials are configured, return a mock "not found" so the UI
   // can guide the guest to contact the hotel. This avoids silent failure.
   if (!hasCredentials) {
-    console.warn('[get-booking] OTASync credentials not configured. Returning not-found fallback.');
+    if (process.env.DEBUG) console.warn('[get-booking] OTASync credentials not configured. Returning not-found fallback.');
     return {
       statusCode: 200,
       headers: corsHeaders,

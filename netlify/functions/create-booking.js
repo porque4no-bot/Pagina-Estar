@@ -260,12 +260,12 @@ exports.handler = async (event, context) => {
     const raw = await blobStore.get(idempKey);
     if (raw) {
       const existing = JSON.parse(raw);
-      console.log(`[idempotency] Returning cached booking ${existing.bookingCode}`);
+      if (process.env.DEBUG) console.log(`[idempotency] Returning cached booking ${existing.bookingCode}`);
       return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(existing) };
     }
   } catch (e) {
     // Blobs unavailable locally or in misconfigured env — proceed without idempotency
-    console.warn('[idempotency] Blobs store unavailable, proceeding without deduplication:', e.message);
+    if (process.env.DEBUG) console.warn('[idempotency] Blobs store unavailable, proceeding without deduplication:', e.message);
     blobStore = null;
   }
 
@@ -301,6 +301,15 @@ exports.handler = async (event, context) => {
 
   // 1. MOCK BOOKING GENERATOR (Fallback)
   if (!hasCredentials) {
+    if (process.env.NETLIFY) {
+      console.error('create-booking: OTASync credentials missing in production environment');
+      return {
+        statusCode: 503,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Service temporarily unavailable. Missing configuration.' })
+      };
+    }
+
     const mockBookingCode = `ESTAR-MOCK-${Math.floor(10000 + Math.random() * 90000)}`;
     return {
       statusCode: 200,
@@ -484,7 +493,7 @@ exports.handler = async (event, context) => {
       try {
         await blobStore.set(idempKey, JSON.stringify(successPayload), { ttl: 86400 }); // 24h TTL
       } catch (e) {
-        console.warn('[idempotency] Failed to cache booking result:', e.message);
+        if (process.env.DEBUG) console.warn('[idempotency] Failed to cache booking result:', e.message);
       }
     }
 
