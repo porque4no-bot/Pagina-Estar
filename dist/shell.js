@@ -985,33 +985,6 @@
     if (main && !main.id) main.id = 'main-content';
   }
 
-  /* ----- HERO VIDEO LAZY LOAD ----- */
-  function setupHeroVideoPlayback() {
-    const heroVideo = document.getElementById('hero-video');
-    if (!heroVideo) return;
-
-    // On mobile or slow connections, skip video entirely to save bandwidth.
-    // CSS already hides .hero-media video on max-width:768px and shows the
-    // poster background-image instead — this JS guard prevents unnecessary
-    // network requests on small viewports and data-saver mode.
-    const prefersReducedData = window.matchMedia('(prefers-reduced-data: reduce)').matches;
-    const isMobile = window.matchMedia('(max-width: 768px)').matches;
-
-    if (prefersReducedData || isMobile) {
-      // Show poster only — don't load video
-      heroVideo.style.display = 'none';
-    } else {
-      const videoObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            heroVideo.play().catch(() => {}); // ignore autoplay policy errors
-            videoObserver.disconnect();
-          }
-        });
-      }, { threshold: 0.1 });
-      videoObserver.observe(heroVideo);
-    }
-  }
 
   /* ---------- INIT ---------- */
   if (document.readyState === 'loading') {
@@ -1029,7 +1002,6 @@
       setupBookingBarScroll();
       fetchDynamicRating();
       setupNetlifyForms();
-      setupHeroVideoPlayback();
     });
   } else {
     injectSkipLink();
@@ -1045,6 +1017,5 @@
     setupBookingBarScroll();
     fetchDynamicRating();
     setupNetlifyForms();
-    setupHeroVideoPlayback();
   }
 })();
