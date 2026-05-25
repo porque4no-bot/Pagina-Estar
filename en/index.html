@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/png" href="../assets/favicon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estar — Studio Apartments &amp; Boutique Hotel in Manizales, Coffee Region</title>
+<meta name="description" content="Furnished studio apartments in Manizales, Coffee Region. Digital check-in, fully equipped kitchen, fiber WiFi. Short and long stays in El Cable and La Estrella.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Estar — Studio Apartments Manizales">
+<meta property="og:title" content="Estar — Studio Apartments &amp; Boutique Hotel in Manizales, Coffee Region">
+<meta property="og:description" content="Furnished studio apartments in Manizales, Coffee Region. Digital check-in, fully equipped kitchen, fiber WiFi. Short and long stays in El Cable and La Estrella.">
+<meta property="og:image" content="https://estar.com.co/assets/photos/fachada.webp">
+<meta property="og:url" content="https://estar.com.co/en/index.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://estar.com.co/assets/photos/fachada.webp">
+<link rel="canonical" href="https://estar.com.co/en/index.html">
+<link rel="alternate" hreflang="es" href="https://estar.com.co/index.html">
+<link rel="alternate" hreflang="en" href="https://estar.com.co/en/index.html">
+<link rel="manifest" href="/manifest.json">
+<link rel="preload" as="image" href="../assets/photos/hero_first_frame.webp" fetchpriority="high">
+<link rel="stylesheet" href="../colors_and_type.css?v=2">
+<link rel="stylesheet" href="../styles.css?v=3">
+<script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LodgingBusiness",
+  "name": "Estar — Studio Apartments Manizales",
+  "url": "https://estar.com.co",
+  "telephone": "+573102490414",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Manizales",
+    "addressRegion": "Caldas",
+    "addressCountry": "CO"
+  },
+  "priceRange": "$$",
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "9.0",
+    "reviewCount": "126",
+    "bestRating": "10"
+  },
+  "amenityFeature": [
+    {"@type": "LocationFeatureSpecification", "name": "Fiber optic WiFi", "value": true},
+    {"@type": "LocationFeatureSpecification", "name": "Equipped kitchen", "value": true},
+    {"@type": "LocationFeatureSpecification", "name": "Digital check-in", "value": true}
+  ]
+}
+</script>
+</head>
+<body data-screen-label="01 Home" data-booking>
+
+<!-- ============================== HEADER ============================== -->
+<header class="site-header">
+  <div class="container">
+    <a href="index.html" class="brand" aria-label="estar — home">
+      <span class="star-mark" aria-hidden="true"></span>
+      <img src="../assets/logo.png" alt="estar" class="logo-img" width="120" height="32">
+    </a>
+
+    <nav aria-label="Main">
+      <ul class="nav-list">
+        <li><a href="index.html" class="is-current" data-i18n="nav_estadias">Stays</a></li>
+        <li><a href="vivir.html" data-i18n="nav_vivir">Extended Stay</a></li>
+        <li><a href="explora.html" data-i18n="nav_explorar">Explore</a></li>
+        <li><a href="empresas.html" data-i18n="nav_empresas">Companies</a></li>
+        <li><a href="grupos.html" data-i18n="nav_grupos">Groups</a></li>
+      </ul>
+    </nav>
+
+    <div class="header-actions">
+      <a href="../index.html" class="lang-toggle">ES</a>
+      <a href="#reservar" class="book-btn" data-i18n="book_btn">Book</a>
+      <button class="menu-btn" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ============================== HERO ============================== -->
+<section class="hero has-star-cursor" data-screen-label="01.1 Hero">
+  <div class="hero-media">
+    <video autoplay muted loop playsinline poster="../assets/photos/hero_first_frame.webp">
+      <source src="../assets/video/hero.mp4" type="video/mp4">
+    </video>
+    <script>if(/Android/i.test(navigator.userAgent)||window.innerWidth<=767){var _v=document.currentScript.previousElementSibling;if(_v&&_v.tagName==='VIDEO')_v.remove();}</script>
+  </div>
+  <div class="hero-scrim"></div>
+
+  <div class="container hero-inner">
+    <p class="hero-eyebrow"><span class="dot"></span><span data-i18n="hero_eyebrow">Manizales · Caldas · Colombia</span></p>
+
+    <h1 class="hero-title" data-headline>
+      <span class="voice-only voice-susurro">Stay.</span>
+      <span class="voice-only voice-conversacion">A place to be.</span>
+      <span class="voice-only voice-manifiesto">This city is yours.</span>
+    </h1>
+  </div>
+
+  <div class="scroll-cue"><span>Scroll</span></div>
+
+  <!-- Booking bar pinned to bottom of hero -->
+  <form class="booking-bar" id="reservar">
+    <div class="booking-field custom-select-field" id="checkin-field" tabindex="0">
+      <!-- Desktop: individual labels -->
+      <span class="label" data-i18n="book_check_in">Check in</span>
+      <span class="value" id="checkin-display" data-i18n="book_pick_dates">Pick a date</span>
+      <!-- Mobile: combined dates label + display (shown via CSS, updated via JS) -->
+      <span class="label mb-dates-lbl">Dates</span>
+      <span class="value" id="dates-display">Pick dates</span>
+      <input type="date" id="checkin-input" name="checkin" required style="display: none;">
+      <div class="custom-dropdown-menu calendar-dropdown" id="checkin-calendar"></div>
+    </div>
+    <div class="booking-field custom-select-field" id="checkout-field" tabindex="0">
+      <span class="label" data-i18n="book_check_out">Check out</span>
+      <span class="value" id="checkout-display" data-i18n="book_pick_dates">Pick a date</span>
+      <input type="date" id="checkout-input" name="checkout" required style="display: none;">
+      <div class="custom-dropdown-menu calendar-dropdown" id="checkout-calendar"></div>
+    </div>
+    <div class="booking-field custom-select-field" id="guests-field" tabindex="0">
+      <span class="label" data-i18n="book_guests">Guests</span>
+      <span class="value" id="guests-display" data-i18n="book_one_guest">1 guest</span>
+      <select id="guests-input" name="guests" style="display: none;">
+        <option value="1">1 guest</option>
+        <option value="2">2 guests</option>
+        <option value="3">3 guests</option>
+        <option value="4">4 guests or more</option>
+      </select>
+
+      <!-- Custom Dropdown Panel -->
+      <div class="custom-dropdown-menu">
+        <div class="custom-dropdown-option active" data-value="1">
+          <span class="option-text" data-i18n="book_one_guest">1 guest</span>
+          <span class="option-check">✶</span>
+        </div>
+        <div class="custom-dropdown-option" data-value="2">
+          <span class="option-text" data-i18n="book_two_guests">2 guests</span>
+          <span class="option-check">✶</span>
+        </div>
+        <div class="custom-dropdown-option" data-value="3">
+          <span class="option-text" data-i18n="book_three_guests">3 guests</span>
+          <span class="option-check">✶</span>
+        </div>
+        <div class="custom-dropdown-option" data-value="4">
+          <span class="option-text" data-i18n="book_four_guests_more">4 guests or more</span>
+          <span class="option-check">✶</span>
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="booking-cta">
+      <span data-i18n="book_search">Check availability</span>
+      <span aria-hidden="true">→</span>
+    </button>
+    <div class="escnna-inline-notice" style="grid-column: 1 / -1; text-align: center; font-size: 10px; line-height: 1.4; color: var(--ink-500); padding: 8px 12px; border-top: 1px solid var(--paper-400); background: var(--paper-200); border-radius: 0 0 4px 4px;">
+      In compliance with Law 679 of 2001, we warn that child sexual exploitation and abuse are criminally and administratively punished. <a href="escnna.html" target="_blank" style="color: var(--terracotta); text-decoration: underline;">Read regulations and report hotlines</a>.
+    </div>
+  </form>
+</section>
+
+<!-- ============================== AMENITIES ============================== -->
+<section class="amenities" data-screen-label="01.2 Servicios">
+  <div class="container">
+    <div class="head" data-reveal>
+      <p class="eyebrow terracotta">What's included</p>
+      <h2 class="display-m">
+        Lodging in Manizales: everything you need, <span class="serif-italic">nothing you don't.</span>
+      </h2>
+    </div>
+    <div class="amenities-grid">
+      <div class="amenity" data-reveal>
+        <i data-lucide="key-round"></i>
+        <h4>Digital Check-in</h4>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="wifi"></i>
+        <h4>Wi-Fi &amp; Coworking</h4>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="utensils"></i>
+        <h4>Equipped Kitchen</h4>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="sparkles"></i>
+        <h4>Housekeeping</h4>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="coffee"></i>
+        <h4>Breakfast</h4>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="paw-print"></i>
+        <h4>Pet Friendly</h4>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== LOCATION & RATINGS ============================== -->
+<section class="location-ratings" id="ubicacion">
+  <div class="container">
+    <div class="location-grid">
+      <!-- Left Column: Info, Ratings and Places -->
+      <div class="location-info-column" data-reveal>
+        <p class="eyebrow terracotta" data-i18n="loc_eyebrow">Strategic location</p>
+        <h2 class="display-m" data-i18n-html="loc_title">Studio apartments in La Estrella and El Cable, <span class="serif-italic">tourist stays in Manizales</span></h2>
+
+        <!-- Minimalist Rating Stats -->
+        <div class="location-stats">
+          <div class="stat-item">
+            <div class="stat-header">
+              <span class="stat-number" data-i18n="loc_booking_score">9.0</span>
+              <span class="stat-star">✶</span>
+            </div>
+            <span class="stat-brand">Booking.com</span>
+            <p class="stat-desc" data-i18n="loc_booking_reviews">126 guest reviews</p>
+          </div>
+          <div class="stat-item">
+            <div class="stat-header">
+              <span class="stat-number" data-i18n="loc_location_score">9.4</span>
+              <span class="stat-star">✶</span>
+            </div>
+            <span class="stat-brand" data-i18n="loc_location_lbl">Excellent location</span>
+            <p class="stat-desc" data-i18n="loc_location_desc_short">Outstanding score for proximity and accessibility.</p>
+          </div>
+        </div>
+
+        <!-- Editorial Proximity List -->
+        <div class="proximity-section">
+          <h3 class="places-title" data-i18n="loc_places_title">Walking distances</h3>
+          <ul class="places-list">
+            <li class="place-item">
+              <span class="place-name">Catholic University</span>
+              <span class="place-distance">200m · 3 min</span>
+            </li>
+            <li class="place-item">
+              <span class="place-name">University of Caldas (Palogrande)</span>
+              <span class="place-distance">400m · 5 min</span>
+            </li>
+            <li class="place-item">
+              <span class="place-name">National University (El Cable)</span>
+              <span class="place-distance">500m · 7 min</span>
+            </li>
+            <li class="place-item">
+              <span class="place-name">Palogrande Stadium</span>
+              <span class="place-distance">400m · 6 min</span>
+            </li>
+            <li class="place-item">
+              <span class="place-name">Cable Tower</span>
+              <span class="place-distance">450m · 6 min</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Right Column: The Map -->
+      <div class="location-map-column" data-reveal>
+        <div class="map-wrapper">
+          <iframe
+            src="https://www.google.com/maps/d/u/0/embed?mid=1_0s9388R0uFZF0P7O3Hu6qshB5v_aBg&ehbc=2E312F&noprof=1"
+            width="100%"
+            height="100%"
+            style="border:0;"
+            allowfullscreen=""
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+            title="estar - Interactive Map">
+          </iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================== ROOMS ============================== -->
+<section class="rooms" id="habitaciones" data-screen-label="01.3 Habitaciones">
+  <div class="container">
+    <div class="rooms-head" data-reveal>
+      <div>
+        <p class="eyebrow terracotta">Studio Apartments</p>
+        <h2 class="display-l">
+          Five types of <span class="serif-italic">furnished studio apartments.</span>
+        </h2>
+      </div>
+      <p class="lead">
+        Fully furnished, with equipped kitchen, private bath and fiber Wi-Fi. Just bring your bag.
+      </p>
+    </div>
+
+    <!-- Mobile pagination: dots + swipe hint (top) -->
+    <div class="room-list-nav" aria-hidden="true">
+      <div class="room-list-dots">
+        <span class="rld active"></span>
+        <span class="rld"></span>
+        <span class="rld"></span>
+        <span class="rld"></span>
+        <span class="rld"></span>
+      </div>
+      <p class="room-list-hint">Swipe to see more</p>
+    </div>
+
+    <div class="room-list-container">
+      <button type="button" class="room-list-btn prev" aria-label="Previous apartment" aria-controls="room-list">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+
+      <div class="room-list" id="room-list">
+
+      <!-- Room 1: Clásica -->
+      <article class="room has-star-cursor" data-reveal>
+        <div class="room-media slider-active">
+          <div class="badge">01 / Clásica</div>
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="../assets/photos/tipo1/1.webp" alt="Studio Clásica - View 1" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo1/2.webp" alt="Studio Clásica - View 2" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo1/3.webp" alt="Studio Clásica - View 3" loading="lazy" width="800" height="600"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Previous image" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Next image" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+          </div>
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">For one or two people</p>
+          <h3>Clásica</h3>
+          <p class="sub">Compact, warm, everything within reach.</p>
+          <p class="body">Queen bed, desk facing the window, fully equipped kitchen and private shower bathroom. The essence of estar, in 28 m².</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacity</span><span class="v">2 guests</span></div>
+            <div class="room-spec"><span class="k">Bed</span><span class="v">1 queen</span></div>
+            <div class="room-spec"><span class="k">Area</span><span class="v">28 m²</span></div>
+            <div class="room-spec"><span class="k">View</span><span class="v">City</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="clasica.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">View details</a>
+            <a href="../reservar.html" class="text-link book-room-trigger" data-room="clasica">Book <span class="arr">→</span></a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Room 2: Selección -->
+      <article class="room has-star-cursor" data-reveal>
+        <div class="room-media slider-active" style="background: var(--terracotta-300);">
+          <div class="badge">02 / Selección</div>
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="../assets/photos/tipo2/1.webp" alt="Studio Selección - View 1" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo2/2.webp" alt="Studio Selección - View 2" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo2/3.webp" alt="Studio Selección - View 3" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo2/4.webp" alt="Studio Selección - View 4" loading="lazy" width="800" height="600"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Previous image" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Next image" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+            <span class="indicator" data-slide="3"></span>
+          </div>
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">For two people</p>
+          <h3>Selección</h3>
+          <p class="sub">A little outdoors, indoors.</p>
+          <p class="body">Same floor plan as the Clásica, now with a private balcony for your morning coffee. Natural light transforms the whole feel of the space.</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacity</span><span class="v">2 guests</span></div>
+            <div class="room-spec"><span class="k">Bed</span><span class="v">1 queen</span></div>
+            <div class="room-spec"><span class="k">Area</span><span class="v">32 m²</span></div>
+            <div class="room-spec"><span class="k">View</span><span class="v">Mountain</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="seleccion.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">View details</a>
+            <a href="../reservar.html" class="text-link book-room-trigger" data-room="seleccion">Book <span class="arr">→</span></a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Room 3: Reserva -->
+      <article class="room has-star-cursor" data-reveal>
+        <div class="room-media slider-active" style="background: var(--olive);">
+          <div class="badge">03 / Reserva</div>
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="../assets/photos/tipo3/1.webp" alt="Studio Reserva - View 1" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo3/2.webp" alt="Studio Reserva - View 2" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo3/3.webp" alt="Studio Reserva - View 3" loading="lazy" width="800" height="600"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Previous image" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Next image" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+          </div>
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">For couples or extended stays</p>
+          <h3>Reserva</h3>
+          <p class="sub">Living area separate from the bedroom.</p>
+          <p class="body">Defined spaces: bedroom, living room with sofa and work area. 55" Smart TV, open kitchen and a larger bathroom with exterior window.</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacity</span><span class="v">2 guests</span></div>
+            <div class="room-spec"><span class="k">Bed</span><span class="v">1 king</span></div>
+            <div class="room-spec"><span class="k">Area</span><span class="v">42 m²</span></div>
+            <div class="room-spec"><span class="k">View</span><span class="v">City</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="reserva.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">View details</a>
+            <a href="../reservar.html" class="text-link book-room-trigger" data-room="reserva">Book <span class="arr">→</span></a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Room 4: Origen -->
+      <article class="room has-star-cursor" data-reveal>
+        <div class="room-media slider-active" style="background: var(--sand);">
+          <div class="badge">04 / Origen</div>
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="../assets/photos/tipo4/1.webp" alt="Studio Origen - View 1" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo4/2.webp" alt="Studio Origen - View 2" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo4/3.webp" alt="Studio Origen - View 3" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo4/4.webp" alt="Studio Origen - View 4" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo4/5.webp" alt="Studio Origen - View 5" loading="lazy" width="800" height="600"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Previous image" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Next image" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+            <span class="indicator" data-slide="3"></span>
+            <span class="indicator" data-slide="4"></span>
+          </div>
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">For couples</p>
+          <h3>Origen</h3>
+          <p class="sub">Our most-requested room.</p>
+          <p class="body">The Origen studio with a front balcony — where most guests spend their afternoons reading or working with the hum of the city in the background.</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacity</span><span class="v">2 guests</span></div>
+            <div class="room-spec"><span class="k">Bed</span><span class="v">1 king</span></div>
+            <div class="room-spec"><span class="k">Area</span><span class="v">52 m²</span></div>
+            <div class="room-spec"><span class="k">View</span><span class="v">Mountain</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="origen.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">View details</a>
+            <a href="../reservar.html" class="text-link book-room-trigger" data-room="origen">Book <span class="arr">→</span></a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Room 5: Especial -->
+      <article class="room has-star-cursor" data-reveal>
+        <div class="room-media slider-active" style="background: var(--ink);">
+          <div class="badge">05 / Especial</div>
+          <div class="slider-wrapper">
+            <div class="slider-track">
+              <div class="slider-slide"><img src="../assets/photos/tipo5/1.webp" alt="Studio Especial - View 1" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo5/2.webp" alt="Studio Especial - View 2" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo5/3.webp" alt="Studio Especial - View 3" loading="lazy" width="800" height="600"></div>
+              <div class="slider-slide"><img src="../assets/photos/tipo5/4.webp" alt="Studio Especial - View 4" loading="lazy" width="800" height="600"></div>
+            </div>
+          </div>
+          <button class="slider-arrow prev" aria-label="Previous image" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button class="slider-arrow next" aria-label="Next image" type="button">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <div class="slider-indicators">
+            <span class="indicator active" data-slide="0"></span>
+            <span class="indicator" data-slide="1"></span>
+            <span class="indicator" data-slide="2"></span>
+            <span class="indicator" data-slide="3"></span>
+          </div>
+        </div>
+        <div class="room-info">
+          <p class="eyebrow">For small groups or families</p>
+          <h3>Especial</h3>
+          <p class="sub">Two spaces, one price.</p>
+          <p class="body">King bed + double sofa bed in a separate living area. Full kitchen with large fridge. Ideal for families or four friends traveling together.</p>
+          <div class="room-specs">
+            <div class="room-spec"><span class="k">Capacity</span><span class="v">4 guests</span></div>
+            <div class="room-spec"><span class="k">Bed</span><span class="v">1 king + sofa bed</span></div>
+            <div class="room-spec"><span class="k">Area</span><span class="v">60 m²</span></div>
+            <div class="room-spec"><span class="k">View</span><span class="v">Mountain</span></div>
+          </div>
+          <div class="room-foot">
+            <a href="especial.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">View details</a>
+            <a href="../reservar.html" class="text-link book-room-trigger" data-room="especial">Book <span class="arr">→</span></a>
+          </div>
+        </div>
+      </article>
+
+      </div>
+      <button type="button" class="room-list-btn next" aria-label="Next apartment" aria-controls="room-list">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== SEGMENTS (4 profiles) ============================== -->
+<section class="segments" data-screen-label="01.4 Para quién">
+  <div class="container">
+    <div class="segments-head" data-reveal>
+      <p class="eyebrow terracotta">For your pace</p>
+      <h2 class="display-m">
+        Contemporary lodging designed for <span class="serif-italic">every type of stay.</span>
+      </h2>
+    </div>
+
+    <div class="segments-grid">
+      <a href="index.html" class="segment" data-reveal>
+        <span class="num">01</span>
+        <h3>Short Getaway</h3>
+        <p>From one night to a week. Tourism visits, a weekend in the Coffee Axis, a pause.</p>
+        <span class="arrow">Book <span aria-hidden="true">→</span></span>
+      </a>
+      <a href="vivir.html" class="segment" data-reveal>
+        <span class="num">02</span>
+        <h3>Weeks and months</h3>
+        <p>For digital nomads. Dedicated internet, ergonomic desk, tiered rates.</p>
+        <span class="arrow">Rates <span aria-hidden="true">→</span></span>
+      </a>
+      <a href="vivir.html#aplicar" class="segment" data-reveal>
+        <span class="num">03</span>
+        <h3>Extended Stay</h3>
+        <p>From 3 to 12 months. For residents and postgrads. One invoice, no guarantors.</p>
+        <span class="arrow">Apply <span aria-hidden="true">→</span></span>
+      </a>
+      <a href="empresas.html" class="segment" data-reveal>
+        <span class="num">04</span>
+        <h3>Companies &amp; groups</h3>
+        <p>B2B agreements, centralized billing, pre-negotiated rates for your team.</p>
+        <span class="arrow">B2B <span aria-hidden="true">→</span></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== EXPLORE (Manizales cross-link) ============================== -->
+<section class="explore wipe-band" data-reveal data-screen-label="01.5 Manizales">
+  <div class="container">
+    <div>
+      <p class="eyebrow on-dark">Local guide</p>
+      <h2>
+        Tourism in Manizales: Nevado, Coffee Axis tour <span class="italic">and sunsets.</span>
+      </h2>
+      <p class="lead on-dark">
+        A curated guide from us: specialty coffee shops, hidden restaurants, Ruiz hot springs, and the aerial cable just before sunset.
+      </p>
+      <a href="explora.html" class="btn btn-ghost-light" style="margin-top: 12px;">
+        Explore Manizales <span aria-hidden="true">→</span>
+      </a>
+    </div>
+    <div class="explore-photos">
+      <div class="explore-photo" style="background-image: url('../assets/photos/cable.webp'); background-size: cover; background-position: center;"></div>
+      <div class="explore-photo" style="background-image: url('../assets/photos/termales.webp'); background-size: cover; background-position: center;"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== TESTIMONIAL ============================== -->
+<section class="testimonial wipe-band" data-reveal data-screen-label="01.6 Voz huésped">
+  <div class="container">
+    <div class="quote-mark" aria-hidden="true">"</div>
+    <blockquote>
+      We stayed five nights and by the fifth it felt like home. The kitchen, the morning light, the quiet. That can't be faked.
+    </blockquote>
+    <cite>Mariana &amp; Felipe — Bogotá, 2025</cite>
+  </div>
+</section>
+
+<!-- ============================== NEWSLETTER ============================== -->
+<section class="newsletter" data-screen-label="01.7 Newsletter">
+  <div class="container">
+    <div data-reveal>
+      <p class="eyebrow on-dark">Stay close</p>
+      <h3>
+        A short letter <span class="serif-italic">every season.</span>
+      </h3>
+      <p>
+        Local recommendations, regional coffee recipes and availability before anyone else.
+      </p>
+    </div>
+    <form data-reveal name="newsletter" data-netlify="true">
+      <input type="hidden" name="form-name" value="newsletter">
+      <label for="newsletter-email" class="visually-hidden">Your email address</label>
+      <input type="email" name="email" id="newsletter-email" placeholder="you@email.com" required>
+      <button type="submit">Subscribe <span aria-hidden="true">→</span></button>
+    </form>
+    <p style="font-size: 11px; color: rgba(250,246,239,0.7); margin-top: 12px; line-height: 1.4;">
+      By subscribing you authorize email usage under our <a href="privacidad.html" target="_blank" style="text-decoration: underline; color: inherit;">Privacy Policy</a>.
+    </p>
+  </div>
+</section>
+
+<!-- ============================== FOOTER ============================== -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="brand-stack" aria-hidden="true"></div>
+        <p data-i18n-html="footer_desc">Lodging in the heart of Manizales, designed to <span class="serif-italic">be</span> at home.</p>
+      </div>
+      <div class="footer-col">
+        <h5 data-i18n="footer_estadias">Stays</h5>
+        <ul>
+          <li><a href="index.html" data-i18n="footer_apartaestudios">Studio apartments</a></li>
+          <li><a href="vivir.html" data-i18n="footer_vivir">Extended Stay</a></li>
+          <li><a href="grupos.html" data-i18n="footer_grupos">Groups &amp; events</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5 data-i18n="footer_empresas">Companies</h5>
+        <ul>
+          <li><a href="empresas.html" data-i18n="footer_portal">Corporate portal</a></li>
+          <li><a href="empresas.html#contacto" data-i18n="footer_convenio">Request agreement</a></li>
+          <li><a href="grupos.html#cotizar" data-i18n="footer_cotizar">Quote groups</a></li>
+          <li><a href="trabaja.html" data-i18n="footer_trabaja">Work with us</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5 data-i18n="footer_descubre">Discover</h5>
+        <ul>
+          <li><a href="explora.html" data-i18n="footer_explorar">Explore Manizales</a></li>
+          <li><a href="faq.html" data-i18n="footer_preguntas">FAQ</a></li>
+          <li><a href="contacto.html" data-i18n="footer_contacto">Contact Us</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bot">
+      <span>
+        <span data-i18n="footer_copyright">© 2026 estar · Manizales, Colombia</span> ·
+        <span data-i18n="footer_rnt" class="rnt-badge" style="color: var(--terracotta); font-weight: 900;">RNT 276306</span>
+      </span>
+      <span>
+        <a href="aviso-legal.html" data-i18n="footer_aviso">Legal Notice</a> ·
+        <a href="cancelacion.html" data-i18n="footer_cancelacion">Cancellation Policy</a> ·
+        <a href="privacidad.html" data-i18n="footer_privacidad">Privacy Policy</a> ·
+        <a href="cookies.html" data-i18n="footer_cookies">Cookies Policy</a> ·
+        <a href="escnna.html" data-i18n="footer_escnna">Child Protection (ESCNNA)</a>
+      </span>
+    </div>
+    <div class="booking-spacer"></div>
+  </div>
+</footer>
+
+<!-- ============================== TWEAKS DEFAULTS ============================== -->
+<script>
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "atmosphere": "amanecer",
+    "voice": "conversacion",
+    "texture": "grano",
+    "language": "en"
+  }/*EDITMODE-END*/;
+</script>
+<script src="../shell.js?v=2" defer></script>
+<script src="../kunas.js" defer></script>
+<script>document.addEventListener('DOMContentLoaded',function(){lucide.createIcons();});</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const list = document.getElementById('room-list');
+  const dots = document.querySelectorAll('.rld');
+  const hint = document.querySelector('.room-list-hint');
+  if (!list || !dots.length) return;
+
+  function cardWidth() {
+    const card = list.querySelector('.room');
+    if (!card) return 0;
+    return card.offsetWidth + parseFloat(getComputedStyle(list).gap || 32);
+  }
+
+  function scrollToIndex(i) {
+    i = Math.max(0, Math.min(i, dots.length - 1));
+    list.scrollTo({ left: i * cardWidth(), behavior: 'smooth' });
+  }
+
+  function currentIndex() {
+    const w = cardWidth();
+    return w ? Math.round(list.scrollLeft / w) : 0;
+  }
+
+  // Keep dots in sync
+  list.addEventListener('scroll', function() {
+    const i = currentIndex();
+    dots.forEach(function(d, j) { d.classList.toggle('active', j === i); });
+    if (list.scrollLeft > 20 && hint) hint.style.opacity = '0';
+  }, { passive: true });
+
+  // One card per swipe — intercept touch, prevent momentum
+  var startX = 0, startY = 0, startScroll = 0, axis = null;
+
+  list.addEventListener('touchstart', function(e) {
+    startX      = e.touches[0].clientX;
+    startY      = e.touches[0].clientY;
+    startScroll = list.scrollLeft;
+    axis        = null;
+  }, { passive: true });
+
+  list.addEventListener('touchmove', function(e) {
+    var dx = e.touches[0].clientX - startX;
+    var dy = e.touches[0].clientY - startY;
+    if (axis === null) axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (axis === 'x') {
+      e.preventDefault();            // block native scroll momentum
+      list.scrollLeft = startScroll - dx;
+    }
+  }, { passive: false });
+
+  list.addEventListener('touchend', function(e) {
+    if (axis !== 'x') return;
+    var dx = e.changedTouches[0].clientX - startX;
+    var base = Math.round(startScroll / cardWidth());
+    if (Math.abs(dx) < 30) { scrollToIndex(base); return; } // too short → snap back
+    scrollToIndex(dx < 0 ? base + 1 : base - 1);
+  }, { passive: true });
+
+  // Prev/Next buttons (desktop)
+  var prevBtn = document.querySelector('.room-list-btn.prev');
+  var nextBtn = document.querySelector('.room-list-btn.next');
+  if (prevBtn) prevBtn.addEventListener('click', function() { scrollToIndex(currentIndex() - 1); });
+  if (nextBtn) nextBtn.addEventListener('click', function() { scrollToIndex(currentIndex() + 1); });
+});
+</script>
+
+<!-- ============================== LIGHTBOX ============================== -->
+<div id="lightbox" role="dialog" aria-modal="true" aria-label="Photo gallery - Estar Manizales">
+  <button class="lb-close" aria-label="Close">
+    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+  <button class="lb-prev" aria-label="Previous photo">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+  </button>
+  <button class="lb-next" aria-label="Next photo">
+    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+  </button>
+  <div class="lb-canvas">
+    <img id="lb-img" src="" alt="" draggable="false">
+  </div>
+  <div class="lb-counter" id="lb-counter"></div>
+  <p class="lb-hint">Double tap · Pinch · Scroll to zoom</p>
+</div>
+
+  <!-- Contact Float Bubble -->
+  <div class="contact-float" id="contactFloat">
+    <button class="contact-trigger" aria-label="Open contact options">
+      <span class="contact-icon contact-icon-chat">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+      </span>
+      <span class="contact-icon contact-icon-close">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </span>
+    </button>
+
+    <div class="contact-menu">
+      <div class="contact-menu-header">
+        <span class="contact-menu-title" data-i18n="contact_title">Contact Us</span>
+        <span class="contact-menu-subtitle" data-i18n="contact_subtitle">Contemporary lodging</span>
+      </div>
+      <div class="contact-menu-list">
+        <!-- WhatsApp -->
+        <a href="https://api.whatsapp.com/send/?phone=573102490414&text&type=phone_number&app_absent=0" target="_blank" rel="noopener noreferrer" class="contact-item ci-whatsapp">
+          <div class="contact-item-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.709 1.457h.004c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+          </div>
+          <div class="contact-item-text">
+            <span class="contact-item-title">WhatsApp</span>
+            <span class="contact-item-desc" data-i18n="contact_wa_desc">Chat with us</span>
+          </div>
+        </a>
+
+        <!-- Instagram -->
+        <a href="https://www.instagram.com/hotel.estar/" target="_blank" rel="noopener noreferrer" class="contact-item ci-instagram">
+          <div class="contact-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-instagram"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
+          </div>
+          <div class="contact-item-text">
+            <span class="contact-item-title">Instagram</span>
+            <span class="contact-item-desc">@hotel.estar</span>
+          </div>
+        </a>
+
+        <!-- Email -->
+        <a href="mailto:reservas@estar.com.co" class="contact-item ci-email">
+          <div class="contact-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          </div>
+          <div class="contact-item-text">
+            <span class="contact-item-title" data-i18n="contact_email_title">Email</span>
+            <span class="contact-item-desc">reservas@estar.com.co</span>
+          </div>
+        </a>
+
+        <!-- Google Maps -->
+        <a href="https://maps.app.goo.gl/QwDXDmpE7NwV4m1ZA" target="_blank" rel="noopener noreferrer" class="contact-item ci-maps">
+          <div class="contact-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+          <div class="contact-item-text">
+            <span class="contact-item-title">Google Maps</span>
+            <span class="contact-item-desc" data-i18n="contact_maps_desc">Get directions</span>
+          </div>
+        </a>
+
+        <!-- Waze -->
+        <a href="https://ul.waze.com/ul?place=ChIJT2vbCbBlR44Rbq4GbLKZIeU&ll=5.05957470%2C-75.48809350&navigate=yes&utm_campaign=default&utm_source=waze_website&utm_medium=lm_share_location" target="_blank" rel="noopener noreferrer" class="contact-item ci-waze">
+          <div class="contact-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-navigation"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          </div>
+          <div class="contact-item-text">
+            <span class="contact-item-title">Waze</span>
+            <span class="contact-item-desc" data-i18n="contact_waze_desc">Navigate with Waze</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ── LIGHTBOX ─────────────────────────────────────────────────────────── */
+(function () {
+  var lb      = document.getElementById('lightbox');
+  var lbImg   = document.getElementById('lb-img');
+  var canvas  = lb.querySelector('.lb-canvas');
+  var btnClose= lb.querySelector('.lb-close');
+  var btnPrev = lb.querySelector('.lb-prev');
+  var btnNext = lb.querySelector('.lb-next');
+  var counter = document.getElementById('lb-counter');
+
+  var gallery = [], idx = 0;
+  var sc = 1, tx = 0, ty = 0;
+  var MIN = 1, MAX = 6;
+
+  function apply(animated) {
+    lbImg.style.transition = animated
+      ? 'transform 0.22s ease, opacity 0.15s ease'
+      : 'none';
+    lbImg.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + sc + ')';
+    canvas.classList.toggle('zoomed', sc > 1.05);
+  }
+
+  function clamp() {
+    var hw = Math.max(0, (lbImg.offsetWidth  * sc - canvas.clientWidth)  / 2);
+    var hh = Math.max(0, (lbImg.offsetHeight * sc - canvas.clientHeight) / 2);
+    tx = Math.max(-hw, Math.min(hw, tx));
+    ty = Math.max(-hh, Math.min(hh, ty));
+  }
+
+  function reset() {
+    sc = 1; tx = 0; ty = 0;
+    apply(true);
+    canvas.classList.remove('zoomed', 'dragging');
+  }
+
+  function show(i) {
+    i = Math.max(0, Math.min(i, gallery.length - 1));
+    idx = i;
+    reset();
+    lbImg.classList.add('fading');
+    setTimeout(function () {
+      lbImg.src = gallery[i].src;
+      lbImg.alt = gallery[i].alt;
+      lbImg.classList.remove('fading');
+    }, 140);
+    counter.textContent = gallery.length > 1 ? (i + 1) + ' / ' + gallery.length : '';
+    btnPrev.style.visibility = gallery.length > 1 ? '' : 'hidden';
+    btnNext.style.visibility = gallery.length > 1 ? '' : 'hidden';
+  }
+
+  function open(images, i) {
+    gallery = images;
+    show(i);
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function close() {
+    lb.classList.remove('open');
+    document.body.style.overflow = '';
+    reset();
+  }
+
+  /* ── Wheel zoom ── */
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var f = e.deltaY < 0 ? 1.18 : 0.85;
+    var prev = sc;
+    sc = Math.max(MIN, Math.min(MAX, sc * f));
+    var cx = e.clientX - canvas.clientWidth  / 2;
+    var cy = e.clientY - canvas.clientHeight / 2;
+    tx = cx - (cx - tx) * (sc / prev);
+    ty = cy - (cy - ty) * (sc / prev);
+    clamp();
+    apply(false);
+  }, { passive: false });
+
+  /* ── Mouse drag ── */
+  var drag = false, dsx, dsy, dtx, dty;
+  canvas.addEventListener('mousedown', function (e) {
+    if (sc <= 1 || e.button !== 0) return;
+    drag = true; dsx = e.clientX; dsy = e.clientY; dtx = tx; dty = ty;
+    canvas.classList.add('dragging');
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', function (e) {
+    if (!drag) return;
+    tx = dtx + e.clientX - dsx;
+    ty = dty + e.clientY - dsy;
+    clamp();
+    apply(false);
+  });
+  window.addEventListener('mouseup', function () {
+    drag = false;
+    canvas.classList.remove('dragging');
+  });
+
+  /* ── Double-click / double-tap toggle zoom ── */
+  var lastClick = 0;
+  canvas.addEventListener('click', function (e) {
+    var now = Date.now();
+    if (now - lastClick < 320) {
+      if (sc > 1.5) {
+        reset();
+      } else {
+        var prev = sc; sc = 2.5;
+        var cx = e.clientX - canvas.clientWidth  / 2;
+        var cy = e.clientY - canvas.clientHeight / 2;
+        tx = cx - (cx - tx) * (sc / prev);
+        ty = cy - (cy - ty) * (sc / prev);
+        clamp();
+        apply(true);
+      }
+      lastClick = 0;
+    } else {
+      lastClick = now;
+    }
+  });
+
+  /* ── Touch pinch + pan ── */
+  var tpts = {}, pinchDist = 0, pinchMx = 0, pinchMy = 0;
+  var panSx, panSy, panTx, panTy;
+
+  canvas.addEventListener('touchstart', function (e) {
+    Array.from(e.changedTouches).forEach(function (t) { tpts[t.identifier] = t; });
+    var pts = Object.values(tpts);
+    if (pts.length === 2) {
+      pinchDist = Math.hypot(pts[1].clientX - pts[0].clientX, pts[1].clientY - pts[0].clientY);
+      pinchMx = (pts[0].clientX + pts[1].clientX) / 2;
+      pinchMy = (pts[0].clientY + pts[1].clientY) / 2;
+    } else if (pts.length === 1) {
+      panSx = pts[0].clientX; panSy = pts[0].clientY; panTx = tx; panTy = ty;
+    }
+  }, { passive: true });
+
+  canvas.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(function (t) { tpts[t.identifier] = t; });
+    var pts = Object.values(tpts);
+    if (pts.length === 2) {
+      var dist = Math.hypot(pts[1].clientX - pts[0].clientX, pts[1].clientY - pts[0].clientY);
+      var mx = (pts[0].clientX + pts[1].clientX) / 2;
+      var my = (pts[0].clientY + pts[1].clientY) / 2;
+      var prev = sc;
+      sc = Math.max(MIN, Math.min(MAX, sc * dist / pinchDist));
+      var cx = mx - canvas.clientWidth  / 2;
+      var cy = my - canvas.clientHeight / 2;
+      tx = cx - (cx - tx) * (sc / prev) + (mx - pinchMx);
+      ty = cy - (cy - ty) * (sc / prev) + (my - pinchMy);
+      clamp(); apply(false);
+      pinchDist = dist; pinchMx = mx; pinchMy = my;
+    } else if (pts.length === 1 && sc > 1) {
+      tx = panTx + (pts[0].clientX - panSx);
+      ty = panTy + (pts[0].clientY - panSy);
+      clamp(); apply(false);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', function (e) {
+    Array.from(e.changedTouches).forEach(function (t) { delete tpts[t.identifier]; });
+    if (sc < 1) reset();
+  }, { passive: true });
+
+  /* ── Controls ── */
+  btnClose.addEventListener('click', close);
+  btnPrev.addEventListener('click', function () { show(idx - 1); });
+  btnNext.addEventListener('click', function () { show(idx + 1); });
+  lb.addEventListener('click', function (e) { if (e.target === lb) close(); });
+  document.addEventListener('keydown', function (e) {
+    if (!lb.classList.contains('open')) return;
+    if (e.key === 'Escape')     close();
+    if (e.key === 'ArrowLeft')  show(idx - 1);
+    if (e.key === 'ArrowRight') show(idx + 1);
+  });
+
+  /* ── Wire room slider images ── */
+  document.querySelectorAll('.room').forEach(function (room) {
+    var imgs = Array.from(room.querySelectorAll('.slider-slide img'));
+    var images = imgs.map(function (img) { return { src: img.src, alt: img.alt }; });
+    imgs.forEach(function (img, i) {
+      img.style.cursor = 'zoom-in';
+      img.addEventListener('click', function (e) {
+        e.stopPropagation();
+        open(images, i);
+      });
+    });
+  });
+})();
+</script>
+
+</body>
+</html>
