@@ -5316,3 +5316,8 @@ textarea:focus-visible,
   outline-offset: 3px;
 }
 
+/* ── Data-saver: hide hero video, show poster background instead ── */
+@media (prefers-reduced-data: reduce) {
+  #hero-video { display: none; }
+}
+
