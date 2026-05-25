@@ -64,6 +64,33 @@ fs.readdirSync(rootDir).forEach(file => {
   }
 });
 
+// Optional: generate responsive image variants using Sharp
+async function generateResponsiveImages() {
+  let sharp;
+  try {
+    sharp = require('sharp');
+  } catch (e) {
+    console.log('Sharp not installed — skipping responsive image generation. Run: npm install sharp');
+    return;
+  }
+
+  const photosDir = path.join('dist', 'assets', 'photos');
+  const widths = [480, 768, 1200];
+  const files = fs.readdirSync(photosDir).filter(f => f.endsWith('.webp') && !f.includes('-'));
+
+  for (const file of files) {
+    const input = path.join(photosDir, file);
+    const base = file.replace('.webp', '');
+    for (const w of widths) {
+      const output = path.join(photosDir, `${base}-${w}w.webp`);
+      if (!fs.existsSync(output)) {
+        await sharp(input).resize(w, null, { withoutEnlargement: true }).webp({ quality: 80 }).toFile(output);
+        console.log(`  Generated: ${base}-${w}w.webp`);
+      }
+    }
+  }
+}
+
 async function build() {
   // Minify CSS files with esbuild
   console.log('Minifying CSS files...');
@@ -86,6 +113,8 @@ async function build() {
     console.error('Esbuild compilation failed:', error);
     process.exit(1);
   }
+
+  await generateResponsiveImages();
 }
 
 build().catch(err => {
