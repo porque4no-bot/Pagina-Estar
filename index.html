@@ -849,7 +849,7 @@
     .then(function(r){return r.ok?r.json():Promise.reject();})
     .then(function(d){
       var reviews=d.reviews||[];
-      if(!reviews.length||d.isMock)return;
+      if(!reviews.length)return;
       var html=reviews.slice(0,3).map(function(r){
         var text=r.text||'';
         if(text.length>200)text=text.slice(0,197)+'…';

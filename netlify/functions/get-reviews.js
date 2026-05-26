@@ -1,28 +1,20 @@
 const fs = require('fs');
 const path = require('path');
 
-// Helper to load local .env variables if not already set (e.g. running outside Netlify dev)
 function loadEnv() {
-  if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') {
-    return;
-  }
+  if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
   try {
     const envPath = path.join(__dirname, '../../.env');
     if (fs.existsSync(envPath)) {
-      const envContent = fs.readFileSync(envPath, 'utf8');
-      envContent.split('\n').forEach(line => {
+      fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
         const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
         if (match) {
           const key = match[1];
           let value = match[2] || '';
-          if (value.startsWith('"') && value.endsWith('"')) {
-            value = value.substring(1, value.length - 1);
-          } else if (value.startsWith("'") && value.endsWith("'")) {
-            value = value.substring(1, value.length - 1);
+          if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
           }
-          if (!process.env[key]) {
-            process.env[key] = value.trim();
-          }
+          if (!process.env[key]) process.env[key] = value.trim();
         }
       });
     }
@@ -33,256 +25,219 @@ function loadEnv() {
 
 loadEnv();
 
-// In-memory cache for the authentication session key (pkey)
-let sessionCache = {
-  pkey: null,
-  expiresAt: null,
-  promise: null
-};
+let sessionCache = { pkey: null, expiresAt: null, promise: null };
 
-// Log in and get session key (pkey)
 async function getSessionKey(token, username, password) {
   const now = Date.now();
-  if (sessionCache.pkey && sessionCache.expiresAt && sessionCache.expiresAt > now) {
-    return sessionCache.pkey;
-  }
-
+  if (sessionCache.pkey && sessionCache.expiresAt && sessionCache.expiresAt > now) return sessionCache.pkey;
   if (sessionCache.promise) {
-    try {
-      return await sessionCache.promise;
-    } catch (err) {
-      sessionCache.promise = null;
-    }
+    try { return await sessionCache.promise; } catch { sessionCache.promise = null; }
   }
-
   sessionCache.promise = (async () => {
-    const authController = new AbortController();
-    const authTimeoutId = setTimeout(() => authController.abort(), 10000);
-    let response;
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    let res;
     try {
-      response = await fetch('https://app.otasync.me/api/user/auth/login', {
+      res = await fetch('https://app.otasync.me/api/user/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, username, password, remember: 0 }),
-        signal: authController.signal
+        signal: ctrl.signal
       });
-      clearTimeout(authTimeoutId);
+      clearTimeout(tid);
     } catch (err) {
-      clearTimeout(authTimeoutId);
-      if (err.name === 'AbortError') {
-        throw new Error('Request timeout during authentication');
-      }
-      throw err;
+      clearTimeout(tid);
+      throw err.name === 'AbortError' ? new Error('Auth timeout') : err;
     }
-
-    if (!response.ok) {
-      throw new Error(`Authentication failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    if (!data.pkey) {
-      throw new Error('Authentication response did not contain a session key (pkey)');
-    }
-
-    // Cache session key for 30 minutes
+    if (!res.ok) throw new Error(`Auth failed: ${res.status}`);
+    const data = await res.json();
+    if (!data.pkey) throw new Error('No pkey in auth response');
     sessionCache.pkey = data.pkey;
     sessionCache.expiresAt = Date.now() + 30 * 60 * 1000;
     return data.pkey;
   })();
-
-  try {
-    return await sessionCache.promise;
-  } finally {
-    sessionCache.promise = null;
-  }
+  try { return await sessionCache.promise; } finally { sessionCache.promise = null; }
 }
 
-// Static fallback reviews
 const FALLBACK_REVIEWS = [
   {
-    text: "Nos quedamos cinco noches y la quinta sentíamos que era nuestra casa. La cocina, la luz por la mañana, el silencio. Eso no se finge.",
-    author: "Mariana & Felipe",
+    text: "Muy conveniente, económico, limpio y moderno. Lo recomiendo altamente. La ubicación es excelente, cerca de buenas tiendas, restaurantes y vida nocturna. El apartamento es muy moderno, limpio, espacioso y bien iluminado. El personal es súper amable y servicial.",
+    author: "Douglas",
+    country: "Canadá",
+    score: 10,
+    date: "2024-04",
+    source: "booking_com"
+  },
+  {
+    text: "Excelente hotel, situado en un barrio muy agradable. Los apartaestudios son modernos, cómodos y espaciosos. Todo está muy limpio y bien mantenido. Dormimos de maravilla. El desayuno es delicioso y variado. El personal es adorable y servicial. Lo recomiendo al 100%.",
+    author: "Catherine",
+    country: "Bélgica",
+    score: 10,
+    date: "2025-02",
+    source: "booking_com"
+  },
+  {
+    text: "¡Wooow, el mejor lugar para quedarse en Manizales! Amé cada detalle del lugar, lo limpio y acogedor que era. 20 de 10 en ubicación: súper cerca al Cable, la Av. Santander y restaurantes. El barrio La Estrella es un lugar que invita a recorrer. 100% recomendado.",
+    author: "Angélica",
     country: "Colombia",
     score: 10,
-    date: "2025",
+    date: "2023-09",
+    source: "booking_com"
+  },
+  {
+    text: "Anfitriona increíble, gran comodidad y ubicación. La estancia fue perfecta; tiene una ubicación grandiosa que facilitó disfrutar de la ciudad. Es un vecindario lindo y tranquilo rodeado de excelentes restaurantes. La habitación era muy cómoda y agradable.",
+    author: "Manuela",
+    country: "Países Bajos",
+    score: 10,
+    date: "2023-09",
+    source: "booking_com"
+  },
+  {
+    text: "La habitación tiene espacio de sobra para las 6 maletas y mochilas. Excelente cama para descansar y una ducha espectacular. Además, el diseño de la iluminación está muy bien logrado. Los blackouts funcionan a la perfección. Altamente recomendado.",
+    author: "Renatus",
+    country: "Panamá",
+    score: 10,
+    date: "2023-12",
+    source: "booking_com"
+  },
+  {
+    text: "La cocineta está muy bien equipada, excelente ubicación cerca de centros comerciales, cafés, restaurantes y vías principales. Hay café y aromática disponibles todo el tiempo en la recepción. No tengo quejas, todo estuvo muy bien.",
+    author: "Francia",
+    country: "Colombia",
+    score: 10,
+    date: "2024-10",
+    source: "booking_com"
+  },
+  {
+    text: "Totalmente nuevo, bien decorado, luminoso y ventilado. Cama y sábanas extremadamente cómodas. El personal fue muy amable y dispuesto a ayudar. Excelente ubicación en la zona rosa pero lo suficientemente apartado para no escuchar ruido por la noche.",
+    author: "Maisie",
+    country: "Reino Unido",
+    score: 10,
+    date: "2023-12",
+    source: "booking_com"
+  },
+  {
+    text: "El personal de recepción y la señora Marta tuvieron un 10 en su disposición y con el desayuno. Las instalaciones y la ubicación hacen de Estar una excelente alternativa en Manizales.",
+    author: "Rodrigo",
+    country: "Chile",
+    score: 10,
+    date: "2024-05",
+    source: "booking_com"
+  },
+  {
+    text: "Me encantó, quiero volver. Es un apartaestudio muy moderno, cómodo y limpio. Está ubicado en un punto muy estratégico de la ciudad y es fácil de llegar. Me encantó el servicio y la amabilidad del anfitrión.",
+    author: "Huésped verificado",
+    country: "Colombia",
+    score: 10,
+    date: "2023-09",
+    source: "booking_com"
+  },
+  {
+    text: "Excelente ubicación, lo cual facilitaba mucho el movimiento por la ciudad. El espacio fue totalmente satisfactorio y la cama es sumamente cómoda. Una experiencia muy buena.",
+    author: "Jose",
+    country: "Colombia",
+    score: 10,
+    date: "2023-09",
     source: "booking_com"
   }
 ];
 
-// Format a date string to "YYYY-MM" for the output date field
-function formatReviewDate(raw) {
-  if (!raw) return '';
-  // Try parsing as a full date
-  const d = new Date(raw);
-  if (!isNaN(d.getTime())) {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    return `${year}-${month}`;
-  }
-  // Already in YYYY-MM or YYYY format — return as-is
-  return String(raw).slice(0, 7);
-}
-
-// Map a raw OTASync review object to our output format
 function mapReview(r) {
-  const text =
-    r.content || r.review_text || r.text || r.comment ||
-    r.review || r.description || r.body || '';
-
-  const author =
-    r.author_name || r.author || r.reviewer_name ||
-    r.guest_name || r.name || 'Huésped';
-
-  const country =
-    r.country || r.country_name || r.guest_country ||
-    r.nationality || '';
-
-  const score =
-    typeof r.score === 'number' ? r.score :
-    typeof r.rating === 'number' ? r.rating :
-    parseFloat(r.score || r.rating || r.note || r.grade || 0);
-
-  const rawDate =
-    r.date || r.review_date || r.created_at ||
-    r.submitted_at || r.check_out_date || '';
-
-  return {
-    text: String(text).trim(),
-    author: String(author).trim(),
-    country: String(country).trim(),
-    score: score,
-    date: formatReviewDate(rawDate),
-    source: 'booking_com'
-  };
+  const text = r.content || r.review_text || r.text || r.comment || r.description || r.body || '';
+  const author = r.author_name || r.author || r.reviewer_name || r.guest_name || r.name || 'Huésped';
+  const country = r.country || r.country_name || r.guest_country || r.nationality || '';
+  const score = typeof r.score === 'number' ? r.score :
+                typeof r.rating === 'number' ? r.rating :
+                parseFloat(r.score || r.rating || r.note || r.grade || 0);
+  const rawDate = r.date || r.review_date || r.created_at || r.submitted_at || r.check_out_date || '';
+  let date = '';
+  if (rawDate) {
+    const d = new Date(rawDate);
+    if (!isNaN(d.getTime())) {
+      date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    } else {
+      date = String(rawDate).slice(0, 7);
+    }
+  }
+  return { text: String(text).trim(), author: String(author).trim(), country: String(country).trim(), score, date, source: 'booking_com' };
 }
 
 exports.handler = async (event, context) => {
-  // CORS Headers
   const allowedOrigin = process.env.ALLOWED_ORIGIN;
   const corsHeaders = {
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Content-Type': 'application/json'
   };
-  if (allowedOrigin && allowedOrigin !== '*') {
-    corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
-  }
+  if (allowedOrigin && allowedOrigin !== '*') corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers: corsHeaders, body: '' };
-  }
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
 
-  // Read environment variables
   const token = process.env.OTASYNC_TOKEN || '';
   const username = process.env.OTASYNC_USERNAME || '';
   const password = process.env.OTASYNC_PASSWORD || '';
   const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
 
-  const hasCredentials = token && username && password;
-
-  // Return fallback if no credentials
-  if (!hasCredentials) {
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify({ reviews: FALLBACK_REVIEWS, isMock: true })
-    };
+  if (!token || !username || !password) {
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ reviews: FALLBACK_REVIEWS, isMock: true }) };
   }
 
-  // Build date range: last 18 months → today
   const today = new Date();
-  const dfrom = new Date(today);
-  dfrom.setMonth(dfrom.getMonth() - 18);
-
-  const toDateStr = today.toISOString().split('T')[0];
-  const fromDateStr = dfrom.toISOString().split('T')[0];
+  const start = new Date(today);
+  start.setFullYear(start.getFullYear() - 2);
 
   try {
     const pkey = await getSessionKey(token, username, password);
 
-    const payload = {
-      key: pkey,
-      id_properties: propertyId,
-      sourceCode: 2,
-      dfrom: fromDateStr,
-      dto: toDateStr
-    };
-
-    const reviewsController = new AbortController();
-    const reviewsTimeoutId = setTimeout(() => reviewsController.abort(), 10000);
-    let response;
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    let res;
     try {
-      response = await fetch('https://app.otasync.me/api/reviews/data/details', {
+      res = await fetch('https://app.otasync.me/api/reviews/details', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: reviewsController.signal
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${pkey}` },
+        body: JSON.stringify({
+          key: pkey,
+          hotelCode: propertyId,
+          sourceCodes: [2],
+          reviewDateFilter: {
+            start: start.toISOString().split('T')[0],
+            end: today.toISOString().split('T')[0]
+          },
+          limit: 20,
+          offset: 0
+        }),
+        signal: ctrl.signal
       });
-      clearTimeout(reviewsTimeoutId);
+      clearTimeout(tid);
     } catch (err) {
-      clearTimeout(reviewsTimeoutId);
-      if (err.name === 'AbortError') {
-        console.error('get-reviews: request timeout fetching reviews');
-        return {
-          statusCode: 200,
-          headers: corsHeaders,
-          body: JSON.stringify({ reviews: FALLBACK_REVIEWS, isMock: true })
-        };
-      }
-      throw err;
+      clearTimeout(tid);
+      console.error('get-reviews fetch error:', err.message);
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ reviews: FALLBACK_REVIEWS, isMock: true }) };
     }
 
-    if (!response.ok) {
-      console.error(`get-reviews: OTASync returned status ${response.status}`);
-      return {
-        statusCode: 200,
-        headers: corsHeaders,
-        body: JSON.stringify({ reviews: FALLBACK_REVIEWS, isMock: true })
-      };
+    if (!res.ok) {
+      console.error(`get-reviews: OTASync returned ${res.status}`);
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ reviews: FALLBACK_REVIEWS, isMock: true }) };
     }
 
-    const otaData = await response.json();
+    const otaData = await res.json();
+    const rawList = otaData.reviews || otaData.data || otaData.items || otaData.results || otaData.list || [];
 
-    // OTASync may return reviews under different keys
-    const rawList =
-      otaData.reviews || otaData.data || otaData.items ||
-      otaData.results || otaData.list || [];
-
-    if (!Array.isArray(rawList) || rawList.length === 0) {
-      return {
-        statusCode: 200,
-        headers: corsHeaders,
-        body: JSON.stringify({ reviews: FALLBACK_REVIEWS, isMock: true })
-      };
+    if (!Array.isArray(rawList) || !rawList.length) {
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ reviews: FALLBACK_REVIEWS, isMock: true }) };
     }
 
-    // Map, filter (score >= 8), sort descending, take top 6
-    const reviews = rawList
-      .map(mapReview)
-      .filter(r => r.score >= 8)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 6);
+    const reviews = rawList.map(mapReview).filter(r => r.score >= 8).sort((a, b) => b.score - a.score).slice(0, 6);
 
-    if (reviews.length === 0) {
-      return {
-        statusCode: 200,
-        headers: corsHeaders,
-        body: JSON.stringify({ reviews: FALLBACK_REVIEWS, isMock: true })
-      };
+    if (!reviews.length) {
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ reviews: FALLBACK_REVIEWS, isMock: true }) };
     }
 
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify({ reviews, isMock: false })
-    };
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ reviews, isMock: false }) };
 
   } catch (error) {
     console.error('get-reviews error:', error.message);
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify({ reviews: FALLBACK_REVIEWS, isMock: true })
-    };
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ reviews: FALLBACK_REVIEWS, isMock: true }) };
   }
 };
