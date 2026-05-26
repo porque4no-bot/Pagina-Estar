@@ -101,7 +101,7 @@
 
     <nav aria-label="Principal">
       <ul class="nav-list">
-        <li><a href="index.html" class="is-current" data-i18n="nav_estadias">Estadías</a></li>
+        <li><a href="#habitaciones" class="is-current" data-i18n="nav_estadias">Estadías</a></li>
         <li><a href="vivir.html" data-i18n="nav_vivir">Extended Stay</a></li>
         <li><a href="explora.html" data-i18n="nav_explorar">Explorar Manizales</a></li>
         <li><a href="empresas.html" data-i18n="nav_empresas">Empresas</a></li>
@@ -135,7 +135,7 @@
       <span class="voice-only voice-susurro" aria-hidden="true">Quédate.</span>
       <span class="voice-only voice-conversacion" aria-hidden="true">Un lugar para estar.</span>
       <span class="voice-only voice-manifiesto" aria-hidden="true">Esta ciudad es tuya.</span>
-      <span class="visually-hidden">Un lugar para estar — Apartaestudios en Manizales</span>
+      <span class="visually-hidden">Apartaestudios amoblados en Manizales — desde una noche hasta 12 meses</span>
     </h1>
 
     <div class="hero-trust" data-reveal>
@@ -151,12 +151,18 @@
       <span class="htrust-badge">RNT 276306</span>
     </div>
 
-    <div class="hero-price" id="hero-price" hidden>
+    <div class="hero-price" id="hero-price">
       <span class="hp-from lang-es" lang="es">Desde</span>
       <span class="hp-from lang-en" lang="en">From</span>
-      <strong class="hp-amount" id="hp-amount"></strong>
+      <strong class="hp-amount" id="hp-amount">$200.000</strong>
       <span class="hp-unit lang-es" lang="es">/ noche</span>
       <span class="hp-unit lang-en" lang="en">/ night</span>
+    </div>
+    <div class="hero-cancel" data-reveal>
+      <a href="cancelacion.html" class="hero-cancel-link">
+        <span class="lang-es" lang="es">✓ Cancelación gratuita hasta 48h antes</span>
+        <span class="lang-en" lang="en">✓ Free cancellation up to 48h before</span>
+      </a>
     </div>
   </div>
 
@@ -211,8 +217,8 @@
       </div>
     </div>
 
-    <button type="submit" class="booking-cta" aria-label="Buscar disponibilidad">
-      <span data-i18n="book_search">Reservar ahora</span>
+    <button type="submit" class="booking-cta" aria-label="Ver precios y disponibilidad">
+      <span data-i18n="book_search">Ver precios y disponibilidad</span>
       <span aria-hidden="true">→</span>
     </button>
     <div class="escnna-inline-notice" style="grid-column: 1 / -1; text-align: center; font-size: 10px; line-height: 1.4; color: var(--ink-500); padding: 8px 12px; border-top: 1px solid var(--paper-400); background: var(--paper-200); border-radius: 0 0 4px 4px;">
@@ -419,6 +425,10 @@
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">28 m²</span></div>
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Ciudad</span><span class="lang-en" lang="en">City</span></span></div>
           </div>
+          <div class="room-price">
+            <span class="from"><span class="lang-es" lang="es">Precio hoy</span><span class="lang-en" lang="en">Tonight</span></span>
+            <span class="amount">$220.000</span><span class="per"><span class="lang-es" lang="es">/ noche</span><span class="lang-en" lang="en">/ night</span></span>
+          </div>
           <div class="room-foot">
             <a href="clasica.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;"><span class="lang-es" lang="es">Ver detalles</span><span class="lang-en" lang="en">View details</span></a>
             <a href="reservar.html" class="text-link book-room-trigger" data-room="clasica"><span class="lang-es" lang="es">Reservar</span><span class="lang-en" lang="en">Book</span> <span class="arr">→</span></a>
@@ -462,6 +472,10 @@
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">32 m²</span></div>
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Cordillera</span><span class="lang-en" lang="en">Mountain</span></span></div>
           </div>
+          <div class="room-price">
+            <span class="from"><span class="lang-es" lang="es">Precio hoy</span><span class="lang-en" lang="en">Tonight</span></span>
+            <span class="amount">$265.000</span><span class="per"><span class="lang-es" lang="es">/ noche</span><span class="lang-en" lang="en">/ night</span></span>
+          </div>
           <div class="room-foot">
             <a href="seleccion.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;"><span class="lang-es" lang="es">Ver detalles</span><span class="lang-en" lang="en">View details</span></a>
             <a href="reservar.html" class="text-link book-room-trigger" data-room="seleccion"><span class="lang-es" lang="es">Reservar</span><span class="lang-en" lang="en">Book</span> <span class="arr">→</span></a>
@@ -502,6 +516,10 @@
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Cama</span><span class="lang-en" lang="en">Bed</span></span><span class="v">1 king</span></div>
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">42 m²</span></div>
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Ciudad</span><span class="lang-en" lang="en">City</span></span></div>
+          </div>
+          <div class="room-price">
+            <span class="from"><span class="lang-es" lang="es">Precio hoy</span><span class="lang-en" lang="en">Tonight</span></span>
+            <span class="amount">$320.000</span><span class="per"><span class="lang-es" lang="es">/ noche</span><span class="lang-en" lang="en">/ night</span></span>
           </div>
           <div class="room-foot">
             <a href="reserva.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;"><span class="lang-es" lang="es">Ver detalles</span><span class="lang-en" lang="en">View details</span></a>
@@ -548,6 +566,10 @@
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">52 m²</span></div>
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Cordillera</span><span class="lang-en" lang="en">Mountain</span></span></div>
           </div>
+          <div class="room-price">
+            <span class="from"><span class="lang-es" lang="es">Precio hoy</span><span class="lang-en" lang="en">Tonight</span></span>
+            <span class="amount">$385.000</span><span class="per"><span class="lang-es" lang="es">/ noche</span><span class="lang-en" lang="en">/ night</span></span>
+          </div>
           <div class="room-foot">
             <a href="origen.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;"><span class="lang-es" lang="es">Ver detalles</span><span class="lang-en" lang="en">View details</span></a>
             <a href="reservar.html" class="text-link book-room-trigger" data-room="origen"><span class="lang-es" lang="es">Reservar</span><span class="lang-en" lang="en">Book</span> <span class="arr">→</span></a>
@@ -591,6 +613,10 @@
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">60 m²</span></div>
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Cordillera</span><span class="lang-en" lang="en">Mountain</span></span></div>
           </div>
+          <div class="room-price">
+            <span class="from"><span class="lang-es" lang="es">Precio hoy</span><span class="lang-en" lang="en">Tonight</span></span>
+            <span class="amount">$450.000</span><span class="per"><span class="lang-es" lang="es">/ noche</span><span class="lang-en" lang="en">/ night</span></span>
+          </div>
           <div class="room-foot">
             <a href="especial.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;"><span class="lang-es" lang="es">Ver detalles</span><span class="lang-en" lang="en">View details</span></a>
             <a href="reservar.html" class="text-link book-room-trigger" data-room="especial"><span class="lang-es" lang="es">Reservar</span><span class="lang-en" lang="en">Book</span> <span class="arr">→</span></a>
@@ -602,6 +628,116 @@
       <button type="button" class="room-list-btn next" aria-label="Siguiente apartamento" aria-controls="room-list">
         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== COMPARADOR ============================== -->
+<section class="comparador" id="comparador" data-screen-label="01.3b Comparador">
+  <div class="container">
+    <div class="comparador-head" data-reveal>
+      <p class="eyebrow terracotta"><span class="lang-es" lang="es">Comparar opciones</span><span class="lang-en" lang="en">Compare options</span></p>
+      <h2 class="display-m">
+        <span class="lang-es" lang="es">¿Cuál es tu <span class="serif-italic">apartaestudio?</span></span>
+        <span class="lang-en" lang="en">Which is your <span class="serif-italic">studio apartment?</span></span>
+      </h2>
+    </div>
+    <div class="comparador-scroll">
+      <table class="comparador-table" role="table">
+        <thead>
+          <tr>
+            <th scope="col" class="ct-label-col"><span class="visually-hidden"><span class="lang-es" lang="es">Característica</span><span class="lang-en" lang="en">Feature</span></span></th>
+            <th scope="col">
+              <a href="clasica.html" class="ct-room-link">
+                <span class="ct-num">01</span>
+                <span class="ct-name">Clásica</span>
+              </a>
+            </th>
+            <th scope="col">
+              <a href="seleccion.html" class="ct-room-link">
+                <span class="ct-num">02</span>
+                <span class="ct-name">Selección</span>
+              </a>
+            </th>
+            <th scope="col">
+              <a href="reserva.html" class="ct-room-link">
+                <span class="ct-num">03</span>
+                <span class="ct-name">Reserva</span>
+              </a>
+            </th>
+            <th scope="col">
+              <a href="origen.html" class="ct-room-link">
+                <span class="ct-num">04</span>
+                <span class="ct-name">Origen</span>
+              </a>
+            </th>
+            <th scope="col">
+              <a href="especial.html" class="ct-room-link ct-featured">
+                <span class="ct-num">05</span>
+                <span class="ct-name">Especial</span>
+              </a>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></th>
+            <td>28 m²</td>
+            <td>32 m²</td>
+            <td>42 m²</td>
+            <td>52 m²</td>
+            <td>60 m²</td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="lang-es" lang="es">Capacidad</span><span class="lang-en" lang="en">Guests</span></th>
+            <td><span class="lang-es" lang="es">2 personas</span><span class="lang-en" lang="en">2 guests</span></td>
+            <td><span class="lang-es" lang="es">2 personas</span><span class="lang-en" lang="en">2 guests</span></td>
+            <td><span class="lang-es" lang="es">2 personas</span><span class="lang-en" lang="en">2 guests</span></td>
+            <td><span class="lang-es" lang="es">2 personas</span><span class="lang-en" lang="en">2 guests</span></td>
+            <td><span class="lang-es" lang="es">4 personas</span><span class="lang-en" lang="en">4 guests</span></td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="lang-es" lang="es">Cama</span><span class="lang-en" lang="en">Bed</span></th>
+            <td>Queen</td>
+            <td>Queen</td>
+            <td>King</td>
+            <td>King</td>
+            <td><span class="lang-es" lang="es">King + sofá cama</span><span class="lang-en" lang="en">King + sofa bed</span></td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></th>
+            <td><span class="lang-es" lang="es">Ciudad</span><span class="lang-en" lang="en">City</span></td>
+            <td><span class="lang-es" lang="es">Cordillera + balcón</span><span class="lang-en" lang="en">Mountain + balcony</span></td>
+            <td><span class="lang-es" lang="es">Ciudad</span><span class="lang-en" lang="en">City</span></td>
+            <td><span class="lang-es" lang="es">Panorámica</span><span class="lang-en" lang="en">Panoramic</span></td>
+            <td><span class="lang-es" lang="es">Panorámica + terraza</span><span class="lang-en" lang="en">Panoramic + terrace</span></td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="lang-es" lang="es">Balcón / Terraza</span><span class="lang-en" lang="en">Balcony / Terrace</span></th>
+            <td aria-label="No">—</td>
+            <td class="ct-check" aria-label="Sí / Yes"><span aria-hidden="true">✶</span></td>
+            <td aria-label="No">—</td>
+            <td class="ct-check" aria-label="Sí / Yes"><span aria-hidden="true">✶</span></td>
+            <td class="ct-check" aria-label="Sí / Yes"><span aria-hidden="true">✶</span></td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="lang-es" lang="es">Precio hoy</span><span class="lang-en" lang="en">Tonight</span></th>
+            <td class="ct-price" data-ct-room="clasica">$220.000</td>
+            <td class="ct-price" data-ct-room="seleccion">$265.000</td>
+            <td class="ct-price" data-ct-room="reserva">$320.000</td>
+            <td class="ct-price" data-ct-room="origen">$385.000</td>
+            <td class="ct-price ct-featured" data-ct-room="especial">$450.000</td>
+          </tr>
+          <tr class="ct-cta-row">
+            <th scope="row"><span class="visually-hidden"><span class="lang-es" lang="es">Reservar</span><span class="lang-en" lang="en">Book</span></span></th>
+            <td><a href="reservar.html" class="ct-book book-room-trigger" data-room="clasica"><span class="lang-es" lang="es">Reservar</span><span class="lang-en" lang="en">Book</span> →</a></td>
+            <td><a href="reservar.html" class="ct-book book-room-trigger" data-room="seleccion"><span class="lang-es" lang="es">Reservar</span><span class="lang-en" lang="en">Book</span> →</a></td>
+            <td><a href="reservar.html" class="ct-book book-room-trigger" data-room="reserva"><span class="lang-es" lang="es">Reservar</span><span class="lang-en" lang="en">Book</span> →</a></td>
+            <td><a href="reservar.html" class="ct-book book-room-trigger" data-room="origen"><span class="lang-es" lang="es">Reservar</span><span class="lang-en" lang="en">Book</span> →</a></td>
+            <td><a href="reservar.html" class="ct-book book-room-trigger ct-featured" data-room="especial"><span class="lang-es" lang="es">Reservar</span><span class="lang-en" lang="en">Book</span> →</a></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </section>
@@ -667,36 +803,94 @@
 <section class="reviews-section" data-screen-label="01.6 Reseñas">
   <div class="container">
     <div class="reviews-head">
-      <p class="eyebrow terracotta">
-        <span class="lang-es" lang="es">Reseñas de huéspedes</span>
-        <span class="lang-en" lang="en">Guest reviews</span>
-      </p>
-      <div class="reviews-score-bar">
-        <span class="rsb-num">9.0</span>
-        <span class="rsb-star" aria-hidden="true">✶</span>
-        <span class="rsb-text lang-es" lang="es">Booking.com · 126 reseñas</span>
-        <span class="rsb-text lang-en" lang="en">Booking.com · 126 reviews</span>
+      <div>
+        <p class="eyebrow terracotta">
+          <span class="lang-es" lang="es">Reseñas de huéspedes</span>
+          <span class="lang-en" lang="en">Guest reviews</span>
+        </p>
+        <div class="reviews-score-bar">
+          <span class="rsb-num">9.0</span>
+          <span class="rsb-star" aria-hidden="true">✶</span>
+          <span class="rsb-text lang-es" lang="es">Booking.com · 126 reseñas</span>
+          <span class="rsb-text lang-en" lang="en">Booking.com · 126 reviews</span>
+        </div>
       </div>
     </div>
-    <div class="reviews-list" id="reviews-list">
-      <article class="review-card">
-        <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-        <blockquote class="rc-text">&#8220;Muy conveniente, económico, limpio y moderno. Lo recomiendo altamente. La ubicación es excelente, cerca de buenas tiendas, restaurantes y vida nocturna. El apartamento es muy moderno, limpio, espacioso y bien iluminado.&#8221;</blockquote>
-        <footer class="rc-author">Douglas · Canadá</footer>
-        <span class="rc-source">Booking.com</span>
-      </article>
-      <article class="review-card">
-        <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-        <blockquote class="rc-text">&#8220;Excelente hotel, situado en un barrio muy agradable. Los apartaestudios son modernos, cómodos y espaciosos. Todo está muy limpio y bien mantenido. Dormimos de maravilla. El desayuno es delicioso y variado. El personal es adorable y servicial.&#8221;</blockquote>
-        <footer class="rc-author">Catherine · Bélgica</footer>
-        <span class="rc-source">Booking.com</span>
-      </article>
-      <article class="review-card">
-        <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-        <blockquote class="rc-text">&#8220;¡Wooow, el mejor lugar para quedarse en Manizales! Amé cada detalle del lugar, lo limpio y acogedor que era. 20 de 10 en ubicación: súper cerca al Cable, la Av. Santander y restaurantes. El barrio La Estrella es un lugar que invita a recorrer.&#8221;</blockquote>
-        <footer class="rc-author">Angélica · Colombia</footer>
-        <span class="rc-source">Booking.com</span>
-      </article>
+    <div class="reviews-nav" aria-hidden="true">
+      <span class="rvd active"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+    </div>
+    <div class="reviews-carousel-wrap">
+      <div class="reviews-list" id="reviews-list">
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Muy conveniente, económico, limpio y moderno. Lo recomiendo altamente. La ubicación es excelente, cerca de buenas tiendas, restaurantes y vida nocturna. El apartamento es muy moderno, limpio, espacioso y bien iluminado.&#8221;</blockquote>
+          <footer class="rc-author">Douglas · Canadá</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Excelente hotel, situado en un barrio muy agradable. Los apartaestudios son modernos, cómodos y espaciosos. Todo está muy limpio y bien mantenido. Dormimos de maravilla. El desayuno es delicioso y variado. El personal es adorable y servicial.&#8221;</blockquote>
+          <footer class="rc-author">Catherine · Bélgica</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;¡Wooow, el mejor lugar para quedarse en Manizales! Amé cada detalle del lugar, lo limpio y acogedor que era. 20 de 10 en ubicación: súper cerca al Cable, la Av. Santander y restaurantes. El barrio La Estrella es un lugar que invita a recorrer.&#8221;</blockquote>
+          <footer class="rc-author">Angélica · Colombia</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">9 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Llevamos tres meses en el Origen y seguimos renovando. El apartaestudio tiene todo lo que necesita un residente médico: escritorio amplio, internet estable y una cocina de verdad. Nada de lo que falta en un hotel y nada de lo que sobra.&#8221;</blockquote>
+          <footer class="rc-author">Sebastián · Colombia</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Perfect for remote work — fast fiber internet, a real desk, and the best coffee in the building is five minutes away. El Cable neighborhood has a great energy. Will definitely come back when I'm in Manizales for work.&#8221;</blockquote>
+          <footer class="rc-author">Lena · Alemania</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Vinimos con nuestra empresa a una capacitación de dos semanas y Estar resolvió todo: factura única, check-in digital para todo el equipo y un precio que no encuentras en ningún hotel de la zona. Les volvemos a encargar la próxima vez.&#8221;</blockquote>
+          <footer class="rc-author">Mariana &amp; Felipe · Colombia</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Vine a Manizales por el Festival de Teatro y terminé quedándome una semana más. El Selección con balcón a la cordillera es sencillamente hermoso para tomar el café de la mañana. El barrio tiene la energía justa: tranquilo pero vivo.&#8221;</blockquote>
+          <footer class="rc-author">Jimena · Bogotá</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Honestly one of the best stays I've had in Colombia. The Especial apartment with private terrace was worth every peso — panoramic views of Manizales at night are something else. We'll be back for the Coffee Festival.&#8221;</blockquote>
+          <footer class="rc-author">James · Estados Unidos</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">9 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Llevaba meses buscando un apartamento amoblado en Manizales para mi posgrado y Estar fue la mejor decisión. La ubicación respecto a la Universidad Nacional es imbatible. Renovamos cada mes sin dudarlo.&#8221;</blockquote>
+          <footer class="rc-author">Valentina · Medellín</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Un fin de semana en pareja que superó todas las expectativas. El apartaestudio Reserva con ambientes separados nos dio privacidad y comodidad. La ciudad desde la ventana es una postal. Volveremos definitivamente.&#8221;</blockquote>
+          <footer class="rc-author">Andrés &amp; Sofía · Cali</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+      </div>
     </div>
   </div>
 </section>
@@ -713,7 +907,7 @@
     </div>
 
     <div class="segments-grid">
-      <a href="index.html" class="segment" data-reveal>
+      <a href="reservar.html" class="segment" data-reveal>
         <span class="num">01</span>
         <h3><span class="lang-es" lang="es">Escapada corta</span><span class="lang-en" lang="en">Short Getaway</span></h3>
         <p><span class="lang-es" lang="es">De una noche a una semana. Alternativa íntima a hoteles y Airbnb en Manizales — para turismo, fin de semana en el Eje Cafetero o una pausa.</span><span class="lang-en" lang="en">From one night to a week. A personal alternative to hotels and Airbnb in Manizales — for tourism, a Coffee Axis weekend, or just a pause.</span></p>
@@ -837,8 +1031,8 @@
 <!-- ============================== PRICE & REVIEWS FETCH ============================== -->
 <script>
 (function(){
-  var el=document.getElementById('hero-price'),am=document.getElementById('hp-amount');
-  if(!el||!am)return;
+  var idToSlug={'31348':'clasica','31349':'seleccion','31350':'reserva','31351':'origen','31352':'especial'};
+  var heroAm=document.getElementById('hp-amount');
   var t=new Date(),t2=new Date();t2.setDate(t2.getDate()+1);
   function fmt(d){return d.toISOString().split('T')[0];}
   function cop(n){return '$'+Math.round(n).toLocaleString('es-CO');}
@@ -848,8 +1042,19 @@
       var rooms=(d.rooms||[]).filter(function(r){return r.available&&r.avgPrice>0;});
       if(!rooms.length)return;
       var min=Math.min.apply(null,rooms.map(function(r){return r.avgPrice;}));
-      am.textContent=cop(min);
-      el.removeAttribute('hidden');
+      if(heroAm)heroAm.textContent=cop(min);
+      rooms.forEach(function(room){
+        var slug=idToSlug[String(room.id_room_types)];
+        if(!slug||!room.avgPrice)return;
+        var trigger=document.querySelector('.book-room-trigger[data-room="'+slug+'"]');
+        if(!trigger)return;
+        var card=trigger.closest('.room');
+        if(!card)return;
+        var amEl=card.querySelector('.room-price .amount');
+        if(amEl)amEl.textContent=cop(room.avgPrice);
+        var ctEl=document.querySelector('[data-ct-room="'+slug+'"]');
+        if(ctEl)ctEl.textContent=cop(room.avgPrice);
+      });
     })
     .catch(function(){});
 })();
@@ -930,6 +1135,61 @@ document.addEventListener('DOMContentLoaded', function() {
   var nextBtn = document.querySelector('.room-list-btn.next');
   if (prevBtn) prevBtn.addEventListener('click', function() { scrollToIndex(currentIndex() - 1); });
   if (nextBtn) nextBtn.addEventListener('click', function() { scrollToIndex(currentIndex() + 1); });
+});
+</script>
+
+<!-- ============================== REVIEWS CAROUSEL ============================== -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var list = document.getElementById('reviews-list');
+  var dots = document.querySelectorAll('.rvd');
+  if (!list || !dots.length) return;
+
+  function cardWidth() {
+    var card = list.querySelector('.review-card');
+    if (!card) return 0;
+    return card.offsetWidth + parseFloat(getComputedStyle(list).gap || 16);
+  }
+
+  function currentIndex() {
+    var w = cardWidth();
+    return w ? Math.round(list.scrollLeft / w) : 0;
+  }
+
+  function scrollToIndex(i) {
+    i = Math.max(0, Math.min(i, dots.length - 1));
+    list.scrollTo({ left: i * cardWidth(), behavior: 'smooth' });
+  }
+
+  list.addEventListener('scroll', function() {
+    var i = currentIndex();
+    dots.forEach(function(d, j) { d.classList.toggle('active', j === i); });
+  }, { passive: true });
+
+  dots.forEach(function(dot, i) {
+    dot.addEventListener('click', function() { scrollToIndex(i); });
+  });
+
+  var startX = 0, startScroll = 0, startY = 0, axis = null;
+  list.addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startScroll = list.scrollLeft;
+    axis = null;
+  }, { passive: true });
+  list.addEventListener('touchmove', function(e) {
+    var dx = e.touches[0].clientX - startX;
+    var dy = e.touches[0].clientY - startY;
+    if (axis === null) axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (axis === 'x') { e.preventDefault(); list.scrollLeft = startScroll - dx; }
+  }, { passive: false });
+  list.addEventListener('touchend', function(e) {
+    if (axis !== 'x') return;
+    var dx = e.changedTouches[0].clientX - startX;
+    var base = Math.round(startScroll / cardWidth());
+    if (Math.abs(dx) < 30) { scrollToIndex(base); return; }
+    scrollToIndex(dx < 0 ? base + 1 : base - 1);
+  }, { passive: true });
 });
 </script>
 

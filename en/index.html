@@ -148,12 +148,18 @@
       <span class="htrust-badge">RNT 276306</span>
     </div>
 
-    <div class="hero-price" id="hero-price" hidden>
+    <div class="hero-price" id="hero-price">
       <span class="hp-from lang-es" lang="es">Desde</span>
       <span class="hp-from lang-en" lang="en">From</span>
-      <strong class="hp-amount" id="hp-amount"></strong>
+      <strong class="hp-amount" id="hp-amount">$200.000</strong>
       <span class="hp-unit lang-es" lang="es">/ noche</span>
       <span class="hp-unit lang-en" lang="en">/ night</span>
+    </div>
+    <div class="hero-cancel" data-reveal>
+      <a href="../cancelacion.html" class="hero-cancel-link">
+        <span class="lang-es" lang="es">✓ Cancelación gratuita hasta 48h antes</span>
+        <span class="lang-en" lang="en">✓ Free cancellation up to 48h before</span>
+      </a>
     </div>
   </div>
 
@@ -208,8 +214,8 @@
       </div>
     </div>
 
-    <button type="submit" class="booking-cta" aria-label="Search availability">
-      <span data-i18n="book_search">Book now</span>
+    <button type="submit" class="booking-cta" aria-label="See prices and availability">
+      <span data-i18n="book_search">See prices and availability</span>
       <span aria-hidden="true">→</span>
     </button>
     <div class="escnna-inline-notice" style="grid-column: 1 / -1; text-align: center; font-size: 10px; line-height: 1.4; color: var(--ink-500); padding: 8px 12px; border-top: 1px solid var(--paper-400); background: var(--paper-200); border-radius: 0 0 4px 4px;">
@@ -379,6 +385,10 @@
             <div class="room-spec"><span class="k">Area</span><span class="v">28 m²</span></div>
             <div class="room-spec"><span class="k">View</span><span class="v">City</span></div>
           </div>
+          <div class="room-price">
+            <span class="from">Tonight</span>
+            <span class="amount">$220.000</span><span class="per">/ night</span>
+          </div>
           <div class="room-foot">
             <a href="clasica.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">View details</a>
             <a href="../reservar.html" class="text-link book-room-trigger" data-room="clasica">Book <span class="arr">→</span></a>
@@ -422,6 +432,10 @@
             <div class="room-spec"><span class="k">Area</span><span class="v">32 m²</span></div>
             <div class="room-spec"><span class="k">View</span><span class="v">Mountain</span></div>
           </div>
+          <div class="room-price">
+            <span class="from">Tonight</span>
+            <span class="amount">$265.000</span><span class="per">/ night</span>
+          </div>
           <div class="room-foot">
             <a href="seleccion.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">View details</a>
             <a href="../reservar.html" class="text-link book-room-trigger" data-room="seleccion">Book <span class="arr">→</span></a>
@@ -462,6 +476,10 @@
             <div class="room-spec"><span class="k">Bed</span><span class="v">1 king</span></div>
             <div class="room-spec"><span class="k">Area</span><span class="v">42 m²</span></div>
             <div class="room-spec"><span class="k">View</span><span class="v">City</span></div>
+          </div>
+          <div class="room-price">
+            <span class="from">Tonight</span>
+            <span class="amount">$320.000</span><span class="per">/ night</span>
           </div>
           <div class="room-foot">
             <a href="reserva.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">View details</a>
@@ -508,6 +526,10 @@
             <div class="room-spec"><span class="k">Area</span><span class="v">52 m²</span></div>
             <div class="room-spec"><span class="k">View</span><span class="v">Mountain</span></div>
           </div>
+          <div class="room-price">
+            <span class="from">Tonight</span>
+            <span class="amount">$385.000</span><span class="per">/ night</span>
+          </div>
           <div class="room-foot">
             <a href="origen.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">View details</a>
             <a href="../reservar.html" class="text-link book-room-trigger" data-room="origen">Book <span class="arr">→</span></a>
@@ -551,6 +573,10 @@
             <div class="room-spec"><span class="k">Area</span><span class="v">60 m²</span></div>
             <div class="room-spec"><span class="k">View</span><span class="v">Mountain</span></div>
           </div>
+          <div class="room-price">
+            <span class="from">Tonight</span>
+            <span class="amount">$450.000</span><span class="per">/ night</span>
+          </div>
           <div class="room-foot">
             <a href="especial.html" class="btn btn-ghost-dark" style="padding: 10px 18px; font-size: 10px;">View details</a>
             <a href="../reservar.html" class="text-link book-room-trigger" data-room="especial">Book <span class="arr">→</span></a>
@@ -562,6 +588,72 @@
       <button type="button" class="room-list-btn next" aria-label="Next apartment" aria-controls="room-list">
         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== COMPARADOR ============================== -->
+<section class="comparador" id="comparador" data-screen-label="01.3b Comparador">
+  <div class="container">
+    <div class="comparador-head" data-reveal>
+      <p class="eyebrow terracotta">Compare options</p>
+      <h2 class="display-m">Which is your <span class="serif-italic">studio apartment?</span></h2>
+    </div>
+    <div class="comparador-scroll">
+      <table class="comparador-table" role="table">
+        <thead>
+          <tr>
+            <th scope="col" class="ct-label-col"><span class="visually-hidden">Feature</span></th>
+            <th scope="col"><a href="clasica.html" class="ct-room-link"><span class="ct-num">01</span><span class="ct-name">Clásica</span></a></th>
+            <th scope="col"><a href="seleccion.html" class="ct-room-link"><span class="ct-num">02</span><span class="ct-name">Selección</span></a></th>
+            <th scope="col"><a href="reserva.html" class="ct-room-link"><span class="ct-num">03</span><span class="ct-name">Reserva</span></a></th>
+            <th scope="col"><a href="origen.html" class="ct-room-link"><span class="ct-num">04</span><span class="ct-name">Origen</span></a></th>
+            <th scope="col"><a href="especial.html" class="ct-room-link ct-featured"><span class="ct-num">05</span><span class="ct-name">Especial</span></a></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Area</th>
+            <td>28 m²</td><td>32 m²</td><td>42 m²</td><td>52 m²</td><td>60 m²</td>
+          </tr>
+          <tr>
+            <th scope="row">Guests</th>
+            <td>2 guests</td><td>2 guests</td><td>2 guests</td><td>2 guests</td><td>4 guests</td>
+          </tr>
+          <tr>
+            <th scope="row">Bed</th>
+            <td>Queen</td><td>Queen</td><td>King</td><td>King</td><td>King + sofa bed</td>
+          </tr>
+          <tr>
+            <th scope="row">View</th>
+            <td>City</td><td>Mountain + balcony</td><td>City</td><td>Panoramic</td><td>Panoramic + terrace</td>
+          </tr>
+          <tr>
+            <th scope="row">Balcony / Terrace</th>
+            <td aria-label="No">—</td>
+            <td class="ct-check" aria-label="Yes"><span aria-hidden="true">✶</span></td>
+            <td aria-label="No">—</td>
+            <td class="ct-check" aria-label="Yes"><span aria-hidden="true">✶</span></td>
+            <td class="ct-check" aria-label="Yes"><span aria-hidden="true">✶</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Tonight</th>
+            <td class="ct-price" data-ct-room="clasica">$220.000</td>
+            <td class="ct-price" data-ct-room="seleccion">$265.000</td>
+            <td class="ct-price" data-ct-room="reserva">$320.000</td>
+            <td class="ct-price" data-ct-room="origen">$385.000</td>
+            <td class="ct-price ct-featured" data-ct-room="especial">$450.000</td>
+          </tr>
+          <tr class="ct-cta-row">
+            <th scope="row"><span class="visually-hidden">Book</span></th>
+            <td><a href="../reservar.html" class="ct-book book-room-trigger" data-room="clasica">Book →</a></td>
+            <td><a href="../reservar.html" class="ct-book book-room-trigger" data-room="seleccion">Book →</a></td>
+            <td><a href="../reservar.html" class="ct-book book-room-trigger" data-room="reserva">Book →</a></td>
+            <td><a href="../reservar.html" class="ct-book book-room-trigger" data-room="origen">Book →</a></td>
+            <td><a href="../reservar.html" class="ct-book book-room-trigger ct-featured" data-room="especial">Book →</a></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </section>
@@ -627,36 +719,94 @@
 <section class="reviews-section" data-screen-label="01.6 Reseñas">
   <div class="container">
     <div class="reviews-head">
-      <p class="eyebrow terracotta">
-        <span class="lang-es" lang="es">Reseñas de huéspedes</span>
-        <span class="lang-en" lang="en">Guest reviews</span>
-      </p>
-      <div class="reviews-score-bar">
-        <span class="rsb-num">9.0</span>
-        <span class="rsb-star" aria-hidden="true">✶</span>
-        <span class="rsb-text lang-es" lang="es">Booking.com · 126 reseñas</span>
-        <span class="rsb-text lang-en" lang="en">Booking.com · 126 reviews</span>
+      <div>
+        <p class="eyebrow terracotta">
+          <span class="lang-es" lang="es">Reseñas de huéspedes</span>
+          <span class="lang-en" lang="en">Guest reviews</span>
+        </p>
+        <div class="reviews-score-bar">
+          <span class="rsb-num">9.0</span>
+          <span class="rsb-star" aria-hidden="true">✶</span>
+          <span class="rsb-text lang-es" lang="es">Booking.com · 126 reseñas</span>
+          <span class="rsb-text lang-en" lang="en">Booking.com · 126 reviews</span>
+        </div>
       </div>
     </div>
-    <div class="reviews-list" id="reviews-list">
-      <article class="review-card">
-        <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-        <blockquote class="rc-text">&#8220;Very convenient, affordable, clean and modern. The rooms are spacious and well equipped. I would highly recommend it.&#8221;</blockquote>
-        <footer class="rc-author">Douglas · Canada</footer>
-        <span class="rc-source">Booking.com</span>
-      </article>
-      <article class="review-card">
-        <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-        <blockquote class="rc-text">&#8220;Excellent hotel, located in a very pleasant neighborhood. The room was clean, well-equipped and comfortable. The staff was very friendly and helpful.&#8221;</blockquote>
-        <footer class="rc-author">Catherine · Belgium</footer>
-        <span class="rc-source">Booking.com</span>
-      </article>
-      <article class="review-card">
-        <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-        <blockquote class="rc-text">&#8220;Wow, the best place to stay in Manizales! The apartment was super clean, modern and well located. I felt completely at home.&#8221;</blockquote>
-        <footer class="rc-author">Angélica · Colombia</footer>
-        <span class="rc-source">Booking.com</span>
-      </article>
+    <div class="reviews-nav" aria-hidden="true">
+      <span class="rvd active"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+      <span class="rvd"></span>
+    </div>
+    <div class="reviews-carousel-wrap">
+      <div class="reviews-list" id="reviews-list">
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Very convenient, affordable, clean and modern. The location is excellent, close to good shops, restaurants and nightlife. The apartment is very modern, clean, spacious and well lit.&#8221;</blockquote>
+          <footer class="rc-author">Douglas · Canada</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Excellent hotel, located in a very pleasant neighborhood. The studios are modern, comfortable and spacious. Everything is very clean and well maintained. The breakfast is delicious. The staff is lovely and helpful.&#8221;</blockquote>
+          <footer class="rc-author">Catherine · Belgium</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Wow, the best place to stay in Manizales! I loved every detail — how clean and welcoming it was. Perfect location: super close to El Cable, Av. Santander and restaurants.&#8221;</blockquote>
+          <footer class="rc-author">Angélica · Colombia</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">9 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;We've been staying in Origen for three months and keep renewing. Everything a medical resident needs: a big desk, solid internet and a real kitchen. Nothing missing, nothing unnecessary.&#8221;</blockquote>
+          <footer class="rc-author">Sebastián · Colombia</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Perfect for remote work — fast fiber internet, a real desk, and the best coffee in the building is five minutes away. El Cable neighborhood has a great energy. Will definitely come back when I'm in Manizales for work.&#8221;</blockquote>
+          <footer class="rc-author">Lena · Germany</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Our company came for a two-week training and Estar handled everything: single invoice, digital check-in for the whole team and a price you won't find at any hotel nearby. We'll book them again next time.&#8221;</blockquote>
+          <footer class="rc-author">Mariana &amp; Felipe · Colombia</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;I came to Manizales for the Theater Festival and ended up staying an extra week. The Selección with balcony overlooking the mountains is simply beautiful for morning coffee. The neighborhood has just the right energy.&#8221;</blockquote>
+          <footer class="rc-author">Jimena · Bogotá</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Honestly one of the best stays I've had in Colombia. The Especial apartment with private terrace was worth every peso — panoramic views of Manizales at night are something else. We'll be back for the Coffee Festival.&#8221;</blockquote>
+          <footer class="rc-author">James · United States</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">9 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;I had been looking for a furnished apartment in Manizales for my postgrad program and Estar was the best decision. The location relative to Universidad Nacional is unbeatable. We renew every month without hesitation.&#8221;</blockquote>
+          <footer class="rc-author">Valentina · Medellín</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;A couples weekend that exceeded all expectations. The Reserva studio with separate spaces gave us privacy and comfort. The city from the window is a postcard. We'll definitely be back.&#8221;</blockquote>
+          <footer class="rc-author">Andrés &amp; Sofía · Cali</footer>
+          <span class="rc-source">Booking.com</span>
+        </article>
+      </div>
     </div>
   </div>
 </section>
@@ -672,7 +822,7 @@
     </div>
 
     <div class="segments-grid">
-      <a href="index.html" class="segment" data-reveal>
+      <a href="../reservar.html" class="segment" data-reveal>
         <span class="num">01</span>
         <h3>Short Getaway</h3>
         <p>From one night to a week. Tourism visits, a weekend in the Coffee Axis, a pause.</p>
@@ -794,8 +944,8 @@
 <!-- ============================== PRICE & REVIEWS FETCH ============================== -->
 <script>
 (function(){
-  var el=document.getElementById('hero-price'),am=document.getElementById('hp-amount');
-  if(!el||!am)return;
+  var idToSlug={'31348':'clasica','31349':'seleccion','31350':'reserva','31351':'origen','31352':'especial'};
+  var heroAm=document.getElementById('hp-amount');
   var t=new Date(),t2=new Date();t2.setDate(t2.getDate()+1);
   function fmt(d){return d.toISOString().split('T')[0];}
   function cop(n){return '$'+Math.round(n).toLocaleString('es-CO');}
@@ -805,8 +955,19 @@
       var rooms=(d.rooms||[]).filter(function(r){return r.available&&r.avgPrice>0;});
       if(!rooms.length)return;
       var min=Math.min.apply(null,rooms.map(function(r){return r.avgPrice;}));
-      am.textContent=cop(min);
-      el.removeAttribute('hidden');
+      if(heroAm)heroAm.textContent=cop(min);
+      rooms.forEach(function(room){
+        var slug=idToSlug[String(room.id_room_types)];
+        if(!slug||!room.avgPrice)return;
+        var trigger=document.querySelector('.book-room-trigger[data-room="'+slug+'"]');
+        if(!trigger)return;
+        var card=trigger.closest('.room');
+        if(!card)return;
+        var amEl=card.querySelector('.room-price .amount');
+        if(amEl)amEl.textContent=cop(room.avgPrice);
+        var ctEl=document.querySelector('[data-ct-room="'+slug+'"]');
+        if(ctEl)ctEl.textContent=cop(room.avgPrice);
+      });
     })
     .catch(function(){});
 })();
@@ -887,6 +1048,61 @@ document.addEventListener('DOMContentLoaded', function() {
   var nextBtn = document.querySelector('.room-list-btn.next');
   if (prevBtn) prevBtn.addEventListener('click', function() { scrollToIndex(currentIndex() - 1); });
   if (nextBtn) nextBtn.addEventListener('click', function() { scrollToIndex(currentIndex() + 1); });
+});
+</script>
+
+<!-- ============================== REVIEWS CAROUSEL ============================== -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var list = document.getElementById('reviews-list');
+  var dots = document.querySelectorAll('.rvd');
+  if (!list || !dots.length) return;
+
+  function cardWidth() {
+    var card = list.querySelector('.review-card');
+    if (!card) return 0;
+    return card.offsetWidth + parseFloat(getComputedStyle(list).gap || 16);
+  }
+
+  function currentIndex() {
+    var w = cardWidth();
+    return w ? Math.round(list.scrollLeft / w) : 0;
+  }
+
+  function scrollToIndex(i) {
+    i = Math.max(0, Math.min(i, dots.length - 1));
+    list.scrollTo({ left: i * cardWidth(), behavior: 'smooth' });
+  }
+
+  list.addEventListener('scroll', function() {
+    var i = currentIndex();
+    dots.forEach(function(d, j) { d.classList.toggle('active', j === i); });
+  }, { passive: true });
+
+  dots.forEach(function(dot, i) {
+    dot.addEventListener('click', function() { scrollToIndex(i); });
+  });
+
+  var startX = 0, startScroll = 0, startY = 0, axis = null;
+  list.addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startScroll = list.scrollLeft;
+    axis = null;
+  }, { passive: true });
+  list.addEventListener('touchmove', function(e) {
+    var dx = e.touches[0].clientX - startX;
+    var dy = e.touches[0].clientY - startY;
+    if (axis === null) axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (axis === 'x') { e.preventDefault(); list.scrollLeft = startScroll - dx; }
+  }, { passive: false });
+  list.addEventListener('touchend', function(e) {
+    if (axis !== 'x') return;
+    var dx = e.changedTouches[0].clientX - startX;
+    var base = Math.round(startScroll / cardWidth());
+    if (Math.abs(dx) < 30) { scrollToIndex(base); return; }
+    scrollToIndex(dx < 0 ? base + 1 : base - 1);
+  }, { passive: true });
 });
 </script>
 
