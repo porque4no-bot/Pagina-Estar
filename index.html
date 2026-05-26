@@ -25,6 +25,11 @@
 <link rel="stylesheet" href="styles.css?v=3">
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
 <link rel="preconnect" href="https://checkout.wompi.co" crossorigin>
+<link rel="dns-prefetch" href="https://maps.google.com">
+<link rel="dns-prefetch" href="https://maps.googleapis.com">
+<link rel="dns-prefetch" href="https://www.google.com">
+<link rel="dns-prefetch" href="https://production.wompi.co">
+<link rel="preconnect" href="https://production.wompi.co" crossorigin>
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
 <script type="application/ld+json">
 [
@@ -161,7 +166,7 @@
 
   <!-- Booking bar pinned to bottom of hero -->
   <form class="booking-bar" id="reservar">
-    <div class="booking-field custom-select-field" id="checkin-field" tabindex="0">
+    <div class="booking-field custom-select-field" id="checkin-field" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false">
       <!-- Desktop: individual labels -->
       <span class="label" data-i18n="book_check_in">Llegada</span>
       <span class="value" id="checkin-display" data-i18n="book_pick_dates">Elige una fecha</span>
@@ -171,13 +176,13 @@
       <input type="date" id="checkin-input" name="checkin" required style="display: none;">
       <div class="custom-dropdown-menu calendar-dropdown" id="checkin-calendar"></div>
     </div>
-    <div class="booking-field custom-select-field" id="checkout-field" tabindex="0">
+    <div class="booking-field custom-select-field" id="checkout-field" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false">
       <span class="label" data-i18n="book_check_out">Salida</span>
       <span class="value" id="checkout-display" data-i18n="book_pick_dates">Elige una fecha</span>
       <input type="date" id="checkout-input" name="checkout" required style="display: none;">
       <div class="custom-dropdown-menu calendar-dropdown" id="checkout-calendar"></div>
     </div>
-    <div class="booking-field custom-select-field" id="guests-field" tabindex="0">
+    <div class="booking-field custom-select-field" id="guests-field" tabindex="0" role="button" aria-haspopup="listbox" aria-expanded="false">
       <span class="label" data-i18n="book_guests">Huéspedes</span>
       <span class="value" id="guests-display" data-i18n="book_one_guest">1 huésped</span>
       <select id="guests-input" name="guests" style="display: none;">
@@ -744,33 +749,6 @@
     </div>
   </div>
 </section>
-<!-- ============================== NEWSLETTER ============================== -->
-<section class="newsletter" data-screen-label="01.7 Newsletter">
-  <div class="container">
-    <div data-reveal>
-      <p class="eyebrow on-dark"><span class="lang-es" lang="es">Quédate cerca</span><span class="lang-en" lang="en">Stay close</span></p>
-      <h3>
-        <span class="lang-es" lang="es">Una carta breve <span class="serif-italic">cada estación.</span></span>
-        <span class="lang-en" lang="en">A short letter <span class="serif-italic">every season.</span></span>
-      </h3>
-      <p>
-        <span class="lang-es" lang="es">Recomendaciones locales, recetas con café de la región y disponibilidad antes que nadie.</span>
-        <span class="lang-en" lang="en">Local recommendations, regional coffee recipes and availability before anyone else.</span>
-      </p>
-    </div>
-    <form data-reveal name="newsletter" data-netlify="true">
-      <input type="hidden" name="form-name" value="newsletter">
-      <label for="newsletter-email" class="visually-hidden">Tu correo electrónico</label>
-      <input type="email" name="email" id="newsletter-email" placeholder="tu@correo.com" required>
-      <button type="submit"><span class="lang-es" lang="es">Suscribirme</span><span class="lang-en" lang="en">Subscribe</span> <span aria-hidden="true">→</span></button>
-    </form>
-    <p style="font-size: 11px; color: rgba(250,246,239,0.7); margin-top: 12px; line-height: 1.4;">
-      <span class="lang-es" lang="es">Al suscribirte autorizas el uso de tu correo bajo nuestra <a href="privacidad.html" target="_blank" style="text-decoration: underline; color: inherit;">Política de Privacidad</a>.</span>
-      <span class="lang-en" lang="en">By subscribing you authorize email usage under our <a href="privacidad.html" target="_blank" style="text-decoration: underline; color: inherit;">Privacy Policy</a>.</span>
-    </p>
-  </div>
-</section>
-
 <!-- ============================== FOOTER ============================== -->
 <footer class="site-footer">
   <div class="container">
@@ -805,9 +783,27 @@
         </ul>
       </div>
     </div>
+    <div class="footer-newsletter">
+      <div class="fn-text">
+        <p class="fn-label lang-es" lang="es">Quédate cerca — una carta breve cada estación.</p>
+        <p class="fn-label lang-en" lang="en">Stay close — a short letter every season.</p>
+      </div>
+      <form class="fn-form" name="newsletter" data-netlify="true">
+        <input type="hidden" name="form-name" value="newsletter">
+        <label for="fn-email" class="visually-hidden">
+          <span class="lang-es" lang="es">Tu correo electrónico</span>
+          <span class="lang-en" lang="en">Your email address</span>
+        </label>
+        <input type="email" name="email" id="fn-email" placeholder="tu@correo.com" required autocomplete="email">
+        <button type="submit">
+          <span class="lang-es" lang="es">Suscribirse</span>
+          <span class="lang-en" lang="en">Subscribe</span>
+        </button>
+      </form>
+    </div>
     <div class="footer-bot">
       <span>
-        <span data-i18n="footer_copyright">© 2026 estar · Manizales, Colombia</span> · 
+        <span data-i18n="footer_copyright">© 2026 estar · Manizales, Colombia</span> ·
         <span data-i18n="footer_rnt" class="rnt-badge" style="color: var(--terracotta); font-weight: 900;">RNT 276306</span>
       </span>
       <span>
