@@ -1467,7 +1467,7 @@ function ManageBooking({ onBack, lang }) {
 function BookingEngine() {
   const initialParams = parseQueryParams();
   
-  const [lang, setLang] = useState(document.documentElement.lang || 'es');
+  const [lang, setLang] = useState(window.location.pathname.startsWith('/en/') ? 'en' : 'es');
   const [mode, setMode] = useState('book'); // 'book' | 'manage'
   const [search, setSearch] = useState({ 
     checkin: initialParams.checkin, 
@@ -1578,20 +1578,9 @@ function BookingEngine() {
     return () => clearTimeout(timer);
   }, [currentStep]);
 
-  /* Listener for decoupled language changes from shell.js */
   useEffect(() => {
-    const handleLangChange = (e) => {
-      if (e.detail && e.detail.lang) {
-        setLang(e.detail.lang);
-      }
-    };
-    document.addEventListener('estar-lang-change', handleLangChange);
     window.enterManageMode = () => setMode('manage');
-    
-    return () => { 
-      document.removeEventListener('estar-lang-change', handleLangChange);
-      delete window.enterManageMode; 
-    };
+    return () => { delete window.enterManageMode; };
   }, []);
 
   const booking = { room: selectedRoom, rate: selectedRate, extras, guest: guestData, payment: paymentMethod };
