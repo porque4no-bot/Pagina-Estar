@@ -719,9 +719,9 @@
 </section>
 
 <!-- REVIEWS -->
-<section class="reviews-section" data-screen-label="01.6 Reseñas" data-reveal>
+<section class="reviews-section" data-screen-label="01.6 Reseñas">
   <div class="container">
-    <div class="reviews-head" data-reveal>
+    <div class="reviews-head">
       <p class="eyebrow terracotta">
         <span class="lang-es" lang="es">Reseñas de huéspedes</span>
         <span class="lang-en" lang="en">Guest reviews</span>
@@ -853,7 +853,7 @@
       var html=reviews.slice(0,3).map(function(r){
         var text=r.text||'';
         if(text.length>200)text=text.slice(0,197)+'…';
-        return '<article class="review-card" data-reveal>'+
+        return '<article class="review-card">'+
           '<div class="rc-score">'+Math.round(r.score||10)+' <span aria-hidden="true">✶</span></div>'+
           '<blockquote class="rc-text">&#8220;'+text+'&#8221;</blockquote>'+
           '<footer class="rc-author">'+r.author+(r.country?' · '+r.country:'')+'</footer>'+
