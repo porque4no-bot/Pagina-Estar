@@ -5317,3 +5317,50 @@ textarea:focus-visible,
 }
 
 
+
+/* ── HERO PRICE ──────────────────────────────────────────────────────── */
+.hero-price {
+  display: flex; align-items: baseline; gap: 6px;
+  margin-top: 20px; flex-wrap: wrap;
+}
+.hp-from { font-size: 13px; color: rgba(250,246,239,0.75); font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.08em; }
+.hp-amount { font-size: 28px; font-family: var(--font-heading); font-weight: 700; color: var(--white); letter-spacing: -0.02em; }
+.hp-unit { font-size: 13px; color: rgba(250,246,239,0.75); font-family: var(--font-label); }
+
+/* ── HERO TRUST BADGES ───────────────────────────────────────────────── */
+.hero-trust { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.htrust-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(250,246,239,0.12);
+  border: 1px solid rgba(250,246,239,0.25);
+  border-radius: 100px; padding: 5px 12px;
+  font-size: 12px; font-family: var(--font-label);
+  color: rgba(250,246,239,0.9); letter-spacing: 0.02em;
+  backdrop-filter: blur(4px);
+}
+.htrust-star { color: var(--terracotta-300); font-size: 11px; }
+@media (max-width: 767px) { .htrust-badge { font-size: 11px; padding: 4px 10px; } }
+
+/* ── PARTNERS STRIP ──────────────────────────────────────────────────── */
+.partners-strip { background: var(--ink); padding: 16px 0; border-bottom: 1px solid rgba(250,246,239,0.08); }
+.partners-inner { display: flex; align-items: center; justify-content: center; gap: 24px; flex-wrap: wrap; }
+.ps-label { font-size: 11px; font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.1em; color: rgba(250,246,239,0.45); }
+.ps-logo { height: 32px; width: auto; object-fit: contain; mix-blend-mode: screen; opacity: 0.85; filter: brightness(1.1); transition: opacity 0.2s; }
+.ps-logo:hover { opacity: 1; }
+
+/* ── REVIEWS SECTION ─────────────────────────────────────────────────── */
+.reviews-section { background: var(--sand); padding: 100px 0; }
+.reviews-head { margin-bottom: 48px; }
+.reviews-score-bar { display: flex; align-items: baseline; gap: 8px; margin-top: 8px; }
+.rsb-num { font-size: 36px; font-family: var(--font-heading); font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+.rsb-star { font-size: 20px; color: var(--terracotta); }
+.rsb-text { font-size: 14px; color: var(--ink-500); font-family: var(--font-body); }
+.reviews-list { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 768px) { .reviews-list { grid-template-columns: repeat(3, 1fr); } }
+.review-card { background: var(--white); border: 1px solid var(--border); border-radius: 8px; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+.rc-score { font-family: var(--font-heading); font-weight: 700; font-size: 20px; color: var(--ink); }
+.rc-score span { color: var(--terracotta); font-size: 14px; }
+.rc-text { font-family: var(--font-body); font-size: 15px; line-height: 1.65; color: var(--ink); margin: 0; flex: 1; }
+.rc-author { font-size: 13px; font-family: var(--font-label); color: var(--ink-500); letter-spacing: 0.01em; }
+.rc-source { font-size: 11px; font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.08em; color: var(--terracotta); opacity: 0.8; }
+@media (max-width: 767px) { .reviews-section { padding: 56px 0; } .reviews-head { margin-bottom: 32px; } .hp-amount { font-size: 24px; } }
