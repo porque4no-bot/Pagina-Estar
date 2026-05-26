@@ -21,7 +21,9 @@
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' https://unpkg.com https://checkout.wompi.co https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' https:; font-src 'self'; connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net; frame-src https://checkout.wompi.co"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://unpkg.com https://checkout.wompi.co https://www.googletagmanager.com https://maps.googleapis.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' https: data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://maps.googleapis.com; frame-src https://checkout.wompi.co https://www.google.com; frame-ancestors 'self'"
 
 [[headers]]
   for = "/api/*"

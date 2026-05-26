@@ -120,7 +120,7 @@
 <!-- ============================== HERO ============================== -->
 <section class="hero has-star-cursor" data-screen-label="01.1 Hero">
   <div class="hero-media">
-    <video autoplay muted loop playsinline preload="none" poster="../assets/photos/hero_first_frame.webp">
+    <video autoplay muted loop playsinline preload="none" poster="../assets/photos/hero_first_frame.webp" aria-hidden="true" role="presentation">
       <source src="../assets/video/hero.mp4" type="video/mp4">
     </video>
     <script>if(/Android/i.test(navigator.userAgent)||window.innerWidth<=767){var _v=document.currentScript.previousElementSibling;if(_v&&_v.tagName==='VIDEO')_v.remove();}</script>
@@ -181,7 +181,7 @@
     <div class="booking-field custom-select-field" id="guests-field" tabindex="0" role="button" aria-haspopup="listbox" aria-expanded="false">
       <span class="label" data-i18n="book_guests">Guests</span>
       <span class="value" id="guests-display" data-i18n="book_one_guest">1 guest</span>
-      <select id="guests-input" name="guests" style="display: none;">
+      <select id="guests-input" name="guests" style="display: none;" aria-hidden="true" tabindex="-1" aria-label="Number of guests">
         <option value="1">1 guest</option>
         <option value="2">2 guests</option>
         <option value="3">3 guests</option>
@@ -209,7 +209,7 @@
       </div>
     </div>
 
-    <button type="submit" class="booking-cta">
+    <button type="submit" class="booking-cta" aria-label="Search availability">
       <span data-i18n="book_search">Book now</span>
       <span aria-hidden="true">→</span>
     </button>
@@ -224,8 +224,14 @@
   <div class="container partners-inner">
     <span class="ps-label lang-es" lang="es">Miembro de</span>
     <span class="ps-label lang-en" lang="en">Member of</span>
-    <img src="../assets/logo-cotelco.png" alt="COTELCO - Asociación Hotelera y Turística de Colombia" class="ps-logo" width="100" height="40" loading="lazy">
-    <img src="../assets/logo-asohost.png" alt="ASOHOST - Asociación de Anfitriones" class="ps-logo" width="90" height="40" loading="lazy">
+    <picture>
+      <source srcset="../assets/logo-cotelco.webp" type="image/webp">
+      <img src="../assets/logo-cotelco.png" alt="COTELCO - Asociación Hotelera y Turística de Colombia" class="ps-logo" width="100" height="40" loading="lazy">
+    </picture>
+    <picture>
+      <source srcset="../assets/logo-asohost.webp" type="image/webp">
+      <img src="../assets/logo-asohost.png" alt="ASOHOST - Asociación de Anfitriones" class="ps-logo" width="90" height="40" loading="lazy">
+    </picture>
   </div>
 </div>
 
@@ -574,45 +580,45 @@
     <div class="amenities-grid">
       <div class="amenity" data-reveal>
         <i data-lucide="key-round"></i>
-        <h4>
+        <h3>
           <span class="lang-es" lang="es">Acceso 24/7</span>
           <span class="lang-en" lang="en">Digital Check-in</span>
-        </h4>
+        </h3>
       </div>
       <div class="amenity" data-reveal>
         <i data-lucide="wifi"></i>
-        <h4>
+        <h3>
           <span class="lang-es" lang="es">WiFi Fibra óptica</span>
           <span class="lang-en" lang="en">Wi-Fi &amp; Coworking</span>
-        </h4>
+        </h3>
       </div>
       <div class="amenity" data-reveal>
         <i data-lucide="utensils"></i>
-        <h4>
+        <h3>
           <span class="lang-es" lang="es">Cocina completa</span>
           <span class="lang-en" lang="en">Equipped Kitchen</span>
-        </h4>
+        </h3>
       </div>
       <div class="amenity" data-reveal>
         <i data-lucide="sparkles"></i>
-        <h4>
+        <h3>
           <span class="lang-es" lang="es">Aseo incluido</span>
           <span class="lang-en" lang="en">Housekeeping</span>
-        </h4>
+        </h3>
       </div>
       <div class="amenity" data-reveal>
         <i data-lucide="coffee"></i>
-        <h4>
+        <h3>
           <span class="lang-es" lang="es">Desayuno opcional</span>
           <span class="lang-en" lang="en">Breakfast</span>
-        </h4>
+        </h3>
       </div>
       <div class="amenity" data-reveal>
         <i data-lucide="paw-print"></i>
-        <h4>
+        <h3>
           <span class="lang-es" lang="es">Pet friendly</span>
           <span class="lang-en" lang="en">Pet Friendly</span>
-        </h4>
+        </h3>
       </div>
     </div>
   </div>
@@ -714,7 +720,7 @@
         <p data-i18n-html="footer_desc">Lodging in the heart of Manizales, designed to <span class="serif-italic">be</span> at home.</p>
       </div>
       <div class="footer-col">
-        <h5 data-i18n="footer_estadias">Stays</h5>
+        <p class="footer-col-heading" data-i18n="footer_estadias">Stays</p>
         <ul>
           <li><a href="index.html" data-i18n="footer_apartaestudios">Studio apartments</a></li>
           <li><a href="vivir.html" data-i18n="footer_vivir">Extended Stay</a></li>
@@ -722,7 +728,7 @@
         </ul>
       </div>
       <div class="footer-col">
-        <h5 data-i18n="footer_empresas">Companies</h5>
+        <p class="footer-col-heading" data-i18n="footer_empresas">Companies</p>
         <ul>
           <li><a href="empresas.html" data-i18n="footer_portal">Corporate portal</a></li>
           <li><a href="empresas.html#contacto" data-i18n="footer_convenio">Request agreement</a></li>
@@ -731,7 +737,7 @@
         </ul>
       </div>
       <div class="footer-col">
-        <h5 data-i18n="footer_descubre">Discover</h5>
+        <p class="footer-col-heading" data-i18n="footer_descubre">Discover</p>
         <ul>
           <li><a href="nosotros.html" data-i18n="footer_nosotros">About Us</a></li>
           <li><a href="explora.html" data-i18n="footer_explorar">Explore Manizales</a></li>
@@ -761,7 +767,7 @@
     <div class="footer-bot">
       <span>
         <span data-i18n="footer_copyright">© 2026 estar · Manizales, Colombia</span> ·
-        <span data-i18n="footer_rnt" class="rnt-badge" style="color: var(--terracotta); font-weight: 900;">RNT 276306</span>
+        <span data-i18n="footer_rnt" class="rnt-badge" style="color: var(--terracotta-300); font-weight: 900;">RNT 276306</span>
       </span>
       <span>
         <a href="aviso-legal.html" data-i18n="footer_aviso">Legal Notice</a> ·
