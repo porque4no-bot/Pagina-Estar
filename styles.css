@@ -309,16 +309,16 @@ h1, h2, h3, h4, h5, h6 {
   text-transform: uppercase;
   padding: 12px 20px;
   border-radius: 8px;
-  border: 1px solid var(--terracotta);
-  background: var(--terracotta);
-  color: var(--paper);
+  border: 1px solid var(--terracotta-700);
+  background: var(--terracotta-700);
+  color: var(--white);
   transition: background var(--dur-base) var(--ease-out),
               color var(--dur-base) var(--ease-out),
               border-color var(--dur-base) var(--ease-out);
 }
-.book-btn:hover { background: var(--terracotta-700); color: var(--paper); border-color: var(--terracotta-700); }
-.is-scrolled .book-btn { border-color: var(--terracotta); background: var(--terracotta); color: var(--paper); }
-.is-scrolled .book-btn:hover { background: var(--terracotta-700); color: var(--paper); border-color: var(--terracotta-700); }
+.book-btn:hover { background: var(--terracotta); color: var(--white); border-color: var(--terracotta); }
+.is-scrolled .book-btn { border-color: var(--terracotta-700); background: var(--terracotta-700); color: var(--white); }
+.is-scrolled .book-btn:hover { background: var(--terracotta); color: var(--white); border-color: var(--terracotta); }
 
 .menu-btn {
   display: flex;
@@ -1558,7 +1558,7 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   stroke-width: 1.5;
   width: 32px; height: 32px;
 }
-.amenity h4 {
+.amenity h3, .amenity-title {
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 18px;
@@ -1685,7 +1685,7 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   margin-bottom: 24px;
 }
 .footer-brand p { font-family: var(--font-body); font-style: italic; font-size: 16px; line-height: 1.6; max-width: 38ch; color: rgba(250,246,239,0.75); margin: 0; }
-.footer-col h5 {
+.footer-col h5, .footer-col .footer-col-heading {
   font-family: var(--font-label);
   font-weight: 700;
   font-size: 11px;
@@ -1705,7 +1705,7 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   font-size: 10px;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: rgba(250,246,239,0.4);
+  color: rgba(250,246,239,0.6);
 }
 .footer-bot a:hover { color: var(--paper); }
 
@@ -5344,7 +5344,7 @@ textarea:focus-visible,
 /* ── PARTNERS STRIP ──────────────────────────────────────────────────── */
 .partners-strip { background: var(--ink); padding: 16px 0; border-bottom: 1px solid rgba(250,246,239,0.08); }
 .partners-inner { display: flex; align-items: center; justify-content: center; gap: 24px; flex-wrap: wrap; }
-.ps-label { font-size: 11px; font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.1em; color: rgba(250,246,239,0.45); }
+.ps-label { font-size: 11px; font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.1em; color: rgba(250,246,239,0.75); }
 .ps-logo { height: 32px; width: auto; object-fit: contain; mix-blend-mode: screen; opacity: 0.85; filter: brightness(1.1); transition: opacity 0.2s; }
 .ps-logo:hover { opacity: 1; }
 
@@ -5362,7 +5362,7 @@ textarea:focus-visible,
 .rc-score span { color: var(--terracotta); font-size: 14px; }
 .rc-text { font-family: var(--font-body); font-size: 15px; line-height: 1.65; color: var(--ink); margin: 0; flex: 1; }
 .rc-author { font-size: 13px; font-family: var(--font-label); color: var(--ink-500); letter-spacing: 0.01em; }
-.rc-source { font-size: 11px; font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.08em; color: var(--terracotta); opacity: 0.8; }
+.rc-source { font-size: 11px; font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.08em; color: var(--terracotta-700); }
 
 /* ── FOOTER NEWSLETTER ──────────────────────────────────────── */
 .footer-newsletter {
@@ -5405,7 +5405,7 @@ textarea:focus-visible,
 .fn-form input[type="email"]::placeholder { color: rgba(250,246,239,0.35); }
 .fn-form input[type="email"]:focus { border-color: rgba(250,246,239,0.5); }
 .fn-form button {
-  background: var(--terracotta);
+  background: var(--terracotta-700);
   color: var(--white);
   border: none;
   border-radius: 4px;
@@ -5419,7 +5419,7 @@ textarea:focus-visible,
   white-space: nowrap;
   transition: background 0.2s;
 }
-.fn-form button:hover { background: var(--terracotta-700); }
+.fn-form button:hover { background: var(--terracotta); }
 
 @media (max-width: 767px) {
   .footer-newsletter { flex-direction: column; align-items: flex-start; gap: 16px; }

@@ -88,6 +88,18 @@ function injectGA4(dir) {
 console.log('Injecting GA4 tracking...');
 injectGA4(distDir);
 
+async function convertLogosToWebP(sharp) {
+  const logosToConvert = ['logo-cotelco.png', 'logo-asohost.png'];
+  for (const logo of logosToConvert) {
+    const input = path.join(distDir, 'assets', logo);
+    const output = input.replace('.png', '.webp');
+    if (fs.existsSync(input) && !fs.existsSync(output)) {
+      await sharp(input).webp({ quality: 85 }).toFile(output);
+      console.log(`  Converted to WebP: ${logo}`);
+    }
+  }
+}
+
 // Optional: generate responsive image variants using Sharp
 async function generateResponsiveImages() {
   let sharp;
@@ -97,6 +109,8 @@ async function generateResponsiveImages() {
     console.log('Sharp not installed — skipping responsive image generation. Run: npm install sharp');
     return;
   }
+
+  await convertLogosToWebP(sharp);
 
   const photosDir = path.join('dist', 'assets', 'photos');
   const widths = [480, 768, 1200];
