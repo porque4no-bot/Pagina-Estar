@@ -11,14 +11,16 @@ if (!fs.existsSync(distDir)) {
 }
 
 // Helper to copy directory recursively
+const ARIAL_FONTS = new Set(['Arial-Regular.woff2', 'Arial-Bold.woff2', 'Arial-Italic.woff2', 'Arial-Black.woff2']);
+
 function copyFolderSync(from, to) {
   if (!fs.existsSync(from)) return;
   fs.mkdirSync(to, { recursive: true });
   fs.readdirSync(from).forEach(element => {
     const srcPath = path.join(from, element);
     const destPath = path.join(to, element);
-    // Skip drive_downloads directory
     if (srcPath.includes('drive_downloads')) return false;
+    if (ARIAL_FONTS.has(element)) return;
     const stat = fs.lstatSync(srcPath);
     if (stat.isFile()) {
       fs.copyFileSync(srcPath, destPath);
@@ -45,10 +47,8 @@ foldersToCopy.forEach(folder => {
   copyFolderSync(src, dest);
 });
 
-// Copy specific non-CSS files
+// Copy specific non-CSS, non-JS files
 const filesToCopy = [
-  'shell.js',
-  'kunas.js',
   'rooms_db.json',
   'favicon.png',
   'datos_habitaciones_estar.csv',
@@ -123,6 +123,14 @@ async function build() {
     const css = fs.readFileSync(path.join(rootDir, cssFile), 'utf8');
     const result = await esbuild.transform(css, { loader: 'css', minify: true });
     fs.writeFileSync(path.join(distDir, cssFile), result.code);
+  }
+
+  console.log('Minifying shell.js and kunas.js...');
+  const jsFilesToMinify = ['shell.js', 'kunas.js'];
+  for (const jsFile of jsFilesToMinify) {
+    const js = fs.readFileSync(path.join(rootDir, jsFile), 'utf8');
+    const result = await esbuild.transform(js, { loader: 'js', minify: true });
+    fs.writeFileSync(path.join(distDir, jsFile), result.code);
   }
 
   console.log('Compiling motor-app.jsx with esbuild...');

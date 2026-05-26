@@ -864,7 +864,11 @@
 
     if (!list || !prevBtn || !nextBtn) return;
 
-    function getScrollStep() {
+    let cachedScrollStep = null;
+    let cachedMaxScroll = null;
+    let rafId = null;
+
+    function computeScrollStep() {
       const firstCard = list.querySelector('.room');
       if (firstCard) {
         const style = window.getComputedStyle(list);
@@ -874,12 +878,30 @@
       return 450;
     }
 
+    function getScrollStep() {
+      if (cachedScrollStep === null) cachedScrollStep = computeScrollStep();
+      return cachedScrollStep;
+    }
+
     function updateButtonStates() {
       const scrollLeft = list.scrollLeft;
-      const maxScroll = list.scrollWidth - list.clientWidth;
-      
+      if (cachedMaxScroll === null) cachedMaxScroll = list.scrollWidth - list.clientWidth;
       prevBtn.disabled = scrollLeft <= 10;
-      nextBtn.disabled = scrollLeft >= maxScroll - 10;
+      nextBtn.disabled = scrollLeft >= cachedMaxScroll - 10;
+    }
+
+    function onScrollDeferred() {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        updateButtonStates();
+      });
+    }
+
+    function invalidateCache() {
+      cachedScrollStep = null;
+      cachedMaxScroll = null;
+      updateButtonStates();
     }
 
     prevBtn.addEventListener('click', (e) => {
@@ -892,9 +914,9 @@
       list.scrollBy({ left: getScrollStep(), behavior: 'smooth' });
     });
 
-    list.addEventListener('scroll', updateButtonStates);
-    window.addEventListener('resize', updateButtonStates);
-    
+    list.addEventListener('scroll', onScrollDeferred, { passive: true });
+    window.addEventListener('resize', invalidateCache);
+
     // Initial check
     setTimeout(updateButtonStates, 100);
   }

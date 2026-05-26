@@ -29,34 +29,6 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: "Estar Arial";
-  src: url("fonts/Arial-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Estar Arial";
-  src: url("fonts/Arial-Italic.woff2") format("woff2");
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Estar Arial";
-  src: url("fonts/Arial-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Estar Arial";
-  src: url("fonts/Arial-Black.woff2") format("woff2");
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
 
 /* ----------  TOKENS  ---------- */
 :root {
@@ -116,10 +88,10 @@
   --border-on-brand:      color-mix(in srgb, var(--white) 30%, transparent);
 
   /* —— Type families —— */
-  --font-display:  "Estar Arial", Arial, system-ui, sans-serif;
-  --font-heading:  "Estar Arial", Arial, "Helvetica Neue", system-ui, sans-serif;
+  --font-display:  Arial, "Helvetica Neue", system-ui, sans-serif;
+  --font-heading:  Arial, "Helvetica Neue", system-ui, sans-serif;
   --font-body:     "Libre Baskerville", "Iowan Old Style", Georgia, serif;
-  --font-label:    "Estar Arial", Arial, system-ui, sans-serif;
+  --font-label:    Arial, "Helvetica Neue", system-ui, sans-serif;
 
   /* —— Type scale —— */
   --fs-display:    clamp(56px, 9vw, 120px);
