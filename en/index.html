@@ -828,50 +828,6 @@
     "language": "en"
   }/*EDITMODE-END*/;
 </script>
-<script>
-(function(){
-  var el=document.getElementById('hero-price'),am=document.getElementById('hp-amount');
-  if(!el||!am)return;
-  var t=new Date(),t2=new Date();t2.setDate(t2.getDate()+1);
-  function fmt(d){return d.toISOString().split('T')[0];}
-  function cop(n){return '$'+Math.round(n).toLocaleString('es-CO');}
-  fetch('/api/check-availability?checkin='+fmt(t)+'&checkout='+fmt(t2)+'&guests=1')
-    .then(function(r){return r.ok?r.json():Promise.reject();})
-    .then(function(d){
-      var rooms=(d.rooms||[]).filter(function(r){return r.available&&r.avgPrice>0;});
-      if(!rooms.length){return;}
-      var min=Math.min.apply(null,rooms.map(function(r){return r.avgPrice;}));
-      am.textContent=cop(min);
-      el.removeAttribute('hidden');
-    })
-    .catch(function(){});
-})();
-</script>
-<script>
-(function(){
-  var list=document.getElementById('reviews-list');
-  if(!list)return;
-  fetch('/api/get-reviews')
-    .then(function(r){return r.ok?r.json():Promise.reject();})
-    .then(function(d){
-      var reviews=d.reviews||[];
-      if(!reviews.length)return;
-      var html=reviews.slice(0,3).map(function(r){
-        var text=r.text||'';
-        if(text.length>200)text=text.slice(0,197)+'…';
-        return '<article class="review-card" data-reveal>'+
-          '<div class="rc-score">'+Math.round(r.score||10)+' <span aria-hidden="true">✶</span></div>'+
-          '<blockquote class="rc-text">"'+text+'"</blockquote>'+
-          '<footer class="rc-author">'+r.author+(r.country?' · '+r.country:'')+'</footer>'+
-          '<span class="rc-source">Booking.com</span>'+
-        '</article>';
-      }).join('');
-      list.innerHTML=html;
-      if(window.lucide)lucide.createIcons();
-    })
-    .catch(function(){});
-})();
-</script>
 <script src="../shell.js?v=2" defer></script>
 <script src="../kunas.js" defer></script>
 <script>document.addEventListener('DOMContentLoaded',function(){lucide.createIcons();});</script>
