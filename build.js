@@ -67,6 +67,27 @@ fs.readdirSync(rootDir).forEach(file => {
   }
 });
 
+// Inject GA4 into all HTML files in dist (including en/ subdir)
+const GA4_ID = 'G-9PB0Z2KQJK';
+const ga4Snippet = `<!-- Google tag (gtag.js) -->\n<script async src="https://www.googletagmanager.com/gtag/js?id=${GA4_ID}"></script>\n<script>\n  window.dataLayer = window.dataLayer || [];\n  function gtag(){dataLayer.push(arguments);}\n  gtag('js', new Date());\n  gtag('config', '${GA4_ID}');\n</script>`;
+
+function injectGA4(dir) {
+  fs.readdirSync(dir).forEach(entry => {
+    const fullPath = path.join(dir, entry);
+    if (fs.lstatSync(fullPath).isDirectory()) {
+      injectGA4(fullPath);
+    } else if (entry.endsWith('.html')) {
+      let content = fs.readFileSync(fullPath, 'utf8');
+      if (!content.includes('gtag') && content.includes('</head>')) {
+        content = content.replace('</head>', ga4Snippet + '\n</head>');
+        fs.writeFileSync(fullPath, content);
+      }
+    }
+  });
+}
+console.log('Injecting GA4 tracking...');
+injectGA4(distDir);
+
 // Optional: generate responsive image variants using Sharp
 async function generateResponsiveImages() {
   let sharp;
