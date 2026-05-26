@@ -386,7 +386,7 @@
             <div class="room-spec"><span class="k">View</span><span class="v">City</span></div>
           </div>
           <div class="room-price">
-            <span class="from">From</span>
+            <span class="from">Tonight</span>
             <span class="amount">$220.000</span><span class="per">/ night</span>
           </div>
           <div class="room-foot">
@@ -433,7 +433,7 @@
             <div class="room-spec"><span class="k">View</span><span class="v">Mountain</span></div>
           </div>
           <div class="room-price">
-            <span class="from">From</span>
+            <span class="from">Tonight</span>
             <span class="amount">$265.000</span><span class="per">/ night</span>
           </div>
           <div class="room-foot">
@@ -478,7 +478,7 @@
             <div class="room-spec"><span class="k">View</span><span class="v">City</span></div>
           </div>
           <div class="room-price">
-            <span class="from">From</span>
+            <span class="from">Tonight</span>
             <span class="amount">$320.000</span><span class="per">/ night</span>
           </div>
           <div class="room-foot">
@@ -527,7 +527,7 @@
             <div class="room-spec"><span class="k">View</span><span class="v">Mountain</span></div>
           </div>
           <div class="room-price">
-            <span class="from">From</span>
+            <span class="from">Tonight</span>
             <span class="amount">$385.000</span><span class="per">/ night</span>
           </div>
           <div class="room-foot">
@@ -574,7 +574,7 @@
             <div class="room-spec"><span class="k">View</span><span class="v">Mountain</span></div>
           </div>
           <div class="room-price">
-            <span class="from">From</span>
+            <span class="from">Tonight</span>
             <span class="amount">$450.000</span><span class="per">/ night</span>
           </div>
           <div class="room-foot">
@@ -637,12 +637,12 @@
             <td class="ct-check" aria-label="Yes"><span aria-hidden="true">✶</span></td>
           </tr>
           <tr>
-            <th scope="row">Price from</th>
-            <td class="ct-price">$220.000</td>
-            <td class="ct-price">$265.000</td>
-            <td class="ct-price">$320.000</td>
-            <td class="ct-price">$385.000</td>
-            <td class="ct-price ct-featured">$450.000</td>
+            <th scope="row">Tonight</th>
+            <td class="ct-price" data-ct-room="clasica">$220.000</td>
+            <td class="ct-price" data-ct-room="seleccion">$265.000</td>
+            <td class="ct-price" data-ct-room="reserva">$320.000</td>
+            <td class="ct-price" data-ct-room="origen">$385.000</td>
+            <td class="ct-price ct-featured" data-ct-room="especial">$450.000</td>
           </tr>
           <tr class="ct-cta-row">
             <th scope="row"><span class="visually-hidden">Book</span></th>
@@ -965,6 +965,8 @@
         if(!card)return;
         var amEl=card.querySelector('.room-price .amount');
         if(amEl)amEl.textContent=cop(room.avgPrice);
+        var ctEl=document.querySelector('[data-ct-room="'+slug+'"]');
+        if(ctEl)ctEl.textContent=cop(room.avgPrice);
       });
     })
     .catch(function(){});
