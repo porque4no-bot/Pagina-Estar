@@ -13,3 +13,7 @@ node_modules/
 .claude/worktrees/
 dist/
 motor-app.js
+
+# Scraper output (generated locally, not checked in)
+scripts/booking_reviews_9plus.json
+scripts/debug_screenshot.png
