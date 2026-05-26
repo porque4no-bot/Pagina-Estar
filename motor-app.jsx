@@ -1561,8 +1561,14 @@ function BookingEngine() {
     }
   }, [rooms]);
 
-  // Scroll to the top of the booking steps whenever the active step changes
+  // Skip auto-scroll on initial mount so the SearchBar is visible above the room cards.
+  // Only scroll when the user navigates between steps after the first render.
+  const didMountRef = useRef(false);
   useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
     const timer = setTimeout(() => {
       const steps = document.querySelector('.be-steps');
       const target = steps || document.querySelector('.be-progress') || document.body;
