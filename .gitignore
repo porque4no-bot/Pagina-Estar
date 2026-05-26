@@ -11,3 +11,5 @@ scratch/
 .env.*.local
 node_modules/
 .claude/worktrees/
+dist/
+motor-app.js
