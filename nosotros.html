@@ -6,15 +6,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sobre Nosotros · estar</title>
-<meta name="description" content="Conoce la historia de Estar, el apartahotel boutique en Manizales fundado en 2023 por Rafael y Daniela Castaño. Diseño de Intempo, identidad de Valeria Ramírez.">
+<meta name="description" content="Conoce la historia de Estar: apartahotel boutique en Manizales, alternativa a Airbnb Manizales y hoteles. Fundado en 2023 por Rafael y Daniela Castaño. Diseño Intempo, marca Valeria Ramírez.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Estar — Apartaestudios Manizales">
 <meta property="og:title" content="Sobre Nosotros · estar">
-<meta property="og:description" content="Conoce la historia de Estar, el apartahotel boutique en Manizales fundado en 2023 por Rafael y Daniela Castaño.">
-<meta property="og:image" content="https://estar.com.co/assets/photos/fachada.webp">
+<meta property="og:description" content="La historia detrás de Estar, el apartahotel boutique en Manizales fundado en 2023 por Rafael y Daniela Castaño.">
+<meta property="og:image" content="https://estar.com.co/assets/photos/fachada_drone.webp">
 <meta property="og:url" content="https://estar.com.co/nosotros.html">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://estar.com.co/assets/photos/fachada.webp">
+<meta name="twitter:image" content="https://estar.com.co/assets/photos/fachada_drone.webp">
 <link rel="canonical" href="https://estar.com.co/nosotros.html">
 <link rel="alternate" hreflang="es" href="https://estar.com.co/nosotros.html">
 <link rel="alternate" hreflang="en" href="https://estar.com.co/en/nosotros.html">
@@ -23,278 +23,56 @@
 <link rel="stylesheet" href="styles.css?v=3">
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
 <style>
-.nos-hero {
-  position: relative;
-  width: 100%;
-  height: 420px;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
-  margin-bottom: var(--space-9);
-}
-.nos-hero img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 60%;
-}
-.nos-hero-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(30,28,24,0.72) 0%, transparent 55%);
-}
-.nos-hero-text {
-  position: absolute;
-  bottom: var(--space-7);
-  left: var(--space-7);
-  color: var(--white);
-}
-.nos-hero-text .t-eyebrow {
-  color: var(--sand-300);
-  margin-bottom: var(--space-2);
-}
-.nos-hero-text h1 {
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 5vw, 3rem);
-  font-weight: 400;
-  margin: 0;
-  line-height: 1.1;
-  color: var(--white);
-}
-.nos-section {
-  margin-bottom: var(--space-10);
-}
-.nos-section-eyebrow {
-  font-family: var(--font-label);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-weight: 700;
-  color: var(--terracotta);
-  margin-bottom: var(--space-3);
-}
-.nos-split {
+/* ── Layout editorial (story split) ─────────────────────────── */
+.nos-editorial {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-7);
+  gap: var(--space-8);
+  margin-top: var(--space-8);
   align-items: center;
 }
-@media (min-width: 800px) {
-  .nos-split {
-    grid-template-columns: 1.2fr 1fr;
-    gap: var(--space-9);
-  }
-  .nos-split.reverse {
-    direction: rtl;
-  }
-  .nos-split.reverse > * {
-    direction: ltr;
+@media (min-width: 860px) {
+  .nos-editorial {
+    grid-template-columns: 1.15fr 1fr;
+    gap: var(--space-10);
   }
 }
-.nos-split-img {
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  aspect-ratio: 4/3;
-}
-.nos-split-img img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.nos-split-body h2 {
-  font-family: var(--font-display);
-  font-size: clamp(1.6rem, 3.5vw, 2.2rem);
-  font-weight: 400;
-  line-height: 1.2;
-  margin-bottom: var(--space-5);
-  color: var(--fg);
-}
-.nos-split-body p {
+.nos-editorial-text p {
   font-family: var(--font-body);
-  font-size: 16px;
-  line-height: 1.75;
-  color: var(--fg-muted);
-  margin-bottom: var(--space-4);
-}
-.nos-split-body p:last-child {
-  margin-bottom: 0;
-}
-.credits-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-4);
-}
-@media (min-width: 600px) {
-  .credits-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-.credit-card {
-  background: var(--paper-200);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
-}
-.credit-card-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--bg-brand);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--terracotta);
-  margin-bottom: var(--space-4);
-}
-.credit-card-icon svg {
-  width: 20px;
-  height: 20px;
-}
-.credit-card h3 {
-  font-family: var(--font-heading);
   font-size: 17px;
-  font-weight: 700;
-  margin-bottom: var(--space-1);
-  color: var(--fg);
-}
-.credit-card .credit-role {
-  font-family: var(--font-label);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--terracotta);
-  font-weight: 700;
-  margin-bottom: var(--space-3);
-}
-.credit-card p {
-  font-family: var(--font-body);
-  font-size: 14px;
-  line-height: 1.65;
+  line-height: 1.78;
   color: var(--fg-muted);
-  margin: 0;
+  margin-bottom: var(--space-5);
 }
-.team-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-4);
-}
-@media (min-width: 560px) {
-  .team-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-@media (min-width: 900px) {
-  .team-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-.team-card {
-  background: var(--paper);
-  border: 1px solid var(--border);
+.nos-editorial-text p:last-child { margin-bottom: 0; }
+.nos-editorial-img {
   border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  text-align: center;
-}
-.team-avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: var(--paper-200);
-  margin: 0 auto var(--space-4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-size: 1.6rem;
-  color: var(--fg-subtle);
-  border: 2px solid var(--border);
   overflow: hidden;
+  aspect-ratio: 4/5;
 }
-.team-avatar img {
+.nos-editorial-img img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-.team-card h3 {
-  font-family: var(--font-heading);
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: var(--space-1);
-  color: var(--fg);
-}
-.team-card .team-role {
-  font-family: var(--font-label);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--terracotta);
-  font-weight: 700;
-}
-.nos-stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-4);
-  margin-top: var(--space-7);
-}
-@media (min-width: 600px) {
-  .nos-stats {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-.nos-stat {
-  text-align: center;
-  padding: var(--space-5) var(--space-4);
-  background: var(--paper-200);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-}
-.nos-stat-num {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  color: var(--terracotta);
   display: block;
-  line-height: 1;
-  margin-bottom: var(--space-2);
 }
-.nos-stat-label {
-  font-family: var(--font-label);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--fg-muted);
-  font-weight: 700;
+/* ── Project credits: 2-col value grid ───────────────────────── */
+@media (min-width: 768px) {
+  .value-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
 }
-.nos-cta {
-  background: var(--ink);
-  color: var(--white);
-  border-radius: var(--radius-lg);
-  padding: var(--space-8) var(--space-7);
-  text-align: center;
-  margin-top: var(--space-10);
-  margin-bottom: var(--space-8);
-}
-.nos-cta h2 {
-  font-family: var(--font-display);
-  font-size: clamp(1.5rem, 3vw, 2rem);
-  font-weight: 400;
-  color: var(--white);
-  margin-bottom: var(--space-4);
-}
-.nos-cta p {
-  font-family: var(--font-body);
-  font-size: 16px;
-  color: var(--sand-300);
-  margin-bottom: var(--space-6);
-}
+/* ── Stat amenities: large numbers ───────────────────────────── */
+.amenity-stat { font-family: var(--font-display); font-size: 2.4rem; font-weight: 400; line-height: 1; }
+.amenity-stat-sub { font-size: 12px; font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-muted); font-weight: 700; margin-top: 6px; display: block; }
 </style>
 </head>
 <body>
 
-<a href="#main" class="skip-link">
+<a href="#main-content" class="skip-link">
   <span class="lang-es" lang="es">Saltar al contenido</span>
   <span class="lang-en" lang="en">Skip to content</span>
 </a>
 
+<!-- ============================== HEADER ============================== -->
 <header class="site-header">
   <div class="container">
     <a href="index.html" class="brand" aria-label="estar — inicio">
@@ -316,195 +94,232 @@
   </div>
 </header>
 
-<main id="main" class="policy-page">
-  <div class="policy-container">
+<!-- ============================== HERO ============================== -->
+<section class="sub-hero olive">
+  <div class="star-bg" aria-hidden="true"></div>
+  <div class="container">
+    <span class="pill">
+      <span class="lang-es" lang="es">Manizales · Desde 2023</span>
+      <span class="lang-en" lang="en">Manizales · Since 2023</span>
+    </span>
+    <h1>
+      <span class="lang-es" lang="es">Un lugar para <span class="italic">estar de verdad.</span></span>
+      <span class="lang-en" lang="en">A place to <span class="italic">truly be home.</span></span>
+    </h1>
+    <p class="lead">
+      <span class="lang-es" lang="es">Somos un apartahotel boutique en El Cable y La Estrella, Manizales — cinco apartaestudios diseñados para que quedarse aquí se sienta como llegar a casa, no a un hotel.</span>
+      <span class="lang-en" lang="en">We're a boutique studio hotel in El Cable and La Estrella, Manizales — five apartments designed so that staying here feels like coming home, not checking into a hotel.</span>
+    </p>
+  </div>
+</section>
 
-    <!-- Hero -->
-    <div class="nos-hero" data-reveal>
-      <img src="assets/photos/fachada_drone.webp" alt="Vista aérea de Estar — Apartaestudios Manizales" loading="eager" width="1200" height="420">
-      <div class="nos-hero-overlay"></div>
-      <div class="nos-hero-text">
-        <p class="nos-section-eyebrow">
-          <span class="lang-es" lang="es">Manizales, Colombia · Desde 2023</span>
-          <span class="lang-en" lang="en">Manizales, Colombia · Since 2023</span>
+<!-- ============================== HISTORIA ============================== -->
+<section class="section" id="main-content">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow terracotta">
+          <span class="lang-es" lang="es">La Historia</span>
+          <span class="lang-en" lang="en">Our Story</span>
         </p>
-        <h1>
-          <span class="lang-es" lang="es">Un lugar para<br>estar de verdad</span>
-          <span class="lang-en" lang="en">A place to truly<br>be home</span>
-        </h1>
+        <h2 class="display-l">
+          <span class="lang-es" lang="es">Nació de una idea sencilla <span class="serif-italic">y dos hermanos.</span></span>
+          <span class="lang-en" lang="en">Born from a simple idea <span class="serif-italic">and two siblings.</span></span>
+        </h2>
       </div>
     </div>
 
-    <!-- Historia -->
-    <section class="nos-section" data-reveal>
-      <p class="nos-section-eyebrow">
-        <span class="lang-es" lang="es">La Historia</span>
-        <span class="lang-en" lang="en">Our Story</span>
-      </p>
-      <div class="nos-split">
-        <div class="nos-split-body">
-          <h2>
-            <span class="lang-es" lang="es">Nació de una idea sencilla y de dos hermanos</span>
-            <span class="lang-en" lang="en">Born from a simple idea and two siblings</span>
-          </h2>
-          <p>
-            <span class="lang-es" lang="es">Estar abrió sus puertas en 2023 con una convicción clara: Manizales merece un lugar donde quedarse sea, en sí mismo, parte de la experiencia. Rafael y Daniela Castaño, hermanos y manizaleños de nacimiento, decidieron crear en el sector de El Cable y La Estrella un apartahotel que se sintiera como un hogar propio — contemporáneo, cálido y sin las frialdades de un hotel convencional.</span>
-            <span class="lang-en" lang="en">Estar opened its doors in 2023 with a clear conviction: Manizales deserves a place where staying is, in itself, part of the experience. Rafael and Daniela Castaño, siblings and lifelong Manizaleños, set out to create in the El Cable and La Estrella district a studio hotel that would feel like your own home — contemporary, warm, and without the impersonal coldness of a conventional hotel.</span>
-          </p>
-          <p>
-            <span class="lang-es" lang="es">El nombre lo dice todo. «Estar» no es solo un verbo — es una invitación. A descansar con calma, a moverse por la ciudad con facilidad, a sentirse parte del barrio. Cada apartaestudio fue pensado para eso: para que quien llegue, de verdad esté.</span>
-            <span class="lang-en" lang="en">The name says it all. «Estar» — the Spanish verb for «to be» in a place — is not just a word, it's an invitation. To rest with ease, to move through the city freely, to feel part of the neighborhood. Every apartment was designed with that in mind: so that whoever arrives truly feels at home.</span>
-          </p>
-        </div>
-        <div class="nos-split-img">
-          <img src="assets/photos/interior_detalle.webp" alt="Detalle interior de Estar — diseño contemporáneo" loading="lazy" width="600" height="450">
-        </div>
+    <div class="nos-editorial" data-reveal>
+      <div class="nos-editorial-text">
+        <p>
+          <span class="lang-es" lang="es">Estar abrió sus puertas en 2023 con una convicción clara: Manizales merece un lugar donde quedarse sea, en sí mismo, parte de la experiencia. Rafael y Daniela Castaño, hermanos y manizaleños de nacimiento, vieron que la oferta local — entre hoteles fríos y arriendos con trabas — dejaba un vacío enorme. Decidieron llenarlo.</span>
+          <span class="lang-en" lang="en">Estar opened in 2023 with a clear conviction: Manizales deserves a place where staying is, in itself, part of the experience. Siblings Rafael and Daniela Castaño — lifelong Manizaleños — saw that the local options, between impersonal hotels and tangled rental contracts, left a huge gap. They decided to fill it.</span>
+        </p>
+        <p>
+          <span class="lang-es" lang="es">El nombre lo dice todo. «Estar» no es solo un verbo — es una invitación. A descansar con calma, a moverse por la ciudad sin complicaciones, a sentirse parte del barrio. Cada apartaestudio fue pensado para eso: para que quien llegue, de verdad esté.</span>
+          <span class="lang-en" lang="en">The name says it all. «Estar» — the Spanish verb for being in a place — is not just a word, it's an invitation. To rest without rushing, to move through the city freely, to feel part of the neighborhood. Every apartment was designed with exactly that in mind.</span>
+        </p>
+        <p>
+          <span class="lang-es" lang="es">Hoy, quienes nos visitan — turistas, nómadas digitales, médicos residentes, familias de paso por el Eje Cafetero — encuentran en Estar algo que los hoteles convencionales y los alquileres de plataforma no siempre ofrecen: un hogar temporal con criterio.</span>
+          <span class="lang-en" lang="en">Today, our guests — tourists, digital nomads, medical residents, families passing through the Coffee Axis — find in Estar what conventional hotels and rental platforms don't always offer: a thoughtfully designed temporary home.</span>
+        </p>
       </div>
-    </section>
-
-    <!-- Stats -->
-    <div class="nos-stats" data-reveal>
-      <div class="nos-stat">
-        <span class="nos-stat-num">2023</span>
-        <span class="nos-stat-label">
-          <span class="lang-es" lang="es">Año de apertura</span>
-          <span class="lang-en" lang="en">Opened</span>
-        </span>
-      </div>
-      <div class="nos-stat">
-        <span class="nos-stat-num">5</span>
-        <span class="nos-stat-label">
-          <span class="lang-es" lang="es">Apartaestudios</span>
-          <span class="lang-en" lang="en">Studio apartments</span>
-        </span>
-      </div>
-      <div class="nos-stat">
-        <span class="nos-stat-num">9.0</span>
-        <span class="nos-stat-label">
-          <span class="lang-es" lang="es">Calificación Booking</span>
-          <span class="lang-en" lang="en">Booking.com score</span>
-        </span>
-      </div>
-      <div class="nos-stat">
-        <span class="nos-stat-num">RNT</span>
-        <span class="nos-stat-label">276306</span>
+      <div class="nos-editorial-img">
+        <img src="assets/photos/interior_detalle.webp" alt="Detalle interior de Estar — diseño contemporáneo Intempo" loading="lazy" width="600" height="750">
       </div>
     </div>
+  </div>
+</section>
 
-    <!-- El Proyecto -->
-    <section class="nos-section" style="margin-top: var(--space-10);" data-reveal>
-      <p class="nos-section-eyebrow">
-        <span class="lang-es" lang="es">El Proyecto</span>
-        <span class="lang-en" lang="en">The Project</span>
-      </p>
-      <h2 style="font-family: var(--font-display); font-size: clamp(1.6rem,3.5vw,2.2rem); font-weight: 400; margin-bottom: var(--space-6); color: var(--fg);">
-        <span class="lang-es" lang="es">Construido con los mejores de Manizales</span>
-        <span class="lang-en" lang="en">Built with the best of Manizales</span>
-      </h2>
-      <div class="nos-split reverse">
-        <div class="nos-split-body">
-          <div class="credits-grid">
-            <div class="credit-card">
-              <div class="credit-card-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-              </div>
-              <div class="credit-role">
-                <span class="lang-es" lang="es">Arquitectura e Interiorismo</span>
-                <span class="lang-en" lang="en">Architecture & Interiors</span>
-              </div>
-              <h3>Manuela Arango</h3>
-              <p>
-                <span class="lang-es" lang="es">Firma <strong>Intempo</strong> — Tradujo la visión de los fundadores en espacios contemporáneos, luminosos y pensados para el bienestar del huésped.</span>
-                <span class="lang-en" lang="en"><strong>Intempo</strong> studio — She translated the founders' vision into contemporary, light-filled spaces designed around guest wellbeing.</span>
-              </p>
-            </div>
-            <div class="credit-card">
-              <div class="credit-card-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-              </div>
-              <div class="credit-role">
-                <span class="lang-es" lang="es">Diseño de Marca</span>
-                <span class="lang-en" lang="en">Brand Design</span>
-              </div>
-              <h3>Valeria Ramírez</h3>
-              <p>
-                <span class="lang-es" lang="es">Logotipo, paleta de color, tipografía y voz de marca. Capturó la esencia de Estar en una identidad visual serena y contemporánea.</span>
-                <span class="lang-en" lang="en">Logo, color palette, typography, and brand voice. She captured the essence of Estar in a serene, contemporary visual identity.</span>
-              </p>
-            </div>
-          </div>
-        </div>
-        <div class="nos-split-img">
-          <img src="assets/photos/coworking.webp" alt="Espacios interiores de Estar — diseño Intempo" loading="lazy" width="600" height="450">
-        </div>
+<!-- ============================== STATS ============================== -->
+<section class="amenities" style="background: var(--paper-200);">
+  <div class="container">
+    <div class="amenities-grid" data-reveal>
+      <div class="amenity">
+        <span class="amenity-stat" style="color: var(--terracotta);">2023</span>
+        <h4>
+          <span class="amenity-stat-sub">
+            <span class="lang-es" lang="es">Año de apertura</span>
+            <span class="lang-en" lang="en">Year opened</span>
+          </span>
+        </h4>
       </div>
-    </section>
-
-    <!-- El Equipo -->
-    <section class="nos-section" data-reveal>
-      <p class="nos-section-eyebrow">
-        <span class="lang-es" lang="es">El Equipo</span>
-        <span class="lang-en" lang="en">The Team</span>
-      </p>
-      <h2 style="font-family: var(--font-display); font-size: clamp(1.6rem,3.5vw,2.2rem); font-weight: 400; margin-bottom: var(--space-6); color: var(--fg);">
-        <span class="lang-es" lang="es">Las personas detrás de cada estadía</span>
-        <span class="lang-en" lang="en">The people behind every stay</span>
-      </h2>
-      <div class="team-grid">
-        <div class="team-card">
-          <div class="team-avatar">R</div>
-          <h3>Rafael Castaño</h3>
-          <span class="team-role">
-            <span class="lang-es" lang="es">Co-fundador</span>
-            <span class="lang-en" lang="en">Co-founder</span>
+      <div class="amenity">
+        <span class="amenity-stat" style="color: var(--terracotta);">5</span>
+        <h4>
+          <span class="amenity-stat-sub">
+            <span class="lang-es" lang="es">Apartaestudios</span>
+            <span class="lang-en" lang="en">Studio apartments</span>
           </span>
-        </div>
-        <div class="team-card">
-          <div class="team-avatar">D</div>
-          <h3>Daniela Castaño</h3>
-          <span class="team-role">
-            <span class="lang-es" lang="es">Co-fundadora</span>
-            <span class="lang-en" lang="en">Co-founder</span>
-          </span>
-        </div>
-        <div class="team-card">
-          <div class="team-avatar">D</div>
-          <h3>Diego López</h3>
-          <span class="team-role">
-            <span class="lang-es" lang="es">Administrador</span>
-            <span class="lang-en" lang="en">Operations Manager</span>
-          </span>
-        </div>
-        <div class="team-card">
-          <div class="team-avatar">C</div>
-          <h3>Cruz Elena Calvo</h3>
-          <span class="team-role">
-            <span class="lang-es" lang="es">Asistente de limpieza</span>
-            <span class="lang-en" lang="en">Housekeeping</span>
-          </span>
-        </div>
+        </h4>
       </div>
-    </section>
+      <div class="amenity">
+        <span class="amenity-stat" style="color: var(--terracotta);">9.0</span>
+        <h4>
+          <span class="amenity-stat-sub">
+            <span class="lang-es" lang="es">Booking.com · 126 reseñas</span>
+            <span class="lang-en" lang="en">Booking.com · 126 reviews</span>
+          </span>
+        </h4>
+      </div>
+      <div class="amenity">
+        <span class="amenity-stat" style="color: var(--terracotta);">RNT</span>
+        <h4>
+          <span class="amenity-stat-sub">276306</span>
+        </h4>
+      </div>
+    </div>
+  </div>
+</section>
 
-    <!-- CTA -->
-    <div class="nos-cta" data-reveal>
+<!-- ============================== EL PROYECTO ============================== -->
+<section class="section">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow terracotta">
+          <span class="lang-es" lang="es">El Proyecto</span>
+          <span class="lang-en" lang="en">The Project</span>
+        </p>
+        <h2 class="display-l">
+          <span class="lang-es" lang="es">Construido con los <span class="serif-italic">mejores de Manizales.</span></span>
+          <span class="lang-en" lang="en">Built with the <span class="serif-italic">best of Manizales.</span></span>
+        </h2>
+      </div>
+      <p class="lead">
+        <span class="lang-es" lang="es">Cada detalle de Estar —desde la arquitectura hasta el logotipo— fue creado por profesionales locales que entendieron la visión desde el primer día.</span>
+        <span class="lang-en" lang="en">Every detail of Estar — from the architecture to the logo — was created by local professionals who understood the vision from day one.</span>
+      </p>
+    </div>
+    <div class="value-grid cols-2" data-reveal>
+      <div class="value-cell">
+        <span class="num">
+          <span class="lang-es" lang="es">Arquitectura e Interiorismo</span>
+          <span class="lang-en" lang="en">Architecture & Interiors</span>
+        </span>
+        <h4>Manuela Arango · Intempo</h4>
+        <p>
+          <span class="lang-es" lang="es">Manuela y su firma Intempo tradujeron la visión de los fundadores en espacios contemporáneos, luminosos y funcionales. Cada metro cuadrado fue pensado para el bienestar del huésped: proporciones generosas, materiales duraderos, luz natural siempre presente.</span>
+          <span class="lang-en" lang="en">Manuela and her Intempo studio translated the founders' vision into contemporary, light-filled, functional spaces. Every square meter was designed around guest wellbeing: generous proportions, durable materials, and natural light throughout.</span>
+        </p>
+      </div>
+      <div class="value-cell">
+        <span class="num">
+          <span class="lang-es" lang="es">Diseño de Marca</span>
+          <span class="lang-en" lang="en">Brand Design</span>
+        </span>
+        <h4>Valeria Ramírez</h4>
+        <p>
+          <span class="lang-es" lang="es">Valeria desarrolló la identidad visual completa de Estar: logotipo, paleta de color, tipografía y voz de marca. Una identidad serena y contemporánea que se siente tan propia como los espacios que representa.</span>
+          <span class="lang-en" lang="en">Valeria developed the complete visual identity of Estar: logo, color palette, typography, and brand voice. A serene and contemporary identity that feels as personal as the spaces it represents.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== EL EQUIPO ============================== -->
+<section class="section" style="background: var(--paper-200);">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow terracotta">
+          <span class="lang-es" lang="es">El Equipo</span>
+          <span class="lang-en" lang="en">The Team</span>
+        </p>
+        <h2 class="display-l">
+          <span class="lang-es" lang="es">Las personas detrás <span class="serif-italic">de cada estadía.</span></span>
+          <span class="lang-en" lang="en">The people behind <span class="serif-italic">every stay.</span></span>
+        </h2>
+      </div>
+    </div>
+    <div class="segments-grid" data-reveal>
+      <div class="segment">
+        <span class="num">01</span>
+        <h3>Rafael Castaño</h3>
+        <p>
+          <span class="lang-es" lang="es">Co-fundador. La idea de Estar empezó con él: una convicción de que Manizales merecía algo diferente.</span>
+          <span class="lang-en" lang="en">Co-founder. Estar began with his conviction that Manizales deserved something different.</span>
+        </p>
+      </div>
+      <div class="segment">
+        <span class="num">02</span>
+        <h3>Daniela Castaño</h3>
+        <p>
+          <span class="lang-es" lang="es">Co-fundadora. Dio forma a la experiencia del huésped y al espíritu de hospitalidad que define a Estar.</span>
+          <span class="lang-en" lang="en">Co-founder. She shaped the guest experience and the spirit of hospitality that defines Estar.</span>
+        </p>
+      </div>
+      <div class="segment">
+        <span class="num">03</span>
+        <h3>Diego López</h3>
+        <p>
+          <span class="lang-es" lang="es">Administrador. Lidera la operación diaria con la atención cálida y personalizada que nuestros huéspedes valoran.</span>
+          <span class="lang-en" lang="en">Operations manager. He leads daily operations with the warm, personalized attention our guests value most.</span>
+        </p>
+      </div>
+      <div class="segment">
+        <span class="num">04</span>
+        <h3>Cruz Elena Calvo</h3>
+        <p>
+          <span class="lang-es" lang="es">Asistente de limpieza. Garantiza que cada apartaestudio esté impecable en cada llegada, con dedicación y cuidado.</span>
+          <span class="lang-en" lang="en">Housekeeping. She ensures every apartment is spotless for every arrival, with care and dedication.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== CTA ============================== -->
+<section class="explore wipe-band" data-reveal>
+  <div class="container">
+    <div>
+      <p class="eyebrow on-dark">
+        <span class="lang-es" lang="es">Reserva directa</span>
+        <span class="lang-en" lang="en">Book direct</span>
+      </p>
       <h2>
-        <span class="lang-es" lang="es">Ven a estar con nosotros</span>
-        <span class="lang-en" lang="en">Come stay with us</span>
+        <span class="lang-es" lang="es">Ven a <span class="italic">estar</span> con nosotros.</span>
+        <span class="lang-en" lang="en">Come <span class="italic">be</span> with us.</span>
       </h2>
-      <p>
-        <span class="lang-es" lang="es">Reserva directamente y obtén la mejor tarifa disponible</span>
-        <span class="lang-en" lang="en">Book directly and get the best available rate</span>
+      <p class="lead">
+        <span class="lang-es" lang="es">Reserva directamente en nuestro sitio y obtén la mejor tarifa disponible — sin intermediarios, sin comisiones.</span>
+        <span class="lang-en" lang="en">Book directly on our site and get the best available rate — no middlemen, no commissions.</span>
       </p>
-      <a href="reservar.html" class="book-btn" style="display:inline-flex; font-size:1rem; padding: var(--space-4) var(--space-7);">
-        <span class="lang-es" lang="es">Reservar ahora</span>
-        <span class="lang-en" lang="en">Book now</span>
+      <a href="reservar.html" class="btn btn-ghost-light" style="margin-top: 12px;">
+        <span class="lang-es" lang="es">Ver disponibilidad</span>
+        <span class="lang-en" lang="en">Check availability</span>
+        <span aria-hidden="true"> →</span>
       </a>
     </div>
-
+    <div class="explore-photos">
+      <div class="explore-photo" style="background-image: url('assets/photos/fachada.webp'); background-size: cover; background-position: center;"></div>
+      <div class="explore-photo" style="background-image: url('assets/photos/patio.webp'); background-size: cover; background-position: center;"></div>
+    </div>
   </div>
-</main>
+</section>
 
+<!-- ============================== FOOTER ============================== -->
 <footer class="site-footer">
   <div class="container">
     <div class="footer-top">
@@ -553,7 +368,6 @@
         <h5 data-i18n="footer_descubre">Descubre</h5>
         <ul>
           <li><a href="nosotros.html" data-i18n="footer_nosotros">Sobre Nosotros</a></li>
-          <li><a href="nosotros.html" data-i18n="footer_nosotros">Sobre Nosotros</a></li>
           <li><a href="explora.html" data-i18n="footer_explorar">Explorar Manizales</a></li>
           <li><a href="faq.html" data-i18n="footer_preguntas">Preguntas Frecuentes</a></li>
           <li><a href="contacto.html" data-i18n="footer_contacto">Contáctanos</a></li>
@@ -588,70 +402,70 @@
 <script src="shell.js?v=2" defer></script>
 <script>document.addEventListener('DOMContentLoaded',function(){lucide.createIcons();});</script>
 
-  <!-- Burbuja Flotante de Contacto -->
-  <div class="contact-float" id="contactFloat">
-    <button class="contact-trigger" aria-label="Abrir opciones de contacto">
-      <span class="contact-icon contact-icon-chat">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
-      </span>
-      <span class="contact-icon contact-icon-close">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-      </span>
-    </button>
-    <div class="contact-menu">
-      <div class="contact-menu-header">
-        <span class="contact-menu-title" data-i18n="contact_title">Escríbenos</span>
-        <span class="contact-menu-subtitle" data-i18n="contact_subtitle">Hospedaje contemporáneo</span>
-      </div>
-      <div class="contact-menu-list">
-        <a href="https://api.whatsapp.com/send/?phone=573102490414&text&type=phone_number&app_absent=0" target="_blank" rel="noopener noreferrer" class="contact-item ci-whatsapp">
-          <div class="contact-item-icon">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.709 1.457h.004c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-          </div>
-          <div class="contact-item-text">
-            <span class="contact-item-title">WhatsApp</span>
-            <span class="contact-item-desc" data-i18n="contact_wa_desc">Chatea con nosotros</span>
-          </div>
-        </a>
-        <a href="https://www.instagram.com/hotel.estar/" target="_blank" rel="noopener noreferrer" class="contact-item ci-instagram">
-          <div class="contact-item-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-instagram"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
-          </div>
-          <div class="contact-item-text">
-            <span class="contact-item-title">Instagram</span>
-            <span class="contact-item-desc">@hotel.estar</span>
-          </div>
-        </a>
-        <a href="mailto:reservas@estar.com.co" class="contact-item ci-email">
-          <div class="contact-item-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-          </div>
-          <div class="contact-item-text">
-            <span class="contact-item-title" data-i18n="contact_email_title">Correo</span>
-            <span class="contact-item-desc">reservas@estar.com.co</span>
-          </div>
-        </a>
-        <a href="https://maps.app.goo.gl/QwDXDmpE7NwV4m1ZA" target="_blank" rel="noopener noreferrer" class="contact-item ci-maps">
-          <div class="contact-item-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-          </div>
-          <div class="contact-item-text">
-            <span class="contact-item-title">Google Maps</span>
-            <span class="contact-item-desc" data-i18n="contact_maps_desc">Cómo llegar</span>
-          </div>
-        </a>
-        <a href="https://ul.waze.com/ul?place=ChIJT2vbCbBlR44Rbq4GbLKZIeU&ll=5.05957470%2C-75.48809350&navigate=yes&utm_campaign=default&utm_source=waze_website&utm_medium=lm_share_location" target="_blank" rel="noopener noreferrer" class="contact-item ci-waze">
-          <div class="contact-item-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-navigation"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-          </div>
-          <div class="contact-item-text">
-            <span class="contact-item-title">Waze</span>
-            <span class="contact-item-desc" data-i18n="contact_waze_desc">Navegar con Waze</span>
-          </div>
-        </a>
-      </div>
+<!-- Burbuja Flotante de Contacto -->
+<div class="contact-float" id="contactFloat">
+  <button class="contact-trigger" aria-label="Abrir opciones de contacto">
+    <span class="contact-icon contact-icon-chat">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+    </span>
+    <span class="contact-icon contact-icon-close">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </span>
+  </button>
+  <div class="contact-menu">
+    <div class="contact-menu-header">
+      <span class="contact-menu-title" data-i18n="contact_title">Escríbenos</span>
+      <span class="contact-menu-subtitle" data-i18n="contact_subtitle">Hospedaje contemporáneo</span>
+    </div>
+    <div class="contact-menu-list">
+      <a href="https://api.whatsapp.com/send/?phone=573102490414&text&type=phone_number&app_absent=0" target="_blank" rel="noopener noreferrer" class="contact-item ci-whatsapp">
+        <div class="contact-item-icon">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.709 1.457h.004c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+        </div>
+        <div class="contact-item-text">
+          <span class="contact-item-title">WhatsApp</span>
+          <span class="contact-item-desc" data-i18n="contact_wa_desc">Chatea con nosotros</span>
+        </div>
+      </a>
+      <a href="https://www.instagram.com/hotel.estar/" target="_blank" rel="noopener noreferrer" class="contact-item ci-instagram">
+        <div class="contact-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-instagram"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
+        </div>
+        <div class="contact-item-text">
+          <span class="contact-item-title">Instagram</span>
+          <span class="contact-item-desc">@hotel.estar</span>
+        </div>
+      </a>
+      <a href="mailto:reservas@estar.com.co" class="contact-item ci-email">
+        <div class="contact-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+        </div>
+        <div class="contact-item-text">
+          <span class="contact-item-title" data-i18n="contact_email_title">Correo</span>
+          <span class="contact-item-desc">reservas@estar.com.co</span>
+        </div>
+      </a>
+      <a href="https://maps.app.goo.gl/QwDXDmpE7NwV4m1ZA" target="_blank" rel="noopener noreferrer" class="contact-item ci-maps">
+        <div class="contact-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <div class="contact-item-text">
+          <span class="contact-item-title">Google Maps</span>
+          <span class="contact-item-desc" data-i18n="contact_maps_desc">Cómo llegar</span>
+        </div>
+      </a>
+      <a href="https://ul.waze.com/ul?place=ChIJT2vbCbBlR44Rbq4GbLKZIeU&ll=5.05957470%2C-75.48809350&navigate=yes&utm_campaign=default&utm_source=waze_website&utm_medium=lm_share_location" target="_blank" rel="noopener noreferrer" class="contact-item ci-waze">
+        <div class="contact-item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-navigation"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        </div>
+        <div class="contact-item-text">
+          <span class="contact-item-title">Waze</span>
+          <span class="contact-item-desc" data-i18n="contact_waze_desc">Navegar con Waze</span>
+        </div>
+      </a>
     </div>
   </div>
+</div>
 
 </body>
 </html>
