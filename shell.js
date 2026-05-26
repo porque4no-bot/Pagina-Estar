@@ -9,10 +9,8 @@
 (function () {
   /* ----- HERO VIDEO: conditional load mobile vs desktop ----- */
   const heroVideo = document.querySelector('.hero-media video');
-  if (heroVideo) {
-    heroVideo.src = window.innerWidth <= 768
-      ? 'assets/video/hero-mobile.mp4'
-      : 'assets/video/hero-desktop.mp4';
+  if (heroVideo && window.innerWidth <= 768) {
+    heroVideo.src = 'assets/video/hero-mobile.mp4';
     heroVideo.load();
   }
 

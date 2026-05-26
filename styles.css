@@ -1970,7 +1970,7 @@ body[data-density="compact"] .newsletter { padding: 80px 0; }
   color: var(--terracotta-700);
   letter-spacing: 0.05em;
 }
-.value-cell h4 {
+.value-cell h3 {
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 22px;
@@ -2092,7 +2092,7 @@ body[data-density="compact"] .newsletter { padding: 80px 0; }
   line-height: 1;
   width: 32px;
 }
-.step h5 {
+.step h4 {
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 16px;
@@ -2209,7 +2209,7 @@ body[data-density="compact"] .newsletter { padding: 80px 0; }
 }
 .cross-link:hover { background: var(--paper); border-color: var(--ink-300); }
 .cross-link .eyebrow { color: var(--terracotta-700); margin-bottom: 8px; }
-.cross-link h5 {
+.cross-link h4 {
   font-family: var(--font-heading);
   font-weight: 900;
   font-size: 22px;
@@ -5012,7 +5012,7 @@ html[lang="en"] .lang-es { display: none !important; }
 
   /* ── Value-grid (vivir.html — "Cómo funciona"): compactar celdas ── */
   .value-cell { padding: 20px 24px; gap: 10px; }
-  .value-cell h4 { font-size: 18px; }
+  .value-cell h3 { font-size: 18px; }
   .value-cell p { font-size: 14px; line-height: 1.5; }
 
   /* ── Tarifas móvil: precios ya en cada tarjeta → ocultar tabla separada ── */
