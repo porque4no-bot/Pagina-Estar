@@ -119,7 +119,7 @@
 <!-- ============================== HERO ============================== -->
 <section class="hero has-star-cursor" data-screen-label="01.1 Hero">
   <div class="hero-media">
-    <video autoplay muted loop playsinline poster="assets/photos/hero_first_frame.webp">
+    <video autoplay muted loop playsinline preload="none" poster="assets/photos/hero_first_frame.webp">
       <source src="assets/video/hero.mp4" type="video/mp4">
     </video>
   </div>
@@ -134,6 +134,27 @@
       <span class="voice-only voice-manifiesto" aria-hidden="true">Esta ciudad es tuya.</span>
       <span class="visually-hidden">Un lugar para estar — Apartaestudios en Manizales</span>
     </h1>
+
+    <div class="hero-trust" data-reveal>
+      <span class="htrust-badge">
+        <span class="htrust-star" aria-hidden="true">✶</span>
+        <span class="lang-es" lang="es">9.0 Booking.com · 126 reseñas</span>
+        <span class="lang-en" lang="en">9.0 Booking.com · 126 reviews</span>
+      </span>
+      <span class="htrust-badge htrust-airbnb">
+        <span class="lang-es" lang="es">Superanfitrión Airbnb</span>
+        <span class="lang-en" lang="en">Airbnb Superhost</span>
+      </span>
+      <span class="htrust-badge">RNT 276306</span>
+    </div>
+
+    <div class="hero-price" id="hero-price" hidden>
+      <span class="hp-from lang-es" lang="es">Desde</span>
+      <span class="hp-from lang-en" lang="en">From</span>
+      <strong class="hp-amount" id="hp-amount"></strong>
+      <span class="hp-unit lang-es" lang="es">/ noche</span>
+      <span class="hp-unit lang-en" lang="en">/ night</span>
+    </div>
   </div>
 
   <div class="scroll-cue"><span>Scroll</span></div>
@@ -188,7 +209,7 @@
     </div>
 
     <button type="submit" class="booking-cta">
-      <span data-i18n="book_search">Buscar disponibilidad</span>
+      <span data-i18n="book_search">Reservar ahora</span>
       <span aria-hidden="true">→</span>
     </button>
     <div class="escnna-inline-notice" style="grid-column: 1 / -1; text-align: center; font-size: 10px; line-height: 1.4; color: var(--ink-500); padding: 8px 12px; border-top: 1px solid var(--paper-400); background: var(--paper-200); border-radius: 0 0 4px 4px;">
@@ -202,62 +223,15 @@
   </form>
 </section>
 
-<!-- ============================== AMENITIES ============================== -->
-<section class="amenities" id="main-content" data-screen-label="01.2 Servicios">
-  <div class="container">
-    <div class="head" data-reveal>
-      <p class="eyebrow terracotta"><span class="lang-es" lang="es">Lo que incluye</span><span class="lang-en" lang="en">What's included</span></p>
-      <h2 class="display-m">
-        <span class="lang-es" lang="es">Hospedaje en Manizales: todo lo necesario, <span class="serif-italic">nada de lo demás.</span></span>
-        <span class="lang-en" lang="en">Lodging in Manizales: everything you need, <span class="serif-italic">nothing you don't.</span></span>
-      </h2>
-    </div>
-    <div class="amenities-grid">
-      <div class="amenity" data-reveal>
-        <i data-lucide="key-round"></i>
-        <h4>
-          <span class="lang-es" lang="es">Check-in digital</span>
-          <span class="lang-en" lang="en">Digital Check-in</span>
-        </h4>
-      </div>
-      <div class="amenity" data-reveal>
-        <i data-lucide="wifi"></i>
-        <h4>
-          <span class="lang-es" lang="es">Wi-Fi y Coworking</span>
-          <span class="lang-en" lang="en">Wi-Fi & Coworking</span>
-        </h4>
-      </div>
-      <div class="amenity" data-reveal>
-        <i data-lucide="utensils"></i>
-        <h4>
-          <span class="lang-es" lang="es">Cocina equipada</span>
-          <span class="lang-en" lang="en">Equipped Kitchen</span>
-        </h4>
-      </div>
-      <div class="amenity" data-reveal>
-        <i data-lucide="sparkles"></i>
-        <h4>
-          <span class="lang-es" lang="es">Limpieza</span>
-          <span class="lang-en" lang="en">Housekeeping</span>
-        </h4>
-      </div>
-      <div class="amenity" data-reveal>
-        <i data-lucide="coffee"></i>
-        <h4>
-          <span class="lang-es" lang="es">Desayuno</span>
-          <span class="lang-en" lang="en">Breakfast</span>
-        </h4>
-      </div>
-      <div class="amenity" data-reveal>
-        <i data-lucide="paw-print"></i>
-        <h4>
-          <span class="lang-es" lang="es">Pet friendly</span>
-          <span class="lang-en" lang="en">Pet Friendly</span>
-        </h4>
-      </div>
-    </div>
+<!-- PARTNERS STRIP -->
+<div class="partners-strip" data-screen-label="01.1b Partners">
+  <div class="container partners-inner">
+    <span class="ps-label lang-es" lang="es">Miembro de</span>
+    <span class="ps-label lang-en" lang="en">Member of</span>
+    <img src="assets/logo-cotelco.png" alt="COTELCO - Asociación Hotelera y Turística de Colombia" class="ps-logo" width="100" height="40" loading="lazy">
+    <img src="assets/logo-asohost.png" alt="ASOHOST - Asociación de Anfitriones" class="ps-logo" width="90" height="40" loading="lazy">
   </div>
-</section>
+</div>
 
 <!-- ============================== LOCATION & RATINGS ============================== -->
 <section class="location-ratings" id="ubicacion">
@@ -623,6 +597,63 @@
   </div>
 </section>
 
+<!-- ============================== AMENITIES ============================== -->
+<section class="amenities" id="main-content" data-screen-label="01.2 Servicios">
+  <div class="container">
+    <div class="head" data-reveal>
+      <p class="eyebrow terracotta"><span class="lang-es" lang="es">Lo que incluye</span><span class="lang-en" lang="en">What's included</span></p>
+      <h2 class="display-m">
+        <span class="lang-es" lang="es">Hospedaje en Manizales: todo lo necesario, <span class="serif-italic">nada de lo demás.</span></span>
+        <span class="lang-en" lang="en">Lodging in Manizales: everything you need, <span class="serif-italic">nothing you don't.</span></span>
+      </h2>
+    </div>
+    <div class="amenities-grid">
+      <div class="amenity" data-reveal>
+        <i data-lucide="key-round"></i>
+        <h4>
+          <span class="lang-es" lang="es">Acceso 24/7</span>
+          <span class="lang-en" lang="en">Digital Check-in</span>
+        </h4>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="wifi"></i>
+        <h4>
+          <span class="lang-es" lang="es">WiFi Fibra óptica</span>
+          <span class="lang-en" lang="en">Wi-Fi & Coworking</span>
+        </h4>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="utensils"></i>
+        <h4>
+          <span class="lang-es" lang="es">Cocina completa</span>
+          <span class="lang-en" lang="en">Equipped Kitchen</span>
+        </h4>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="sparkles"></i>
+        <h4>
+          <span class="lang-es" lang="es">Aseo incluido</span>
+          <span class="lang-en" lang="en">Housekeeping</span>
+        </h4>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="coffee"></i>
+        <h4>
+          <span class="lang-es" lang="es">Desayuno opcional</span>
+          <span class="lang-en" lang="en">Breakfast</span>
+        </h4>
+      </div>
+      <div class="amenity" data-reveal>
+        <i data-lucide="paw-print"></i>
+        <h4>
+          <span class="lang-es" lang="es">Pet friendly</span>
+          <span class="lang-en" lang="en">Pet Friendly</span>
+        </h4>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ============================== SEGMENTS (4 profiles) ============================== -->
 <section class="segments" data-screen-label="01.4 Para quién">
   <div class="container">
@@ -687,14 +718,30 @@
   </div>
 </section>
 
-<!-- ============================== TESTIMONIAL ============================== -->
-<section class="testimonial wipe-band" data-reveal data-screen-label="01.6 Voz huésped">
+<!-- REVIEWS -->
+<section class="reviews-section" data-screen-label="01.6 Reseñas" data-reveal>
   <div class="container">
-    <div class="quote-mark" aria-hidden="true">"</div>
-    <blockquote>
-      Nos quedamos cinco noches y la quinta sentíamos que era nuestra casa. La cocina, la luz por la mañana, el silencio. Eso no se finge.
-    </blockquote>
-    <cite>Mariana &amp; Felipe — Bogotá, 2025</cite>
+    <div class="reviews-head" data-reveal>
+      <p class="eyebrow terracotta">
+        <span class="lang-es" lang="es">Reseñas de huéspedes</span>
+        <span class="lang-en" lang="en">Guest reviews</span>
+      </p>
+      <div class="reviews-score-bar">
+        <span class="rsb-num">9.0</span>
+        <span class="rsb-star" aria-hidden="true">✶</span>
+        <span class="rsb-text lang-es" lang="es">Booking.com · 126 reseñas</span>
+        <span class="rsb-text lang-en" lang="en">Booking.com · 126 reviews</span>
+      </div>
+    </div>
+    <div class="reviews-list" id="reviews-list" aria-live="polite">
+      <!-- Fallback estático — JS lo reemplaza si la API responde -->
+      <article class="review-card">
+        <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+        <blockquote class="rc-text">"Nos quedamos cinco noches y la quinta sentíamos que era nuestra casa. La cocina, la luz por la mañana, el silencio. Eso no se finge."</blockquote>
+        <footer class="rc-author">Mariana &amp; Felipe · <span class="lang-es" lang="es">Colombia</span><span class="lang-en" lang="en">Colombia</span></footer>
+        <span class="rc-source">Booking.com</span>
+      </article>
+    </div>
   </div>
 </section>
 
@@ -775,6 +822,49 @@
     <div class="booking-spacer"></div>
   </div>
 </footer>
+
+<!-- ============================== PRICE & REVIEWS FETCH ============================== -->
+<script>
+(function(){
+  var el=document.getElementById('hero-price'),am=document.getElementById('hp-amount');
+  if(!el||!am)return;
+  var t=new Date(),t2=new Date();t2.setDate(t2.getDate()+1);
+  function fmt(d){return d.toISOString().split('T')[0];}
+  function cop(n){return '$'+Math.round(n).toLocaleString('es-CO');}
+  fetch('/api/check-availability?checkin='+fmt(t)+'&checkout='+fmt(t2)+'&guests=1')
+    .then(function(r){return r.ok?r.json():Promise.reject();})
+    .then(function(d){
+      var rooms=(d.rooms||[]).filter(function(r){return r.available&&r.avgPrice>0;});
+      if(!rooms.length)return;
+      var min=Math.min.apply(null,rooms.map(function(r){return r.avgPrice;}));
+      am.textContent=cop(min);
+      el.removeAttribute('hidden');
+    })
+    .catch(function(){});
+})();
+(function(){
+  var list=document.getElementById('reviews-list');
+  if(!list)return;
+  fetch('/api/get-reviews')
+    .then(function(r){return r.ok?r.json():Promise.reject();})
+    .then(function(d){
+      var reviews=d.reviews||[];
+      if(!reviews.length||d.isMock)return;
+      var html=reviews.slice(0,3).map(function(r){
+        var text=r.text||'';
+        if(text.length>200)text=text.slice(0,197)+'…';
+        return '<article class="review-card" data-reveal>'+
+          '<div class="rc-score">'+Math.round(r.score||10)+' <span aria-hidden="true">✶</span></div>'+
+          '<blockquote class="rc-text">&#8220;'+text+'&#8221;</blockquote>'+
+          '<footer class="rc-author">'+r.author+(r.country?' · '+r.country:'')+'</footer>'+
+          '<span class="rc-source">Booking.com</span>'+
+        '</article>';
+      }).join('');
+      list.innerHTML=html;
+    })
+    .catch(function(){});
+})();
+</script>
 
 <!-- ============================== TWEAKS DEFAULTS ============================== -->
 <script>
