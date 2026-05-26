@@ -5426,3 +5426,116 @@ textarea:focus-visible,
   .fn-form { max-width: 100%; width: 100%; }
 }
 @media (max-width: 767px) { .reviews-section { padding: 56px 0; } .reviews-head { margin-bottom: 32px; } .hp-amount { font-size: 24px; } }
+
+/* ── HERO CANCEL BADGE ───────────────────────────────────────────────── */
+.hero-cancel { margin-top: 12px; }
+.hero-cancel-link {
+  display: inline-block;
+  font-family: var(--font-label);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  color: rgba(250,246,239,0.8);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(250,246,239,0.3);
+  padding-bottom: 1px;
+  transition: color 0.2s, border-color 0.2s;
+}
+.hero-cancel-link:hover { color: var(--white); border-color: rgba(250,246,239,0.7); }
+
+/* ── ROOM PRICE IN CARDS ─────────────────────────────────────────────── */
+.room-info .room-price {
+  padding: 12px 0 8px;
+  border-top: 1px solid var(--paper-400);
+  margin-top: 12px;
+}
+body[data-atmosphere="crepusculo"] .room-info .room-price { border-top-color: var(--ink-300); }
+
+/* ── COMPARADOR ──────────────────────────────────────────────────────── */
+.comparador { padding: 72px 0 56px; background: var(--paper-200); }
+.comparador-head { margin-bottom: 40px; }
+.comparador-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.comparador-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+}
+.comparador-table thead th {
+  padding: 0 20px 16px;
+  text-align: left;
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  border-bottom: 2px solid var(--paper-400);
+}
+.comparador-table thead th:first-child { padding-left: 0; width: 120px; }
+.ct-label-col { min-width: 100px; }
+.ct-room-link {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-decoration: none;
+  color: inherit;
+  transition: color 0.2s;
+}
+.ct-room-link:hover { color: var(--terracotta); }
+.ct-num { font-size: 9px; letter-spacing: 0.1em; color: var(--ink-500); }
+.ct-name { font-size: 13px; font-weight: 700; font-family: var(--font-heading); color: var(--ink); }
+.ct-room-link.ct-featured .ct-name { color: var(--terracotta); }
+.comparador-table tbody tr {
+  border-bottom: 1px solid var(--paper-300);
+}
+.comparador-table tbody tr:last-child { border-bottom: none; }
+.comparador-table tbody th {
+  padding: 14px 0;
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.comparador-table tbody td {
+  padding: 14px 20px;
+  vertical-align: middle;
+  color: var(--ink);
+}
+.ct-check { color: var(--terracotta); font-size: 16px; }
+.ct-price {
+  font-family: var(--font-heading);
+  font-weight: 900;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.ct-price.ct-featured { color: var(--terracotta); }
+.ct-cta-row td { padding-top: 16px; padding-bottom: 4px; }
+.ct-book {
+  display: inline-block;
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink-300);
+  padding-bottom: 2px;
+  transition: color 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+.ct-book:hover { color: var(--terracotta); border-color: var(--terracotta); }
+.ct-book.ct-featured { color: var(--terracotta); border-color: var(--terracotta-300); }
+@media (max-width: 767px) {
+  .comparador { padding: 56px 0 40px; }
+  .comparador-table { font-size: 13px; }
+  .comparador-table tbody th { font-size: 9px; }
+  .ct-price { font-size: 14px; }
+}
