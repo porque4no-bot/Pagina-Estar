@@ -1685,6 +1685,9 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   margin-bottom: 24px;
 }
 .footer-brand p { font-family: var(--font-body); font-style: italic; font-size: 16px; line-height: 1.6; max-width: 38ch; color: rgba(250,246,239,0.75); margin: 0; }
+.footer-address { font-style: normal; display: flex; flex-direction: column; gap: 2px; margin-top: 12px; font-family: var(--font-body); font-size: 13px; color: rgba(250,246,239,0.5); }
+.footer-address a { color: rgba(250,246,239,0.5); transition: color var(--dur-base) var(--ease-out); }
+.footer-address a:hover { color: var(--paper); }
 .footer-col h5, .footer-col .footer-col-heading {
   font-family: var(--font-label);
   font-weight: 700;

@@ -44,9 +44,15 @@
     "currenciesAccepted": "COP",
     "address": {
       "@type": "PostalAddress",
+      "streetAddress": "Cl. 61 #23-36, La Estrella",
       "addressLocality": "Manizales",
       "addressRegion": "Caldas",
       "addressCountry": "CO"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 5.059565041000265,
+      "longitude": -75.48809828183073
     },
     "hasMap": "https://maps.app.goo.gl/QwDXDmpE7NwV4m1ZA",
     "checkinTime": "15:00",
@@ -65,11 +71,54 @@
       {"@type": "LocationFeatureSpecification", "name": "Check-in digital", "value": true}
     ],
     "containsPlace": [
-      {"@type": "HotelRoom", "name": "Clásica", "url": "https://estar.com.co/clasica.html"},
-      {"@type": "HotelRoom", "name": "Selección", "url": "https://estar.com.co/seleccion.html"},
-      {"@type": "HotelRoom", "name": "Reserva", "url": "https://estar.com.co/reserva.html"},
-      {"@type": "HotelRoom", "name": "Origen", "url": "https://estar.com.co/origen.html"},
-      {"@type": "HotelRoom", "name": "Especial", "url": "https://estar.com.co/especial.html"}
+      {
+        "@type": "HotelRoom",
+        "name": "Clásica",
+        "description": "Cama queen, escritorio frente a la ventana, cocina equipada con menaje completo y baño privado con ducha. La esencia de estar, en 28 m².",
+        "url": "https://estar.com.co/clasica",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
+        "bed": [{"@type": "BedDetails", "typeOfBed": "Queen size", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 28, "unitCode": "MTK"}
+      },
+      {
+        "@type": "HotelRoom",
+        "name": "Selección",
+        "description": "Balcón privado con vistas a la cordillera. Ideal para el café de las mañanas. La luz natural cambia toda la sensación del espacio.",
+        "url": "https://estar.com.co/seleccion",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
+        "bed": [{"@type": "BedDetails", "typeOfBed": "Queen size", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 32, "unitCode": "MTK"}
+      },
+      {
+        "@type": "HotelRoom",
+        "name": "Reserva",
+        "description": "Dormitorio privado separado de la zona social. Escritorio ergonómico. 42 m². Cuenta con ambientes definidos, cocina y Smart TV.",
+        "url": "https://estar.com.co/reserva",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
+        "bed": [{"@type": "BedDetails", "typeOfBed": "King size", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 42, "unitCode": "MTK"}
+      },
+      {
+        "@type": "HotelRoom",
+        "name": "Origen",
+        "description": "El más espacioso. Diseño con referencia cafetera. Vista panorámica de Manizales para relajarse tras un día de trabajo.",
+        "url": "https://estar.com.co/origen",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
+        "bed": [{"@type": "BedDetails", "typeOfBed": "King size", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 52, "unitCode": "MTK"}
+      },
+      {
+        "@type": "HotelRoom",
+        "name": "Especial",
+        "description": "Nuestra tipología más completa. Terraza privada, cama king + sofá cama. Ideal para viajes familiares o de negocios.",
+        "url": "https://estar.com.co/especial",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 4},
+        "bed": [
+          {"@type": "BedDetails", "typeOfBed": "King size", "numberOfBeds": 1},
+          {"@type": "BedDetails", "typeOfBed": "Sofa bed", "numberOfBeds": 1}
+        ],
+        "floorSize": {"@type": "QuantitativeValue", "value": 60, "unitCode": "MTK"}
+      }
     ],
     "aggregateRating": {
       "@type": "AggregateRating",
@@ -964,6 +1013,10 @@
       <div class="footer-brand">
         <div class="brand-stack" aria-hidden="true"></div>
         <p data-i18n-html="footer_desc">Hospedaje en el corazón de Manizales pensado para <span class="serif-italic">estar</span> en casa.</p>
+        <address class="footer-address">
+          <span>Cl. 61 #23-36, La Estrella · Manizales, Caldas</span>
+          <a href="mailto:reservas@estar.com.co">reservas@estar.com.co</a>
+        </address>
       </div>
       <div class="footer-col">
         <p class="footer-col-heading" data-i18n="footer_estadias">Estadías</p>
@@ -1035,6 +1088,23 @@
   var t=new Date(),t2=new Date();t2.setDate(t2.getDate()+1);
   function fmt(d){return d.toISOString().split('T')[0];}
   function cop(n){return '$'+Math.round(n).toLocaleString('es-CO');}
+  fetch('/api/get-booking-rating')
+    .then(function(r){return r.ok?r.json():Promise.reject();})
+    .then(function(d){
+      if(!d.rating||!d.reviewsCount)return;
+      var ld=document.querySelector('script[type="application/ld+json"]');
+      if(!ld)return;
+      try{
+        var schema=JSON.parse(ld.textContent);
+        var biz=Array.isArray(schema)?schema.find(function(s){return s['@type']==='LodgingBusiness';}):schema;
+        if(biz&&biz.aggregateRating){
+          biz.aggregateRating.ratingValue=d.rating;
+          biz.aggregateRating.reviewCount=d.reviewsCount;
+          ld.textContent=JSON.stringify(schema);
+        }
+      }catch(e){}
+    })
+    .catch(function(){});
   fetch('/api/check-availability?checkin='+fmt(t)+'&checkout='+fmt(t2)+'&guests=1')
     .then(function(r){return r.ok?r.json():Promise.reject();})
     .then(function(d){
