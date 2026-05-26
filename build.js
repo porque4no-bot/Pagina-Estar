@@ -38,7 +38,7 @@ function copyFileSync(from, to) {
 console.log('Copying static assets...');
 
 // Copy specific folders
-const foldersToCopy = ['assets', 'fonts', 'uploads'];
+const foldersToCopy = ['assets', 'fonts', 'uploads', 'en'];
 foldersToCopy.forEach(folder => {
   const src = path.join(rootDir, folder);
   const dest = path.join(distDir, folder);
@@ -51,7 +51,10 @@ const filesToCopy = [
   'kunas.js',
   'rooms_db.json',
   'favicon.png',
-  'datos_habitaciones_estar.csv'
+  'datos_habitaciones_estar.csv',
+  'manifest.json',
+  'robots.txt',
+  'sitemap.xml'
 ];
 filesToCopy.forEach(file => {
   copyFileSync(path.join(rootDir, file), path.join(distDir, file));
