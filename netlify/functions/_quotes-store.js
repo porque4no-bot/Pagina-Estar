@@ -19,8 +19,19 @@ const ROOM_NAME_TO_ID = {
 const VALID_ROOM_IDS = new Set(Object.values(ROOM_NAME_TO_ID));
 
 /* ── Blob store accessors (graceful when unavailable locally) ── */
+/* ── Blob store accessors ──
+   Netlify normally injects the Blobs context automatically. When it doesn't
+   (some deploy previews / older sites), fall back to explicit credentials
+   from env: NETLIFY_SITE_ID + NETLIFY_API_TOKEN (a personal access token). */
 function getQuoteStore() {
-  return getStore({ name: STORE_NAME, consistency: 'eventual' });
+  const opts = { name: STORE_NAME, consistency: 'eventual' };
+  const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token = process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_BLOBS_TOKEN;
+  if (siteID && token) {
+    opts.siteID = siteID;
+    opts.token = token;
+  }
+  return getStore(opts);
 }
 
 async function loadQuote(store, id) {
