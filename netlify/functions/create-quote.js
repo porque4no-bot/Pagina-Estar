@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { authenticateAdmin } = require('./_firebase-auth');
 
 function loadEnv() {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
@@ -40,8 +41,8 @@ exports.handler = async (event, context) => {
     if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
     if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-    const user = context.clientContext && context.clientContext.user;
-    if (!user) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ error: 'Autenticación requerida' }) };
+    const auth = await authenticateAdmin(event);
+    if (!auth.ok) return { statusCode: auth.statusCode, headers: corsHeaders, body: JSON.stringify({ error: auth.error }) };
 
     if (event.body && event.body.length > 20000) return { statusCode: 413, headers: corsHeaders, body: JSON.stringify({ error: 'Payload demasiado grande' }) };
 
@@ -91,7 +92,7 @@ exports.handler = async (event, context) => {
         valor: Math.max(0, parseFloat((descuento && descuento.valor) || 0))
       },
       condiciones: String(condiciones || '').slice(0, 2000),
-      createdBy: user.email || user.sub || 'admin'
+      createdBy: auth.email || 'admin'
     };
 
     /* Encode quote data in the URL — no external storage needed */

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { authenticateAdmin } = require('./_firebase-auth');
 
 function loadEnv() {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
@@ -235,8 +236,8 @@ exports.handler = async (event, context) => {
     if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
     if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-    const user = context.clientContext && context.clientContext.user;
-    if (!user) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ error: 'Autenticación requerida' }) };
+    const auth = await authenticateAdmin(event);
+    if (!auth.ok) return { statusCode: auth.statusCode, headers: corsHeaders, body: JSON.stringify({ error: auth.error }) };
 
     let body;
     try { body = JSON.parse(event.body); }
