@@ -138,6 +138,103 @@
   </div>
 </section>
 
+<!-- ============================== SOLICITAR COTIZACIÓN ============================== -->
+<section class="section quote-request-section" id="cotizar">
+  <div class="container">
+
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow terracotta">
+          <span class="lang-es" lang="es">Cotizaciones B2B</span>
+          <span class="lang-en" lang="en">B2B Quotations</span>
+        </p>
+        <h2 class="display-l">
+          <span class="lang-es" lang="es">¿Necesitas una <span class="serif-italic">cotización a la medida?</span></span>
+          <span class="lang-en" lang="en">Need a <span class="serif-italic">tailored quote?</span></span>
+        </h2>
+      </div>
+      <p class="lead lang-es" lang="es">Cuéntanos fechas, número de habitaciones y tipo de estadía. Recibe una cotización personalizada en menos de 24 horas hábiles.</p>
+      <p class="lead lang-en" lang="en">Tell us your dates, number of rooms and type of stay. Receive a personalized quote within 24 business hours.</p>
+    </div>
+
+    <div class="quote-request-card" data-reveal>
+      <div class="quote-request-info">
+        <p class="eyebrow on-dark">
+          <span class="lang-es">Cómo funciona</span>
+          <span class="lang-en">How it works</span>
+        </p>
+        <h3>
+          <span class="lang-es">Cotización en 24 horas.</span>
+          <span class="lang-en">Quote in 24 hours.</span>
+        </h3>
+        <p class="body on-dark">
+          <span class="lang-es">Sin reuniones previas. Completa el formulario y nuestro equipo prepara una cotización formal con tarifas B2B, condiciones de pago y disponibilidad.</span>
+          <span class="lang-en">No prior meetings. Fill out the form and our team prepares a formal quote with B2B rates, payment terms and availability.</span>
+        </p>
+        <div class="quote-request-steps">
+          <div class="quote-request-step">
+            <span class="n">01</span>
+            <div><h4><span class="lang-es">Completa el formulario</span><span class="lang-en">Fill out the form</span></h4><p><span class="lang-es">Fechas tentativas, habitaciones y tipo de estadía.</span><span class="lang-en">Tentative dates, rooms and stay type.</span></p></div>
+          </div>
+          <div class="quote-request-step">
+            <span class="n">02</span>
+            <div><h4><span class="lang-es">Recibe la cotización</span><span class="lang-en">Receive the quote</span></h4><p><span class="lang-es">Por email en menos de 24 horas hábiles.</span><span class="lang-en">By email within 24 business hours.</span></p></div>
+          </div>
+          <div class="quote-request-step">
+            <span class="n">03</span>
+            <div><h4><span class="lang-es">Confirma y reserva</span><span class="lang-en">Confirm and book</span></h4><p><span class="lang-es">Acepta la cotización y activa el convenio.</span><span class="lang-en">Accept the quote and activate the agreement.</span></p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="quote-request-form-wrap">
+        <form id="requestQuoteForm">
+          <input type="text" name="website" id="rqWebsite" style="display:none" tabindex="-1" autocomplete="off">
+          <div class="field-row">
+            <div class="field"><label for="rqEmpresa">Empresa</label><input id="rqEmpresa" type="text" name="empresa" placeholder="Ej. Hospital de Caldas" required></div>
+            <div class="field"><label for="rqContacto">Nombre del contacto</label><input id="rqContacto" type="text" name="contacto" placeholder="María Restrepo" required></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="rqEmail">Correo corporativo</label><input id="rqEmail" type="email" name="email" placeholder="m.restrepo@empresa.co" required></div>
+            <div class="field"><label for="rqWhatsapp">WhatsApp</label><input id="rqWhatsapp" type="tel" name="whatsapp" placeholder="+57 300 000 0000"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="rqCheckin">Check-in tentativo</label><input id="rqCheckin" type="date" name="fechaCheckin"></div>
+            <div class="field"><label for="rqCheckout">Check-out tentativo</label><input id="rqCheckout" type="date" name="fechaCheckout"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="rqNumHab">N.° de habitaciones</label><input id="rqNumHab" type="number" name="numHabitaciones" min="1" value="1"></div>
+            <div class="field">
+              <label for="rqTipo">Tipo de estadía</label>
+              <select id="rqTipo" name="tipoEstadia">
+                <option value="corta">Corta (1–29 días)</option>
+                <option value="larga">Larga (+30 días)</option>
+                <option value="rotativa">Rotativa</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="rqComentarios">Comentarios adicionales</label>
+            <textarea id="rqComentarios" name="comentarios" rows="3" placeholder="Ej. Equipo de médicos residentes, facturación a nombre de la empresa..."></textarea>
+          </div>
+          <p id="rqError" style="color:var(--error-700);font-size:13px;font-family:var(--font-label);display:none;margin:0 0 12px;"></p>
+          <button type="submit" id="rqSubmitBtn" class="btn btn-ink" style="width:100%;justify-content:center;">
+            <span id="rqBtnText">Solicitar cotización</span>
+            <span id="rqSpinner" class="spinner" style="display:none;border-top-color:var(--paper);"></span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </form>
+        <div class="quote-request-success" id="requestQuoteSuccess">
+          <div class="success-icon">✓</div>
+          <h4><span class="lang-es">¡Solicitud recibida!</span><span class="lang-en">Request received!</span></h4>
+          <p><span class="lang-es">Te contactaremos en menos de 24 horas hábiles con tu cotización personalizada.</span><span class="lang-en">We'll contact you within 24 business hours with your personalized quote.</span></p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
 <!-- ============================== CONTACT FORM ============================== -->
 <section class="section" id="contacto" style="background: var(--paper-200);">
   <div class="container">
@@ -278,6 +375,53 @@
 </script>
 <script src="shell.js" defer></script>
 <script>document.addEventListener('DOMContentLoaded',function(){lucide.createIcons();});</script>
+
+  <script>
+  (function() {
+    var form = document.getElementById('requestQuoteForm');
+    if (!form) return;
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      if (document.getElementById('rqWebsite').value) return;
+      var btn = document.getElementById('rqSubmitBtn');
+      var spinner = document.getElementById('rqSpinner');
+      var btnText = document.getElementById('rqBtnText');
+      var errEl = document.getElementById('rqError');
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      spinner.style.display = 'inline-block';
+      btnText.textContent = 'Enviando...';
+      var data = {
+        empresa: document.getElementById('rqEmpresa').value.trim(),
+        contacto: document.getElementById('rqContacto').value.trim(),
+        email: document.getElementById('rqEmail').value.trim(),
+        whatsapp: document.getElementById('rqWhatsapp').value.trim(),
+        fechaCheckin: document.getElementById('rqCheckin').value,
+        fechaCheckout: document.getElementById('rqCheckout').value,
+        numHabitaciones: document.getElementById('rqNumHab').value,
+        tipoEstadia: document.getElementById('rqTipo').value,
+        comentarios: document.getElementById('rqComentarios').value.trim(),
+        website: ''
+      };
+      try {
+        var res = await fetch('/api/request-quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error('Error');
+        form.style.display = 'none';
+        document.getElementById('requestQuoteSuccess').style.display = 'block';
+      } catch (err) {
+        btn.disabled = false;
+        spinner.style.display = 'none';
+        btnText.textContent = 'Solicitar cotización';
+        errEl.textContent = 'Hubo un error. Inténtalo de nuevo o escríbenos por WhatsApp.';
+        errEl.style.display = 'block';
+      }
+    });
+  })();
+  </script>
 
   <!-- Burbuja Flotante de Contacto -->
   <div class="contact-float" id="contactFloat">
