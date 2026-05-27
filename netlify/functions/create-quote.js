@@ -33,74 +33,85 @@ exports.handler = async (event, context) => {
     'Content-Type': 'application/json'
   };
 
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
-  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
-
   const allowedOrigin = process.env.ALLOWED_ORIGIN;
   if (allowedOrigin) corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
 
-  const user = context.clientContext && context.clientContext.user;
-  if (!user) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ error: 'Autenticación requerida' }) };
+  try {
+    if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
+    if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-  if (event.body && event.body.length > 20000) return { statusCode: 413, headers: corsHeaders, body: JSON.stringify({ error: 'Payload demasiado grande' }) };
+    const user = context.clientContext && context.clientContext.user;
+    if (!user) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ error: 'Autenticación requerida' }) };
 
-  let body;
-  try { body = JSON.parse(event.body); }
-  catch (e) { return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'JSON inválido' }) }; }
+    if (event.body && event.body.length > 20000) return { statusCode: 413, headers: corsHeaders, body: JSON.stringify({ error: 'Payload demasiado grande' }) };
 
-  const { empresa, contacto, email, telefono, nit, referencia, validaHasta, items, descuento, condiciones } = body;
+    let body;
+    try { body = JSON.parse(event.body); }
+    catch (e) { return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'JSON inválido' }) }; }
 
-  if (!empresa || !email || !Array.isArray(items) || items.length === 0) {
-    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Faltan campos: empresa, email, items' }) };
-  }
+    const { empresa, contacto, email, telefono, nit, referencia, validaHasta, items, descuento, condiciones } = body;
 
-  const sanitizedItems = items.map(item => {
-    const u = Math.max(1, Math.min(100, parseInt(item.unidades) || 1));
-    const n = Math.max(1, Math.min(365, parseInt(item.noches) || 1));
-    const t = Math.max(0, parseFloat(item.tarifaPorNoche) || 0);
-    return {
-      habitacion: String(item.habitacion || 'Clásica').slice(0, 100),
-      unidades: u,
-      noches: n,
-      tarifaPorNoche: t,
-      subtotal: u * n * t
+    if (!empresa || !email || !Array.isArray(items) || items.length === 0) {
+      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Faltan campos: empresa, email, items' }) };
+    }
+
+    const sanitizedItems = items.map(item => {
+      const u = Math.max(1, Math.min(100, parseInt(item.unidades) || 1));
+      const n = Math.max(1, Math.min(365, parseInt(item.noches) || 1));
+      const t = Math.max(0, parseFloat(item.tarifaPorNoche) || 0);
+      return {
+        habitacion: String(item.habitacion || 'Clásica').slice(0, 100),
+        unidades: u,
+        noches: n,
+        tarifaPorNoche: t,
+        subtotal: u * n * t
+      };
+    });
+
+    const quoteId = generateQuoteId();
+    const now = new Date();
+    const parsedExpiry = validaHasta ? new Date(validaHasta) : null;
+    const expiresAt = (parsedExpiry && !isNaN(parsedExpiry.getTime()))
+      ? parsedExpiry.toISOString()
+      : new Date(now.getTime() + 30 * 86400000).toISOString();
+
+    const quoteData = {
+      quoteId,
+      empresa: String(empresa).slice(0, 200),
+      contacto: String(contacto || '').slice(0, 200),
+      email: String(email).slice(0, 254),
+      telefono: String(telefono || '').slice(0, 50),
+      nit: String(nit || '').slice(0, 50),
+      referencia: String(referencia || '').slice(0, 300),
+      createdAt: now.toISOString(),
+      expiresAt,
+      items: sanitizedItems,
+      descuento: {
+        tipo: (descuento && descuento.tipo === 'fijo') ? 'fijo' : 'porcentaje',
+        valor: Math.max(0, parseFloat((descuento && descuento.valor) || 0))
+      },
+      condiciones: String(condiciones || '').slice(0, 2000),
+      createdBy: user.email || user.sub || 'admin'
     };
-  });
 
-  const quoteId = generateQuoteId();
-  const now = new Date();
-  const parsedExpiry = validaHasta ? new Date(validaHasta) : null;
-  const expiresAt = (parsedExpiry && !isNaN(parsedExpiry.getTime()))
-    ? parsedExpiry.toISOString()
-    : new Date(now.getTime() + 30 * 86400000).toISOString();
+    /* Encode quote data in the URL — no external storage needed */
+    const base64 = Buffer.from(JSON.stringify(quoteData)).toString('base64');
+    const encoded = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    
+    const base = (process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
+    const shareUrl = `${base}/cotizacion.html?d=${encoded}`;
 
-  const quoteData = {
-    quoteId,
-    empresa: String(empresa).slice(0, 200),
-    contacto: String(contacto || '').slice(0, 200),
-    email: String(email).slice(0, 254),
-    telefono: String(telefono || '').slice(0, 50),
-    nit: String(nit || '').slice(0, 50),
-    referencia: String(referencia || '').slice(0, 300),
-    createdAt: now.toISOString(),
-    expiresAt,
-    items: sanitizedItems,
-    descuento: {
-      tipo: (descuento && descuento.tipo === 'fijo') ? 'fijo' : 'porcentaje',
-      valor: Math.max(0, parseFloat((descuento && descuento.valor) || 0))
-    },
-    condiciones: String(condiciones || '').slice(0, 2000),
-    createdBy: user.email || user.sub || 'admin'
-  };
-
-  /* Encode quote data in the URL — no external storage needed */
-  const encoded = Buffer.from(JSON.stringify(quoteData)).toString('base64url');
-  const base = (process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
-  const shareUrl = `${base}/cotizacion.html?d=${encoded}`;
-
-  return {
-    statusCode: 200,
-    headers: corsHeaders,
-    body: JSON.stringify({ quoteId, shareUrl })
-  };
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({ quoteId, shareUrl })
+    };
+  } catch (err) {
+    console.error('[create-quote] error:', err);
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Error interno del servidor', details: err.message })
+    };
+  }
 };
