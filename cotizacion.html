@@ -11,6 +11,73 @@
 <link rel="stylesheet" href="colors_and_type.css?v=2">
 <link rel="stylesheet" href="styles.css?v=3">
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
+<style>
+/* ── Room cards (visual) ── */
+.quote-rooms { display: grid; gap: 20px; margin: 8px 0 4px; }
+.quote-room-card {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+  background: var(--paper-100);
+  border: 1px solid var(--paper-400);
+  border-radius: 12px;
+  overflow: hidden;
+}
+@media (max-width: 640px) { .quote-room-card { grid-template-columns: 1fr; } }
+.qrc-media { display: flex; flex-direction: column; }
+.qrc-main-img {
+  width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block;
+  background: var(--paper-300);
+}
+.qrc-thumbs { display: flex; gap: 6px; padding: 6px; flex-wrap: wrap; }
+.qrc-thumb {
+  width: 48px; height: 40px; object-fit: cover; border-radius: 4px; cursor: pointer;
+  border: 2px solid transparent; opacity: 0.7; transition: opacity .2s, border-color .2s;
+}
+.qrc-thumb:hover { opacity: 1; }
+.qrc-thumb.is-active { opacity: 1; border-color: var(--terracotta); }
+.qrc-body { padding: 22px 24px 22px 0; }
+@media (max-width: 640px) { .qrc-body { padding: 0 20px 22px; } }
+.qrc-name { font-family: var(--font-heading); font-size: 22px; font-weight: 700; color: var(--ink); margin: 4px 0 6px; }
+.qrc-sub { font-family: var(--font-body); font-size: 14px; color: var(--ink-500); margin: 0 0 12px; }
+.qrc-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 12px; }
+.qrc-meta span {
+  font-family: var(--font-label); font-size: 11px; letter-spacing: 0.06em;
+  color: var(--ink-700); display: inline-flex; align-items: center; gap: 6px;
+}
+.qrc-pricing {
+  display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline;
+  border-top: 1px solid var(--paper-400); padding-top: 12px; margin-top: 12px;
+}
+.qrc-pricing .qrc-units { font-family: var(--font-label); font-size: 12px; color: var(--ink-500); letter-spacing: 0.06em; }
+.qrc-pricing .qrc-line-total { font-family: var(--font-heading); font-size: 18px; font-weight: 700; color: var(--ink); margin-left: auto; }
+
+/* ── Services table ── */
+.quote-services-wrap { margin-top: 8px; }
+.quote-services-table { width: 100%; border-collapse: collapse; }
+.quote-services-table th {
+  font-family: var(--font-label); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-500);
+  text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--paper-400);
+}
+.quote-services-table td { padding: 9px 10px; border-bottom: 1px solid var(--paper-300); font-family: var(--font-body); font-size: 14px; color: var(--ink); }
+.quote-services-table .tax-tag { font-family: var(--font-label); font-size: 10px; letter-spacing: 0.06em; color: var(--ink-500); }
+
+/* ── Tax breakdown (collapsible) ── */
+.quote-tax-details { margin: 4px 0; border-top: 1px dashed var(--paper-400); }
+.quote-tax-summary {
+  cursor: pointer; list-style: none; display: flex; justify-content: space-between;
+  align-items: center; padding: 10px 0;
+  font-family: var(--font-label); font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-700);
+}
+.quote-tax-summary::-webkit-details-marker { display: none; }
+.quote-tax-summary .chev { transition: transform .2s; font-size: 11px; }
+.quote-tax-details[open] .quote-tax-summary .chev { transform: rotate(180deg); }
+.quote-tax-body { padding: 0 0 10px; }
+.quote-tax-line { display: flex; justify-content: space-between; padding: 5px 0; font-family: var(--font-body); font-size: 13px; color: var(--ink-700); }
+.quote-tax-line .tax-base { color: var(--ink-500); font-size: 12px; }
+</style>
 </head>
 <body data-screen-label="Cotización" data-header="dark">
 
@@ -101,6 +168,18 @@
               <dt>Válida hasta</dt>
               <dd id="metaExpiresAt">—</dd>
             </div>
+            <div class="quote-meta-row" id="metaCheckinRow" style="display:none">
+              <dt>Check-in</dt>
+              <dd id="metaCheckin"></dd>
+            </div>
+            <div class="quote-meta-row" id="metaCheckoutRow" style="display:none">
+              <dt>Check-out</dt>
+              <dd id="metaCheckout"></dd>
+            </div>
+            <div class="quote-meta-row" id="metaPersonasRow" style="display:none">
+              <dt>Huéspedes</dt>
+              <dd id="metaPersonas"></dd>
+            </div>
             <div class="quote-meta-row" id="metaRefRow" style="display:none">
               <dt>Referencia</dt>
               <dd id="metaReferencia"></dd>
@@ -111,8 +190,12 @@
 
       <hr class="quote-divider">
 
+      <!-- Room cards (visual) -->
+      <p class="quote-info-label">Alojamiento</p>
+      <div class="quote-rooms" id="quoteRooms"></div>
+
       <!-- Items table -->
-      <div class="quote-table-wrap">
+      <div class="quote-table-wrap" style="margin-top:20px">
         <table class="quote-table">
           <thead>
             <tr>
@@ -128,6 +211,25 @@
         </table>
       </div>
 
+      <!-- Services -->
+      <div id="serviciosSection" style="display:none">
+        <hr class="quote-divider">
+        <p class="quote-info-label">Servicios adicionales</p>
+        <div class="quote-services-wrap">
+          <table class="quote-services-table">
+            <thead>
+              <tr>
+                <th>Servicio</th>
+                <th class="text-center">Cantidad</th>
+                <th class="text-right">Precio unitario</th>
+                <th class="text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody id="quoteServiciosTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Totals -->
       <div class="quote-totals">
         <div class="quote-totals-inner">
@@ -139,11 +241,29 @@
             <span id="totalDescuentoLabel">Descuento</span>
             <span id="totalDescuento" style="color:var(--terracotta-700)">−$ 0</span>
           </div>
+
+          <details class="quote-tax-details" id="taxDetails" style="display:none">
+            <summary class="quote-tax-summary">
+              <span>Impuestos <span id="taxTotalInline"></span></span>
+              <span class="chev" aria-hidden="true">▾</span>
+            </summary>
+            <div class="quote-tax-body">
+              <div class="quote-tax-line" id="ivaTaxLine" style="display:none">
+                <span>IVA 19% <span class="tax-base" id="ivaBaseLabel"></span></span>
+                <span id="ivaAmount">$ 0</span>
+              </div>
+              <div class="quote-tax-line" id="incTaxLine" style="display:none">
+                <span>INC 8% <span class="tax-base" id="incBaseLabel"></span></span>
+                <span id="incAmount">$ 0</span>
+              </div>
+            </div>
+          </details>
+
           <div class="quote-total-row quote-total-final">
             <span>Total</span>
             <span id="totalFinal">$ 0</span>
           </div>
-          <p class="quote-total-note">IVA incluido · Tarifas en Pesos Colombianos (COP)</p>
+          <p class="quote-total-note">Impuestos incluidos en el total · Valores en Pesos Colombianos (COP)</p>
         </div>
       </div>
 
@@ -162,7 +282,7 @@
         <ul class="quote-policies-list">
           <li>Cancelación gratuita con al menos 48 horas de anticipación al check-in.</li>
           <li>Pago a crédito sujeto a aprobación previa de la empresa con convenio vigente.</li>
-          <li>IVA incluido en todas las tarifas indicadas.</li>
+          <li>Impuestos (IVA 19% sobre alojamiento, INC 8% sobre alimentación) detallados en el total.</li>
         </ul>
       </div>
 
@@ -278,6 +398,59 @@ function setHtml(id, html) {
   if (el) el.innerHTML = html || '';
 }
 
+/* ── Room metadata (galleries) ── */
+let ROOMS_DB = {};
+function roomMetaFor(item) {
+  if (item.roomTypeId && ROOMS_DB[item.roomTypeId]) return ROOMS_DB[item.roomTypeId];
+  const byName = Object.values(ROOMS_DB).find(r => r.name === item.habitacion);
+  return byName || null;
+}
+
+function renderRoomCards(items) {
+  const wrap = document.getElementById('quoteRooms');
+  wrap.innerHTML = items.map((it, idx) => {
+    const meta = roomMetaFor(it);
+    const gallery = (meta && meta.gallery && meta.gallery.length) ? meta.gallery : (meta && meta.image ? [meta.image] : []);
+    const main = gallery[0] || 'assets/photos/tipo1/1.webp';
+    const sub = meta ? meta.sub : '';
+    const metaBits = meta ? [
+      meta.area ? `${meta.area} m²` : '',
+      meta.beds || '',
+      meta.view || '',
+      meta.capacity ? `Hasta ${meta.capacity}` : ''
+    ].filter(Boolean) : [];
+    const thumbs = gallery.map((g, i) =>
+      `<img src="${esc(g)}" alt="" class="qrc-thumb${i === 0 ? ' is-active' : ''}" data-card="${idx}" loading="lazy">`
+    ).join('');
+    return `
+      <div class="quote-room-card">
+        <div class="qrc-media">
+          <img src="${esc(main)}" alt="${esc(it.habitacion)}" class="qrc-main-img" id="qrcMain-${idx}" loading="lazy">
+          ${gallery.length > 1 ? `<div class="qrc-thumbs">${thumbs}</div>` : ''}
+        </div>
+        <div class="qrc-body">
+          <p class="qrc-name">${esc(it.habitacion)}</p>
+          ${sub ? `<p class="qrc-sub">${esc(sub)}</p>` : ''}
+          ${metaBits.length ? `<div class="qrc-meta">${metaBits.map(b => `<span>${esc(b)}</span>`).join('')}</div>` : ''}
+          <div class="qrc-pricing">
+            <span class="qrc-units">${it.unidades} u. × ${it.noches} noche(s) × ${formatCOP(it.tarifaPorNoche)}</span>
+            <span class="qrc-line-total">${formatCOP(it.subtotal)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  wrap.querySelectorAll('.qrc-thumb').forEach(t => {
+    t.addEventListener('click', function() {
+      const idx = this.dataset.card;
+      document.getElementById('qrcMain-' + idx).src = this.src;
+      wrap.querySelectorAll(`.qrc-thumb[data-card="${idx}"]`).forEach(el => el.classList.remove('is-active'));
+      this.classList.add('is-active');
+    });
+  });
+}
+
 /* ── Load & render ── */
 async function loadQuote() {
   const params = new URLSearchParams(window.location.search);
@@ -287,6 +460,12 @@ async function loadQuote() {
     showError('Cotización no encontrada', 'No se proporcionó un enlace de cotización válido.');
     return;
   }
+
+  /* Room galleries (non-fatal if unavailable) */
+  try {
+    const rdb = await fetch('rooms_db.json');
+    if (rdb.ok) ROOMS_DB = await rdb.json();
+  } catch (e) {}
 
   try {
     const res = await fetch('/api/get-quote?d=' + encodeURIComponent(d));
@@ -339,12 +518,18 @@ function renderQuote(q) {
   /* Meta */
   setText('metaCreatedAt', formatDateES(q.createdAt));
   setText('metaExpiresAt', formatDateES(q.expiresAt));
+  if (q.checkin) { setText('metaCheckin', formatDateES(q.checkin)); document.getElementById('metaCheckinRow').style.display = ''; }
+  if (q.checkout) { setText('metaCheckout', formatDateES(q.checkout)); document.getElementById('metaCheckoutRow').style.display = ''; }
+  if (q.numPersonas) { setText('metaPersonas', q.numPersonas + (q.numPersonas === 1 ? ' persona' : ' personas')); document.getElementById('metaPersonasRow').style.display = ''; }
   if (q.referencia) {
     setText('metaReferencia', q.referencia);
     document.getElementById('metaRefRow').style.display = '';
   }
 
-  /* Items */
+  /* Room cards (visual) */
+  renderRoomCards(q.items || []);
+
+  /* Items table */
   const subtotalItems = (q.items || []).reduce((s, it) => s + it.subtotal, 0);
   const tbody = document.getElementById('quoteItemsTbody');
   tbody.innerHTML = (q.items || []).map((it, i) => `
@@ -357,16 +542,62 @@ function renderQuote(q) {
     </tr>
   `).join('');
 
+  /* Services — accumulate tax bases */
+  const SVC_LABELS = { desayuno: 'Desayuno', almuerzo: 'Almuerzo', cena: 'Cena', parqueadero: 'Parqueadero', personaAdicional: 'Persona adicional' };
+  const SVC_TAX = { desayuno: 'inc', almuerzo: 'inc', cena: 'inc', parqueadero: 'iva', personaAdicional: 'iva' };
+  const TAX_TAG = { iva: 'IVA 19%', inc: 'INC 8%', ninguno: 'Sin impuesto' };
+  const sv = q.servicios || {};
+  let baseIvaSvc = 0, baseInc = 0, baseNone = 0;
+  const svcRows = [];
+
+  ['desayuno', 'almuerzo', 'cena', 'parqueadero', 'personaAdicional'].forEach(k => {
+    const s = sv[k];
+    if (!s || !s.cantidad || !s.precioUnitario) return;
+    const sub = s.cantidad * s.precioUnitario;
+    if (SVC_TAX[k] === 'iva') baseIvaSvc += sub; else baseInc += sub;
+    svcRows.push({ label: SVC_LABELS[k], tax: SVC_TAX[k], cantidad: s.cantidad, precio: s.precioUnitario, sub });
+  });
+  (sv.otros || []).forEach(o => {
+    if (!o.cantidad || !o.precioUnitario) return;
+    const sub = o.cantidad * o.precioUnitario;
+    if (o.impuesto === 'iva') baseIvaSvc += sub;
+    else if (o.impuesto === 'inc') baseInc += sub;
+    else baseNone += sub;
+    svcRows.push({ label: o.descripcion, tax: o.impuesto || 'ninguno', cantidad: o.cantidad, precio: o.precioUnitario, sub });
+  });
+
+  if (svcRows.length) {
+    document.getElementById('serviciosSection').style.display = '';
+    document.getElementById('quoteServiciosTbody').innerHTML = svcRows.map(r => `
+      <tr>
+        <td>${esc(r.label)} <span class="tax-tag">· ${TAX_TAG[r.tax]}</span></td>
+        <td class="text-center">${r.cantidad}</td>
+        <td class="text-right">${formatCOP(r.precio)}</td>
+        <td class="text-right">${formatCOP(r.sub)}</td>
+      </tr>
+    `).join('');
+  }
+
   /* Totals */
+  const subtotal = subtotalItems + baseIvaSvc + baseInc + baseNone;
   let descuentoAmt = 0;
   if (q.descuento && q.descuento.valor > 0) {
     descuentoAmt = q.descuento.tipo === 'porcentaje'
-      ? subtotalItems * (q.descuento.valor / 100)
+      ? subtotal * (q.descuento.valor / 100)
       : q.descuento.valor;
   }
-  const total = subtotalItems - descuentoAmt;
+  descuentoAmt = Math.min(descuentoAmt, subtotal);
 
-  setText('totalSubtotal', formatCOP(subtotalItems));
+  const ivaRate = (q.impuestos && q.impuestos.ivaRate) || 0.19;
+  const incRate = (q.impuestos && q.impuestos.incRate) || 0.08;
+  const factor = subtotal > 0 ? (subtotal - descuentoAmt) / subtotal : 0;
+  const ivaBaseNet = (subtotalItems + baseIvaSvc) * factor;
+  const incBaseNet = baseInc * factor;
+  const iva = ivaBaseNet * ivaRate;
+  const inc = incBaseNet * incRate;
+  const total = (subtotal - descuentoAmt) + iva + inc;
+
+  setText('totalSubtotal', formatCOP(subtotal));
   setText('totalFinal', formatCOP(total));
 
   if (descuentoAmt > 0) {
@@ -374,6 +605,22 @@ function renderQuote(q) {
     setText('totalDescuentoLabel', label);
     setText('totalDescuento', '−' + formatCOP(descuentoAmt));
     document.getElementById('totalDescuentoRow').style.display = '';
+  }
+
+  /* Tax breakdown */
+  if (iva > 0 || inc > 0) {
+    document.getElementById('taxDetails').style.display = '';
+    setText('taxTotalInline', '+' + formatCOP(iva + inc));
+    if (iva > 0) {
+      document.getElementById('ivaTaxLine').style.display = 'flex';
+      setText('ivaBaseLabel', 'sobre ' + formatCOP(ivaBaseNet));
+      setText('ivaAmount', formatCOP(iva));
+    }
+    if (inc > 0) {
+      document.getElementById('incTaxLine').style.display = 'flex';
+      setText('incBaseLabel', 'sobre ' + formatCOP(incBaseNet));
+      setText('incAmount', formatCOP(inc));
+    }
   }
 
   /* Conditions */

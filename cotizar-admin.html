@@ -447,9 +447,29 @@
       </div>
     </div>
 
-    <!-- ── 3. Ítems ── -->
+    <!-- ── 3. Estadía y huéspedes ── -->
     <div class="admin-card">
-      <p class="admin-card-title">03 · Ítems de la cotización</p>
+      <p class="admin-card-title">03 · Estadía y huéspedes</p>
+      <div class="field-row">
+        <div class="field">
+          <label for="qCheckin">Check-in</label>
+          <input id="qCheckin" type="date" class="it-input" style="min-width:unset">
+        </div>
+        <div class="field">
+          <label for="qCheckout">Check-out</label>
+          <input id="qCheckout" type="date" class="it-input" style="min-width:unset">
+        </div>
+        <div class="field">
+          <label for="qPersonas">Nº de personas</label>
+          <input id="qPersonas" type="number" class="it-input" style="min-width:unset" value="1" min="1" max="200">
+        </div>
+      </div>
+      <p id="estadiaNoches" style="font-family:var(--font-label); font-size:11px; color:var(--ink-500); margin:12px 0 0; letter-spacing:0.06em;"></p>
+    </div>
+
+    <!-- ── 4. Habitaciones ── -->
+    <div class="admin-card">
+      <p class="admin-card-title">04 · Habitaciones</p>
       <div class="items-table-wrap">
         <table class="items-table">
           <thead>
@@ -467,12 +487,54 @@
           </tbody>
         </table>
       </div>
-      <button type="button" id="addItemBtn" class="btn btn-ghost-dark" style="margin-top:8px; padding:12px 20px; font-size:11px;">+ Agregar ítem</button>
+      <button type="button" id="addItemBtn" class="btn btn-ghost-dark" style="margin-top:8px; padding:12px 20px; font-size:11px;">+ Agregar habitación</button>
     </div>
 
-    <!-- ── 4. Descuento ── -->
+    <!-- ── 5. Servicios adicionales ── -->
     <div class="admin-card">
-      <p class="admin-card-title">04 · Descuento global (opcional)</p>
+      <p class="admin-card-title">05 · Servicios adicionales</p>
+      <p style="font-family:var(--font-body); font-size:13px; color:var(--ink-500); margin:0 0 16px;">
+        Las cantidades se prellenan con personas × noches; edítalas si es necesario. Alimentación lleva INC 8%; parqueadero y persona adicional, IVA 19%.
+      </p>
+      <div class="items-table-wrap">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Servicio</th>
+              <th>Cantidad</th>
+              <th>Precio unitario (COP)</th>
+              <th>Impuesto</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody id="serviciosBody">
+            <!-- fixed service rows injected by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <p style="font-family:var(--font-label); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.18em; color:var(--ink-500); margin:24px 0 10px;">Otros conceptos</p>
+      <div class="items-table-wrap">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Descripción</th>
+              <th>Cantidad</th>
+              <th>Precio unitario (COP)</th>
+              <th>Impuesto</th>
+              <th>Subtotal</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="otrosBody"></tbody>
+        </table>
+      </div>
+      <button type="button" id="addOtroBtn" class="btn btn-ghost-dark" style="margin-top:8px; padding:12px 20px; font-size:11px;">+ Agregar concepto</button>
+    </div>
+
+    <!-- ── 6. Descuento ── -->
+    <div class="admin-card">
+      <p class="admin-card-title">06 · Descuento global (opcional)</p>
       <div class="desc-row">
         <div class="desc-radio-group">
           <label class="desc-radio-label">
@@ -492,7 +554,7 @@
 
     <!-- ── 5. Condiciones ── -->
     <div class="admin-card">
-      <p class="admin-card-title">05 · Condiciones especiales</p>
+      <p class="admin-card-title">07 · Condiciones especiales</p>
       <div class="field">
         <textarea id="qCondiciones" class="it-input" style="min-width:unset; width:100%; min-height:100px; resize:vertical; font-family:var(--font-body)" placeholder="Ej. Checkout flexible. Facturación a nombre de la empresa. Crédito a 30 días sujeto a aprobación."></textarea>
       </div>
@@ -507,6 +569,14 @@
       <div class="total-card-line" id="descuentoLine" style="display:none">
         <span id="descuentoLabel">Descuento</span>
         <span id="descuentoDisplay">− $ 0</span>
+      </div>
+      <div class="total-card-line" id="ivaLine" style="display:none">
+        <span>IVA (19%)</span>
+        <span id="ivaDisplay">$ 0</span>
+      </div>
+      <div class="total-card-line" id="incLine" style="display:none">
+        <span>INC (8%)</span>
+        <span id="incDisplay">$ 0</span>
       </div>
       <div class="total-card-line is-total">
         <span>Total estimado</span>
@@ -566,10 +636,30 @@ function showToast(msg, ms) {
   setTimeout(() => t.classList.remove('is-visible'), ms || 2800);
 }
 
+/* ── Tax rates ── */
+const IVA_RATE = 0.19;
+const INC_RATE = 0.08;
+
 /* ── Items table ── */
 const ROOM_TYPES = ['Clásica', 'Selección', 'Reserva', 'Origen', 'Especial'];
-const DEFAULT_RATES = { 'Clásica': 220000, 'Selección': 260000, 'Reserva': 300000, 'Origen': 340000, 'Especial': 380000 };
+const ROOM_NAME_TO_ID = { 'Clásica': '31348', 'Selección': '31349', 'Reserva': '31350', 'Origen': '31351', 'Especial': '31352' };
+const DEFAULT_RATES = { 'Clásica': 220000, 'Selección': 265000, 'Reserva': 320000, 'Origen': 385000, 'Especial': 450000 };
 let rowIdCounter = 0;
+
+/* ── Nights between check-in / check-out ── */
+function stayNights() {
+  const ci = document.getElementById('qCheckin').value;
+  const co = document.getElementById('qCheckout').value;
+  if (!ci || !co) return 0;
+  const d1 = new Date(ci), d2 = new Date(co);
+  if (isNaN(d1) || isNaN(d2)) return 0;
+  const n = Math.round((d2 - d1) / 86400000);
+  return n > 0 ? n : 0;
+}
+
+function numPersonas() {
+  return Math.max(1, parseInt(document.getElementById('qPersonas').value) || 1);
+}
 
 function createRow(defaults) {
   const id = ++rowIdCounter;
@@ -602,13 +692,104 @@ function calcRowSubtotal(tr) {
   return u * n * t;
 }
 
+/* ── Services ── */
+const TAX_LABEL = { iva: 'IVA 19%', inc: 'INC 8%', ninguno: 'Sin impuesto' };
+const SERVICE_DEFS = [
+  { key: 'desayuno',        label: 'Desayuno',          tax: 'inc', price: 25000, qtyMode: 'meal' },
+  { key: 'almuerzo',        label: 'Almuerzo',          tax: 'inc', price: 35000, qtyMode: 'meal' },
+  { key: 'cena',            label: 'Cena',              tax: 'inc', price: 35000, qtyMode: 'meal' },
+  { key: 'parqueadero',     label: 'Parqueadero',       tax: 'iva', price: 15000, qtyMode: 'nights' },
+  { key: 'personaAdicional', label: 'Persona adicional', tax: 'iva', price: 50000, qtyMode: 'manual' }
+];
+let otroIdCounter = 0;
+
+function defaultQtyFor(mode) {
+  const nights = stayNights();
+  if (mode === 'meal') return numPersonas() * nights;
+  if (mode === 'nights') return nights;
+  return 0;
+}
+
+function initServicesTable() {
+  const tbody = document.getElementById('serviciosBody');
+  tbody.innerHTML = SERVICE_DEFS.map(s => `
+    <tr data-svc-key="${s.key}" data-tax="${s.tax}">
+      <td style="font-family:var(--font-body); font-size:14px; color:var(--ink);">${s.label}</td>
+      <td><input type="number" class="it-input" data-field="cantidad" value="${defaultQtyFor(s.qtyMode)}" min="0" max="100000"></td>
+      <td><input type="number" class="it-input" data-field="precio" value="${s.price}" min="0" step="1000"></td>
+      <td style="font-family:var(--font-label); font-size:11px; color:var(--ink-500); letter-spacing:0.08em;">${TAX_LABEL[s.tax]}</td>
+      <td class="it-subtotal svc-subtotal">${formatCOP(defaultQtyFor(s.qtyMode) * s.price)}</td>
+    </tr>
+  `).join('');
+  document.getElementById('otrosBody').innerHTML = '';
+  otroIdCounter = 0;
+}
+
+function createOtroRow() {
+  const id = ++otroIdCounter;
+  const tr = document.createElement('tr');
+  tr.dataset.otroId = id;
+  tr.innerHTML = `
+    <td><input type="text" class="it-input" data-field="descripcion" placeholder="Concepto" style="min-width:160px"></td>
+    <td><input type="number" class="it-input" data-field="cantidad" value="1" min="0" max="100000"></td>
+    <td><input type="number" class="it-input" data-field="precio" value="0" min="0" step="1000"></td>
+    <td>
+      <select class="it-select" data-field="impuesto" style="min-width:120px">
+        <option value="ninguno">Sin impuesto</option>
+        <option value="iva">IVA 19%</option>
+        <option value="inc">INC 8%</option>
+      </select>
+    </td>
+    <td class="it-subtotal svc-subtotal">$ 0</td>
+    <td><button type="button" class="it-remove" title="Eliminar">✕</button></td>
+  `;
+  return tr;
+}
+
+/* Auto-fill service quantities (personas × noches) unless manually edited */
+function autofillServiceQtys() {
+  document.querySelectorAll('#serviciosBody tr').forEach(tr => {
+    const qtyInput = tr.querySelector('[data-field="cantidad"]');
+    if (qtyInput.dataset.touched === '1') return;
+    const def = SERVICE_DEFS.find(s => s.key === tr.dataset.svcKey);
+    if (def) qtyInput.value = defaultQtyFor(def.qtyMode);
+  });
+}
+
 function updateTotals() {
-  let subtotal = 0;
+  /* Rooms (IVA base) */
+  let baseRooms = 0;
   document.querySelectorAll('#itemsBody tr').forEach(tr => {
     const s = calcRowSubtotal(tr);
     tr.querySelector('.it-subtotal').textContent = formatCOP(s);
-    subtotal += s;
+    baseRooms += s;
   });
+
+  /* Fixed services */
+  let baseIvaSvc = 0, baseInc = 0, baseNone = 0;
+  document.querySelectorAll('#serviciosBody tr').forEach(tr => {
+    const c = parseFloat(tr.querySelector('[data-field="cantidad"]').value) || 0;
+    const p = parseFloat(tr.querySelector('[data-field="precio"]').value) || 0;
+    const s = c * p;
+    tr.querySelector('.svc-subtotal').textContent = formatCOP(s);
+    if (tr.dataset.tax === 'iva') baseIvaSvc += s;
+    else if (tr.dataset.tax === 'inc') baseInc += s;
+    else baseNone += s;
+  });
+
+  /* Otros */
+  document.querySelectorAll('#otrosBody tr').forEach(tr => {
+    const c = parseFloat(tr.querySelector('[data-field="cantidad"]').value) || 0;
+    const p = parseFloat(tr.querySelector('[data-field="precio"]').value) || 0;
+    const imp = tr.querySelector('[data-field="impuesto"]').value;
+    const s = c * p;
+    tr.querySelector('.svc-subtotal').textContent = formatCOP(s);
+    if (imp === 'iva') baseIvaSvc += s;
+    else if (imp === 'inc') baseInc += s;
+    else baseNone += s;
+  });
+
+  const subtotal = baseRooms + baseIvaSvc + baseInc + baseNone;
 
   const descTipo = document.querySelector('input[name="descTipo"]:checked').value;
   const descValor = parseFloat(document.getElementById('qDescValor').value) || 0;
@@ -616,10 +797,18 @@ function updateTotals() {
   if (descValor > 0) {
     descAmt = descTipo === 'porcentaje' ? subtotal * (descValor / 100) : descValor;
   }
-  const total = subtotal - descAmt;
+  descAmt = Math.min(descAmt, subtotal);
+
+  /* Discount applies pro-rata to taxable bases */
+  const factor = subtotal > 0 ? (subtotal - descAmt) / subtotal : 0;
+  const iva = (baseRooms + baseIvaSvc) * factor * IVA_RATE;
+  const inc = baseInc * factor * INC_RATE;
+  const total = (subtotal - descAmt) + iva + inc;
 
   document.getElementById('subtotalDisplay').textContent = formatCOP(subtotal);
   document.getElementById('descuentoDisplay').textContent = '− ' + formatCOP(descAmt);
+  document.getElementById('ivaDisplay').textContent = formatCOP(iva);
+  document.getElementById('incDisplay').textContent = formatCOP(inc);
   document.getElementById('totalDisplay').textContent = formatCOP(total);
 
   const discLine = document.getElementById('descuentoLine');
@@ -628,6 +817,8 @@ function updateTotals() {
     const label = descTipo === 'porcentaje' ? `Descuento (${descValor}%)` : 'Descuento';
     document.getElementById('descuentoLabel').textContent = label;
   }
+  document.getElementById('ivaLine').style.display = iva > 0 ? 'flex' : 'none';
+  document.getElementById('incLine').style.display = inc > 0 ? 'flex' : 'none';
 }
 
 function initItemsTable() {
@@ -670,6 +861,39 @@ document.getElementById('itemsBody').addEventListener('click', function(e) {
 document.getElementById('qDescValor').addEventListener('input', updateTotals);
 document.querySelectorAll('input[name="descTipo"]').forEach(r => r.addEventListener('change', updateTotals));
 
+/* ── Services events ── */
+function updateNightsLabel() {
+  const n = stayNights();
+  const el = document.getElementById('estadiaNoches');
+  el.textContent = n > 0 ? `${n} noche${n === 1 ? '' : 's'} · cantidades de servicios prellenadas con ${numPersonas()} persona(s) × ${n} noche(s)` : '';
+}
+
+['qCheckin', 'qCheckout', 'qPersonas'].forEach(id => {
+  document.getElementById(id).addEventListener('input', function() {
+    autofillServiceQtys();
+    updateNightsLabel();
+    updateTotals();
+  });
+});
+
+document.getElementById('serviciosBody').addEventListener('input', function(e) {
+  if (e.target.dataset.field === 'cantidad') e.target.dataset.touched = '1';
+  updateTotals();
+});
+
+document.getElementById('addOtroBtn').addEventListener('click', function() {
+  document.getElementById('otrosBody').appendChild(createOtroRow());
+  updateTotals();
+});
+
+document.getElementById('otrosBody').addEventListener('input', updateTotals);
+document.getElementById('otrosBody').addEventListener('change', updateTotals);
+document.getElementById('otrosBody').addEventListener('click', function(e) {
+  if (!e.target.classList.contains('it-remove')) return;
+  e.target.closest('tr').remove();
+  updateTotals();
+});
+
 /* ── Collect form data ── */
 function collectFormData() {
   const items = [];
@@ -678,8 +902,28 @@ function collectFormData() {
     const u = Math.max(1, parseInt(tr.querySelector('[data-field="unidades"]').value) || 1);
     const n = Math.max(1, parseInt(tr.querySelector('[data-field="noches"]').value) || 1);
     const t = Math.max(0, parseFloat(tr.querySelector('[data-field="tarifa"]').value) || 0);
-    items.push({ habitacion, unidades: u, noches: n, tarifaPorNoche: t, subtotal: u * n * t });
+    items.push({ habitacion, roomTypeId: ROOM_NAME_TO_ID[habitacion] || '', unidades: u, noches: n, tarifaPorNoche: t, subtotal: u * n * t });
   });
+
+  const servicios = { otros: [] };
+  document.querySelectorAll('#serviciosBody tr').forEach(tr => {
+    servicios[tr.dataset.svcKey] = {
+      cantidad: Math.max(0, parseInt(tr.querySelector('[data-field="cantidad"]').value) || 0),
+      precioUnitario: Math.max(0, parseFloat(tr.querySelector('[data-field="precio"]').value) || 0)
+    };
+  });
+  document.querySelectorAll('#otrosBody tr').forEach(tr => {
+    const descripcion = tr.querySelector('[data-field="descripcion"]').value.trim();
+    const cantidad = Math.max(0, parseInt(tr.querySelector('[data-field="cantidad"]').value) || 0);
+    if (!descripcion || cantidad <= 0) return;
+    servicios.otros.push({
+      descripcion,
+      cantidad,
+      precioUnitario: Math.max(0, parseFloat(tr.querySelector('[data-field="precio"]').value) || 0),
+      impuesto: tr.querySelector('[data-field="impuesto"]').value
+    });
+  });
+
   return {
     empresa: document.getElementById('qEmpresa').value.trim(),
     contacto: document.getElementById('qContacto').value.trim(),
@@ -688,7 +932,11 @@ function collectFormData() {
     nit: document.getElementById('qNit').value.trim(),
     referencia: document.getElementById('qReferencia').value.trim(),
     validaHasta: document.getElementById('qValidaHasta').value,
+    checkin: document.getElementById('qCheckin').value,
+    checkout: document.getElementById('qCheckout').value,
+    numPersonas: numPersonas(),
     items,
+    servicios,
     descuento: {
       tipo: document.querySelector('input[name="descTipo"]:checked').value,
       valor: parseFloat(document.getElementById('qDescValor').value) || 0
@@ -831,7 +1079,13 @@ document.getElementById('newQuoteBtn').addEventListener('click', function() {
   });
   document.getElementById('qDescValor').value = '0';
   document.querySelector('input[name="descTipo"][value="porcentaje"]').checked = true;
+  document.getElementById('qCheckin').value = '';
+  document.getElementById('qCheckout').value = '';
+  document.getElementById('qPersonas').value = '1';
   initItemsTable();
+  initServicesTable();
+  updateNightsLabel();
+  updateTotals();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
@@ -843,6 +1097,9 @@ document.getElementById('newQuoteBtn').addEventListener('click', function() {
 })();
 
 initItemsTable();
+initServicesTable();
+updateNightsLabel();
+updateTotals();
 
 </script>
 

@@ -39,15 +39,69 @@ function obfuscateEmail(email) {
   return name.length > 2 ? `${name[0]}***${name[name.length - 1]}@${domain}` : `***@${domain}`;
 }
 
+const SVC_LABELS = { desayuno: 'Desayuno', almuerzo: 'Almuerzo', cena: 'Cena', parqueadero: 'Parqueadero', personaAdicional: 'Persona adicional' };
+const SVC_TAX = { desayuno: 'inc', almuerzo: 'inc', cena: 'inc', parqueadero: 'iva', personaAdicional: 'iva' };
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function buildQuoteEmailHtml({ quote, quoteUrl }) {
   const subtotalItems = quote.items.reduce((sum, item) => sum + item.subtotal, 0);
+
+  /* Services and tax bases */
+  const sv = quote.servicios || {};
+  let baseIvaSvc = 0, baseInc = 0, baseNone = 0;
+  const svcRows = [];
+  ['desayuno', 'almuerzo', 'cena', 'parqueadero', 'personaAdicional'].forEach(k => {
+    const s = sv[k];
+    if (!s || !s.cantidad || !s.precioUnitario) return;
+    const sub = s.cantidad * s.precioUnitario;
+    if (SVC_TAX[k] === 'iva') baseIvaSvc += sub; else baseInc += sub;
+    svcRows.push({ label: SVC_LABELS[k], cantidad: s.cantidad, precio: s.precioUnitario, sub });
+  });
+  (sv.otros || []).forEach(o => {
+    if (!o.cantidad || !o.precioUnitario) return;
+    const sub = o.cantidad * o.precioUnitario;
+    if (o.impuesto === 'iva') baseIvaSvc += sub;
+    else if (o.impuesto === 'inc') baseInc += sub;
+    else baseNone += sub;
+    svcRows.push({ label: o.descripcion, cantidad: o.cantidad, precio: o.precioUnitario, sub });
+  });
+
+  const subtotal = subtotalItems + baseIvaSvc + baseInc + baseNone;
   let descuentoAmt = 0;
   if (quote.descuento && quote.descuento.valor > 0) {
     descuentoAmt = quote.descuento.tipo === 'porcentaje'
-      ? subtotalItems * (quote.descuento.valor / 100)
+      ? subtotal * (quote.descuento.valor / 100)
       : quote.descuento.valor;
   }
-  const total = subtotalItems - descuentoAmt;
+  descuentoAmt = Math.min(descuentoAmt, subtotal);
+
+  const ivaRate = (quote.impuestos && quote.impuestos.ivaRate) || 0.19;
+  const incRate = (quote.impuestos && quote.impuestos.incRate) || 0.08;
+  const factor = subtotal > 0 ? (subtotal - descuentoAmt) / subtotal : 0;
+  const iva = (subtotalItems + baseIvaSvc) * factor * ivaRate;
+  const inc = baseInc * factor * incRate;
+  const total = (subtotal - descuentoAmt) + iva + inc;
+
+  const svcRowsHtml = svcRows.map(r => `
+    <tr>
+      <td colspan="3" style="padding:10px 16px;border-bottom:1px solid #E8E4DC;font-family:Arial,sans-serif;font-size:13px;color:#555550;">${escHtml(r.label)} <span style="color:#9A9A8A;">(${r.cantidad} × ${formatCOP(r.precio)})</span></td>
+      <td style="padding:10px 16px;border-bottom:1px solid #E8E4DC;font-family:Georgia,serif;font-size:14px;color:#2C2C2C;text-align:right;" colspan="2">${formatCOP(r.sub)}</td>
+    </tr>
+  `).join('');
+
+  const subtotalRow = `
+    <tr>
+      <td colspan="4" style="padding:10px 16px;font-family:Arial,sans-serif;font-size:13px;color:#555550;text-align:right;">Subtotal</td>
+      <td style="padding:10px 16px;font-family:Arial,sans-serif;font-size:13px;color:#2C2C2C;text-align:right;">${formatCOP(subtotal)}</td>
+    </tr>`;
+
+  const taxRows = `
+    ${iva > 0 ? `<tr><td colspan="4" style="padding:8px 16px;font-family:Arial,sans-serif;font-size:12px;color:#9A9A8A;text-align:right;">IVA 19%</td><td style="padding:8px 16px;font-family:Arial,sans-serif;font-size:12px;color:#555550;text-align:right;">${formatCOP(iva)}</td></tr>` : ''}
+    ${inc > 0 ? `<tr><td colspan="4" style="padding:8px 16px;font-family:Arial,sans-serif;font-size:12px;color:#9A9A8A;text-align:right;">INC 8%</td><td style="padding:8px 16px;font-family:Arial,sans-serif;font-size:12px;color:#555550;text-align:right;">${formatCOP(inc)}</td></tr>` : ''}
+  `;
 
   const itemRows = quote.items.map(item => `
     <tr>
@@ -163,7 +217,10 @@ function buildQuoteEmailHtml({ quote, quoteUrl }) {
               </thead>
               <tbody>
                 ${itemRows}
+                ${svcRowsHtml}
+                ${subtotalRow}
                 ${discountRow}
+                ${taxRows}
                 <tr style="background:#FAF8F4;">
                   <td colspan="4" style="padding:14px 16px;font-family:Arial,sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#2C2C2C;text-align:right;border-top:2px solid #E8E4DC;">Total</td>
                   <td style="padding:14px 16px;font-family:Georgia,serif;font-size:20px;font-weight:700;color:#C4956A;text-align:right;border-top:2px solid #E8E4DC;">${formatCOP(total)}</td>
@@ -195,7 +252,7 @@ function buildQuoteEmailHtml({ quote, quoteUrl }) {
                 <p style="margin:0 0 10px 0;font-family:Arial,sans-serif;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#7A7A6A;">Políticas</p>
                 <p style="margin:0 0 6px 0;font-family:Arial,sans-serif;font-size:12px;color:#555550;line-height:1.6;">✓ Cancelación gratuita con 48 horas de anticipación.</p>
                 <p style="margin:0 0 6px 0;font-family:Arial,sans-serif;font-size:12px;color:#555550;line-height:1.6;">✓ Pago a crédito sujeto a aprobación de la empresa.</p>
-                <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;color:#555550;line-height:1.6;">✓ IVA incluido en todas las tarifas.</p>
+                <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;color:#555550;line-height:1.6;">✓ Impuestos (IVA 19% / INC 8%) detallados en el total.</p>
               </td></tr>
             </table>
           </td>
