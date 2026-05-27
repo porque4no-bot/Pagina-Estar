@@ -243,26 +243,28 @@ exports.handler = async (event, context) => {
 
   const { quoteId, clientEmail, clientName, quoteUrl } = body;
 
-  if (!quoteId || !clientEmail) {
-    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Faltan campos: quoteId, clientEmail' }) };
+  if (!quoteId || !clientEmail || !quoteUrl) {
+    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Faltan campos: quoteId, clientEmail, quoteUrl' }) };
   }
 
   if (!/^COT-\d{4}-[A-Z0-9]{5}$/.test(quoteId)) {
     return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'quoteId inválido' }) };
   }
 
+  /* Extract and decode quote data from the share URL's ?d= parameter */
   let quoteData;
   try {
-    const { getStore } = require('@netlify/blobs');
-    const store = getStore('quotes');
-    quoteData = await store.get(quoteId, { type: 'json' });
+    const urlObj = new URL(quoteUrl);
+    const encoded = urlObj.searchParams.get('d');
+    if (!encoded) throw new Error('missing d param');
+    quoteData = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
   } catch (err) {
-    console.error('[send-quote-email] Blobs error:', err.message);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error al obtener la cotización' }) };
+    console.error('[send-quote-email] decode error:', err.message);
+    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'quoteUrl inválida o corrompida' }) };
   }
 
-  if (!quoteData) {
-    return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización no encontrada' }) };
+  if (!quoteData || quoteData.quoteId !== quoteId) {
+    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'quoteId no coincide con los datos de la cotización' }) };
   }
 
   const resendApiKey = process.env.RESEND_API_KEY;
@@ -271,7 +273,7 @@ exports.handler = async (event, context) => {
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ sent: false, reason: 'RESEND_API_KEY not configured' }) };
   }
 
-  const resolvedUrl = quoteUrl || `https://estar.com.co/cotizacion.html?id=${quoteId}`;
+  const resolvedUrl = quoteUrl;
   const emailHtml = buildQuoteEmailHtml({ quote: quoteData, quoteUrl: resolvedUrl });
   const toEmail = clientEmail || quoteData.email;
 

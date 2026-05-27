@@ -281,22 +281,22 @@ function setHtml(id, html) {
 /* ── Load & render ── */
 async function loadQuote() {
   const params = new URLSearchParams(window.location.search);
-  const quoteId = params.get('id');
+  const d = params.get('d');
 
-  if (!quoteId) {
-    showError('Cotización no encontrada', 'No se proporcionó un identificador de cotización válido en la URL.');
+  if (!d) {
+    showError('Cotización no encontrada', 'No se proporcionó un enlace de cotización válido.');
     return;
   }
 
   try {
-    const res = await fetch('/api/get-quote?id=' + encodeURIComponent(quoteId));
-    if (res.status === 404) {
+    const res = await fetch('/api/get-quote?d=' + encodeURIComponent(d));
+    if (res.status === 410) {
       const json = await res.json().catch(() => ({}));
-      if (json.expired) {
-        showError('Esta cotización ha vencido', 'La cotización ' + esc(quoteId) + ' ya superó su fecha de vigencia. Contáctanos para obtener una nueva.');
-      } else {
-        showError('Cotización no encontrada', 'El enlace puede ser incorrecto o la cotización fue eliminada.');
-      }
+      showError('Esta cotización ha vencido', 'La cotización ya superó su fecha de vigencia. Contáctanos para obtener una nueva.');
+      return;
+    }
+    if (res.status === 404) {
+      showError('Cotización no encontrada', 'El enlace puede ser incorrecto o la cotización fue eliminada.');
       return;
     }
     if (!res.ok) {

@@ -27,16 +27,17 @@ function generateQuoteId() {
 }
 
 exports.handler = async (event, context) => {
-  const allowedOrigin = process.env.ALLOWED_ORIGIN;
   const corsHeaders = {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
   };
-  if (allowedOrigin) corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
+
+  const allowedOrigin = process.env.ALLOWED_ORIGIN;
+  if (allowedOrigin) corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
 
   const user = context.clientContext && context.clientContext.user;
   if (!user) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ error: 'Autenticación requerida' }) };
@@ -92,19 +93,14 @@ exports.handler = async (event, context) => {
     createdBy: user.email || user.sub || 'admin'
   };
 
-  try {
-    const { getStore } = require('@netlify/blobs');
-    const store = getStore('quotes');
-    await store.setJSON(quoteId, quoteData);
-  } catch (err) {
-    console.error('[create-quote] Blobs error:', err.message);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error al guardar la cotización' }) };
-  }
-
+  /* Encode quote data in the URL — no external storage needed */
+  const encoded = Buffer.from(JSON.stringify(quoteData)).toString('base64url');
   const base = (process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
+  const shareUrl = `${base}/cotizacion.html?d=${encoded}`;
+
   return {
     statusCode: 200,
     headers: corsHeaders,
-    body: JSON.stringify({ quoteId, shareUrl: `${base}/cotizacion.html?id=${quoteId}` })
+    body: JSON.stringify({ quoteId, shareUrl })
   };
 };
