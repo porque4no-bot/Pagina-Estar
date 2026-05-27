@@ -850,7 +850,13 @@ initItemsTable();
 
 /* ── Netlify Identity auth ── */
 (function initAuth() {
-  const identity = window.netlifyIdentity;
+  var identity = window.netlifyIdentity;
+  var hash = window.location.hash;
+  var hasToken = hash && (
+    hash.indexOf('invite_token=') !== -1 ||
+    hash.indexOf('confirmation_token=') !== -1 ||
+    hash.indexOf('recovery_token=') !== -1
+  );
 
   if (!identity) {
     document.getElementById('authOverlay').innerHTML =
@@ -872,21 +878,30 @@ initItemsTable();
     document.getElementById('userEmailDisplay').textContent = '';
   }
 
-  /* Handle init event — also check currentUser() in case init already fired */
+  /* When there's a token in the URL (invite / recovery / confirmation),
+     hide our overlay so the Identity widget can show its own modal.
+     After the user completes signup/reset, the login event fires. */
+  if (hasToken) {
+    document.getElementById('authOverlay').style.display = 'none';
+    identity.on('login', function(user) { identity.close(); showAdmin(user); });
+    identity.on('logout', function() { showLogin(); });
+    identity.on('error', function(err) {
+      var msg = (err && err.message) ? err.message : String(err);
+      showLogin();
+      document.querySelector('.auth-card p').textContent = 'Error: ' + msg;
+    });
+    return;
+  }
+
+  /* Normal flow — no token in URL */
   identity.on('init', function(user) {
     if (user) { showAdmin(user); } else { showLogin(); }
   });
-  const alreadyLoggedIn = identity.currentUser();
+  var alreadyLoggedIn = identity.currentUser();
   if (alreadyLoggedIn) { showAdmin(alreadyLoggedIn); }
 
-  identity.on('login', function(user) {
-    identity.close();
-    showAdmin(user);
-  });
-
-  identity.on('logout', function() {
-    showLogin();
-  });
+  identity.on('login', function(user) { identity.close(); showAdmin(user); });
+  identity.on('logout', function() { showLogin(); });
 
   identity.on('error', function(err) {
     var msg = (err && err.message) ? err.message : String(err);
