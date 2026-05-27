@@ -11,6 +11,110 @@
 <link rel="stylesheet" href="colors_and_type.css?v=2">
 <link rel="stylesheet" href="styles.css?v=3">
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
+<script src="https://unpkg.com/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js" defer></script>
+<style>
+/* ══ Section padding inside the quote doc ══ */
+.quote-section { padding: 28px 48px; }
+@media (max-width: 600px) { .quote-section { padding: 22px 24px; } }
+.quote-section-label {
+  font-family: var(--font-label); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.22em; color: var(--ink-500); margin: 0 0 16px;
+}
+
+/* ══ Stay summary band ══ */
+.quote-stay {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1px; background: var(--paper-400);
+  border: 1px solid var(--paper-400); border-radius: 12px; overflow: hidden;
+}
+@media (max-width: 560px) { .quote-stay { grid-template-columns: 1fr 1fr; } }
+.quote-stay-cell { background: var(--white); padding: 16px 20px; display: flex; flex-direction: column; gap: 4px; }
+.quote-stay-cell .qs-label {
+  font-family: var(--font-label); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-500);
+}
+.quote-stay-cell .qs-value { font-family: var(--font-heading); font-size: 16px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+.quote-stay-cell .qs-value small { display: block; font-family: var(--font-body); font-size: 12px; font-weight: 400; color: var(--ink-500); margin-top: 2px; }
+
+/* ══ Room accordion (compact) ══ */
+.quote-rooms { display: flex; flex-direction: column; gap: 10px; }
+.quote-room {
+  border: 1px solid var(--paper-400); border-radius: 12px; overflow: hidden;
+  background: var(--white); transition: box-shadow var(--dur-base) var(--ease-out);
+}
+.quote-room[open] { box-shadow: var(--shadow-sm); border-color: var(--ink-300); }
+.qr-summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 16px;
+  padding: 14px 18px;
+}
+.qr-summary::-webkit-details-marker { display: none; }
+.qr-thumb { width: 68px; height: 56px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: var(--paper-300); }
+.qr-head-main { flex: 1; min-width: 0; }
+.qr-name { font-family: var(--font-heading); font-size: 17px; font-weight: 700; color: var(--ink); margin: 0; line-height: 1.2; }
+.qr-facts { font-family: var(--font-label); font-size: 11px; letter-spacing: 0.04em; color: var(--ink-500); margin: 4px 0 0; }
+.qr-price { text-align: right; flex-shrink: 0; }
+.qr-units { font-family: var(--font-label); font-size: 10px; letter-spacing: 0.04em; color: var(--ink-500); display: block; }
+.qr-line-total { font-family: var(--font-heading); font-size: 16px; font-weight: 700; color: var(--ink); }
+.qr-chev { flex-shrink: 0; color: var(--ink-500); transition: transform var(--dur-base) var(--ease-out); }
+.quote-room[open] .qr-chev { transform: rotate(180deg); }
+.qr-panel { padding: 0 18px 18px; }
+.qr-gallery { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 12px; scrollbar-width: thin; }
+.qr-gallery img {
+  height: 132px; width: auto; border-radius: 8px; object-fit: cover; flex-shrink: 0;
+  background: var(--paper-300);
+}
+.qr-desc { font-family: var(--font-body); font-size: 14px; color: var(--ink-700); line-height: 1.65; margin: 0 0 14px; }
+.qr-amenities { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; padding: 0; margin: 0; }
+.qr-amenities li {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-label); font-size: 12px; letter-spacing: 0.03em; color: var(--ink-700);
+}
+.qr-amenities svg { width: 15px; height: 15px; color: var(--terracotta); flex-shrink: 0; }
+
+/* ══ Services table ══ */
+.quote-services-table { width: 100%; border-collapse: collapse; }
+.quote-services-table th {
+  font-family: var(--font-label); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-500);
+  text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--paper-400);
+}
+.quote-services-table td { padding: 10px; border-bottom: 1px solid var(--paper-300); font-family: var(--font-body); font-size: 14px; color: var(--ink); }
+.quote-services-table tbody tr:last-child td { border-bottom: none; }
+.quote-services-table .tax-tag { font-family: var(--font-label); font-size: 10px; letter-spacing: 0.04em; color: var(--ink-500); }
+
+/* ══ Tax breakdown (collapsible) ══ */
+.quote-tax-details { border-top: 1px dashed var(--paper-400); border-bottom: 1px dashed var(--paper-400); margin: 4px 0; }
+.quote-tax-summary {
+  cursor: pointer; list-style: none; display: flex; justify-content: space-between;
+  align-items: center; padding: 12px 0; gap: 12px;
+  font-family: var(--font-label); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-700);
+}
+.quote-tax-summary::-webkit-details-marker { display: none; }
+.quote-tax-summary .chev { transition: transform .2s; font-size: 10px; color: var(--ink-500); }
+.quote-tax-details[open] .quote-tax-summary .chev { transform: rotate(180deg); }
+.quote-tax-body { padding: 0 0 12px; }
+.quote-tax-line { display: flex; justify-content: space-between; padding: 5px 0; font-family: var(--font-body); font-size: 13px; color: var(--ink-700); }
+.quote-tax-line .tax-base { color: var(--ink-500); font-size: 12px; margin-left: 6px; }
+
+/* Expand everything when printing to PDF */
+@media print {
+  .quote-room > .qr-panel { display: block !important; }
+  .qr-chev { display: none !important; }
+  .qr-gallery { overflow: visible; flex-wrap: wrap; }
+}
+
+/* ══ PDF export mode (html2pdf) ══ */
+.pdf-export { box-shadow: none !important; border-color: var(--paper-400) !important; }
+.pdf-export .no-print { display: none !important; }
+.pdf-export .quote-room > .qr-panel { display: block !important; }
+.pdf-export .qr-chev { display: none !important; }
+.pdf-export .qr-gallery { overflow: visible; flex-wrap: wrap; }
+.pdf-export .quote-room,
+.pdf-export .quote-stay,
+.pdf-export .quote-totals,
+.pdf-export .quote-services-table tr { page-break-inside: avoid; break-inside: avoid; }
+</style>
 </head>
 <body data-screen-label="Cotización" data-header="dark">
 
@@ -109,23 +213,53 @@
         </div>
       </div>
 
+      <!-- Stay summary band -->
+      <div class="quote-section" id="staySection" style="display:none; padding-top:0">
+        <div class="quote-stay">
+          <div class="quote-stay-cell">
+            <span class="qs-label">Check-in</span>
+            <span class="qs-value" id="stayCheckin">—</span>
+          </div>
+          <div class="quote-stay-cell">
+            <span class="qs-label">Check-out</span>
+            <span class="qs-value" id="stayCheckout">—</span>
+          </div>
+          <div class="quote-stay-cell">
+            <span class="qs-label">Noches</span>
+            <span class="qs-value" id="stayNights">—</span>
+          </div>
+          <div class="quote-stay-cell">
+            <span class="qs-label">Huéspedes</span>
+            <span class="qs-value" id="stayGuests">—</span>
+          </div>
+        </div>
+      </div>
+
       <hr class="quote-divider">
 
-      <!-- Items table -->
-      <div class="quote-table-wrap">
-        <table class="quote-table">
-          <thead>
-            <tr>
-              <th>Tipología</th>
-              <th class="text-center">Unidades</th>
-              <th class="text-center">Noches</th>
-              <th class="text-right">Tarifa / noche</th>
-              <th class="text-right">Subtotal</th>
-            </tr>
-          </thead>
-          <tbody id="quoteItemsTbody">
-          </tbody>
-        </table>
+      <!-- Room accordion -->
+      <div class="quote-section">
+        <p class="quote-section-label">Alojamiento</p>
+        <div class="quote-rooms" id="quoteRooms"></div>
+      </div>
+
+      <!-- Services -->
+      <div id="serviciosSection" style="display:none">
+        <hr class="quote-divider">
+        <div class="quote-section">
+          <p class="quote-section-label">Servicios adicionales</p>
+          <table class="quote-services-table">
+            <thead>
+              <tr>
+                <th>Servicio</th>
+                <th class="text-center">Cantidad</th>
+                <th class="text-right">Precio unitario</th>
+                <th class="text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody id="quoteServiciosTbody"></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Totals -->
@@ -139,11 +273,29 @@
             <span id="totalDescuentoLabel">Descuento</span>
             <span id="totalDescuento" style="color:var(--terracotta-700)">−$ 0</span>
           </div>
+
+          <details class="quote-tax-details" id="taxDetails" style="display:none">
+            <summary class="quote-tax-summary">
+              <span>Impuestos <span id="taxTotalInline"></span></span>
+              <span class="chev" aria-hidden="true">▾</span>
+            </summary>
+            <div class="quote-tax-body">
+              <div class="quote-tax-line" id="ivaTaxLine" style="display:none">
+                <span>IVA 19% <span class="tax-base" id="ivaBaseLabel"></span></span>
+                <span id="ivaAmount">$ 0</span>
+              </div>
+              <div class="quote-tax-line" id="incTaxLine" style="display:none">
+                <span>INC 8% <span class="tax-base" id="incBaseLabel"></span></span>
+                <span id="incAmount">$ 0</span>
+              </div>
+            </div>
+          </details>
+
           <div class="quote-total-row quote-total-final">
             <span>Total</span>
             <span id="totalFinal">$ 0</span>
           </div>
-          <p class="quote-total-note">IVA incluido · Tarifas en Pesos Colombianos (COP)</p>
+          <p class="quote-total-note">Impuestos incluidos en el total · Valores en Pesos Colombianos (COP)</p>
         </div>
       </div>
 
@@ -162,7 +314,7 @@
         <ul class="quote-policies-list">
           <li>Cancelación gratuita con al menos 48 horas de anticipación al check-in.</li>
           <li>Pago a crédito sujeto a aprobación previa de la empresa con convenio vigente.</li>
-          <li>IVA incluido en todas las tarifas indicadas.</li>
+          <li>Impuestos (IVA 19% sobre alojamiento, INC 8% sobre alimentación) detallados en el total.</li>
         </ul>
       </div>
 
@@ -186,7 +338,7 @@
         <div class="quote-ctas-inner">
           <a href="reservar.html" class="btn btn-primary">Aceptar y reservar <span aria-hidden="true">→</span></a>
           <a id="quoteWaLink" href="https://api.whatsapp.com/send/?phone=573102490414&text=Hola%2C+quisiera+proceder+con+la+cotizaci%C3%B3n" target="_blank" rel="noopener noreferrer" class="btn btn-ghost-dark">Contactar por WhatsApp</a>
-          <button onclick="window.print()" class="btn btn-ghost-dark">Descargar PDF</button>
+          <button id="downloadPdfBtn" type="button" class="btn btn-ghost-dark">Descargar PDF</button>
         </div>
       </div>
 
@@ -278,21 +430,88 @@ function setHtml(id, html) {
   if (el) el.innerHTML = html || '';
 }
 
+/* ── Room metadata (galleries) ── */
+let ROOMS_DB = {};
+function roomMetaFor(item) {
+  if (item.roomTypeId && ROOMS_DB[item.roomTypeId]) return ROOMS_DB[item.roomTypeId];
+  const byName = Object.values(ROOMS_DB).find(r => r.name === item.habitacion);
+  return byName || null;
+}
+
+function renderRoomCards(items) {
+  const wrap = document.getElementById('quoteRooms');
+  wrap.innerHTML = items.map((it, idx) => {
+    const meta = roomMetaFor(it);
+    const gallery = (meta && meta.gallery && meta.gallery.length) ? meta.gallery : (meta && meta.image ? [meta.image] : []);
+    const thumb = gallery[0] || 'assets/photos/tipo1/1.webp';
+    const facts = meta ? [
+      meta.area ? `${meta.area} m²` : '',
+      meta.beds || '',
+      meta.view || ''
+    ].filter(Boolean).join('  ·  ') : '';
+    const galleryHtml = gallery.length
+      ? `<div class="qr-gallery">${gallery.map(g => `<img src="${esc(g)}" alt="${esc(it.habitacion)}" loading="lazy">`).join('')}</div>`
+      : '';
+    const amenitiesHtml = (meta && meta.amenities && meta.amenities.length)
+      ? `<ul class="qr-amenities">${meta.amenities.map(a => `<li><i data-lucide="${esc(a.icon)}"></i>${esc(a.l)}</li>`).join('')}</ul>`
+      : '';
+    return `
+      <details class="quote-room"${idx === 0 ? ' open' : ''}>
+        <summary class="qr-summary">
+          <img src="${esc(thumb)}" alt="${esc(it.habitacion)}" class="qr-thumb" loading="lazy">
+          <div class="qr-head-main">
+            <p class="qr-name">${esc(it.habitacion)}</p>
+            ${facts ? `<p class="qr-facts">${esc(facts)}</p>` : ''}
+          </div>
+          <div class="qr-price">
+            <span class="qr-units">${it.unidades} u. × ${it.noches} noche${it.noches === 1 ? '' : 's'}</span>
+            <span class="qr-line-total">${formatCOP(it.subtotal)}</span>
+          </div>
+          <i data-lucide="chevron-down" class="qr-chev"></i>
+        </summary>
+        <div class="qr-panel">
+          ${galleryHtml}
+          ${meta && meta.description ? `<p class="qr-desc">${esc(meta.description)}</p>` : ''}
+          ${amenitiesHtml}
+        </div>
+      </details>
+    `;
+  }).join('');
+
+  if (window.lucide) lucide.createIcons();
+}
+
 /* ── Load & render ── */
 async function loadQuote() {
   const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
   const d = params.get('d');
+  const preview = params.get('preview') === '1';
 
-  if (!d) {
+  if (!id && !d) {
     showError('Cotización no encontrada', 'No se proporcionó un enlace de cotización válido.');
     return;
   }
 
+  /* Room galleries (non-fatal if unavailable) */
   try {
-    const res = await fetch('/api/get-quote?d=' + encodeURIComponent(d));
+    const rdb = await fetch('rooms_db.json');
+    if (rdb.ok) ROOMS_DB = await rdb.json();
+  } catch (e) {}
+
+  const query = id
+    ? 'id=' + encodeURIComponent(id) + (preview ? '&preview=1' : '')
+    : 'd=' + encodeURIComponent(d);
+
+  try {
+    const res = await fetch('/api/get-quote?' + query);
     if (res.status === 410) {
       const json = await res.json().catch(() => ({}));
-      showError('Esta cotización ha vencido', 'La cotización ya superó su fecha de vigencia. Contáctanos para obtener una nueva.');
+      if (json.cancelled) {
+        showError('Esta cotización fue cancelada', 'La cotización ya no está vigente. Contáctanos para solicitar una nueva.');
+      } else {
+        showError('Esta cotización ha vencido', 'La cotización ya superó su fecha de vigencia. Contáctanos para obtener una nueva.');
+      }
       return;
     }
     if (res.status === 404) {
@@ -344,29 +563,78 @@ function renderQuote(q) {
     document.getElementById('metaRefRow').style.display = '';
   }
 
-  /* Items */
+  /* Stay summary band */
+  const nights = (q.checkin && q.checkout)
+    ? Math.max(0, Math.round((new Date(q.checkout) - new Date(q.checkin)) / 86400000))
+    : 0;
+  if (q.checkin || q.checkout || q.numPersonas) {
+    document.getElementById('staySection').style.display = '';
+    setText('stayCheckin', q.checkin ? formatDateES(q.checkin) : '—');
+    setText('stayCheckout', q.checkout ? formatDateES(q.checkout) : '—');
+    setText('stayNights', nights > 0 ? nights : '—');
+    setText('stayGuests', q.numPersonas ? String(q.numPersonas) : '—');
+  }
+
+  /* Room accordion */
+  renderRoomCards(q.items || []);
   const subtotalItems = (q.items || []).reduce((s, it) => s + it.subtotal, 0);
-  const tbody = document.getElementById('quoteItemsTbody');
-  tbody.innerHTML = (q.items || []).map((it, i) => `
-    <tr class="${i % 2 === 0 ? 'qt-even' : ''}">
-      <td class="qt-room">${esc(it.habitacion)}</td>
-      <td class="text-center qt-num">${it.unidades}</td>
-      <td class="text-center qt-num">${it.noches}</td>
-      <td class="text-right qt-num">${formatCOP(it.tarifaPorNoche)}</td>
-      <td class="text-right qt-subtotal">${formatCOP(it.subtotal)}</td>
-    </tr>
-  `).join('');
+
+  /* Services — accumulate tax bases */
+  const SVC_LABELS = { desayuno: 'Desayuno', almuerzo: 'Almuerzo', cena: 'Cena', parqueadero: 'Parqueadero', personaAdicional: 'Persona adicional' };
+  const SVC_TAX = { desayuno: 'inc', almuerzo: 'inc', cena: 'inc', parqueadero: 'iva', personaAdicional: 'iva' };
+  const TAX_TAG = { iva: 'IVA 19%', inc: 'INC 8%', ninguno: 'Sin impuesto' };
+  const sv = q.servicios || {};
+  let baseIvaSvc = 0, baseInc = 0, baseNone = 0;
+  const svcRows = [];
+
+  ['desayuno', 'almuerzo', 'cena', 'parqueadero', 'personaAdicional'].forEach(k => {
+    const s = sv[k];
+    if (!s || !s.cantidad || !s.precioUnitario) return;
+    const sub = s.cantidad * s.precioUnitario;
+    if (SVC_TAX[k] === 'iva') baseIvaSvc += sub; else baseInc += sub;
+    svcRows.push({ label: SVC_LABELS[k], tax: SVC_TAX[k], cantidad: s.cantidad, precio: s.precioUnitario, sub });
+  });
+  (sv.otros || []).forEach(o => {
+    if (!o.cantidad || !o.precioUnitario) return;
+    const sub = o.cantidad * o.precioUnitario;
+    if (o.impuesto === 'iva') baseIvaSvc += sub;
+    else if (o.impuesto === 'inc') baseInc += sub;
+    else baseNone += sub;
+    svcRows.push({ label: o.descripcion, tax: o.impuesto || 'ninguno', cantidad: o.cantidad, precio: o.precioUnitario, sub });
+  });
+
+  if (svcRows.length) {
+    document.getElementById('serviciosSection').style.display = '';
+    document.getElementById('quoteServiciosTbody').innerHTML = svcRows.map(r => `
+      <tr>
+        <td>${esc(r.label)} <span class="tax-tag">· ${TAX_TAG[r.tax]}</span></td>
+        <td class="text-center">${r.cantidad}</td>
+        <td class="text-right">${formatCOP(r.precio)}</td>
+        <td class="text-right">${formatCOP(r.sub)}</td>
+      </tr>
+    `).join('');
+  }
 
   /* Totals */
+  const subtotal = subtotalItems + baseIvaSvc + baseInc + baseNone;
   let descuentoAmt = 0;
   if (q.descuento && q.descuento.valor > 0) {
     descuentoAmt = q.descuento.tipo === 'porcentaje'
-      ? subtotalItems * (q.descuento.valor / 100)
+      ? subtotal * (q.descuento.valor / 100)
       : q.descuento.valor;
   }
-  const total = subtotalItems - descuentoAmt;
+  descuentoAmt = Math.min(descuentoAmt, subtotal);
 
-  setText('totalSubtotal', formatCOP(subtotalItems));
+  const ivaRate = (q.impuestos && q.impuestos.ivaRate) || 0.19;
+  const incRate = (q.impuestos && q.impuestos.incRate) || 0.08;
+  const factor = subtotal > 0 ? (subtotal - descuentoAmt) / subtotal : 0;
+  const ivaBaseNet = (subtotalItems + baseIvaSvc) * factor;
+  const incBaseNet = baseInc * factor;
+  const iva = ivaBaseNet * ivaRate;
+  const inc = incBaseNet * incRate;
+  const total = (subtotal - descuentoAmt) + iva + inc;
+
+  setText('totalSubtotal', formatCOP(subtotal));
   setText('totalFinal', formatCOP(total));
 
   if (descuentoAmt > 0) {
@@ -374,6 +642,22 @@ function renderQuote(q) {
     setText('totalDescuentoLabel', label);
     setText('totalDescuento', '−' + formatCOP(descuentoAmt));
     document.getElementById('totalDescuentoRow').style.display = '';
+  }
+
+  /* Tax breakdown */
+  if (iva > 0 || inc > 0) {
+    document.getElementById('taxDetails').style.display = '';
+    setText('taxTotalInline', '+' + formatCOP(iva + inc));
+    if (iva > 0) {
+      document.getElementById('ivaTaxLine').style.display = 'flex';
+      setText('ivaBaseLabel', 'sobre ' + formatCOP(ivaBaseNet));
+      setText('ivaAmount', formatCOP(iva));
+    }
+    if (inc > 0) {
+      document.getElementById('incTaxLine').style.display = 'flex';
+      setText('incBaseLabel', 'sobre ' + formatCOP(incBaseNet));
+      setText('incAmount', formatCOP(inc));
+    }
   }
 
   /* Conditions */
@@ -390,6 +674,46 @@ function renderQuote(q) {
   document.getElementById('quoteLoading').style.display = 'none';
   document.getElementById('quoteDocument').style.display = 'block';
 }
+
+/* ── PDF download (html2pdf) ── */
+async function downloadPDF() {
+  const doc = document.getElementById('quoteDocument');
+  if (!doc || !window.html2pdf) { window.print(); return; }
+
+  const btn = document.getElementById('downloadPdfBtn');
+  const prevLabel = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = 'Generando…'; btn.disabled = true; }
+
+  /* Expand accordions for the export */
+  const accs = Array.from(doc.querySelectorAll('details.quote-room'));
+  const prevOpen = accs.map(a => a.open);
+  accs.forEach(a => { a.open = true; });
+  doc.classList.add('pdf-export');
+
+  const idText = (document.getElementById('quoteIdDisplay').textContent || 'cotizacion').trim();
+  const opt = {
+    margin: [10, 10, 12, 10],
+    filename: 'Cotizacion-' + idText + '.pdf',
+    image: { type: 'jpeg', quality: 0.96 },
+    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css', 'legacy'] }
+  };
+
+  try {
+    await html2pdf().set(opt).from(doc).save();
+  } catch (e) {
+    window.print();
+  } finally {
+    doc.classList.remove('pdf-export');
+    accs.forEach((a, i) => { a.open = prevOpen[i]; });
+    if (btn) { btn.textContent = prevLabel; btn.disabled = false; }
+  }
+}
+
+document.addEventListener('click', function(e) {
+  if (e.target && e.target.id === 'downloadPdfBtn') downloadPDF();
+});
 
 loadQuote();
 </script>

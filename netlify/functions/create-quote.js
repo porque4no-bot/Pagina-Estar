@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { authenticateAdmin } = require('./_firebase-auth');
+const { getQuoteStore, saveQuote, sanitizeQuoteInput } = require('./_quotes-store');
 
 function loadEnv() {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
@@ -50,57 +51,37 @@ exports.handler = async (event, context) => {
     try { body = JSON.parse(event.body); }
     catch (e) { return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'JSON inválido' }) }; }
 
-    const { empresa, contacto, email, telefono, nit, referencia, validaHasta, items, descuento, condiciones } = body;
-
-    if (!empresa || !email || !Array.isArray(items) || items.length === 0) {
+    if (!body.empresa || !body.email || !Array.isArray(body.items) || body.items.length === 0) {
       return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Faltan campos: empresa, email, items' }) };
     }
 
-    const sanitizedItems = items.map(item => {
-      const u = Math.max(1, Math.min(100, parseInt(item.unidades) || 1));
-      const n = Math.max(1, Math.min(365, parseInt(item.noches) || 1));
-      const t = Math.max(0, parseFloat(item.tarifaPorNoche) || 0);
-      return {
-        habitacion: String(item.habitacion || 'Clásica').slice(0, 100),
-        unidades: u,
-        noches: n,
-        tarifaPorNoche: t,
-        subtotal: u * n * t
-      };
-    });
-
     const quoteId = generateQuoteId();
     const now = new Date();
-    const parsedExpiry = validaHasta ? new Date(validaHasta) : null;
-    const expiresAt = (parsedExpiry && !isNaN(parsedExpiry.getTime()))
-      ? parsedExpiry.toISOString()
-      : new Date(now.getTime() + 30 * 86400000).toISOString();
+    const sanitized = sanitizeQuoteInput(body);
 
     const quoteData = {
       quoteId,
-      empresa: String(empresa).slice(0, 200),
-      contacto: String(contacto || '').slice(0, 200),
-      email: String(email).slice(0, 254),
-      telefono: String(telefono || '').slice(0, 50),
-      nit: String(nit || '').slice(0, 50),
-      referencia: String(referencia || '').slice(0, 300),
       createdAt: now.toISOString(),
-      expiresAt,
-      items: sanitizedItems,
-      descuento: {
-        tipo: (descuento && descuento.tipo === 'fijo') ? 'fijo' : 'porcentaje',
-        valor: Math.max(0, parseFloat((descuento && descuento.valor) || 0))
-      },
-      condiciones: String(condiciones || '').slice(0, 2000),
-      createdBy: auth.email || 'admin'
+      updatedAt: now.toISOString(),
+      status: 'activa',
+      views: 0,
+      firstViewedAt: null,
+      lastViewedAt: null,
+      createdBy: auth.email || 'admin',
+      ...sanitized
     };
 
-    /* Encode quote data in the URL — no external storage needed */
-    const base64 = Buffer.from(JSON.stringify(quoteData)).toString('base64');
-    const encoded = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    
+    /* Persist to Netlify Blobs */
+    try {
+      const store = getQuoteStore();
+      await saveQuote(store, quoteData);
+    } catch (e) {
+      console.error('[create-quote] blob store unavailable:', e.message, e.stack);
+      return { statusCode: 503, headers: corsHeaders, body: JSON.stringify({ error: 'Almacenamiento no disponible. Intenta de nuevo.' }) };
+    }
+
     const base = (process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
-    const shareUrl = `${base}/cotizacion.html?d=${encoded}`;
+    const shareUrl = `${base}/cotizacion.html?id=${quoteId}`;
 
     return {
       statusCode: 200,

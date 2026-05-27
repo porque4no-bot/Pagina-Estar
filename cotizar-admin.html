@@ -364,6 +364,44 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .btn[disabled] { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+/* ── Tabs ── */
+.admin-tabs { display: flex; gap: 4px; background: var(--paper-200); border-radius: 8px; padding: 4px; }
+.admin-tab {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-label); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-500);
+  padding: 10px 18px; border-radius: 6px; transition: all var(--dur-fast) var(--ease-out);
+}
+.admin-tab:hover { color: var(--ink); }
+.admin-tab.is-active { background: var(--ink); color: var(--paper); }
+
+/* ── Lista ── */
+.lista-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 24px; flex-wrap: wrap; }
+.lista-table { min-width: 760px; }
+.lista-table td { font-family: var(--font-body); font-size: 13px; color: var(--ink); }
+.lista-id { font-family: var(--font-label); font-size: 11px; letter-spacing: 0.04em; color: var(--ink-700); white-space: nowrap; }
+.lista-total { font-family: var(--font-label); font-weight: 700; white-space: nowrap; }
+.lista-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.lista-actions button {
+  background: none; border: 1px solid var(--paper-400); border-radius: 4px;
+  color: var(--ink-700); cursor: pointer; font-family: var(--font-label);
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 6px 9px; transition: all var(--dur-fast) var(--ease-out); white-space: nowrap;
+}
+.lista-actions button:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.lista-actions button.danger:hover { background: var(--error-700); border-color: var(--error-700); color: var(--white); }
+
+.badge {
+  display: inline-block; font-family: var(--font-label); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 9px; border-radius: 100px;
+  white-space: nowrap;
+}
+.badge-activa    { background: var(--paper-300); color: var(--ink-700); }
+.badge-vista     { background: #DCE7F0; color: #2E5A82; }
+.badge-aceptada  { background: #D8EBD8; color: #2E6B3A; }
+.badge-cancelada { background: #F0DCDC; color: #8A2E2E; }
+.badge-vencida   { background: #EDE6D6; color: #8A6A2E; }
 </style>
 </head>
 <body>
@@ -399,8 +437,20 @@
     <div class="admin-page-header">
       <div>
         <p class="eyebrow terracotta">Hotel Estar — Portal B2B</p>
-        <h1>Nueva cotización</h1>
+        <h1 id="pageTitle">Nueva cotización</h1>
       </div>
+      <div class="admin-tabs">
+        <button type="button" class="admin-tab is-active" data-view="nueva">Nueva cotización</button>
+        <button type="button" class="admin-tab" data-view="lista">Cotizaciones</button>
+      </div>
+    </div>
+
+    <!-- ══════════════ VIEW: Nueva / Editar ══════════════ -->
+    <div id="viewNueva">
+
+    <div id="editBanner" style="display:none; background:var(--terracotta-100); border:1px solid var(--terracotta-300); border-radius:8px; padding:14px 18px; margin-bottom:24px; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+      <span style="font-family:var(--font-label); font-size:12px; letter-spacing:0.06em; color:var(--ink);">Editando cotización <strong id="editBannerId"></strong></span>
+      <button type="button" id="cancelEditBtn" class="btn btn-ghost-dark" style="padding:8px 14px; font-size:11px;">Descartar y crear nueva</button>
     </div>
 
     <!-- ── 1. Datos del cliente ── -->
@@ -447,9 +497,36 @@
       </div>
     </div>
 
-    <!-- ── 3. Ítems ── -->
+    <!-- ── 3. Estadía y huéspedes ── -->
     <div class="admin-card">
-      <p class="admin-card-title">03 · Ítems de la cotización</p>
+      <p class="admin-card-title">03 · Estadía y huéspedes</p>
+      <div class="field-row">
+        <div class="field">
+          <label for="qCheckin">Check-in</label>
+          <input id="qCheckin" type="date" class="it-input" style="min-width:unset">
+        </div>
+        <div class="field">
+          <label for="qCheckout">Check-out</label>
+          <input id="qCheckout" type="date" class="it-input" style="min-width:unset">
+        </div>
+        <div class="field">
+          <label for="qPersonas">Nº de personas</label>
+          <input id="qPersonas" type="number" class="it-input" style="min-width:unset" value="1" min="1" max="200">
+        </div>
+      </div>
+      <p id="estadiaNoches" style="font-family:var(--font-label); font-size:11px; color:var(--ink-500); margin:12px 0 0; letter-spacing:0.06em;"></p>
+    </div>
+
+    <!-- ── 4. Habitaciones ── -->
+    <div class="admin-card">
+      <p class="admin-card-title">04 · Habitaciones</p>
+      <div class="field" style="max-width:320px; margin-bottom:20px">
+        <label for="qComision">Comisión interna (%)</label>
+        <input id="qComision" type="number" class="it-input" style="min-width:unset" value="0" min="0" max="100" step="0.1" placeholder="0">
+        <p style="font-family:var(--font-body); font-size:12px; color:var(--ink-500); margin:6px 0 0; line-height:1.5;">
+          Las tarifas de habitación se inflan este porcentaje antes de mostrarse al cliente. Es un dato interno: <strong>no</strong> se incluye en la cotización ni en el enlace.
+        </p>
+      </div>
       <div class="items-table-wrap">
         <table class="items-table">
           <thead>
@@ -457,8 +534,8 @@
               <th>Tipo de habitación</th>
               <th>Unidades</th>
               <th>Noches</th>
-              <th>Tarifa / noche (COP)</th>
-              <th>Subtotal</th>
+              <th>Tarifa base / noche (COP)</th>
+              <th>Subtotal (cliente)</th>
               <th></th>
             </tr>
           </thead>
@@ -467,12 +544,57 @@
           </tbody>
         </table>
       </div>
-      <button type="button" id="addItemBtn" class="btn btn-ghost-dark" style="margin-top:8px; padding:12px 20px; font-size:11px;">+ Agregar ítem</button>
+      <p style="font-family:var(--font-body); font-size:12px; color:var(--ink-500); margin:10px 0 0;">
+        Las noches se calculan automáticamente a partir del check-in y check-out y son iguales para todas las unidades.
+      </p>
+      <button type="button" id="addItemBtn" class="btn btn-ghost-dark" style="margin-top:8px; padding:12px 20px; font-size:11px;">+ Agregar habitación</button>
     </div>
 
-    <!-- ── 4. Descuento ── -->
+    <!-- ── 5. Servicios adicionales ── -->
     <div class="admin-card">
-      <p class="admin-card-title">04 · Descuento global (opcional)</p>
+      <p class="admin-card-title">05 · Servicios adicionales</p>
+      <p style="font-family:var(--font-body); font-size:13px; color:var(--ink-500); margin:0 0 16px;">
+        Las cantidades se prellenan con personas × noches; edítalas si es necesario. Alimentación lleva INC 8%; parqueadero y persona adicional, IVA 19%.
+      </p>
+      <div class="items-table-wrap">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Servicio</th>
+              <th>Cantidad</th>
+              <th>Precio unitario (COP)</th>
+              <th>Impuesto</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody id="serviciosBody">
+            <!-- fixed service rows injected by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <p style="font-family:var(--font-label); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.18em; color:var(--ink-500); margin:24px 0 10px;">Otros conceptos</p>
+      <div class="items-table-wrap">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Descripción</th>
+              <th>Cantidad</th>
+              <th>Precio unitario (COP)</th>
+              <th>Impuesto</th>
+              <th>Subtotal</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="otrosBody"></tbody>
+        </table>
+      </div>
+      <button type="button" id="addOtroBtn" class="btn btn-ghost-dark" style="margin-top:8px; padding:12px 20px; font-size:11px;">+ Agregar concepto</button>
+    </div>
+
+    <!-- ── 6. Descuento ── -->
+    <div class="admin-card">
+      <p class="admin-card-title">06 · Descuento global (opcional)</p>
       <div class="desc-row">
         <div class="desc-radio-group">
           <label class="desc-radio-label">
@@ -492,7 +614,7 @@
 
     <!-- ── 5. Condiciones ── -->
     <div class="admin-card">
-      <p class="admin-card-title">05 · Condiciones especiales</p>
+      <p class="admin-card-title">07 · Condiciones especiales</p>
       <div class="field">
         <textarea id="qCondiciones" class="it-input" style="min-width:unset; width:100%; min-height:100px; resize:vertical; font-family:var(--font-body)" placeholder="Ej. Checkout flexible. Facturación a nombre de la empresa. Crédito a 30 días sujeto a aprobación."></textarea>
       </div>
@@ -507,6 +629,14 @@
       <div class="total-card-line" id="descuentoLine" style="display:none">
         <span id="descuentoLabel">Descuento</span>
         <span id="descuentoDisplay">− $ 0</span>
+      </div>
+      <div class="total-card-line" id="ivaLine" style="display:none">
+        <span>IVA (19%)</span>
+        <span id="ivaDisplay">$ 0</span>
+      </div>
+      <div class="total-card-line" id="incLine" style="display:none">
+        <span>INC (8%)</span>
+        <span id="incDisplay">$ 0</span>
       </div>
       <div class="total-card-line is-total">
         <span>Total estimado</span>
@@ -548,6 +678,37 @@
       </div>
     </div>
 
+    </div><!-- end #viewNueva -->
+
+    <!-- ══════════════ VIEW: Lista de cotizaciones ══════════════ -->
+    <div id="viewLista" style="display:none">
+      <div class="lista-toolbar">
+        <input type="search" id="listSearch" class="it-input" style="min-width:unset; max-width:320px" placeholder="Buscar por empresa o ID…">
+        <button type="button" id="refreshListBtn" class="btn btn-ghost-dark" style="padding:10px 16px; font-size:11px;">Actualizar</button>
+      </div>
+
+      <div id="listLoading" style="display:none; padding:48px; text-align:center; font-family:var(--font-label); font-size:12px; color:var(--ink-500); letter-spacing:0.08em;">Cargando cotizaciones…</div>
+      <div id="listEmpty" style="display:none; padding:48px; text-align:center; font-family:var(--font-body); font-size:14px; color:var(--ink-500);">Aún no hay cotizaciones creadas.</div>
+      <div id="listError" style="display:none; padding:24px; text-align:center; font-family:var(--font-label); font-size:12px; color:var(--error-700);"></div>
+
+      <div class="items-table-wrap" id="listTableWrap" style="display:none">
+        <table class="items-table lista-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Empresa</th>
+              <th>Estadía</th>
+              <th>Total</th>
+              <th>Estado</th>
+              <th>Vistas</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="listBody"></tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 </main>
 
@@ -566,16 +727,44 @@ function showToast(msg, ms) {
   setTimeout(() => t.classList.remove('is-visible'), ms || 2800);
 }
 
+/* ── Tax rates ── */
+const IVA_RATE = 0.19;
+const INC_RATE = 0.08;
+
 /* ── Items table ── */
 const ROOM_TYPES = ['Clásica', 'Selección', 'Reserva', 'Origen', 'Especial'];
-const DEFAULT_RATES = { 'Clásica': 220000, 'Selección': 260000, 'Reserva': 300000, 'Origen': 340000, 'Especial': 380000 };
+const ROOM_NAME_TO_ID = { 'Clásica': '31348', 'Selección': '31349', 'Reserva': '31350', 'Origen': '31351', 'Especial': '31352' };
+const DEFAULT_RATES = { 'Clásica': 220000, 'Selección': 265000, 'Reserva': 320000, 'Origen': 385000, 'Especial': 450000 };
 let rowIdCounter = 0;
+
+/* ── Nights between check-in / check-out ── */
+function stayNights() {
+  const ci = document.getElementById('qCheckin').value;
+  const co = document.getElementById('qCheckout').value;
+  if (!ci || !co) return 0;
+  const d1 = new Date(ci), d2 = new Date(co);
+  if (isNaN(d1) || isNaN(d2)) return 0;
+  const n = Math.round((d2 - d1) / 86400000);
+  return n > 0 ? n : 0;
+}
+
+function numPersonas() {
+  return Math.max(1, parseInt(document.getElementById('qPersonas').value) || 1);
+}
+
+function comisionPct() {
+  return Math.max(0, Math.min(100, parseFloat(document.getElementById('qComision').value) || 0));
+}
+
+/* Tarifa inflada con la comisión interna (lo que paga el cliente) */
+function effectiveTarifa(base) {
+  return Math.round((base || 0) * (1 + comisionPct() / 100));
+}
 
 function createRow(defaults) {
   const id = ++rowIdCounter;
   const habitacion = (defaults && defaults.habitacion) || 'Clásica';
   const unidades = (defaults && defaults.unidades) || 1;
-  const noches = (defaults && defaults.noches) || 1;
   const tarifa = (defaults && defaults.tarifa) || DEFAULT_RATES[habitacion] || 220000;
 
   const tr = document.createElement('tr');
@@ -587,9 +776,9 @@ function createRow(defaults) {
       </select>
     </td>
     <td><input type="number" class="it-input" data-field="unidades" value="${unidades}" min="1" max="100"></td>
-    <td><input type="number" class="it-input" data-field="noches" value="${noches}" min="1" max="365"></td>
+    <td class="it-noches" data-field="noches" style="font-family:var(--font-label); font-size:13px; font-weight:700; color:var(--ink);">${stayNights()}</td>
     <td><input type="number" class="it-input" data-field="tarifa" value="${tarifa}" min="0" step="1000"></td>
-    <td class="it-subtotal">${formatCOP(unidades * noches * tarifa)}</td>
+    <td class="it-subtotal">${formatCOP(unidades * stayNights() * effectiveTarifa(tarifa))}</td>
     <td><button type="button" class="it-remove" title="Eliminar fila">✕</button></td>
   `;
   return tr;
@@ -597,18 +786,112 @@ function createRow(defaults) {
 
 function calcRowSubtotal(tr) {
   const u = parseFloat(tr.querySelector('[data-field="unidades"]').value) || 0;
-  const n = parseFloat(tr.querySelector('[data-field="noches"]').value) || 0;
-  const t = parseFloat(tr.querySelector('[data-field="tarifa"]').value) || 0;
-  return u * n * t;
+  const n = stayNights();
+  const base = parseFloat(tr.querySelector('[data-field="tarifa"]').value) || 0;
+  return u * n * effectiveTarifa(base);
+}
+
+/* ── Services ── */
+const TAX_LABEL = { iva: 'IVA 19%', inc: 'INC 8%', ninguno: 'Sin impuesto' };
+const SERVICE_DEFS = [
+  { key: 'desayuno',        label: 'Desayuno',          tax: 'inc', price: 25000, qtyMode: 'meal' },
+  { key: 'almuerzo',        label: 'Almuerzo',          tax: 'inc', price: 35000, qtyMode: 'meal' },
+  { key: 'cena',            label: 'Cena',              tax: 'inc', price: 35000, qtyMode: 'meal' },
+  { key: 'parqueadero',     label: 'Parqueadero',       tax: 'iva', price: 15000, qtyMode: 'nights' },
+  { key: 'personaAdicional', label: 'Persona adicional', tax: 'iva', price: 50000, qtyMode: 'manual' }
+];
+let otroIdCounter = 0;
+
+function defaultQtyFor(mode) {
+  const nights = stayNights();
+  if (mode === 'meal') return numPersonas() * nights;
+  if (mode === 'nights') return nights;
+  return 0;
+}
+
+function initServicesTable() {
+  const tbody = document.getElementById('serviciosBody');
+  tbody.innerHTML = SERVICE_DEFS.map(s => `
+    <tr data-svc-key="${s.key}" data-tax="${s.tax}">
+      <td style="font-family:var(--font-body); font-size:14px; color:var(--ink);">${s.label}</td>
+      <td><input type="number" class="it-input" data-field="cantidad" value="${defaultQtyFor(s.qtyMode)}" min="0" max="100000"></td>
+      <td><input type="number" class="it-input" data-field="precio" value="${s.price}" min="0" step="1000"></td>
+      <td style="font-family:var(--font-label); font-size:11px; color:var(--ink-500); letter-spacing:0.08em;">${TAX_LABEL[s.tax]}</td>
+      <td class="it-subtotal svc-subtotal">${formatCOP(defaultQtyFor(s.qtyMode) * s.price)}</td>
+    </tr>
+  `).join('');
+  document.getElementById('otrosBody').innerHTML = '';
+  otroIdCounter = 0;
+}
+
+function createOtroRow() {
+  const id = ++otroIdCounter;
+  const tr = document.createElement('tr');
+  tr.dataset.otroId = id;
+  tr.innerHTML = `
+    <td><input type="text" class="it-input" data-field="descripcion" placeholder="Concepto" style="min-width:160px"></td>
+    <td><input type="number" class="it-input" data-field="cantidad" value="1" min="0" max="100000"></td>
+    <td><input type="number" class="it-input" data-field="precio" value="0" min="0" step="1000"></td>
+    <td>
+      <select class="it-select" data-field="impuesto" style="min-width:120px">
+        <option value="ninguno">Sin impuesto</option>
+        <option value="iva">IVA 19%</option>
+        <option value="inc">INC 8%</option>
+      </select>
+    </td>
+    <td class="it-subtotal svc-subtotal">$ 0</td>
+    <td><button type="button" class="it-remove" title="Eliminar">✕</button></td>
+  `;
+  return tr;
+}
+
+/* Auto-fill service quantities (personas × noches) unless manually edited */
+function autofillServiceQtys() {
+  document.querySelectorAll('#serviciosBody tr').forEach(tr => {
+    const qtyInput = tr.querySelector('[data-field="cantidad"]');
+    if (qtyInput.dataset.touched === '1') return;
+    const def = SERVICE_DEFS.find(s => s.key === tr.dataset.svcKey);
+    if (def) qtyInput.value = defaultQtyFor(def.qtyMode);
+  });
 }
 
 function updateTotals() {
-  let subtotal = 0;
+  /* Rooms (IVA base) */
+  const nights = stayNights();
+  let baseRooms = 0;
   document.querySelectorAll('#itemsBody tr').forEach(tr => {
+    const nochesCell = tr.querySelector('.it-noches');
+    if (nochesCell) nochesCell.textContent = nights;
     const s = calcRowSubtotal(tr);
     tr.querySelector('.it-subtotal').textContent = formatCOP(s);
-    subtotal += s;
+    baseRooms += s;
   });
+
+  /* Fixed services */
+  let baseIvaSvc = 0, baseInc = 0, baseNone = 0;
+  document.querySelectorAll('#serviciosBody tr').forEach(tr => {
+    const c = parseFloat(tr.querySelector('[data-field="cantidad"]').value) || 0;
+    const p = parseFloat(tr.querySelector('[data-field="precio"]').value) || 0;
+    const s = c * p;
+    tr.querySelector('.svc-subtotal').textContent = formatCOP(s);
+    if (tr.dataset.tax === 'iva') baseIvaSvc += s;
+    else if (tr.dataset.tax === 'inc') baseInc += s;
+    else baseNone += s;
+  });
+
+  /* Otros */
+  document.querySelectorAll('#otrosBody tr').forEach(tr => {
+    const c = parseFloat(tr.querySelector('[data-field="cantidad"]').value) || 0;
+    const p = parseFloat(tr.querySelector('[data-field="precio"]').value) || 0;
+    const imp = tr.querySelector('[data-field="impuesto"]').value;
+    const s = c * p;
+    tr.querySelector('.svc-subtotal').textContent = formatCOP(s);
+    if (imp === 'iva') baseIvaSvc += s;
+    else if (imp === 'inc') baseInc += s;
+    else baseNone += s;
+  });
+
+  const subtotal = baseRooms + baseIvaSvc + baseInc + baseNone;
 
   const descTipo = document.querySelector('input[name="descTipo"]:checked').value;
   const descValor = parseFloat(document.getElementById('qDescValor').value) || 0;
@@ -616,10 +899,18 @@ function updateTotals() {
   if (descValor > 0) {
     descAmt = descTipo === 'porcentaje' ? subtotal * (descValor / 100) : descValor;
   }
-  const total = subtotal - descAmt;
+  descAmt = Math.min(descAmt, subtotal);
+
+  /* Discount applies pro-rata to taxable bases */
+  const factor = subtotal > 0 ? (subtotal - descAmt) / subtotal : 0;
+  const iva = (baseRooms + baseIvaSvc) * factor * IVA_RATE;
+  const inc = baseInc * factor * INC_RATE;
+  const total = (subtotal - descAmt) + iva + inc;
 
   document.getElementById('subtotalDisplay').textContent = formatCOP(subtotal);
   document.getElementById('descuentoDisplay').textContent = '− ' + formatCOP(descAmt);
+  document.getElementById('ivaDisplay').textContent = formatCOP(iva);
+  document.getElementById('incDisplay').textContent = formatCOP(inc);
   document.getElementById('totalDisplay').textContent = formatCOP(total);
 
   const discLine = document.getElementById('descuentoLine');
@@ -628,6 +919,8 @@ function updateTotals() {
     const label = descTipo === 'porcentaje' ? `Descuento (${descValor}%)` : 'Descuento';
     document.getElementById('descuentoLabel').textContent = label;
   }
+  document.getElementById('ivaLine').style.display = iva > 0 ? 'flex' : 'none';
+  document.getElementById('incLine').style.display = inc > 0 ? 'flex' : 'none';
 }
 
 function initItemsTable() {
@@ -670,16 +963,73 @@ document.getElementById('itemsBody').addEventListener('click', function(e) {
 document.getElementById('qDescValor').addEventListener('input', updateTotals);
 document.querySelectorAll('input[name="descTipo"]').forEach(r => r.addEventListener('change', updateTotals));
 
+/* ── Services events ── */
+function updateNightsLabel() {
+  const n = stayNights();
+  const el = document.getElementById('estadiaNoches');
+  el.textContent = n > 0 ? `${n} noche${n === 1 ? '' : 's'} · cantidades de servicios prellenadas con ${numPersonas()} persona(s) × ${n} noche(s)` : '';
+}
+
+function onStayChange() {
+  autofillServiceQtys();
+  updateNightsLabel();
+  updateTotals();
+}
+['qCheckin', 'qCheckout', 'qPersonas'].forEach(id => {
+  document.getElementById(id).addEventListener('input', onStayChange);
+  document.getElementById(id).addEventListener('change', onStayChange);
+});
+
+document.getElementById('qComision').addEventListener('input', updateTotals);
+
+document.getElementById('serviciosBody').addEventListener('input', function(e) {
+  if (e.target.dataset.field === 'cantidad') e.target.dataset.touched = '1';
+  updateTotals();
+});
+
+document.getElementById('addOtroBtn').addEventListener('click', function() {
+  document.getElementById('otrosBody').appendChild(createOtroRow());
+  updateTotals();
+});
+
+document.getElementById('otrosBody').addEventListener('input', updateTotals);
+document.getElementById('otrosBody').addEventListener('change', updateTotals);
+document.getElementById('otrosBody').addEventListener('click', function(e) {
+  if (!e.target.classList.contains('it-remove')) return;
+  e.target.closest('tr').remove();
+  updateTotals();
+});
+
 /* ── Collect form data ── */
 function collectFormData() {
   const items = [];
   document.querySelectorAll('#itemsBody tr').forEach(tr => {
     const habitacion = tr.querySelector('[data-field="habitacion"]').value;
     const u = Math.max(1, parseInt(tr.querySelector('[data-field="unidades"]').value) || 1);
-    const n = Math.max(1, parseInt(tr.querySelector('[data-field="noches"]').value) || 1);
-    const t = Math.max(0, parseFloat(tr.querySelector('[data-field="tarifa"]').value) || 0);
-    items.push({ habitacion, unidades: u, noches: n, tarifaPorNoche: t, subtotal: u * n * t });
+    const base = Math.max(0, parseFloat(tr.querySelector('[data-field="tarifa"]').value) || 0);
+    /* Send the base rate + commission; the server inflates and the commission never reaches the client. */
+    items.push({ habitacion, roomTypeId: ROOM_NAME_TO_ID[habitacion] || '', unidades: u, tarifaBase: base });
   });
+
+  const servicios = { otros: [] };
+  document.querySelectorAll('#serviciosBody tr').forEach(tr => {
+    servicios[tr.dataset.svcKey] = {
+      cantidad: Math.max(0, parseInt(tr.querySelector('[data-field="cantidad"]').value) || 0),
+      precioUnitario: Math.max(0, parseFloat(tr.querySelector('[data-field="precio"]').value) || 0)
+    };
+  });
+  document.querySelectorAll('#otrosBody tr').forEach(tr => {
+    const descripcion = tr.querySelector('[data-field="descripcion"]').value.trim();
+    const cantidad = Math.max(0, parseInt(tr.querySelector('[data-field="cantidad"]').value) || 0);
+    if (!descripcion || cantidad <= 0) return;
+    servicios.otros.push({
+      descripcion,
+      cantidad,
+      precioUnitario: Math.max(0, parseFloat(tr.querySelector('[data-field="precio"]').value) || 0),
+      impuesto: tr.querySelector('[data-field="impuesto"]').value
+    });
+  });
+
   return {
     empresa: document.getElementById('qEmpresa').value.trim(),
     contacto: document.getElementById('qContacto').value.trim(),
@@ -688,7 +1038,12 @@ function collectFormData() {
     nit: document.getElementById('qNit').value.trim(),
     referencia: document.getElementById('qReferencia').value.trim(),
     validaHasta: document.getElementById('qValidaHasta').value,
+    checkin: document.getElementById('qCheckin').value,
+    checkout: document.getElementById('qCheckout').value,
+    numPersonas: numPersonas(),
+    comision: comisionPct(),
     items,
+    servicios,
     descuento: {
       tipo: document.querySelector('input[name="descTipo"]:checked').value,
       valor: parseFloat(document.getElementById('qDescValor').value) || 0
@@ -697,7 +1052,9 @@ function collectFormData() {
   };
 }
 
-/* ── Create quote ── */
+/* ── Create / save quote ── */
+let editingQuoteId = null; // null = creating, otherwise editing this id
+
 document.getElementById('createQuoteBtn').addEventListener('click', async function() {
   const errEl = document.getElementById('formError');
   errEl.style.display = 'none';
@@ -706,32 +1063,37 @@ document.getElementById('createQuoteBtn').addEventListener('click', async functi
   if (!data.empresa) { showToast('Ingresa el nombre de la empresa.'); return; }
   if (!data.email) { showToast('Ingresa el email del cliente.'); return; }
   if (!data.validaHasta) { showToast('Selecciona la fecha de vigencia.'); return; }
+  if (!data.checkin || !data.checkout) { showToast('Selecciona check-in y check-out.'); return; }
+  if (stayNights() <= 0) { showToast('El check-out debe ser posterior al check-in.'); return; }
   if (data.items.length === 0) { showToast('Agrega al menos un ítem.'); return; }
 
+  const isEdit = !!editingQuoteId;
   const btn = this;
   btn.disabled = true;
-  document.getElementById('createBtnText').textContent = 'Creando...';
+  document.getElementById('createBtnText').textContent = isEdit ? 'Guardando...' : 'Creando...';
   document.getElementById('createBtnArrow').style.display = 'none';
   document.getElementById('createSpinner').style.display = 'inline-block';
 
   try {
     const token = await window.getAuthToken();
+    const url = isEdit ? '/api/update-quote' : '/api/create-quote';
+    const payload = isEdit ? Object.assign({ quoteId: editingQuoteId }, data) : data;
 
-    const res = await fetch('/api/create-quote', {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify(data)
+      body: JSON.stringify(payload)
     });
 
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Error al crear cotización');
+    if (!res.ok) throw new Error(json.error || 'Error al guardar la cotización');
 
-    showSuccessPanel(json.quoteId, json.shareUrl, data.email);
+    showSuccessPanel(json.quoteId, json.shareUrl, data.email, isEdit);
   } catch (err) {
     errEl.textContent = err.message;
     errEl.style.display = 'block';
     btn.disabled = false;
-    document.getElementById('createBtnText').textContent = 'Crear cotización';
+    document.getElementById('createBtnText').textContent = editingQuoteId ? 'Guardar cambios' : 'Crear cotización';
     document.getElementById('createBtnArrow').style.display = 'inline';
     document.getElementById('createSpinner').style.display = 'none';
   }
@@ -739,19 +1101,20 @@ document.getElementById('createQuoteBtn').addEventListener('click', async functi
 
 let currentQuoteId = null;
 
-function showSuccessPanel(quoteId, shareUrl, clientEmail) {
+function showSuccessPanel(quoteId, shareUrl, clientEmail, isEdit) {
   currentQuoteId = quoteId;
   document.getElementById('successQuoteId').textContent = quoteId;
   document.getElementById('quoteUrlInput').value = shareUrl;
   document.getElementById('sendToEmail').value = clientEmail || '';
-  document.getElementById('viewQuoteLink').href = shareUrl;
+  document.getElementById('viewQuoteLink').href = shareUrl + (shareUrl.includes('?') ? '&' : '?') + 'preview=1';
   document.getElementById('emailStatus').style.display = 'none';
+  document.querySelector('#successPanel .eyebrow').textContent = isEdit ? 'Cotización actualizada correctamente' : 'Cotización creada correctamente';
 
   document.getElementById('successPanel').style.display = 'block';
   document.getElementById('createQuoteBtn').style.display = 'none';
 
   document.getElementById('successPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  showToast('Cotización creada con éxito ✓', 3000);
+  showToast(isEdit ? 'Cambios guardados ✓' : 'Cotización creada con éxito ✓', 3000);
 }
 
 /* ── Copy link ── */
@@ -813,36 +1176,273 @@ document.getElementById('sendEmailBtn').addEventListener('click', async function
   }
 });
 
-/* ── New quote ── */
-document.getElementById('newQuoteBtn').addEventListener('click', function() {
+function defaultValidity() {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  return d.toISOString().split('T')[0];
+}
+
+/* ── Reset the form to a clean "create" state ── */
+function resetForm() {
+  editingQuoteId = null;
   currentQuoteId = null;
+  document.getElementById('pageTitle').textContent = 'Nueva cotización';
+  document.getElementById('editBanner').style.display = 'none';
   document.getElementById('successPanel').style.display = 'none';
-  document.getElementById('createQuoteBtn').style.display = 'flex';
-  document.getElementById('createQuoteBtn').disabled = false;
+  const btn = document.getElementById('createQuoteBtn');
+  btn.style.display = 'flex';
+  btn.disabled = false;
   document.getElementById('createBtnText').textContent = 'Crear cotización';
   document.getElementById('createBtnArrow').style.display = 'inline';
   document.getElementById('createSpinner').style.display = 'none';
   document.getElementById('formError').style.display = 'none';
 
-  // Reset form fields
-  ['qEmpresa','qContacto','qEmail','qTelefono','qNit','qReferencia','qReferencia','qCondiciones'].forEach(id => {
+  ['qEmpresa','qContacto','qEmail','qTelefono','qNit','qReferencia','qCondiciones'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
   document.getElementById('qDescValor').value = '0';
   document.querySelector('input[name="descTipo"][value="porcentaje"]').checked = true;
+  document.getElementById('qValidaHasta').value = defaultValidity();
+  document.getElementById('qCheckin').value = '';
+  document.getElementById('qCheckout').value = '';
+  document.getElementById('qPersonas').value = '1';
+  document.getElementById('qComision').value = '0';
   initItemsTable();
+  initServicesTable();
+  updateNightsLabel();
+  updateTotals();
+}
+
+document.getElementById('newQuoteBtn').addEventListener('click', function() {
+  resetForm();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-/* ── Set default validity date (30 days from today) ── */
-(function setDefaultDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + 30);
-  document.getElementById('qValidaHasta').value = d.toISOString().split('T')[0];
-})();
+document.getElementById('cancelEditBtn').addEventListener('click', function() {
+  resetForm();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
 
+/* ════════════════ Tabs ════════════════ */
+function switchView(view) {
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.toggle('is-active', t.dataset.view === view));
+  document.getElementById('viewNueva').style.display = view === 'nueva' ? 'block' : 'none';
+  document.getElementById('viewLista').style.display = view === 'lista' ? 'block' : 'none';
+  if (view === 'lista') loadQuotesList();
+}
+document.querySelectorAll('.admin-tab').forEach(t => {
+  t.addEventListener('click', () => switchView(t.dataset.view));
+});
+
+/* ════════════════ Quote list ════════════════ */
+const STATUS_LABEL = { activa: 'Activa', vista: 'Vista', aceptada: 'Aceptada', cancelada: 'Cancelada', vencida: 'Vencida' };
+let LIST_CACHE = [];
+
+function computeQuoteTotal(q) {
+  const subtotalItems = (q.items || []).reduce((s, it) => s + (it.subtotal || 0), 0);
+  const sv = q.servicios || {};
+  let baseIva = 0, baseInc = 0, baseNone = 0;
+  ['parqueadero', 'personaAdicional'].forEach(k => { const s = sv[k]; if (s) baseIva += (s.cantidad || 0) * (s.precioUnitario || 0); });
+  ['desayuno', 'almuerzo', 'cena'].forEach(k => { const s = sv[k]; if (s) baseInc += (s.cantidad || 0) * (s.precioUnitario || 0); });
+  (sv.otros || []).forEach(o => {
+    const sub = (o.cantidad || 0) * (o.precioUnitario || 0);
+    if (o.impuesto === 'iva') baseIva += sub; else if (o.impuesto === 'inc') baseInc += sub; else baseNone += sub;
+  });
+  const subtotal = subtotalItems + baseIva + baseInc + baseNone;
+  let desc = 0;
+  if (q.descuento && q.descuento.valor > 0) desc = q.descuento.tipo === 'porcentaje' ? subtotal * (q.descuento.valor / 100) : q.descuento.valor;
+  desc = Math.min(desc, subtotal);
+  const ivaRate = (q.impuestos && q.impuestos.ivaRate) || 0.19;
+  const incRate = (q.impuestos && q.impuestos.incRate) || 0.08;
+  const factor = subtotal > 0 ? (subtotal - desc) / subtotal : 0;
+  const iva = (subtotalItems + baseIva) * factor * ivaRate;
+  const inc = baseInc * factor * incRate;
+  return (subtotal - desc) + iva + inc;
+}
+
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function fmtShortDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  return d.getUTCDate() + '/' + (d.getUTCMonth() + 1) + '/' + String(d.getUTCFullYear()).slice(2);
+}
+
+async function loadQuotesList() {
+  const setBlock = (id, on) => { document.getElementById(id).style.display = on ? '' : 'none'; };
+  setBlock('listLoading', true); setBlock('listEmpty', false); setBlock('listError', false); setBlock('listTableWrap', false);
+  try {
+    const token = await window.getAuthToken();
+    const res = await fetch('/api/list-quotes', { headers: { 'Authorization': `Bearer ${token}` } });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Error al cargar');
+    LIST_CACHE = json.quotes || [];
+    setBlock('listLoading', false);
+    renderQuotesList();
+  } catch (err) {
+    setBlock('listLoading', false);
+    const el = document.getElementById('listError');
+    el.textContent = '✗ ' + err.message;
+    el.style.display = '';
+  }
+}
+
+function renderQuotesList() {
+  const term = (document.getElementById('listSearch').value || '').toLowerCase().trim();
+  const rows = LIST_CACHE.filter(q =>
+    !term || (q.empresa || '').toLowerCase().includes(term) || (q.quoteId || '').toLowerCase().includes(term)
+  );
+  const wrap = document.getElementById('listTableWrap');
+  const empty = document.getElementById('listEmpty');
+  if (!rows.length) { wrap.style.display = 'none'; empty.style.display = ''; return; }
+  empty.style.display = 'none'; wrap.style.display = '';
+
+  document.getElementById('listBody').innerHTML = rows.map(q => {
+    const st = q.statusEfectivo || 'activa';
+    const stay = (q.checkin && q.checkout) ? `${fmtShortDate(q.checkin)} → ${fmtShortDate(q.checkout)}` : '—';
+    const canCancel = st !== 'cancelada';
+    const canReactivate = q.status === 'cancelada';
+    return `
+      <tr data-id="${escHtml(q.quoteId)}">
+        <td class="lista-id">${escHtml(q.quoteId)}</td>
+        <td>${escHtml(q.empresa)}</td>
+        <td style="white-space:nowrap">${stay}</td>
+        <td class="lista-total">${formatCOP(computeQuoteTotal(q))}</td>
+        <td><span class="badge badge-${st}">${STATUS_LABEL[st] || st}</span></td>
+        <td style="text-align:center">${q.views || 0}</td>
+        <td>
+          <div class="lista-actions">
+            <button data-act="view">Ver</button>
+            <button data-act="copy">Enlace</button>
+            <button data-act="edit">Editar</button>
+            ${canReactivate ? '<button data-act="reactivate">Reactivar</button>' : ''}
+            ${canCancel ? '<button data-act="cancel" class="danger">Cancelar</button>' : ''}
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+document.getElementById('listSearch').addEventListener('input', renderQuotesList);
+document.getElementById('refreshListBtn').addEventListener('click', loadQuotesList);
+
+function quoteShareUrl(id) {
+  return window.location.origin + '/cotizacion.html?id=' + id;
+}
+
+document.getElementById('listBody').addEventListener('click', async function(e) {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const tr = btn.closest('tr');
+  const id = tr.dataset.id;
+  const act = btn.dataset.act;
+  const quote = LIST_CACHE.find(q => q.quoteId === id);
+  if (!quote) return;
+
+  if (act === 'view') {
+    window.open(quoteShareUrl(id) + '&preview=1', '_blank');
+  } else if (act === 'copy') {
+    navigator.clipboard.writeText(quoteShareUrl(id))
+      .then(() => showToast('Enlace copiado ✓'))
+      .catch(() => showToast('No se pudo copiar.'));
+  } else if (act === 'edit') {
+    loadQuoteIntoForm(quote);
+  } else if (act === 'cancel') {
+    if (!confirm('¿Cancelar la cotización ' + id + '? El cliente ya no podrá verla.')) return;
+    await quoteStatusAction(id, 'cancel');
+  } else if (act === 'reactivate') {
+    await quoteStatusAction(id, 'reactivate');
+  }
+});
+
+async function quoteStatusAction(id, action) {
+  try {
+    const token = await window.getAuthToken();
+    const res = await fetch('/api/update-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ quoteId: id, action })
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Error');
+    showToast(action === 'cancel' ? 'Cotización cancelada ✓' : 'Cotización reactivada ✓');
+    loadQuotesList();
+  } catch (err) {
+    showToast('✗ ' + err.message);
+  }
+}
+
+/* ════════════════ Load a quote into the form for editing ════════════════ */
+function loadQuoteIntoForm(q) {
+  resetForm();
+  editingQuoteId = q.quoteId;
+  document.getElementById('pageTitle').textContent = 'Editar cotización';
+  document.getElementById('editBannerId').textContent = q.quoteId;
+  document.getElementById('editBanner').style.display = 'flex';
+  document.getElementById('createBtnText').textContent = 'Guardar cambios';
+
+  document.getElementById('qEmpresa').value = q.empresa || '';
+  document.getElementById('qContacto').value = q.contacto || '';
+  document.getElementById('qEmail').value = q.email || '';
+  document.getElementById('qTelefono').value = q.telefono || '';
+  document.getElementById('qNit').value = q.nit || '';
+  document.getElementById('qReferencia').value = q.referencia || '';
+  document.getElementById('qCondiciones').value = q.condiciones || '';
+  document.getElementById('qValidaHasta').value = q.expiresAt ? q.expiresAt.split('T')[0] : defaultValidity();
+  document.getElementById('qCheckin').value = q.checkin || '';
+  document.getElementById('qCheckout').value = q.checkout || '';
+  document.getElementById('qPersonas').value = q.numPersonas || 1;
+  document.getElementById('qComision').value = q.comision || 0;
+  document.getElementById('qDescValor').value = (q.descuento && q.descuento.valor) || 0;
+  const descTipo = (q.descuento && q.descuento.tipo) === 'fijo' ? 'fijo' : 'porcentaje';
+  document.querySelector(`input[name="descTipo"][value="${descTipo}"]`).checked = true;
+
+  /* Rooms — use base rate (tarifaBase) so commission stays separate */
+  const tbody = document.getElementById('itemsBody');
+  tbody.innerHTML = '';
+  rowIdCounter = 0;
+  (q.items || []).forEach(it => {
+    tbody.appendChild(createRow({ habitacion: it.habitacion, unidades: it.unidades, tarifa: it.tarifaBase != null ? it.tarifaBase : it.tarifaPorNoche }));
+  });
+  if (!(q.items || []).length) tbody.appendChild(createRow());
+
+  /* Services */
+  const sv = q.servicios || {};
+  document.querySelectorAll('#serviciosBody tr').forEach(tr => {
+    const s = sv[tr.dataset.svcKey];
+    if (s) {
+      tr.querySelector('[data-field="cantidad"]').value = s.cantidad || 0;
+      tr.querySelector('[data-field="cantidad"]').dataset.touched = '1';
+      tr.querySelector('[data-field="precio"]').value = s.precioUnitario || 0;
+    }
+  });
+  const otrosBody = document.getElementById('otrosBody');
+  otrosBody.innerHTML = '';
+  (sv.otros || []).forEach(o => {
+    const row = createOtroRow();
+    otrosBody.appendChild(row);
+    row.querySelector('[data-field="descripcion"]').value = o.descripcion || '';
+    row.querySelector('[data-field="cantidad"]').value = o.cantidad || 0;
+    row.querySelector('[data-field="precio"]').value = o.precioUnitario || 0;
+    row.querySelector('[data-field="impuesto"]').value = o.impuesto || 'ninguno';
+  });
+
+  updateNightsLabel();
+  updateTotals();
+  switchView('nueva');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ── Init ── */
+document.getElementById('qValidaHasta').value = defaultValidity();
 initItemsTable();
+initServicesTable();
+updateNightsLabel();
+updateTotals();
 
 </script>
 
