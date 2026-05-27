@@ -118,7 +118,7 @@ function copyFileSync(from, to) {
 console.log('Copying static assets...');
 
 // Copy specific folders
-const foldersToCopy = ['assets', 'fonts', 'uploads', 'en'];
+const foldersToCopy = ['assets', 'fonts', 'uploads', 'en', 'netlify/email-templates'];
 foldersToCopy.forEach(folder => {
   const src = path.join(rootDir, folder);
   const dest = path.join(distDir, folder);
