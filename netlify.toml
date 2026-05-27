@@ -6,6 +6,7 @@
 [functions]
   included_files = ["rooms_db.json"]
   node_bundler = "esbuild"
+  external_node_modules = ["@netlify/blobs"]
 
 # Configuration for Netlify deployment and serverless redirects
 [[redirects]]

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getStore } = require('@netlify/blobs');
 
 function loadEnv() {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
@@ -27,12 +28,21 @@ function generateQuoteId() {
 }
 
 exports.handler = async (event, context) => {
-  const allowedOrigin = process.env.ALLOWED_ORIGIN;
   const corsHeaders = {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
   };
+  try {
+    return await handleRequest(event, context, corsHeaders);
+  } catch (err) {
+    console.error('[create-quote] Unhandled error:', err);
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error interno: ' + (err.message || String(err)) }) };
+  }
+};
+
+async function handleRequest(event, context, corsHeaders) {
+  const allowedOrigin = process.env.ALLOWED_ORIGIN;
   if (allowedOrigin) corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
@@ -93,12 +103,11 @@ exports.handler = async (event, context) => {
   };
 
   try {
-    const { getStore } = require('@netlify/blobs');
     const store = getStore('quotes');
     await store.setJSON(quoteId, quoteData);
   } catch (err) {
-    console.error('[create-quote] Blobs error:', err.message);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error al guardar la cotización' }) };
+    console.error('[create-quote] Blobs error:', err.message, err.stack);
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error al guardar la cotización: ' + err.message }) };
   }
 
   const base = (process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');

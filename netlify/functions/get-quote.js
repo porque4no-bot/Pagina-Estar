@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getStore } = require('@netlify/blobs');
 
 function loadEnv() {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
@@ -37,7 +38,6 @@ exports.handler = async (event, context) => {
 
   let quoteData;
   try {
-    const { getStore } = require('@netlify/blobs');
     const store = getStore('quotes');
     quoteData = await store.get(quoteId, { type: 'json' });
   } catch (err) {
