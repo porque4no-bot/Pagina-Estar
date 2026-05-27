@@ -20,43 +20,43 @@ loadEnv();
 
 exports.handler = async (event, context) => {
   const corsHeaders = {
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Content-Type': 'application/json'
   };
 
+  const allowedOrigin = process.env.ALLOWED_ORIGIN;
+  if (allowedOrigin) corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
+
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
-  if (event.httpMethod !== 'GET') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-  const quoteId = event.queryStringParameters && event.queryStringParameters.id;
-  if (!quoteId) return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Falta el parámetro id' }) };
+  const params = event.queryStringParameters || {};
+  const encoded = params.d;
 
-  if (!/^COT-\d{4}-[A-Z0-9]{5}$/.test(quoteId)) {
-    return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización no encontrada' }) };
+  if (!encoded) {
+    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Parámetro d requerido' }) };
   }
 
   let quoteData;
   try {
-    const { getStore } = require('@netlify/blobs');
-    const store = getStore('quotes');
-    quoteData = await store.get(quoteId, { type: 'json' });
-  } catch (err) {
-    console.error('[get-quote] Blobs error:', err.message);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error al obtener la cotización' }) };
+    quoteData = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+  } catch (e) {
+    return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización no encontrada', expired: false }) };
   }
 
-  if (!quoteData) {
-    return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización no encontrada' }) };
+  if (!quoteData || !quoteData.quoteId) {
+    return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización no encontrada', expired: false }) };
   }
 
-  if (quoteData.expiresAt && new Date(quoteData.expiresAt) < new Date()) {
-    return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Esta cotización ha vencido', expired: true }) };
+  /* Check expiry */
+  if (quoteData.expiresAt) {
+    const expires = new Date(quoteData.expiresAt);
+    if (!isNaN(expires.getTime()) && expires < new Date()) {
+      return { statusCode: 410, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización vencida', expired: true }) };
+    }
   }
 
+  /* Strip internal field before returning */
   const { createdBy, ...publicData } = quoteData;
-  return {
-    statusCode: 200,
-    headers: { ...corsHeaders, 'Cache-Control': 'no-store' },
-    body: JSON.stringify(publicData)
-  };
+  return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(publicData) };
 };
