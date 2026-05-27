@@ -29,7 +29,7 @@
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' https://unpkg.com https://checkout.wompi.co https://www.googletagmanager.com https://identity.netlify.com; style-src 'self' 'unsafe-inline'; img-src 'self' https:; font-src 'self'; connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identity.netlify.com; frame-src https://checkout.wompi.co https://app.netlify.com https://identity.netlify.com"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://unpkg.com https://checkout.wompi.co https://www.googletagmanager.com https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' https:; font-src 'self'; connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://estar-4d0da.firebaseapp.com; frame-src https://checkout.wompi.co https://estar-4d0da.firebaseapp.com https://accounts.google.com https://apis.google.com"
 
 [[headers]]
   for = "/api/*"
