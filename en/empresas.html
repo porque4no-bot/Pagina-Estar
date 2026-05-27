@@ -136,6 +136,78 @@
   </div>
 </section>
 
+<!-- ============================== REQUEST QUOTE ============================== -->
+<section class="section quote-request-section" id="cotizar">
+  <div class="container">
+
+    <div class="section-head" data-reveal>
+      <div>
+        <p class="eyebrow terracotta">B2B Quotations</p>
+        <h2 class="display-l">Need a <span class="serif-italic">tailored quote?</span></h2>
+      </div>
+      <p class="lead">Tell us your dates, number of rooms and type of stay. Receive a personalized quote within 24 business hours.</p>
+    </div>
+
+    <div class="quote-request-card" data-reveal>
+      <div class="quote-request-info">
+        <p class="eyebrow on-dark">How it works</p>
+        <h3>Quote in 24 hours.</h3>
+        <p class="body on-dark">No prior meetings. Fill out the form and our team prepares a formal quote with B2B rates, payment terms and availability.</p>
+        <div class="quote-request-steps">
+          <div class="quote-request-step"><span class="n">01</span><div><h4>Fill out the form</h4><p>Tentative dates, rooms and type of stay.</p></div></div>
+          <div class="quote-request-step"><span class="n">02</span><div><h4>Receive the quote</h4><p>By email within 24 business hours.</p></div></div>
+          <div class="quote-request-step"><span class="n">03</span><div><h4>Confirm and book</h4><p>Accept the quote and activate the agreement.</p></div></div>
+        </div>
+      </div>
+
+      <div class="quote-request-form-wrap">
+        <form id="requestQuoteForm">
+          <input type="text" name="website" id="rqWebsite" style="display:none" tabindex="-1" autocomplete="off">
+          <div class="field-row">
+            <div class="field"><label for="rqEmpresa">Company</label><input id="rqEmpresa" type="text" name="empresa" placeholder="e.g. Hospital de Caldas" required></div>
+            <div class="field"><label for="rqContacto">Contact name</label><input id="rqContacto" type="text" name="contacto" placeholder="Maria Restrepo" required></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="rqEmail">Corporate email</label><input id="rqEmail" type="email" name="email" placeholder="m.restrepo@company.co" required></div>
+            <div class="field"><label for="rqWhatsapp">WhatsApp</label><input id="rqWhatsapp" type="tel" name="whatsapp" placeholder="+57 300 000 0000"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="rqCheckin">Tentative check-in</label><input id="rqCheckin" type="date" name="fechaCheckin"></div>
+            <div class="field"><label for="rqCheckout">Tentative check-out</label><input id="rqCheckout" type="date" name="fechaCheckout"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label for="rqNumHab">Number of rooms</label><input id="rqNumHab" type="number" name="numHabitaciones" min="1" value="1"></div>
+            <div class="field">
+              <label for="rqTipo">Type of stay</label>
+              <select id="rqTipo" name="tipoEstadia">
+                <option value="corta">Short (1–29 days)</option>
+                <option value="larga">Long (+30 days)</option>
+                <option value="rotativa">Rotating</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="rqComentarios">Additional comments</label>
+            <textarea id="rqComentarios" name="comentarios" rows="3" placeholder="e.g. Rotating medical residents, invoice to the company name..."></textarea>
+          </div>
+          <p id="rqError" style="color:var(--error-700);font-size:13px;font-family:var(--font-label);display:none;margin:0 0 12px;"></p>
+          <button type="submit" id="rqSubmitBtn" class="btn btn-ink" style="width:100%;justify-content:center;">
+            <span id="rqBtnText">Request quote</span>
+            <span id="rqSpinner" class="spinner" style="display:none;border-top-color:var(--paper);"></span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </form>
+        <div class="quote-request-success" id="requestQuoteSuccess">
+          <div class="success-icon">✓</div>
+          <h4>Request received!</h4>
+          <p>We'll contact you within 24 business hours with your personalized quote.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
 <!-- ============================== CONTACT FORM ============================== -->
 <section class="section" id="contacto" style="background: var(--paper-200);">
   <div class="container">
@@ -277,6 +349,53 @@
 <script src="../shell.js?v=2" defer></script>
 <script src="../kunas.js" defer></script>
 <script>document.addEventListener('DOMContentLoaded',function(){lucide.createIcons();});</script>
+
+  <script>
+  (function() {
+    var form = document.getElementById('requestQuoteForm');
+    if (!form) return;
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      if (document.getElementById('rqWebsite').value) return;
+      var btn = document.getElementById('rqSubmitBtn');
+      var spinner = document.getElementById('rqSpinner');
+      var btnText = document.getElementById('rqBtnText');
+      var errEl = document.getElementById('rqError');
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      spinner.style.display = 'inline-block';
+      btnText.textContent = 'Sending...';
+      var data = {
+        empresa: document.getElementById('rqEmpresa').value.trim(),
+        contacto: document.getElementById('rqContacto').value.trim(),
+        email: document.getElementById('rqEmail').value.trim(),
+        whatsapp: document.getElementById('rqWhatsapp').value.trim(),
+        fechaCheckin: document.getElementById('rqCheckin').value,
+        fechaCheckout: document.getElementById('rqCheckout').value,
+        numHabitaciones: document.getElementById('rqNumHab').value,
+        tipoEstadia: document.getElementById('rqTipo').value,
+        comentarios: document.getElementById('rqComentarios').value.trim(),
+        website: ''
+      };
+      try {
+        var res = await fetch('/api/request-quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error('Error');
+        form.style.display = 'none';
+        document.getElementById('requestQuoteSuccess').style.display = 'block';
+      } catch (err) {
+        btn.disabled = false;
+        spinner.style.display = 'none';
+        btnText.textContent = 'Request quote';
+        errEl.textContent = 'An error occurred. Please try again or contact us via WhatsApp.';
+        errEl.style.display = 'block';
+      }
+    });
+  })();
+  </script>
 
   <!-- Floating Contact Bubble -->
   <div class="contact-float" id="contactFloat">

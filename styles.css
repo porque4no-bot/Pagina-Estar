@@ -5574,3 +5574,491 @@ body[data-atmosphere="crepusculo"] .room-info .room-price { border-top-color: va
   .comparador-table tbody th { font-size: 9px; }
   .ct-price { font-size: 14px; }
 }
+
+/* ============================================================
+   Utilities (shared)
+   ============================================================ */
+
+.text-center { text-align: center !important; }
+.text-right  { text-align: right  !important; }
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(250,246,239,0.3);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   Quote Document — cotizacion.html
+   ============================================================ */
+
+.quote-page {
+  padding: 80px 0 120px;
+  min-height: 60vh;
+}
+@media (max-width: 768px) { .quote-page { padding: 56px 0 80px; } }
+
+/* Loading / error states */
+.quote-state-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  text-align: center;
+  padding: 48px 24px;
+  gap: 16px;
+}
+.quote-state-block svg { animation: spin 1.5s linear infinite; color: var(--terracotta-300); }
+.quote-state-block h2 {
+  font-family: var(--font-heading);
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0;
+}
+.quote-state-block p {
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--ink-500);
+  line-height: 1.65;
+  max-width: 44ch;
+  margin: 0;
+}
+#quoteError svg { animation: none; color: var(--ink-300); }
+
+/* Document card */
+.quote-doc {
+  max-width: 860px;
+  margin: 0 auto;
+  background: var(--white);
+  border: 1px solid var(--paper-400);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.quote-doc-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 40px 48px 32px;
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) { .quote-doc-top { padding: 28px 24px 24px; } }
+
+.quote-doc-brand { display: flex; align-items: center; gap: 16px; }
+
+.brand-stack-doc {
+  width: 32px;
+  height: 32px;
+  background: url("assets/icon-star-charcoal.png") center/contain no-repeat;
+  flex-shrink: 0;
+}
+
+.quote-brand-name {
+  font-family: var(--font-heading);
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0;
+}
+.quote-brand-sub {
+  font-family: var(--font-label);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  margin: 2px 0 0;
+}
+.quote-brand-info { display: flex; flex-direction: column; }
+
+.quote-doc-ref { text-align: right; }
+.quote-id-display {
+  font-family: var(--font-heading);
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  margin: 6px 0 0;
+}
+
+.quote-divider { border: none; border-top: 1px solid var(--paper-400); margin: 0; }
+
+/* Client + meta grid */
+.quote-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding: 32px 48px;
+}
+@media (max-width: 600px) { .quote-info-grid { grid-template-columns: 1fr; padding: 24px; } }
+
+.quote-info-label {
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--ink-500);
+  margin: 0 0 10px;
+}
+.quote-info-empresa {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+.quote-info-line {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink-700);
+  margin: 2px 0;
+}
+
+.quote-meta-dl { margin: 0; }
+.quote-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--paper-400);
+}
+.quote-meta-row:last-child { border-bottom: none; }
+.quote-meta-row dt {
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-500);
+  flex-shrink: 0;
+}
+.quote-meta-row dd {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink);
+  margin: 0;
+  text-align: right;
+}
+
+/* Items table */
+.quote-table-wrap {
+  padding: 0 48px 8px;
+  overflow-x: auto;
+}
+@media (max-width: 600px) { .quote-table-wrap { padding: 0 16px 8px; } }
+
+.quote-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 480px;
+}
+.quote-table thead th {
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-500);
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 2px solid var(--paper-400);
+}
+.quote-table tbody td {
+  padding: 12px;
+  border-bottom: 1px solid var(--paper-400);
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+}
+.quote-table tbody tr:last-child td { border-bottom: none; }
+.quote-table tbody tr.qt-even td { background: var(--paper); }
+.qt-room { font-weight: 700; }
+.qt-num { font-family: var(--font-label); font-size: 13px; color: var(--ink-700); }
+.qt-subtotal { font-weight: 700; }
+
+/* Totals */
+.quote-totals {
+  padding: 20px 48px 28px;
+  display: flex;
+  justify-content: flex-end;
+}
+@media (max-width: 600px) { .quote-totals { padding: 16px 24px 24px; } }
+.quote-totals-inner { width: 100%; max-width: 320px; }
+
+.quote-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--paper-400);
+}
+.quote-total-row:last-of-type { border-bottom: none; }
+.quote-total-row span:first-child {
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-500);
+}
+.quote-total-row span:last-child {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.quote-total-final span:first-child { color: var(--ink); font-size: 12px; }
+.quote-total-final span:last-child { font-size: 26px; color: var(--terracotta); }
+
+.quote-total-note {
+  font-family: var(--font-label);
+  font-size: 10px;
+  color: var(--ink-300);
+  letter-spacing: 0.08em;
+  margin: 10px 0 0;
+  text-align: right;
+}
+
+/* Conditions */
+.quote-conditions-text {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink-700);
+  line-height: 1.7;
+  padding: 16px 48px 28px;
+  margin: 0;
+}
+@media (max-width: 600px) { .quote-conditions-text { padding: 12px 24px 20px; } }
+
+/* Policies */
+.quote-policies { padding: 24px 48px 28px; }
+@media (max-width: 600px) { .quote-policies { padding: 20px 24px; } }
+.quote-policies-list {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink-700);
+  line-height: 1.7;
+  padding-left: 18px;
+  margin: 8px 0 0;
+}
+.quote-policies-list li { margin-bottom: 4px; }
+
+/* Hotel footer */
+.quote-hotel-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 20px 48px;
+  background: var(--paper);
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) { .quote-hotel-footer { padding: 16px 24px; } }
+.quote-hotel-name {
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+.quote-hotel-addr {
+  font-family: var(--font-label);
+  font-size: 11px;
+  color: var(--ink-500);
+  margin: 0;
+  letter-spacing: 0.06em;
+}
+.quote-hotel-contacts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+.quote-hotel-contact-link {
+  font-family: var(--font-label);
+  font-size: 11px;
+  color: var(--ink-500);
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid transparent;
+  transition: color var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
+}
+.quote-hotel-contact-link:hover { color: var(--terracotta); border-bottom-color: currentColor; }
+.quote-rnt {
+  font-family: var(--font-label);
+  font-size: 10px;
+  color: var(--ink-300);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* CTAs */
+.quote-ctas {
+  padding: 24px 48px 36px;
+  border-top: 1px solid var(--paper-400);
+}
+@media (max-width: 600px) { .quote-ctas { padding: 20px 24px 28px; } }
+.quote-ctas-inner {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) {
+  .quote-ctas-inner { flex-direction: column; }
+  .quote-ctas-inner .btn { justify-content: center; }
+}
+
+/* ============================================================
+   Quote Request Section — empresas.html
+   ============================================================ */
+
+.quote-request-section { background: var(--paper); }
+
+.quote-request-card {
+  background: var(--ink);
+  border-radius: 8px;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 1024px) { .quote-request-card { grid-template-columns: 1fr 1.5fr; } }
+
+.quote-request-info {
+  padding: 52px 44px;
+  background: var(--ink);
+}
+@media (max-width: 600px) { .quote-request-info { padding: 36px 28px; } }
+.quote-request-info h3 {
+  font-family: var(--font-heading);
+  font-size: clamp(22px, 3vw, 32px);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+  margin: 8px 0 16px;
+  line-height: 1;
+}
+.quote-request-info .body { color: rgba(250,246,239,0.8); max-width: 40ch; }
+
+.quote-request-steps { margin-top: 28px; }
+.quote-request-step {
+  display: flex;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(250,246,239,0.1);
+  margin-bottom: 14px;
+}
+.quote-request-step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.quote-request-step .n {
+  font-family: var(--font-heading);
+  font-weight: 900;
+  font-size: 18px;
+  color: var(--terracotta-300);
+  flex-shrink: 0;
+  width: 26px;
+  line-height: 1.2;
+}
+.quote-request-step h4 {
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--paper);
+  margin: 0 0 4px;
+}
+.quote-request-step p {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: rgba(250,246,239,0.65);
+  margin: 0;
+  line-height: 1.55;
+}
+
+.quote-request-form-wrap {
+  padding: 52px 44px;
+  background: var(--paper-200);
+}
+@media (max-width: 600px) { .quote-request-form-wrap { padding: 36px 28px; } }
+#requestQuoteForm .field input,
+#requestQuoteForm .field select,
+#requestQuoteForm .field textarea { background: var(--paper); }
+
+.quote-request-success {
+  display: none;
+  text-align: center;
+  padding: 48px 24px;
+}
+.quote-request-success .success-icon {
+  font-size: 40px;
+  line-height: 1;
+  margin-bottom: 16px;
+  color: var(--success);
+}
+.quote-request-success h4 {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0 0 12px;
+}
+.quote-request-success p {
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--ink-700);
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* ============================================================
+   Print styles
+   ============================================================ */
+
+@media print {
+  .site-header,
+  .site-footer,
+  .contact-float,
+  .no-print { display: none !important; }
+
+  body { background: white; color: black; }
+
+  .quote-page { padding: 0; }
+  .container { max-width: 100%; padding: 0; }
+
+  .quote-doc {
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
+    max-width: 100%;
+  }
+
+  .quote-doc-top { padding: 20px 24px 16px; }
+  .quote-info-grid { padding: 16px 24px; }
+  .quote-table-wrap { padding: 0 24px 4px; }
+  .quote-totals { padding: 12px 24px 20px; }
+  .quote-policies { padding: 12px 24px 20px; }
+  .quote-hotel-footer { padding: 12px 24px; }
+  .quote-conditions-text { padding: 8px 24px 16px; }
+  .quote-total-final span:last-child { font-size: 22px; }
+  a[href]::after { content: none !important; }
+}

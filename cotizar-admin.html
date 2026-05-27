@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal de Cotizaciones — Hotel Estar</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="stylesheet" href="colors_and_type.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
+<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+<style>
+/* ── Admin page chrome ── */
+.admin-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--ink);
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(250,246,239,0.1);
+}
+.admin-header .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.admin-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.admin-logo-row img { height: 24px; width: auto; filter: brightness(0) invert(1); }
+.admin-badge {
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--terracotta-300);
+  padding: 3px 8px;
+  border: 1px solid var(--terracotta-700);
+  border-radius: 4px;
+}
+.admin-user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+#userEmailDisplay {
+  font-family: var(--font-label);
+  font-size: 11px;
+  color: var(--ink-300);
+  letter-spacing: 0.08em;
+}
+
+/* ── Auth overlay ── */
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--paper);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.auth-card {
+  background: var(--white);
+  border: 1px solid var(--paper-400);
+  border-radius: 12px;
+  padding: 56px 48px;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+.auth-card img { height: 32px; width: auto; margin: 0 auto 28px; display: block; }
+.auth-card h2 {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  margin: 0 0 12px;
+}
+.auth-card p {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink-500);
+  line-height: 1.65;
+  margin: 0 0 32px;
+}
+
+/* ── Admin main layout ── */
+.admin-main { padding: 56px 0 96px; }
+.admin-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 48px;
+  flex-wrap: wrap;
+}
+.admin-page-header h1 {
+  font-family: var(--font-heading);
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 8px 0 0;
+}
+
+/* ── Admin form card ── */
+.admin-card {
+  background: var(--paper-200);
+  border-radius: 8px;
+  padding: 36px 40px;
+  margin-bottom: 24px;
+}
+@media (max-width: 600px) {
+  .admin-card { padding: 24px 20px; }
+}
+.admin-card-title {
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--terracotta-700);
+  margin: 0 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.admin-card-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--paper-400);
+}
+
+/* ── Items table ── */
+.items-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+.items-table th {
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink-500);
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 2px solid var(--paper-400);
+}
+.items-table td {
+  padding: 10px 10px 10px 12px;
+  border-bottom: 1px solid var(--paper-400);
+  vertical-align: middle;
+}
+.items-table tbody tr:last-child td { border-bottom: none; }
+.it-select, .it-input {
+  background: var(--paper);
+  border: 1px solid var(--paper-400);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+  width: 100%;
+  transition: border-color var(--dur-base) var(--ease-out);
+}
+.it-input { min-width: 64px; }
+.it-select { min-width: 130px; }
+.it-select:focus, .it-input:focus { border-color: var(--ink); }
+.it-subtotal {
+  font-family: var(--font-label);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  min-width: 110px;
+}
+.it-remove {
+  background: none;
+  border: 1px solid var(--paper-400);
+  border-radius: 4px;
+  color: var(--ink-500);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 8px;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.it-remove:hover { background: var(--error); color: var(--error-700); border-color: var(--error-700); }
+
+/* ── Discount toggle ── */
+.desc-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.desc-radio-group {
+  display: flex;
+  gap: 16px;
+}
+.desc-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-700);
+  cursor: pointer;
+}
+.desc-input-wrap { flex: 1; min-width: 140px; max-width: 200px; }
+
+/* ── Total summary ── */
+.total-card {
+  background: var(--ink);
+  border-radius: 8px;
+  padding: 28px 32px;
+  margin-bottom: 24px;
+}
+.total-card-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(250,246,239,0.1);
+}
+.total-card-line:last-of-type { border-bottom: none; }
+.total-card-line span:first-child {
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink-300);
+}
+.total-card-line span:last-child {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--paper);
+}
+.total-card-line.is-total span:first-child { color: var(--paper); font-size: 12px; }
+.total-card-line.is-total span:last-child { font-size: 28px; color: var(--terracotta-300); }
+
+.total-actions { margin-top: 24px; display: flex; flex-direction: column; gap: 12px; }
+
+/* ── Success panel ── */
+.success-panel {
+  background: var(--paper-200);
+  border: 2px solid var(--success);
+  border-radius: 8px;
+  padding: 36px 40px;
+  margin-bottom: 24px;
+}
+@media (max-width: 600px) {
+  .success-panel { padding: 24px 20px; }
+}
+.success-panel h3 {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  margin: 8px 0 20px;
+}
+.url-display {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.url-input {
+  flex: 1;
+  background: var(--white);
+  border: 1px solid var(--paper-400);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: var(--font-label);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+  min-width: 200px;
+}
+.send-email-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.send-email-input {
+  flex: 1;
+  background: var(--white);
+  border: 1px solid var(--paper-400);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  min-width: 200px;
+  outline: none;
+  transition: border-color var(--dur-base) var(--ease-out);
+}
+.send-email-input:focus { border-color: var(--ink); }
+.success-btn-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 12px 24px;
+  border-radius: 100px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+  z-index: 300;
+  white-space: nowrap;
+}
+.toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Spinner ── */
+.spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(250,246,239,0.3);
+  border-top-color: var(--paper);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<header class="admin-header">
+  <div class="container">
+    <div class="admin-logo-row">
+      <img src="assets/logo.png" alt="estar">
+      <span class="admin-badge">Portal B2B</span>
+    </div>
+    <div class="admin-user-row">
+      <span id="userEmailDisplay"></span>
+      <button id="logoutBtn" class="btn btn-ghost-light" style="display:none; padding:10px 16px; font-size:11px;">Cerrar sesión</button>
+    </div>
+  </div>
+</header>
+
+<!-- Auth overlay -->
+<div id="authOverlay" class="auth-overlay">
+  <div class="auth-card">
+    <img src="assets/logo.png" alt="estar">
+    <h2>Portal de cotizaciones</h2>
+    <p>Acceso exclusivo para el equipo de Hotel Estar. Inicia sesión con tu cuenta autorizada.</p>
+    <button id="loginBtn" class="btn btn-ink" style="width:100%; justify-content:center;">Iniciar sesión →</button>
+  </div>
+</div>
+
+<!-- Main admin content -->
+<main id="adminContent" class="admin-main" style="display:none">
+  <div class="container">
+
+    <div class="admin-page-header">
+      <div>
+        <p class="eyebrow terracotta">Hotel Estar — Portal B2B</p>
+        <h1>Nueva cotización</h1>
+      </div>
+    </div>
+
+    <!-- ── 1. Datos del cliente ── -->
+    <div class="admin-card">
+      <p class="admin-card-title">01 · Datos del cliente</p>
+      <div class="field-row">
+        <div class="field">
+          <label for="qEmpresa">Empresa <span style="color:var(--terracotta)">*</span></label>
+          <input id="qEmpresa" type="text" class="it-input" style="min-width:unset" placeholder="Ej. Hospital de Caldas" required>
+        </div>
+        <div class="field">
+          <label for="qContacto">Nombre del contacto</label>
+          <input id="qContacto" type="text" class="it-input" style="min-width:unset" placeholder="María Restrepo">
+        </div>
+      </div>
+      <div class="field-row" style="margin-top:16px">
+        <div class="field">
+          <label for="qEmail">Email <span style="color:var(--terracotta)">*</span></label>
+          <input id="qEmail" type="email" class="it-input" style="min-width:unset" placeholder="m.restrepo@empresa.co" required>
+        </div>
+        <div class="field">
+          <label for="qTelefono">Teléfono / WhatsApp</label>
+          <input id="qTelefono" type="tel" class="it-input" style="min-width:unset" placeholder="+57 300 000 0000">
+        </div>
+      </div>
+      <div class="field" style="margin-top:16px; max-width:320px">
+        <label for="qNit">NIT (opcional)</label>
+        <input id="qNit" type="text" class="it-input" style="min-width:unset" placeholder="890.000.000-1">
+      </div>
+    </div>
+
+    <!-- ── 2. Referencia y vigencia ── -->
+    <div class="admin-card">
+      <p class="admin-card-title">02 · Referencia y vigencia</p>
+      <div class="field-row">
+        <div class="field">
+          <label for="qReferencia">Referencia interna</label>
+          <input id="qReferencia" type="text" class="it-input" style="min-width:unset" placeholder="Ej. Hospital de Caldas — Q1 2026">
+        </div>
+        <div class="field">
+          <label for="qValidaHasta">Válida hasta <span style="color:var(--terracotta)">*</span></label>
+          <input id="qValidaHasta" type="date" class="it-input" style="min-width:unset" required>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 3. Ítems ── -->
+    <div class="admin-card">
+      <p class="admin-card-title">03 · Ítems de la cotización</p>
+      <div class="items-table-wrap">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Tipo de habitación</th>
+              <th>Unidades</th>
+              <th>Noches</th>
+              <th>Tarifa / noche (COP)</th>
+              <th>Subtotal</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody">
+            <!-- rows injected by JS -->
+          </tbody>
+        </table>
+      </div>
+      <button type="button" id="addItemBtn" class="btn btn-ghost-dark" style="margin-top:8px; padding:12px 20px; font-size:11px;">+ Agregar ítem</button>
+    </div>
+
+    <!-- ── 4. Descuento ── -->
+    <div class="admin-card">
+      <p class="admin-card-title">04 · Descuento global (opcional)</p>
+      <div class="desc-row">
+        <div class="desc-radio-group">
+          <label class="desc-radio-label">
+            <input type="radio" name="descTipo" value="porcentaje" checked> % Porcentaje
+          </label>
+          <label class="desc-radio-label">
+            <input type="radio" name="descTipo" value="fijo"> Valor fijo (COP)
+          </label>
+        </div>
+        <div class="desc-input-wrap">
+          <div class="field" style="margin:0">
+            <input id="qDescValor" type="number" class="it-input" style="min-width:unset" value="0" min="0" step="any" placeholder="0">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 5. Condiciones ── -->
+    <div class="admin-card">
+      <p class="admin-card-title">05 · Condiciones especiales</p>
+      <div class="field">
+        <textarea id="qCondiciones" class="it-input" style="min-width:unset; width:100%; min-height:100px; resize:vertical; font-family:var(--font-body)" placeholder="Ej. Checkout flexible. Facturación a nombre de la empresa. Crédito a 30 días sujeto a aprobación."></textarea>
+      </div>
+    </div>
+
+    <!-- ── Total card ── -->
+    <div class="total-card">
+      <div class="total-card-line">
+        <span>Subtotal</span>
+        <span id="subtotalDisplay">$ 0</span>
+      </div>
+      <div class="total-card-line" id="descuentoLine" style="display:none">
+        <span id="descuentoLabel">Descuento</span>
+        <span id="descuentoDisplay">− $ 0</span>
+      </div>
+      <div class="total-card-line is-total">
+        <span>Total estimado</span>
+        <span id="totalDisplay">$ 0</span>
+      </div>
+      <div class="total-actions">
+        <button id="createQuoteBtn" type="button" class="btn btn-ink" style="justify-content:center;">
+          <span id="createBtnText">Crear cotización</span>
+          <span id="createSpinner" class="spinner" style="display:none"></span>
+          <span aria-hidden="true" id="createBtnArrow">→</span>
+        </button>
+        <p id="formError" style="color:var(--error-700); font-size:13px; font-family:var(--font-label); display:none; margin:0; text-align:center;"></p>
+      </div>
+    </div>
+
+    <!-- ── Success panel ── -->
+    <div id="successPanel" style="display:none" class="success-panel">
+      <p class="eyebrow terracotta">Cotización creada correctamente</p>
+      <h3 id="successQuoteId"></h3>
+
+      <div class="url-display">
+        <input type="text" id="quoteUrlInput" class="url-input" readonly>
+        <button id="copyUrlBtn" class="btn btn-ghost-dark" style="padding:10px 16px; font-size:11px; flex-shrink:0;">Copiar enlace</button>
+      </div>
+
+      <p class="eyebrow" style="margin-bottom:10px">Enviar por email al cliente</p>
+      <div class="send-email-row">
+        <input type="email" id="sendToEmail" class="send-email-input" placeholder="Email del cliente">
+        <button id="sendEmailBtn" class="btn btn-ink" style="padding:10px 20px; font-size:11px; flex-shrink:0;">
+          <span id="sendBtnText">Enviar</span>
+          <span id="sendSpinner" class="spinner" style="display:none"></span>
+        </button>
+      </div>
+      <p id="emailStatus" style="font-family:var(--font-label); font-size:11px; display:none; margin:0 0 16px;"></p>
+
+      <div class="success-btn-row">
+        <a id="viewQuoteLink" href="#" target="_blank" class="btn btn-ghost-dark">Ver cotización →</a>
+        <button id="newQuoteBtn" class="btn btn-ghost-dark">Nueva cotización</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* ── Helpers ── */
+function formatCOP(n) {
+  return '$ ' + Math.round(n || 0).toLocaleString('es-CO');
+}
+
+function showToast(msg, ms) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('is-visible');
+  setTimeout(() => t.classList.remove('is-visible'), ms || 2800);
+}
+
+/* ── Items table ── */
+const ROOM_TYPES = ['Clásica', 'Selección', 'Reserva', 'Origen', 'Especial'];
+const DEFAULT_RATES = { 'Clásica': 220000, 'Selección': 260000, 'Reserva': 300000, 'Origen': 340000, 'Especial': 380000 };
+let rowIdCounter = 0;
+
+function createRow(defaults) {
+  const id = ++rowIdCounter;
+  const habitacion = (defaults && defaults.habitacion) || 'Clásica';
+  const unidades = (defaults && defaults.unidades) || 1;
+  const noches = (defaults && defaults.noches) || 1;
+  const tarifa = (defaults && defaults.tarifa) || DEFAULT_RATES[habitacion] || 220000;
+
+  const tr = document.createElement('tr');
+  tr.dataset.rowId = id;
+  tr.innerHTML = `
+    <td>
+      <select class="it-select" data-field="habitacion">
+        ${ROOM_TYPES.map(r => `<option value="${r}"${r === habitacion ? ' selected' : ''}>${r}</option>`).join('')}
+      </select>
+    </td>
+    <td><input type="number" class="it-input" data-field="unidades" value="${unidades}" min="1" max="100"></td>
+    <td><input type="number" class="it-input" data-field="noches" value="${noches}" min="1" max="365"></td>
+    <td><input type="number" class="it-input" data-field="tarifa" value="${tarifa}" min="0" step="1000"></td>
+    <td class="it-subtotal">${formatCOP(unidades * noches * tarifa)}</td>
+    <td><button type="button" class="it-remove" title="Eliminar fila">✕</button></td>
+  `;
+  return tr;
+}
+
+function calcRowSubtotal(tr) {
+  const u = parseFloat(tr.querySelector('[data-field="unidades"]').value) || 0;
+  const n = parseFloat(tr.querySelector('[data-field="noches"]').value) || 0;
+  const t = parseFloat(tr.querySelector('[data-field="tarifa"]').value) || 0;
+  return u * n * t;
+}
+
+function updateTotals() {
+  let subtotal = 0;
+  document.querySelectorAll('#itemsBody tr').forEach(tr => {
+    const s = calcRowSubtotal(tr);
+    tr.querySelector('.it-subtotal').textContent = formatCOP(s);
+    subtotal += s;
+  });
+
+  const descTipo = document.querySelector('input[name="descTipo"]:checked').value;
+  const descValor = parseFloat(document.getElementById('qDescValor').value) || 0;
+  let descAmt = 0;
+  if (descValor > 0) {
+    descAmt = descTipo === 'porcentaje' ? subtotal * (descValor / 100) : descValor;
+  }
+  const total = subtotal - descAmt;
+
+  document.getElementById('subtotalDisplay').textContent = formatCOP(subtotal);
+  document.getElementById('descuentoDisplay').textContent = '− ' + formatCOP(descAmt);
+  document.getElementById('totalDisplay').textContent = formatCOP(total);
+
+  const discLine = document.getElementById('descuentoLine');
+  discLine.style.display = descAmt > 0 ? 'flex' : 'none';
+  if (descAmt > 0) {
+    const label = descTipo === 'porcentaje' ? `Descuento (${descValor}%)` : 'Descuento';
+    document.getElementById('descuentoLabel').textContent = label;
+  }
+}
+
+function initItemsTable() {
+  const tbody = document.getElementById('itemsBody');
+  tbody.innerHTML = '';
+  rowIdCounter = 0;
+  tbody.appendChild(createRow());
+  updateTotals();
+}
+
+document.getElementById('addItemBtn').addEventListener('click', function() {
+  document.getElementById('itemsBody').appendChild(createRow());
+  updateTotals();
+});
+
+document.getElementById('itemsBody').addEventListener('input', function(e) {
+  if (e.target.closest('tr')) updateTotals();
+});
+
+document.getElementById('itemsBody').addEventListener('change', function(e) {
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+  if (e.target.dataset.field === 'habitacion') {
+    const tarInput = tr.querySelector('[data-field="tarifa"]');
+    if (parseFloat(tarInput.value) === 0) {
+      tarInput.value = DEFAULT_RATES[e.target.value] || 220000;
+    }
+  }
+  updateTotals();
+});
+
+document.getElementById('itemsBody').addEventListener('click', function(e) {
+  if (!e.target.classList.contains('it-remove')) return;
+  const rows = document.querySelectorAll('#itemsBody tr');
+  if (rows.length <= 1) { showToast('Debe haber al menos un ítem.'); return; }
+  e.target.closest('tr').remove();
+  updateTotals();
+});
+
+document.getElementById('qDescValor').addEventListener('input', updateTotals);
+document.querySelectorAll('input[name="descTipo"]').forEach(r => r.addEventListener('change', updateTotals));
+
+/* ── Collect form data ── */
+function collectFormData() {
+  const items = [];
+  document.querySelectorAll('#itemsBody tr').forEach(tr => {
+    const habitacion = tr.querySelector('[data-field="habitacion"]').value;
+    const u = Math.max(1, parseInt(tr.querySelector('[data-field="unidades"]').value) || 1);
+    const n = Math.max(1, parseInt(tr.querySelector('[data-field="noches"]').value) || 1);
+    const t = Math.max(0, parseFloat(tr.querySelector('[data-field="tarifa"]').value) || 0);
+    items.push({ habitacion, unidades: u, noches: n, tarifaPorNoche: t, subtotal: u * n * t });
+  });
+  return {
+    empresa: document.getElementById('qEmpresa').value.trim(),
+    contacto: document.getElementById('qContacto').value.trim(),
+    email: document.getElementById('qEmail').value.trim(),
+    telefono: document.getElementById('qTelefono').value.trim(),
+    nit: document.getElementById('qNit').value.trim(),
+    referencia: document.getElementById('qReferencia').value.trim(),
+    validaHasta: document.getElementById('qValidaHasta').value,
+    items,
+    descuento: {
+      tipo: document.querySelector('input[name="descTipo"]:checked').value,
+      valor: parseFloat(document.getElementById('qDescValor').value) || 0
+    },
+    condiciones: document.getElementById('qCondiciones').value.trim()
+  };
+}
+
+/* ── Create quote ── */
+document.getElementById('createQuoteBtn').addEventListener('click', async function() {
+  const errEl = document.getElementById('formError');
+  errEl.style.display = 'none';
+
+  const data = collectFormData();
+  if (!data.empresa) { showToast('Ingresa el nombre de la empresa.'); return; }
+  if (!data.email) { showToast('Ingresa el email del cliente.'); return; }
+  if (!data.validaHasta) { showToast('Selecciona la fecha de vigencia.'); return; }
+  if (data.items.length === 0) { showToast('Agrega al menos un ítem.'); return; }
+
+  const btn = this;
+  btn.disabled = true;
+  document.getElementById('createBtnText').textContent = 'Creando...';
+  document.getElementById('createBtnArrow').style.display = 'none';
+  document.getElementById('createSpinner').style.display = 'inline-block';
+
+  try {
+    const identity = window.netlifyIdentity;
+    const user = identity.currentUser();
+    const token = await user.jwt();
+
+    const res = await fetch('/api/create-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(data)
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Error al crear cotización');
+
+    showSuccessPanel(json.quoteId, json.shareUrl, data.email);
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    document.getElementById('createBtnText').textContent = 'Crear cotización';
+    document.getElementById('createBtnArrow').style.display = 'inline';
+    document.getElementById('createSpinner').style.display = 'none';
+  }
+});
+
+let currentQuoteId = null;
+
+function showSuccessPanel(quoteId, shareUrl, clientEmail) {
+  currentQuoteId = quoteId;
+  document.getElementById('successQuoteId').textContent = quoteId;
+  document.getElementById('quoteUrlInput').value = shareUrl;
+  document.getElementById('sendToEmail').value = clientEmail || '';
+  document.getElementById('viewQuoteLink').href = shareUrl;
+  document.getElementById('emailStatus').style.display = 'none';
+
+  document.getElementById('successPanel').style.display = 'block';
+  document.getElementById('createQuoteBtn').style.display = 'none';
+
+  document.getElementById('successPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast('Cotización creada con éxito ✓', 3000);
+}
+
+/* ── Copy link ── */
+document.getElementById('copyUrlBtn').addEventListener('click', function() {
+  const url = document.getElementById('quoteUrlInput').value;
+  if (!url) return;
+  navigator.clipboard.writeText(url)
+    .then(() => showToast('Enlace copiado al portapapeles ✓'))
+    .catch(() => {
+      document.getElementById('quoteUrlInput').select();
+      document.execCommand('copy');
+      showToast('Enlace copiado ✓');
+    });
+});
+
+/* ── Send email ── */
+document.getElementById('sendEmailBtn').addEventListener('click', async function() {
+  const emailInput = document.getElementById('sendToEmail');
+  const toEmail = emailInput.value.trim();
+  const statusEl = document.getElementById('emailStatus');
+
+  if (!toEmail || !toEmail.includes('@')) {
+    showToast('Ingresa un email válido.');
+    return;
+  }
+  if (!currentQuoteId) return;
+
+  const btn = this;
+  btn.disabled = true;
+  document.getElementById('sendBtnText').textContent = 'Enviando...';
+  document.getElementById('sendSpinner').style.display = 'inline-block';
+  statusEl.style.display = 'none';
+
+  try {
+    const identity = window.netlifyIdentity;
+    const user = identity.currentUser();
+    const token = await user.jwt();
+    const shareUrl = document.getElementById('quoteUrlInput').value;
+
+    const res = await fetch('/api/send-quote-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ quoteId: currentQuoteId, clientEmail: toEmail, quoteUrl: shareUrl })
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Error al enviar');
+
+    statusEl.style.color = 'var(--success)';
+    statusEl.textContent = '✓ Email enviado correctamente a ' + toEmail;
+    statusEl.style.display = 'block';
+    showToast('Email enviado ✓', 3000);
+  } catch (err) {
+    statusEl.style.color = 'var(--error-700)';
+    statusEl.textContent = '✗ ' + err.message;
+    statusEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    document.getElementById('sendBtnText').textContent = 'Enviar';
+    document.getElementById('sendSpinner').style.display = 'none';
+  }
+});
+
+/* ── New quote ── */
+document.getElementById('newQuoteBtn').addEventListener('click', function() {
+  currentQuoteId = null;
+  document.getElementById('successPanel').style.display = 'none';
+  document.getElementById('createQuoteBtn').style.display = 'flex';
+  document.getElementById('createQuoteBtn').disabled = false;
+  document.getElementById('createBtnText').textContent = 'Crear cotización';
+  document.getElementById('createBtnArrow').style.display = 'inline';
+  document.getElementById('createSpinner').style.display = 'none';
+  document.getElementById('formError').style.display = 'none';
+
+  // Reset form fields
+  ['qEmpresa','qContacto','qEmail','qTelefono','qNit','qReferencia','qReferencia','qCondiciones'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('qDescValor').value = '0';
+  document.querySelector('input[name="descTipo"][value="porcentaje"]').checked = true;
+  initItemsTable();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+/* ── Set default validity date (30 days from today) ── */
+(function setDefaultDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  document.getElementById('qValidaHasta').value = d.toISOString().split('T')[0];
+})();
+
+/* ── Netlify Identity auth ── */
+document.addEventListener('DOMContentLoaded', function() {
+  initItemsTable();
+
+  const identity = window.netlifyIdentity;
+
+  if (!identity) {
+    document.getElementById('authOverlay').innerHTML =
+      '<div class="auth-card"><h2>Error de autenticación</h2><p>El widget de identidad no cargó. Recarga la página o verifica que Netlify Identity esté habilitado para este sitio.</p></div>';
+    return;
+  }
+
+  function showAdmin(user) {
+    document.getElementById('authOverlay').style.display = 'none';
+    document.getElementById('adminContent').style.display = 'block';
+    document.getElementById('logoutBtn').style.display = 'inline-flex';
+    document.getElementById('userEmailDisplay').textContent = user.email || '';
+  }
+
+  function showLogin() {
+    document.getElementById('authOverlay').style.display = 'flex';
+    document.getElementById('adminContent').style.display = 'none';
+    document.getElementById('logoutBtn').style.display = 'none';
+    document.getElementById('userEmailDisplay').textContent = '';
+  }
+
+  identity.on('init', function(user) {
+    if (user) {
+      showAdmin(user);
+    } else {
+      showLogin();
+    }
+  });
+
+  identity.on('login', function(user) {
+    identity.close();
+    showAdmin(user);
+  });
+
+  identity.on('logout', function() {
+    showLogin();
+  });
+
+  document.getElementById('loginBtn').addEventListener('click', function() {
+    identity.open('login');
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', function() {
+    identity.logout();
+  });
+});
+</script>
+</body>
+</html>

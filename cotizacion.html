@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cotización — Hotel Estar Manizales</title>
+<meta name="description" content="Cotización comercial Hotel Estar Manizales.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="/manifest.json">
+<link rel="stylesheet" href="colors_and_type.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
+<script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
+</head>
+<body data-screen-label="Cotización" data-header="dark">
+
+<header class="site-header">
+  <div class="container">
+    <a href="index.html" class="brand" aria-label="estar — inicio">
+      <span class="star-mark" aria-hidden="true"></span>
+      <img src="assets/logo.png" alt="estar" class="logo-img" width="120" height="32">
+    </a>
+    <nav><ul class="nav-list">
+      <li><a href="index.html">Estadías</a></li>
+      <li><a href="vivir.html">Extended Stay</a></li>
+      <li><a href="explora.html">Explorar Manizales</a></li>
+      <li><a href="empresas.html">Empresas</a></li>
+      <li><a href="grupos.html">Grupos</a></li>
+    </ul></nav>
+    <div class="header-actions">
+      <button class="lang-toggle">EN</button>
+      <a href="reservar.html" class="book-btn">Reservar</a>
+      <button class="menu-btn" aria-label="Menú"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+
+<!-- ============================== QUOTE PAGE ============================== -->
+<section class="quote-page">
+  <div class="container">
+
+    <!-- Loading state -->
+    <div id="quoteLoading" class="quote-state-block">
+      <div class="quote-state-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+      </div>
+      <p>Cargando cotización…</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="quoteError" class="quote-state-block" style="display:none">
+      <div class="quote-state-icon quote-state-icon--muted">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+      </div>
+      <h2 id="errorTitle">Esta cotización ya no está disponible</h2>
+      <p id="errorMsg">El enlace puede haber vencido o no es válido. Contáctanos para solicitar una nueva cotización.</p>
+      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:28px">
+        <a href="empresas.html#cotizar" class="btn btn-ink">Solicitar cotización →</a>
+        <a href="https://api.whatsapp.com/send/?phone=573102490414&text=Hola%2C%20quisiera%20solicitar%20una%20cotizaci%C3%B3n%20para%20mi%20empresa." target="_blank" rel="noopener noreferrer" class="btn btn-ghost-dark">WhatsApp</a>
+      </div>
+    </div>
+
+    <!-- Quote document -->
+    <div id="quoteDocument" class="quote-doc" style="display:none" aria-label="Cotización comercial">
+
+      <!-- Document header -->
+      <div class="quote-doc-top">
+        <div class="quote-doc-brand">
+          <div class="brand-stack-doc" aria-hidden="true"></div>
+          <div class="quote-brand-info">
+            <p class="quote-brand-name">ESTAR</p>
+            <p class="quote-brand-sub">Hotel Apartamento · Manizales, Colombia</p>
+          </div>
+        </div>
+        <div class="quote-doc-ref">
+          <p class="eyebrow" style="color:var(--ink-500)">Cotización comercial</p>
+          <p class="quote-id-display" id="quoteIdDisplay">—</p>
+        </div>
+      </div>
+
+      <hr class="quote-divider">
+
+      <!-- Client + meta info -->
+      <div class="quote-info-grid">
+        <div class="quote-info-col">
+          <p class="quote-info-label">Cliente</p>
+          <p class="quote-info-empresa" id="infoEmpresa">—</p>
+          <p class="quote-info-line" id="infoContacto"></p>
+          <p class="quote-info-line" id="infoEmail"></p>
+          <p class="quote-info-line" id="infoTelefono"></p>
+          <p class="quote-info-line" id="infoNit"></p>
+        </div>
+        <div class="quote-info-col">
+          <p class="quote-info-label">Vigencia</p>
+          <dl class="quote-meta-dl">
+            <div class="quote-meta-row">
+              <dt>Fecha de emisión</dt>
+              <dd id="metaCreatedAt">—</dd>
+            </div>
+            <div class="quote-meta-row">
+              <dt>Válida hasta</dt>
+              <dd id="metaExpiresAt">—</dd>
+            </div>
+            <div class="quote-meta-row" id="metaRefRow" style="display:none">
+              <dt>Referencia</dt>
+              <dd id="metaReferencia"></dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+
+      <hr class="quote-divider">
+
+      <!-- Items table -->
+      <div class="quote-table-wrap">
+        <table class="quote-table">
+          <thead>
+            <tr>
+              <th>Tipología</th>
+              <th class="text-center">Unidades</th>
+              <th class="text-center">Noches</th>
+              <th class="text-right">Tarifa / noche</th>
+              <th class="text-right">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody id="quoteItemsTbody">
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Totals -->
+      <div class="quote-totals">
+        <div class="quote-totals-inner">
+          <div class="quote-total-row">
+            <span>Subtotal</span>
+            <span id="totalSubtotal">$ 0</span>
+          </div>
+          <div class="quote-total-row" id="totalDescuentoRow" style="display:none">
+            <span id="totalDescuentoLabel">Descuento</span>
+            <span id="totalDescuento" style="color:var(--terracotta-700)">−$ 0</span>
+          </div>
+          <div class="quote-total-row quote-total-final">
+            <span>Total</span>
+            <span id="totalFinal">$ 0</span>
+          </div>
+          <p class="quote-total-note">IVA incluido · Tarifas en Pesos Colombianos (COP)</p>
+        </div>
+      </div>
+
+      <!-- Special conditions -->
+      <div id="condicionesSection" style="display:none">
+        <hr class="quote-divider">
+        <p class="quote-info-label">Condiciones especiales</p>
+        <p id="condicionesText" class="quote-conditions-text"></p>
+      </div>
+
+      <hr class="quote-divider">
+
+      <!-- Policies -->
+      <div class="quote-policies">
+        <p class="quote-info-label">Políticas</p>
+        <ul class="quote-policies-list">
+          <li>Cancelación gratuita con al menos 48 horas de anticipación al check-in.</li>
+          <li>Pago a crédito sujeto a aprobación previa de la empresa con convenio vigente.</li>
+          <li>IVA incluido en todas las tarifas indicadas.</li>
+        </ul>
+      </div>
+
+      <hr class="quote-divider">
+
+      <!-- Hotel contact -->
+      <div class="quote-hotel-footer">
+        <div>
+          <p class="quote-hotel-name">Hotel Estar</p>
+          <p class="quote-hotel-addr">Cl. 61 #23-36, La Estrella · Manizales, Caldas, Colombia</p>
+        </div>
+        <div class="quote-hotel-contacts">
+          <a href="mailto:reservas@estar.com.co" class="quote-hotel-contact-link">reservas@estar.com.co</a>
+          <a href="https://api.whatsapp.com/send/?phone=573102490414" target="_blank" rel="noopener noreferrer" class="quote-hotel-contact-link">+57 310 249 0414</a>
+          <span class="quote-rnt">RNT 276306</span>
+        </div>
+      </div>
+
+      <!-- CTAs (hidden in print) -->
+      <div class="quote-ctas no-print">
+        <div class="quote-ctas-inner">
+          <a href="reservar.html" class="btn btn-primary">Aceptar y reservar <span aria-hidden="true">→</span></a>
+          <a id="quoteWaLink" href="https://api.whatsapp.com/send/?phone=573102490414&text=Hola%2C+quisiera+proceder+con+la+cotizaci%C3%B3n" target="_blank" rel="noopener noreferrer" class="btn btn-ghost-dark">Contactar por WhatsApp</a>
+          <button onclick="window.print()" class="btn btn-ghost-dark">Descargar PDF</button>
+        </div>
+      </div>
+
+    </div>
+    <!-- end .quote-doc -->
+  </div>
+</section>
+
+<!-- ============================== FOOTER ============================== -->
+<footer class="site-footer no-print">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="brand-stack" aria-hidden="true"></div>
+        <p>Hospedaje en el corazón de Manizales pensado para <span class="serif-italic">estar</span> en casa.</p>
+        <address class="footer-address">
+          <span>Cl. 61 #23-36, La Estrella · Manizales, Caldas</span>
+          <a href="mailto:reservas@estar.com.co">reservas@estar.com.co</a>
+        </address>
+      </div>
+      <div class="footer-col">
+        <p class="footer-col-heading">Estadías</p>
+        <ul>
+          <li><a href="index.html">Apartaestudios</a></li>
+          <li><a href="vivir.html">Extended Stay</a></li>
+          <li><a href="grupos.html">Grupos y eventos</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <p class="footer-col-heading">Empresas</p>
+        <ul>
+          <li><a href="empresas.html">Portal corporativo</a></li>
+          <li><a href="empresas.html#contacto">Solicitar convenio</a></li>
+          <li><a href="empresas.html#cotizar">Cotizar</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <p class="footer-col-heading">Descubre</p>
+        <ul>
+          <li><a href="nosotros.html">Sobre Nosotros</a></li>
+          <li><a href="faq.html">Preguntas Frecuentes</a></li>
+          <li><a href="contacto.html">Contáctanos</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bot">
+      <span>© 2026 estar · Manizales, Colombia · <span class="rnt-badge" style="color:var(--terracotta-300);font-weight:900;">RNT 276306</span></span>
+      <span>
+        <a href="aviso-legal.html">Aviso Legal</a> ·
+        <a href="cancelacion.html">Cancelación</a> ·
+        <a href="privacidad.html">Privacidad</a>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const TWEAK_DEFAULTS = { brand: 'olive', language: 'es', density: 'comfortable', cinemagraph: true };
+</script>
+<script src="shell.js" defer></script>
+<script>document.addEventListener('DOMContentLoaded', function(){ if(window.lucide) lucide.createIcons(); });</script>
+
+<script>
+/* ── Helpers ── */
+function esc(str) {
+  return String(str || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatCOP(n) {
+  return '$ ' + Math.round(n || 0).toLocaleString('es-CO');
+}
+
+function formatDateES(isoStr) {
+  if (!isoStr) return '';
+  const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return isoStr;
+  return d.getUTCDate() + ' de ' + months[d.getUTCMonth()] + ' de ' + d.getUTCFullYear();
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val || '';
+}
+
+function setHtml(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html || '';
+}
+
+/* ── Load & render ── */
+async function loadQuote() {
+  const params = new URLSearchParams(window.location.search);
+  const quoteId = params.get('id');
+
+  if (!quoteId) {
+    showError('Cotización no encontrada', 'No se proporcionó un identificador de cotización válido en la URL.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/get-quote?id=' + encodeURIComponent(quoteId));
+    if (res.status === 404) {
+      const json = await res.json().catch(() => ({}));
+      if (json.expired) {
+        showError('Esta cotización ha vencido', 'La cotización ' + esc(quoteId) + ' ya superó su fecha de vigencia. Contáctanos para obtener una nueva.');
+      } else {
+        showError('Cotización no encontrada', 'El enlace puede ser incorrecto o la cotización fue eliminada.');
+      }
+      return;
+    }
+    if (!res.ok) {
+      showError('Error al cargar la cotización', 'Ocurrió un problema en el servidor. Inténtalo más tarde.');
+      return;
+    }
+    const data = await res.json();
+    renderQuote(data);
+  } catch (err) {
+    showError('Error de conexión', 'No fue posible cargar la cotización. Verifica tu conexión e inténtalo de nuevo.');
+  }
+}
+
+function showError(title, msg) {
+  document.getElementById('quoteLoading').style.display = 'none';
+  document.getElementById('quoteDocument').style.display = 'none';
+  document.getElementById('quoteError').style.display = 'flex';
+  document.getElementById('errorTitle').textContent = title;
+  document.getElementById('errorMsg').textContent = msg;
+  document.title = title + ' — Hotel Estar';
+}
+
+function renderQuote(q) {
+  document.title = 'Cotización ' + q.quoteId + ' — Hotel Estar';
+
+  /* Header */
+  setText('quoteIdDisplay', q.quoteId);
+
+  /* Client info */
+  setText('infoEmpresa', q.empresa);
+  setText('infoContacto', q.contacto);
+  setText('infoEmail', q.email);
+  setText('infoTelefono', q.telefono || '');
+  setText('infoNit', q.nit ? 'NIT ' + q.nit : '');
+  ['infoContacto','infoEmail','infoTelefono','infoNit'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = el.textContent.trim() ? '' : 'none';
+  });
+
+  /* Meta */
+  setText('metaCreatedAt', formatDateES(q.createdAt));
+  setText('metaExpiresAt', formatDateES(q.expiresAt));
+  if (q.referencia) {
+    setText('metaReferencia', q.referencia);
+    document.getElementById('metaRefRow').style.display = '';
+  }
+
+  /* Items */
+  const subtotalItems = (q.items || []).reduce((s, it) => s + it.subtotal, 0);
+  const tbody = document.getElementById('quoteItemsTbody');
+  tbody.innerHTML = (q.items || []).map((it, i) => `
+    <tr class="${i % 2 === 0 ? 'qt-even' : ''}">
+      <td class="qt-room">${esc(it.habitacion)}</td>
+      <td class="text-center qt-num">${it.unidades}</td>
+      <td class="text-center qt-num">${it.noches}</td>
+      <td class="text-right qt-num">${formatCOP(it.tarifaPorNoche)}</td>
+      <td class="text-right qt-subtotal">${formatCOP(it.subtotal)}</td>
+    </tr>
+  `).join('');
+
+  /* Totals */
+  let descuentoAmt = 0;
+  if (q.descuento && q.descuento.valor > 0) {
+    descuentoAmt = q.descuento.tipo === 'porcentaje'
+      ? subtotalItems * (q.descuento.valor / 100)
+      : q.descuento.valor;
+  }
+  const total = subtotalItems - descuentoAmt;
+
+  setText('totalSubtotal', formatCOP(subtotalItems));
+  setText('totalFinal', formatCOP(total));
+
+  if (descuentoAmt > 0) {
+    const label = q.descuento.tipo === 'porcentaje' ? 'Descuento (' + q.descuento.valor + '%)' : 'Descuento';
+    setText('totalDescuentoLabel', label);
+    setText('totalDescuento', '−' + formatCOP(descuentoAmt));
+    document.getElementById('totalDescuentoRow').style.display = '';
+  }
+
+  /* Conditions */
+  if (q.condiciones) {
+    document.getElementById('condicionesSection').style.display = '';
+    document.getElementById('condicionesText').innerHTML = esc(q.condiciones).replace(/\n/g, '<br>');
+  }
+
+  /* WhatsApp CTA with quote ID in message */
+  const waMsg = encodeURIComponent('Hola, quisiera proceder con la cotización ' + q.quoteId + ' de ' + q.empresa + '.');
+  document.getElementById('quoteWaLink').href = 'https://api.whatsapp.com/send/?phone=573102490414&text=' + waMsg;
+
+  /* Show document */
+  document.getElementById('quoteLoading').style.display = 'none';
+  document.getElementById('quoteDocument').style.display = 'block';
+}
+
+loadQuote();
+</script>
+
+</body>
+</html>
