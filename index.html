@@ -136,6 +136,14 @@
   }
 ]
 </script>
+<script>
+(function(){
+  var h = window.location.hash;
+  if (h && (h.indexOf('invite_token=') !== -1 || h.indexOf('confirmation_token=') !== -1 || h.indexOf('recovery_token=') !== -1)) {
+    window.location.replace('/cotizar-admin.html' + h);
+  }
+}());
+</script>
 </head>
 <body data-screen-label="01 Home" data-booking>
 <a href="#main-content" class="skip-link">Saltar al contenido principal</a>
