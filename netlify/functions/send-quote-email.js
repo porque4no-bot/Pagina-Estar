@@ -231,53 +231,57 @@ exports.handler = async (event, context) => {
   };
   if (allowedOrigin) corsHeaders['Access-Control-Allow-Origin'] = allowedOrigin;
 
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
-  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
-
-  const user = context.clientContext && context.clientContext.user;
-  if (!user) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ error: 'Autenticación requerida' }) };
-
-  let body;
-  try { body = JSON.parse(event.body); }
-  catch (e) { return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'JSON inválido' }) }; }
-
-  const { quoteId, clientEmail, clientName, quoteUrl } = body;
-
-  if (!quoteId || !clientEmail || !quoteUrl) {
-    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Faltan campos: quoteId, clientEmail, quoteUrl' }) };
-  }
-
-  if (!/^COT-\d{4}-[A-Z0-9]{5}$/.test(quoteId)) {
-    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'quoteId inválido' }) };
-  }
-
-  /* Extract and decode quote data from the share URL's ?d= parameter */
-  let quoteData;
   try {
-    const urlObj = new URL(quoteUrl);
-    const encoded = urlObj.searchParams.get('d');
-    if (!encoded) throw new Error('missing d param');
-    quoteData = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
-  } catch (err) {
-    console.error('[send-quote-email] decode error:', err.message);
-    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'quoteUrl inválida o corrompida' }) };
-  }
+    if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
+    if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-  if (!quoteData || quoteData.quoteId !== quoteId) {
-    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'quoteId no coincide con los datos de la cotización' }) };
-  }
+    const user = context.clientContext && context.clientContext.user;
+    if (!user) return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ error: 'Autenticación requerida' }) };
 
-  const resendApiKey = process.env.RESEND_API_KEY;
-  if (!resendApiKey) {
-    if (process.env.DEBUG) console.log('[send-quote-email] RESEND_API_KEY no configurada. Omitiendo envío.');
-    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ sent: false, reason: 'RESEND_API_KEY not configured' }) };
-  }
+    let body;
+    try { body = JSON.parse(event.body); }
+    catch (e) { return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'JSON inválido' }) }; }
 
-  const resolvedUrl = quoteUrl;
-  const emailHtml = buildQuoteEmailHtml({ quote: quoteData, quoteUrl: resolvedUrl });
-  const toEmail = clientEmail || quoteData.email;
+    const { quoteId, clientEmail, clientName, quoteUrl } = body;
 
-  try {
+    if (!quoteId || !clientEmail || !quoteUrl) {
+      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Faltan campos: quoteId, clientEmail, quoteUrl' }) };
+    }
+
+    if (!/^COT-\d{4}-[A-Z0-9]{5}$/.test(quoteId)) {
+      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'quoteId inválido' }) };
+    }
+
+    /* Extract and decode quote data from the share URL's ?d= parameter */
+    let quoteData;
+    try {
+      const urlObj = new URL(quoteUrl);
+      const encoded = urlObj.searchParams.get('d');
+      if (!encoded) throw new Error('missing d param');
+      
+      // Decode manually to support older Node runtimes that lack base64url support
+      const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      quoteData = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+    } catch (err) {
+      console.error('[send-quote-email] decode error:', err.message);
+      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'quoteUrl inválida o corrompida' }) };
+    }
+
+    if (!quoteData || quoteData.quoteId !== quoteId) {
+      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'quoteId no coincide con los datos de la cotización' }) };
+    }
+
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      if (process.env.DEBUG) console.log('[send-quote-email] RESEND_API_KEY no configurada. Omitiendo envío.');
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ sent: false, reason: 'RESEND_API_KEY not configured' }) };
+    }
+
+    const resolvedUrl = quoteUrl;
+    const emailHtml = buildQuoteEmailHtml({ quote: quoteData, quoteUrl: resolvedUrl });
+    const toEmail = clientEmail || quoteData.email;
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     let res;
@@ -315,6 +319,6 @@ exports.handler = async (event, context) => {
     };
   } catch (err) {
     console.error('[send-quote-email] Error:', err.message);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ sent: false, error: 'Error interno' }) };
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ sent: false, error: 'Error interno del servidor', details: err.message }) };
   }
 };
