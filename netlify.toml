@@ -7,6 +7,18 @@
   included_files = ["rooms_db.json"]
   node_bundler = "esbuild"
 
+[functions."create-quote"]
+  node_bundler = "nft"
+
+[functions."get-quote"]
+  node_bundler = "nft"
+
+[functions."send-quote-email"]
+  node_bundler = "nft"
+
+[build.environment]
+  NODE_VERSION = "20"
+
 # Configuration for Netlify deployment and serverless redirects
 [[redirects]]
   from = "/en"
