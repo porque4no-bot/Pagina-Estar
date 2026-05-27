@@ -117,6 +117,11 @@
     tweaks = { ...defaults, ...stored };
   } catch (e) {}
 
+  // Language is always derived from the URL, never from localStorage.
+  // Root pages (/) are Spanish; pages under /en/ are English.
+  const pageLang = window.location.pathname.startsWith('/en/') ? 'en' : 'es';
+  tweaks.language = pageLang;
+
   const ATMOSPHERE_LABEL = {
     amanecer: 'Amanecer',
     mediodia: 'Mediodía',
@@ -526,6 +531,16 @@
       const btn = e.target.closest('[data-key] button');
       if (btn) {
         const k = btn.parentElement.getAttribute('data-key');
+        if (k === 'language') {
+          const targetLang = btn.getAttribute('data-value');
+          if (targetLang !== tweaks.language) {
+            const path = window.location.pathname;
+            window.location.href = targetLang === 'en'
+              ? '/en' + (path === '/' ? '/' : path)
+              : (path.startsWith('/en/') ? path.slice(3) || '/' : path);
+          }
+          return;
+        }
         tweaks[k] = btn.getAttribute('data-value');
         applyTweaks();
         persist();
@@ -534,6 +549,7 @@
       }
       if (e.target.closest('.px-reset')) {
         tweaks = { ...defaults };
+        tweaks.language = pageLang;
         applyTweaks();
         persist();
         refreshPanel();
@@ -560,21 +576,14 @@
     const toggles = document.querySelectorAll('.lang-toggle');
     toggles.forEach((toggle) => {
       toggle.addEventListener('click', () => {
-        const nextLang = tweaks.language === 'es' ? 'en' : 'es';
-        tweaks.language = nextLang;
-        applyTweaks();
-        persist();
-        
-        // Refresh panel if it exists
-        const panel = document.querySelector('.tweaks-panel-x');
-        if (panel) {
-          panel.querySelectorAll('[data-key="language"] button').forEach((b) => {
-            b.classList.toggle('active', b.getAttribute('data-value') === nextLang);
-          });
+        const path = window.location.pathname;
+        let target;
+        if (path.startsWith('/en/')) {
+          target = path.slice(3) || '/';
+        } else {
+          target = '/en' + (path === '/' ? '/' : path);
         }
-        
-        // Dispatch custom event for decoupling with kunas.js or other custom scripts
-        document.dispatchEvent(new CustomEvent('estar-lang-change', { detail: { lang: nextLang } }));
+        window.location.href = target;
       });
     });
   }
@@ -772,8 +781,8 @@
       const tooltip = document.createElement('div');
       tooltip.className = 'contact-tooltip';
       tooltip.innerHTML = `
-        <span><span class="lang-es">¿Te podemos ayudar?</span><span class="lang-en">Can we help you?</span></span>
-        <button class="contact-tooltip-close" aria-label="Cerrar">
+        <span>${tweaks.language === 'en' ? 'Can we help you?' : '¿Te podemos ayudar?'}</span>
+        <button class="contact-tooltip-close" aria-label="${tweaks.language === 'en' ? 'Close' : 'Cerrar'}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
       `;
@@ -1011,7 +1020,7 @@
     skip.id = 'skip-to-content';
     skip.href = '#main-content';
     skip.className = 'skip-link';
-    skip.textContent = 'Saltar al contenido principal';
+    skip.textContent = tweaks.language === 'en' ? 'Skip to main content' : 'Saltar al contenido principal';
     document.body.insertBefore(skip, document.body.firstChild);
   }
 

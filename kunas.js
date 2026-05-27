@@ -255,7 +255,7 @@ const KUNAS_CONFIG = {
 
   // ── Render unified range picker ──────────────────────────────────────────
   function renderRangePicker(container) {
-    const lang     = document.documentElement.lang || 'es';
+    const lang     = window.location.pathname.startsWith('/en/') ? 'en' : 'es';
     const months   = lang === 'es' ? MONTHS_ES : MONTHS_EN;
     const weekdays = lang === 'es' ? WEEKDAYS_ES : WEEKDAYS_EN;
     const todayStr = getLocalDateString(0);
@@ -489,7 +489,7 @@ const KUNAS_CONFIG = {
    * Actualiza los textos legibles sobre los inputs transparentes
    */
   function updateDisplayValues() {
-    const lang = document.documentElement.lang || 'es';
+    const lang = window.location.pathname.startsWith('/en/') ? 'en' : 'es';
 
     // Llegada
     if (checkinDisplay && checkinInput && checkinInput.value) {
@@ -766,7 +766,9 @@ const KUNAS_CONFIG = {
     if (preselectedRoomType && !VALID_ROOMS.includes(preselectedRoomType)) {
       preselectedRoomType = '';
     }
-    let url = `reservar.html?checkin=${checkin}&checkout=${checkout}&guests=${guests}`;
+    const isEn = window.location.pathname.startsWith('/en/');
+    const base = isEn ? '/en/reservar.html' : 'reservar.html';
+    let url = `${base}?checkin=${checkin}&checkout=${checkout}&guests=${guests}`;
     if (preselectedRoomType) {
       url += `&room=${preselectedRoomType}`;
     }
@@ -822,10 +824,6 @@ const KUNAS_CONFIG = {
     updateDisplayValues();
     setupBookingBar();
 
-    // Listen for global language changes (from shell.js) to update display values
-    document.addEventListener('estar-lang-change', () => {
-      setTimeout(updateDisplayValues, 50);
-    });
   }
 
   if (document.readyState === 'loading') {

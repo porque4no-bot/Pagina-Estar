@@ -2,6 +2,84 @@ const fs = require('fs');
 const path = require('path');
 const esbuild = require('esbuild');
 
+/* ── Bilingual element stripper ──────────────────────────────────────────────
+   Removes all HTML elements whose class list contains `targetClass`.
+   Handles nested same-tag elements, script/style pass-through, and comments.
+   No external dependencies — pure string/character scanning.
+─────────────────────────────────────────────────────────────────────────────*/
+function stripBilingualElements(html, targetClass) {
+  const VOID = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
+
+  function tagClose(str, pos) {
+    let i = pos + 1, inQ = false, qc = '';
+    while (i < str.length) {
+      const c = str[i];
+      if (!inQ && (c === '"' || c === "'")) { inQ = true; qc = c; }
+      else if (inQ && c === qc) { inQ = false; }
+      else if (!inQ && c === '>') return i;
+      i++;
+    }
+    return -1;
+  }
+
+  function parseTag(str, pos) {
+    const end = tagClose(str, pos);
+    if (end < 0) return null;
+    const raw = str.slice(pos, end + 1);
+    const isClose = raw[1] === '/';
+    const isSelf = raw[raw.length - 2] === '/';
+    const nm = raw.match(/^<\/?([a-zA-Z][a-zA-Z0-9]*)/);
+    const name = nm ? nm[1].toLowerCase() : '';
+    const cm = raw.match(/\bclass="([^"]*)"/);
+    const classes = cm ? cm[1].split(/\s+/) : [];
+    return { end, name, isClose, isSelf: isSelf || VOID.has(name), hasTarget: classes.includes(targetClass) };
+  }
+
+  let out = '', i = 0;
+  while (i < html.length) {
+    if (html[i] !== '<') { out += html[i++]; continue; }
+
+    if (html.startsWith('<!--', i)) {
+      const e = html.indexOf('-->', i + 4);
+      if (e < 0) { out += html.slice(i); break; }
+      out += html.slice(i, e + 3); i = e + 3; continue;
+    }
+
+    const tag = parseTag(html, i);
+    if (!tag) { out += html[i++]; continue; }
+
+    if (!tag.isClose && (tag.name === 'script' || tag.name === 'style')) {
+      const ct = `</${tag.name}>`;
+      const ce = html.toLowerCase().indexOf(ct, tag.end + 1);
+      if (ce < 0) { out += html.slice(i); break; }
+      out += html.slice(i, ce + ct.length); i = ce + ct.length; continue;
+    }
+
+    if (!tag.isClose && !tag.isSelf && tag.hasTarget) {
+      let depth = 1, j = tag.end + 1;
+      while (j < html.length && depth > 0) {
+        if (html[j] !== '<') { j++; continue; }
+        const inner = parseTag(html, j);
+        if (!inner) { j++; continue; }
+        if (inner.name === tag.name) {
+          if (!inner.isClose && !inner.isSelf) depth++;
+          else if (inner.isClose) depth--;
+        }
+        j = inner.end + 1;
+      }
+      while (j < html.length && html[j] === ' ') j++;
+      if (j < html.length && html[j] === '\r') j++;
+      if (j < html.length && html[j] === '\n') j++;
+      const nl = out.lastIndexOf('\n');
+      if (nl >= 0 && out.slice(nl + 1).trim() === '') out = out.slice(0, nl + 1);
+      i = j; continue;
+    }
+
+    out += html.slice(i, tag.end + 1); i = tag.end + 1;
+  }
+  return out;
+}
+
 const rootDir = __dirname;
 const distDir = path.join(rootDir, 'dist');
 
@@ -87,6 +165,24 @@ function injectGA4(dir) {
 }
 console.log('Injecting GA4 tracking...');
 injectGA4(distDir);
+
+// Strip bilingual mash: remove .lang-en from root ES pages, .lang-es from en/ pages
+console.log('Stripping bilingual inline elements...');
+fs.readdirSync(distDir).forEach(file => {
+  if (!file.endsWith('.html')) return;
+  const p = path.join(distDir, file);
+  const stripped = stripBilingualElements(fs.readFileSync(p, 'utf8'), 'lang-en');
+  fs.writeFileSync(p, stripped);
+});
+const distEnDir = path.join(distDir, 'en');
+if (fs.existsSync(distEnDir)) {
+  fs.readdirSync(distEnDir).forEach(file => {
+    if (!file.endsWith('.html')) return;
+    const p = path.join(distEnDir, file);
+    const stripped = stripBilingualElements(fs.readFileSync(p, 'utf8'), 'lang-es');
+    fs.writeFileSync(p, stripped);
+  });
+}
 
 async function convertLogosToWebP(sharp) {
   const logosToConvert = ['logo-cotelco.png', 'logo-asohost.png'];
