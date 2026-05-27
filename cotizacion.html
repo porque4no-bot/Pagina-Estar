@@ -12,71 +12,96 @@
 <link rel="stylesheet" href="styles.css?v=3">
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
 <style>
-/* ── Room cards (visual) ── */
-.quote-rooms { display: grid; gap: 20px; margin: 8px 0 4px; }
-.quote-room-card {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 24px;
-  background: var(--paper-100);
-  border: 1px solid var(--paper-400);
-  border-radius: 12px;
-  overflow: hidden;
+/* ══ Section padding inside the quote doc ══ */
+.quote-section { padding: 28px 48px; }
+@media (max-width: 600px) { .quote-section { padding: 22px 24px; } }
+.quote-section-label {
+  font-family: var(--font-label); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.22em; color: var(--ink-500); margin: 0 0 16px;
 }
-@media (max-width: 640px) { .quote-room-card { grid-template-columns: 1fr; } }
-.qrc-media { display: flex; flex-direction: column; }
-.qrc-main-img {
-  width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block;
+
+/* ══ Stay summary band ══ */
+.quote-stay {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1px; background: var(--paper-400);
+  border: 1px solid var(--paper-400); border-radius: 12px; overflow: hidden;
+}
+@media (max-width: 560px) { .quote-stay { grid-template-columns: 1fr 1fr; } }
+.quote-stay-cell { background: var(--white); padding: 16px 20px; display: flex; flex-direction: column; gap: 4px; }
+.quote-stay-cell .qs-label {
+  font-family: var(--font-label); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-500);
+}
+.quote-stay-cell .qs-value { font-family: var(--font-heading); font-size: 16px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+.quote-stay-cell .qs-value small { display: block; font-family: var(--font-body); font-size: 12px; font-weight: 400; color: var(--ink-500); margin-top: 2px; }
+
+/* ══ Room accordion (compact) ══ */
+.quote-rooms { display: flex; flex-direction: column; gap: 10px; }
+.quote-room {
+  border: 1px solid var(--paper-400); border-radius: 12px; overflow: hidden;
+  background: var(--white); transition: box-shadow var(--dur-base) var(--ease-out);
+}
+.quote-room[open] { box-shadow: var(--shadow-sm); border-color: var(--ink-300); }
+.qr-summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 16px;
+  padding: 14px 18px;
+}
+.qr-summary::-webkit-details-marker { display: none; }
+.qr-thumb { width: 68px; height: 56px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: var(--paper-300); }
+.qr-head-main { flex: 1; min-width: 0; }
+.qr-name { font-family: var(--font-heading); font-size: 17px; font-weight: 700; color: var(--ink); margin: 0; line-height: 1.2; }
+.qr-facts { font-family: var(--font-label); font-size: 11px; letter-spacing: 0.04em; color: var(--ink-500); margin: 4px 0 0; }
+.qr-price { text-align: right; flex-shrink: 0; }
+.qr-units { font-family: var(--font-label); font-size: 10px; letter-spacing: 0.04em; color: var(--ink-500); display: block; }
+.qr-line-total { font-family: var(--font-heading); font-size: 16px; font-weight: 700; color: var(--ink); }
+.qr-chev { flex-shrink: 0; color: var(--ink-500); transition: transform var(--dur-base) var(--ease-out); }
+.quote-room[open] .qr-chev { transform: rotate(180deg); }
+.qr-panel { padding: 0 18px 18px; }
+.qr-gallery { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 12px; scrollbar-width: thin; }
+.qr-gallery img {
+  height: 132px; width: auto; border-radius: 8px; object-fit: cover; flex-shrink: 0;
   background: var(--paper-300);
 }
-.qrc-thumbs { display: flex; gap: 6px; padding: 6px; flex-wrap: wrap; }
-.qrc-thumb {
-  width: 48px; height: 40px; object-fit: cover; border-radius: 4px; cursor: pointer;
-  border: 2px solid transparent; opacity: 0.7; transition: opacity .2s, border-color .2s;
+.qr-desc { font-family: var(--font-body); font-size: 14px; color: var(--ink-700); line-height: 1.65; margin: 0 0 14px; }
+.qr-amenities { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; padding: 0; margin: 0; }
+.qr-amenities li {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-label); font-size: 12px; letter-spacing: 0.03em; color: var(--ink-700);
 }
-.qrc-thumb:hover { opacity: 1; }
-.qrc-thumb.is-active { opacity: 1; border-color: var(--terracotta); }
-.qrc-body { padding: 22px 24px 22px 0; }
-@media (max-width: 640px) { .qrc-body { padding: 0 20px 22px; } }
-.qrc-name { font-family: var(--font-heading); font-size: 22px; font-weight: 700; color: var(--ink); margin: 4px 0 6px; }
-.qrc-sub { font-family: var(--font-body); font-size: 14px; color: var(--ink-500); margin: 0 0 12px; }
-.qrc-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 12px; }
-.qrc-meta span {
-  font-family: var(--font-label); font-size: 11px; letter-spacing: 0.06em;
-  color: var(--ink-700); display: inline-flex; align-items: center; gap: 6px;
-}
-.qrc-pricing {
-  display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline;
-  border-top: 1px solid var(--paper-400); padding-top: 12px; margin-top: 12px;
-}
-.qrc-pricing .qrc-units { font-family: var(--font-label); font-size: 12px; color: var(--ink-500); letter-spacing: 0.06em; }
-.qrc-pricing .qrc-line-total { font-family: var(--font-heading); font-size: 18px; font-weight: 700; color: var(--ink); margin-left: auto; }
+.qr-amenities svg { width: 15px; height: 15px; color: var(--terracotta); flex-shrink: 0; }
 
-/* ── Services table ── */
-.quote-services-wrap { margin-top: 8px; }
+/* ══ Services table ══ */
 .quote-services-table { width: 100%; border-collapse: collapse; }
 .quote-services-table th {
   font-family: var(--font-label); font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-500);
   text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--paper-400);
 }
-.quote-services-table td { padding: 9px 10px; border-bottom: 1px solid var(--paper-300); font-family: var(--font-body); font-size: 14px; color: var(--ink); }
-.quote-services-table .tax-tag { font-family: var(--font-label); font-size: 10px; letter-spacing: 0.06em; color: var(--ink-500); }
+.quote-services-table td { padding: 10px; border-bottom: 1px solid var(--paper-300); font-family: var(--font-body); font-size: 14px; color: var(--ink); }
+.quote-services-table tbody tr:last-child td { border-bottom: none; }
+.quote-services-table .tax-tag { font-family: var(--font-label); font-size: 10px; letter-spacing: 0.04em; color: var(--ink-500); }
 
-/* ── Tax breakdown (collapsible) ── */
-.quote-tax-details { margin: 4px 0; border-top: 1px dashed var(--paper-400); }
+/* ══ Tax breakdown (collapsible) ══ */
+.quote-tax-details { border-top: 1px dashed var(--paper-400); border-bottom: 1px dashed var(--paper-400); margin: 4px 0; }
 .quote-tax-summary {
   cursor: pointer; list-style: none; display: flex; justify-content: space-between;
-  align-items: center; padding: 10px 0;
-  font-family: var(--font-label); font-size: 12px; font-weight: 700;
+  align-items: center; padding: 12px 0; gap: 12px;
+  font-family: var(--font-label); font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-700);
 }
 .quote-tax-summary::-webkit-details-marker { display: none; }
-.quote-tax-summary .chev { transition: transform .2s; font-size: 11px; }
+.quote-tax-summary .chev { transition: transform .2s; font-size: 10px; color: var(--ink-500); }
 .quote-tax-details[open] .quote-tax-summary .chev { transform: rotate(180deg); }
-.quote-tax-body { padding: 0 0 10px; }
+.quote-tax-body { padding: 0 0 12px; }
 .quote-tax-line { display: flex; justify-content: space-between; padding: 5px 0; font-family: var(--font-body); font-size: 13px; color: var(--ink-700); }
-.quote-tax-line .tax-base { color: var(--ink-500); font-size: 12px; }
+.quote-tax-line .tax-base { color: var(--ink-500); font-size: 12px; margin-left: 6px; }
+
+/* Expand everything when printing to PDF */
+@media print {
+  .quote-room > .qr-panel { display: block !important; }
+  .qr-chev { display: none !important; }
+  .qr-gallery { overflow: visible; flex-wrap: wrap; }
+}
 </style>
 </head>
 <body data-screen-label="Cotización" data-header="dark">
@@ -168,18 +193,6 @@
               <dt>Válida hasta</dt>
               <dd id="metaExpiresAt">—</dd>
             </div>
-            <div class="quote-meta-row" id="metaCheckinRow" style="display:none">
-              <dt>Check-in</dt>
-              <dd id="metaCheckin"></dd>
-            </div>
-            <div class="quote-meta-row" id="metaCheckoutRow" style="display:none">
-              <dt>Check-out</dt>
-              <dd id="metaCheckout"></dd>
-            </div>
-            <div class="quote-meta-row" id="metaPersonasRow" style="display:none">
-              <dt>Huéspedes</dt>
-              <dd id="metaPersonas"></dd>
-            </div>
             <div class="quote-meta-row" id="metaRefRow" style="display:none">
               <dt>Referencia</dt>
               <dd id="metaReferencia"></dd>
@@ -188,34 +201,41 @@
         </div>
       </div>
 
+      <!-- Stay summary band -->
+      <div class="quote-section" id="staySection" style="display:none; padding-top:0">
+        <div class="quote-stay">
+          <div class="quote-stay-cell">
+            <span class="qs-label">Check-in</span>
+            <span class="qs-value" id="stayCheckin">—</span>
+          </div>
+          <div class="quote-stay-cell">
+            <span class="qs-label">Check-out</span>
+            <span class="qs-value" id="stayCheckout">—</span>
+          </div>
+          <div class="quote-stay-cell">
+            <span class="qs-label">Noches</span>
+            <span class="qs-value" id="stayNights">—</span>
+          </div>
+          <div class="quote-stay-cell">
+            <span class="qs-label">Huéspedes</span>
+            <span class="qs-value" id="stayGuests">—</span>
+          </div>
+        </div>
+      </div>
+
       <hr class="quote-divider">
 
-      <!-- Room cards (visual) -->
-      <p class="quote-info-label">Alojamiento</p>
-      <div class="quote-rooms" id="quoteRooms"></div>
-
-      <!-- Items table -->
-      <div class="quote-table-wrap" style="margin-top:20px">
-        <table class="quote-table">
-          <thead>
-            <tr>
-              <th>Tipología</th>
-              <th class="text-center">Unidades</th>
-              <th class="text-center">Noches</th>
-              <th class="text-right">Tarifa / noche</th>
-              <th class="text-right">Subtotal</th>
-            </tr>
-          </thead>
-          <tbody id="quoteItemsTbody">
-          </tbody>
-        </table>
+      <!-- Room accordion -->
+      <div class="quote-section">
+        <p class="quote-section-label">Alojamiento</p>
+        <div class="quote-rooms" id="quoteRooms"></div>
       </div>
 
       <!-- Services -->
       <div id="serviciosSection" style="display:none">
         <hr class="quote-divider">
-        <p class="quote-info-label">Servicios adicionales</p>
-        <div class="quote-services-wrap">
+        <div class="quote-section">
+          <p class="quote-section-label">Servicios adicionales</p>
           <table class="quote-services-table">
             <thead>
               <tr>
@@ -411,44 +431,42 @@ function renderRoomCards(items) {
   wrap.innerHTML = items.map((it, idx) => {
     const meta = roomMetaFor(it);
     const gallery = (meta && meta.gallery && meta.gallery.length) ? meta.gallery : (meta && meta.image ? [meta.image] : []);
-    const main = gallery[0] || 'assets/photos/tipo1/1.webp';
-    const sub = meta ? meta.sub : '';
-    const metaBits = meta ? [
+    const thumb = gallery[0] || 'assets/photos/tipo1/1.webp';
+    const facts = meta ? [
       meta.area ? `${meta.area} m²` : '',
       meta.beds || '',
-      meta.view || '',
-      meta.capacity ? `Hasta ${meta.capacity}` : ''
-    ].filter(Boolean) : [];
-    const thumbs = gallery.map((g, i) =>
-      `<img src="${esc(g)}" alt="" class="qrc-thumb${i === 0 ? ' is-active' : ''}" data-card="${idx}" loading="lazy">`
-    ).join('');
+      meta.view || ''
+    ].filter(Boolean).join('  ·  ') : '';
+    const galleryHtml = gallery.length
+      ? `<div class="qr-gallery">${gallery.map(g => `<img src="${esc(g)}" alt="${esc(it.habitacion)}" loading="lazy">`).join('')}</div>`
+      : '';
+    const amenitiesHtml = (meta && meta.amenities && meta.amenities.length)
+      ? `<ul class="qr-amenities">${meta.amenities.map(a => `<li><i data-lucide="${esc(a.icon)}"></i>${esc(a.l)}</li>`).join('')}</ul>`
+      : '';
     return `
-      <div class="quote-room-card">
-        <div class="qrc-media">
-          <img src="${esc(main)}" alt="${esc(it.habitacion)}" class="qrc-main-img" id="qrcMain-${idx}" loading="lazy">
-          ${gallery.length > 1 ? `<div class="qrc-thumbs">${thumbs}</div>` : ''}
-        </div>
-        <div class="qrc-body">
-          <p class="qrc-name">${esc(it.habitacion)}</p>
-          ${sub ? `<p class="qrc-sub">${esc(sub)}</p>` : ''}
-          ${metaBits.length ? `<div class="qrc-meta">${metaBits.map(b => `<span>${esc(b)}</span>`).join('')}</div>` : ''}
-          <div class="qrc-pricing">
-            <span class="qrc-units">${it.unidades} u. × ${it.noches} noche(s) × ${formatCOP(it.tarifaPorNoche)}</span>
-            <span class="qrc-line-total">${formatCOP(it.subtotal)}</span>
+      <details class="quote-room"${idx === 0 ? ' open' : ''}>
+        <summary class="qr-summary">
+          <img src="${esc(thumb)}" alt="${esc(it.habitacion)}" class="qr-thumb" loading="lazy">
+          <div class="qr-head-main">
+            <p class="qr-name">${esc(it.habitacion)}</p>
+            ${facts ? `<p class="qr-facts">${esc(facts)}</p>` : ''}
           </div>
+          <div class="qr-price">
+            <span class="qr-units">${it.unidades} u. × ${it.noches} noche${it.noches === 1 ? '' : 's'}</span>
+            <span class="qr-line-total">${formatCOP(it.subtotal)}</span>
+          </div>
+          <i data-lucide="chevron-down" class="qr-chev"></i>
+        </summary>
+        <div class="qr-panel">
+          ${galleryHtml}
+          ${meta && meta.description ? `<p class="qr-desc">${esc(meta.description)}</p>` : ''}
+          ${amenitiesHtml}
         </div>
-      </div>
+      </details>
     `;
   }).join('');
 
-  wrap.querySelectorAll('.qrc-thumb').forEach(t => {
-    t.addEventListener('click', function() {
-      const idx = this.dataset.card;
-      document.getElementById('qrcMain-' + idx).src = this.src;
-      wrap.querySelectorAll(`.qrc-thumb[data-card="${idx}"]`).forEach(el => el.classList.remove('is-active'));
-      this.classList.add('is-active');
-    });
-  });
+  if (window.lucide) lucide.createIcons();
 }
 
 /* ── Load & render ── */
@@ -518,29 +536,26 @@ function renderQuote(q) {
   /* Meta */
   setText('metaCreatedAt', formatDateES(q.createdAt));
   setText('metaExpiresAt', formatDateES(q.expiresAt));
-  if (q.checkin) { setText('metaCheckin', formatDateES(q.checkin)); document.getElementById('metaCheckinRow').style.display = ''; }
-  if (q.checkout) { setText('metaCheckout', formatDateES(q.checkout)); document.getElementById('metaCheckoutRow').style.display = ''; }
-  if (q.numPersonas) { setText('metaPersonas', q.numPersonas + (q.numPersonas === 1 ? ' persona' : ' personas')); document.getElementById('metaPersonasRow').style.display = ''; }
   if (q.referencia) {
     setText('metaReferencia', q.referencia);
     document.getElementById('metaRefRow').style.display = '';
   }
 
-  /* Room cards (visual) */
-  renderRoomCards(q.items || []);
+  /* Stay summary band */
+  const nights = (q.checkin && q.checkout)
+    ? Math.max(0, Math.round((new Date(q.checkout) - new Date(q.checkin)) / 86400000))
+    : 0;
+  if (q.checkin || q.checkout || q.numPersonas) {
+    document.getElementById('staySection').style.display = '';
+    setText('stayCheckin', q.checkin ? formatDateES(q.checkin) : '—');
+    setText('stayCheckout', q.checkout ? formatDateES(q.checkout) : '—');
+    setText('stayNights', nights > 0 ? nights : '—');
+    setText('stayGuests', q.numPersonas ? String(q.numPersonas) : '—');
+  }
 
-  /* Items table */
+  /* Room accordion */
+  renderRoomCards(q.items || []);
   const subtotalItems = (q.items || []).reduce((s, it) => s + it.subtotal, 0);
-  const tbody = document.getElementById('quoteItemsTbody');
-  tbody.innerHTML = (q.items || []).map((it, i) => `
-    <tr class="${i % 2 === 0 ? 'qt-even' : ''}">
-      <td class="qt-room">${esc(it.habitacion)}</td>
-      <td class="text-center qt-num">${it.unidades}</td>
-      <td class="text-center qt-num">${it.noches}</td>
-      <td class="text-right qt-num">${formatCOP(it.tarifaPorNoche)}</td>
-      <td class="text-right qt-subtotal">${formatCOP(it.subtotal)}</td>
-    </tr>
-  `).join('');
 
   /* Services — accumulate tax bases */
   const SVC_LABELS = { desayuno: 'Desayuno', almuerzo: 'Almuerzo', cena: 'Cena', parqueadero: 'Parqueadero', personaAdicional: 'Persona adicional' };
