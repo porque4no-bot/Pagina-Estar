@@ -1685,6 +1685,9 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   margin-bottom: 24px;
 }
 .footer-brand p { font-family: var(--font-body); font-style: italic; font-size: 16px; line-height: 1.6; max-width: 38ch; color: rgba(250,246,239,0.75); margin: 0; }
+.footer-address { font-style: normal; display: flex; flex-direction: column; gap: 2px; margin-top: 12px; font-family: var(--font-body); font-size: 13px; color: rgba(250,246,239,0.5); }
+.footer-address a { color: rgba(250,246,239,0.5); transition: color var(--dur-base) var(--ease-out); }
+.footer-address a:hover { color: var(--paper); }
 .footer-col h5, .footer-col .footer-col-heading {
   font-family: var(--font-label);
   font-weight: 700;
@@ -1967,7 +1970,7 @@ body[data-density="compact"] .newsletter { padding: 80px 0; }
   color: var(--terracotta-700);
   letter-spacing: 0.05em;
 }
-.value-cell h4 {
+.value-cell h3 {
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 22px;
@@ -2089,7 +2092,7 @@ body[data-density="compact"] .newsletter { padding: 80px 0; }
   line-height: 1;
   width: 32px;
 }
-.step h5 {
+.step h4 {
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 16px;
@@ -2206,7 +2209,7 @@ body[data-density="compact"] .newsletter { padding: 80px 0; }
 }
 .cross-link:hover { background: var(--paper); border-color: var(--ink-300); }
 .cross-link .eyebrow { color: var(--terracotta-700); margin-bottom: 8px; }
-.cross-link h5 {
+.cross-link h4 {
   font-family: var(--font-heading);
   font-weight: 900;
   font-size: 22px;
@@ -5009,7 +5012,7 @@ html[lang="en"] .lang-es { display: none !important; }
 
   /* ── Value-grid (vivir.html — "Cómo funciona"): compactar celdas ── */
   .value-cell { padding: 20px 24px; gap: 10px; }
-  .value-cell h4 { font-size: 18px; }
+  .value-cell h3 { font-size: 18px; }
   .value-cell p { font-size: 14px; line-height: 1.5; }
 
   /* ── Tarifas móvil: precios ya en cada tarjeta → ocultar tabla separada ── */
@@ -5392,6 +5395,8 @@ textarea:focus-visible,
 .rc-score span { color: var(--terracotta); font-size: 14px; }
 .rc-text { font-family: var(--font-body); font-size: 15px; line-height: 1.65; color: var(--ink); margin: 0; flex: 1; }
 .rc-author { font-size: 13px; font-family: var(--font-label); color: var(--ink-500); letter-spacing: 0.01em; }
+.rc-profile { font-size: 11px; font-family: var(--font-label); color: var(--ink-300); letter-spacing: 0.01em; }
+.rc-date { font-size: 11px; font-family: var(--font-label); color: var(--ink-300); letter-spacing: 0.01em; }
 .rc-source { font-size: 11px; font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.08em; color: var(--terracotta-700); }
 
 /* ── FOOTER NEWSLETTER ──────────────────────────────────────── */

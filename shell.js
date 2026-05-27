@@ -7,6 +7,13 @@
    ============================================================ */
 
 (function () {
+  /* ----- HERO VIDEO: conditional load mobile vs desktop ----- */
+  const heroVideo = document.querySelector('.hero-media video');
+  if (heroVideo && window.innerWidth <= 768) {
+    heroVideo.src = 'assets/video/hero-mobile.mp4';
+    heroVideo.load();
+  }
+
   /* ----- SITE-WIDE CONSTANTS ----- */
   const WHATSAPP_NUMBER = '573102490414'; // Change here to update all floating WhatsApp buttons
 

@@ -44,9 +44,15 @@
     "currenciesAccepted": "COP",
     "address": {
       "@type": "PostalAddress",
+      "streetAddress": "Cl. 61 #23-36, La Estrella",
       "addressLocality": "Manizales",
       "addressRegion": "Caldas",
       "addressCountry": "CO"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 5.059565041000265,
+      "longitude": -75.48809828183073
     },
     "hasMap": "https://maps.app.goo.gl/QwDXDmpE7NwV4m1ZA",
     "checkinTime": "15:00",
@@ -65,11 +71,54 @@
       {"@type": "LocationFeatureSpecification", "name": "Check-in digital", "value": true}
     ],
     "containsPlace": [
-      {"@type": "HotelRoom", "name": "Clásica", "url": "https://estar.com.co/clasica.html"},
-      {"@type": "HotelRoom", "name": "Selección", "url": "https://estar.com.co/seleccion.html"},
-      {"@type": "HotelRoom", "name": "Reserva", "url": "https://estar.com.co/reserva.html"},
-      {"@type": "HotelRoom", "name": "Origen", "url": "https://estar.com.co/origen.html"},
-      {"@type": "HotelRoom", "name": "Especial", "url": "https://estar.com.co/especial.html"}
+      {
+        "@type": "HotelRoom",
+        "name": "Clásica",
+        "description": "Cama queen, escritorio frente a la ventana, cocina equipada con menaje completo y baño privado con ducha. La esencia de estar, en 28 m².",
+        "url": "https://estar.com.co/clasica",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
+        "bed": [{"@type": "BedDetails", "typeOfBed": "Queen size", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 28, "unitCode": "MTK"}
+      },
+      {
+        "@type": "HotelRoom",
+        "name": "Selección",
+        "description": "Balcón privado con vistas a la cordillera. Ideal para el café de las mañanas. La luz natural cambia toda la sensación del espacio.",
+        "url": "https://estar.com.co/seleccion",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
+        "bed": [{"@type": "BedDetails", "typeOfBed": "Queen size", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 32, "unitCode": "MTK"}
+      },
+      {
+        "@type": "HotelRoom",
+        "name": "Reserva",
+        "description": "Dormitorio privado separado de la zona social. Escritorio ergonómico. 42 m². Cuenta con ambientes definidos, cocina y Smart TV.",
+        "url": "https://estar.com.co/reserva",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
+        "bed": [{"@type": "BedDetails", "typeOfBed": "King size", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 42, "unitCode": "MTK"}
+      },
+      {
+        "@type": "HotelRoom",
+        "name": "Origen",
+        "description": "El más espacioso. Diseño con referencia cafetera. Vista panorámica de Manizales para relajarse tras un día de trabajo.",
+        "url": "https://estar.com.co/origen",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
+        "bed": [{"@type": "BedDetails", "typeOfBed": "King size", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 52, "unitCode": "MTK"}
+      },
+      {
+        "@type": "HotelRoom",
+        "name": "Especial",
+        "description": "Nuestra tipología más completa. Terraza privada, cama king + sofá cama. Ideal para viajes familiares o de negocios.",
+        "url": "https://estar.com.co/especial",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 4},
+        "bed": [
+          {"@type": "BedDetails", "typeOfBed": "King size", "numberOfBeds": 1},
+          {"@type": "BedDetails", "typeOfBed": "Sofa bed", "numberOfBeds": 1}
+        ],
+        "floorSize": {"@type": "QuantitativeValue", "value": 60, "unitCode": "MTK"}
+      }
     ],
     "aggregateRating": {
       "@type": "AggregateRating",
@@ -123,7 +172,7 @@
 <section class="hero has-star-cursor" data-screen-label="01.1 Hero">
   <div class="hero-media">
     <video autoplay muted loop playsinline preload="auto" poster="assets/photos/hero_first_frame.webp" aria-hidden="true" role="presentation">
-      <source src="assets/video/hero.mp4" type="video/mp4">
+      <source src="assets/video/hero-desktop.mp4" type="video/mp4">
     </video>
   </div>
   <div class="hero-scrim"></div>
@@ -832,62 +881,82 @@
       <div class="reviews-list" id="reviews-list">
         <article class="review-card">
           <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-          <blockquote class="rc-text">&#8220;Muy conveniente, económico, limpio y moderno. Lo recomiendo altamente. La ubicación es excelente, cerca de buenas tiendas, restaurantes y vida nocturna. El apartamento es muy moderno, limpio, espacioso y bien iluminado.&#8221;</blockquote>
+          <blockquote class="rc-text">&#8220;Muy conveniente, económico, limpio y moderno. La ubicación es excelente, cerca de buenas tiendas, restaurantes y vida nocturna. El apartamento es muy moderno, limpio, espacioso y bien iluminado. El personal es súper amable. El Wi-Fi funcionó excelente. La ducha es muy buena con agua caliente. El gran ventanal aporta mucha luz y los blackouts funcionan muy bien de noche.&#8221;</blockquote>
           <footer class="rc-author">Douglas · Canadá</footer>
+          <span class="rc-profile">Pareja · 10 noches</span>
+          <time class="rc-date" datetime="2024-04-20">Abril 2024</time>
           <span class="rc-source">Booking.com</span>
         </article>
         <article class="review-card">
           <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-          <blockquote class="rc-text">&#8220;Excelente hotel, situado en un barrio muy agradable. Los apartaestudios son modernos, cómodos y espaciosos. Todo está muy limpio y bien mantenido. Dormimos de maravilla. El desayuno es delicioso y variado. El personal es adorable y servicial.&#8221;</blockquote>
-          <footer class="rc-author">Catherine · Bélgica</footer>
+          <blockquote class="rc-text">&#8220;La habitación tiene espacio de sobra para las 6 maletas que traíamos. Estar fue perfecto para celebrar el fin de año con la familia. Excelente cama para descansar y una ducha espectacular para dos personas. El diseño de la iluminación está muy bien logrado. Los blackouts funcionan a la perfección. Altamente recomendado.&#8221;</blockquote>
+          <footer class="rc-author">Renatus · Panamá</footer>
+          <span class="rc-profile">Pareja · 2 noches</span>
+          <time class="rc-date" datetime="2024-01-02">Enero 2024</time>
           <span class="rc-source">Booking.com</span>
         </article>
         <article class="review-card">
           <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-          <blockquote class="rc-text">&#8220;¡Wooow, el mejor lugar para quedarse en Manizales! Amé cada detalle del lugar, lo limpio y acogedor que era. 20 de 10 en ubicación: súper cerca al Cable, la Av. Santander y restaurantes. El barrio La Estrella es un lugar que invita a recorrer.&#8221;</blockquote>
+          <blockquote class="rc-text">&#8220;Totalmente nuevo, bien decorado, luminoso y ventilado. Cama y sábanas extremadamente cómodas. El personal fue muy amable y dispuesto a ayudar. Excelente ubicación en la zona rosa pero lo suficientemente apartado para no escuchar nada de ruido por la noche. ¡Lo único malo fue no haberme quedado más tiempo!&#8221;</blockquote>
+          <footer class="rc-author">Maisie · Reino Unido</footer>
+          <span class="rc-profile">Pareja · 2 noches</span>
+          <time class="rc-date" datetime="2023-12-18">Diciembre 2023</time>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;¡Wooow, el mejor lugar para quedarse en Manizales! Amé cada detalle del lugar, lo limpio y acogedor que era. 20 de 10 en ubicación: súper cerca al Cable, la Av. Santander y restaurantes. El barrio La Estrella es un lugar que invita a recorrer. Gracias a Daniela por su increíble acogida. Volvería sin dudarlo.&#8221;</blockquote>
           <footer class="rc-author">Angélica · Colombia</footer>
-          <span class="rc-source">Booking.com</span>
-        </article>
-        <article class="review-card">
-          <div class="rc-score">9 <span aria-hidden="true">✶</span></div>
-          <blockquote class="rc-text">&#8220;Llevamos tres meses en el Origen y seguimos renovando. El apartaestudio tiene todo lo que necesita un residente médico: escritorio amplio, internet estable y una cocina de verdad. Nada de lo que falta en un hotel y nada de lo que sobra.&#8221;</blockquote>
-          <footer class="rc-author">Sebastián · Colombia</footer>
+          <span class="rc-profile">Solo/a · 1 noche</span>
+          <time class="rc-date" datetime="2023-10-03">Octubre 2023</time>
           <span class="rc-source">Booking.com</span>
         </article>
         <article class="review-card">
           <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-          <blockquote class="rc-text">&#8220;Perfect for remote work — fast fiber internet, a real desk, and the best coffee in the building is five minutes away. El Cable neighborhood has a great energy. Will definitely come back when I'm in Manizales for work.&#8221;</blockquote>
-          <footer class="rc-author">Lena · Alemania</footer>
+          <blockquote class="rc-text">&#8220;Anfitriona increíble, gran comodidad y ubicación. La estancia fue perfecta; tiene una ubicación grandiosa que facilitó disfrutar de la ciudad. Es un vecindario lindo y tranquilo rodeado de excelentes restaurantes. La habitación era muy cómoda y Daniela me ayudó con toda la información que necesité con mucha amabilidad. Recomendado al 100%.&#8221;</blockquote>
+          <footer class="rc-author">Manuela · Países Bajos</footer>
+          <span class="rc-profile">Solo/a · 1 noche</span>
+          <time class="rc-date" datetime="2023-10-01">Octubre 2023</time>
           <span class="rc-source">Booking.com</span>
         </article>
         <article class="review-card">
           <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-          <blockquote class="rc-text">&#8220;Vinimos con nuestra empresa a una capacitación de dos semanas y Estar resolvió todo: factura única, check-in digital para todo el equipo y un precio que no encuentras en ningún hotel de la zona. Les volvemos a encargar la próxima vez.&#8221;</blockquote>
-          <footer class="rc-author">Mariana &amp; Felipe · Colombia</footer>
+          <blockquote class="rc-text">&#8220;La cocineta está muy bien equipada, excelente ubicación cerca de centros comerciales, cafés, restaurantes y vías principales donde tomamos el transporte a otros sitios de interés. Además, hay café y aromática disponibles todo el tiempo en la recepción. No tengo quejas, todo estuvo muy bien.&#8221;</blockquote>
+          <footer class="rc-author">Francia · Colombia</footer>
+          <span class="rc-profile">Familiar · 4 noches</span>
+          <time class="rc-date" datetime="2024-10-13">Octubre 2024</time>
           <span class="rc-source">Booking.com</span>
         </article>
         <article class="review-card">
           <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-          <blockquote class="rc-text">&#8220;Vine a Manizales por el Festival de Teatro y terminé quedándome una semana más. El Selección con balcón a la cordillera es sencillamente hermoso para tomar el café de la mañana. El barrio tiene la energía justa: tranquilo pero vivo.&#8221;</blockquote>
-          <footer class="rc-author">Jimena · Bogotá</footer>
+          <blockquote class="rc-text">&#8220;Excelente hotel, situado en un barrio muy agradable. Los apartaestudios son modernos, cómodos y espaciosos. Todo está muy limpio y bien mantenido. Dormimos de maravilla. El personal es adorable y servicial. Lo recomiendo al 100%.&#8221;</blockquote>
+          <footer class="rc-author">Catherine · Bélgica</footer>
+          <span class="rc-profile">Familiar · 3 noches</span>
+          <time class="rc-date" datetime="2025-02-13">Febrero 2025</time>
           <span class="rc-source">Booking.com</span>
         </article>
         <article class="review-card">
           <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-          <blockquote class="rc-text">&#8220;Honestly one of the best stays I've had in Colombia. The Especial apartment with private terrace was worth every peso — panoramic views of Manizales at night are something else. We'll be back for the Coffee Festival.&#8221;</blockquote>
-          <footer class="rc-author">James · Estados Unidos</footer>
-          <span class="rc-source">Booking.com</span>
-        </article>
-        <article class="review-card">
-          <div class="rc-score">9 <span aria-hidden="true">✶</span></div>
-          <blockquote class="rc-text">&#8220;Llevaba meses buscando un apartamento amoblado en Manizales para mi posgrado y Estar fue la mejor decisión. La ubicación respecto a la Universidad Nacional es imbatible. Renovamos cada mes sin dudarlo.&#8221;</blockquote>
-          <footer class="rc-author">Valentina · Medellín</footer>
+          <blockquote class="rc-text">&#8220;Me encantó, quiero volver. Es un apartaestudio muy moderno, cómodo y limpio. Está ubicado en un punto muy estratégico de la ciudad y es fácil de llegar. Me encantó el servicio y la amabilidad del anfitrión.&#8221;</blockquote>
+          <footer class="rc-author">Huésped verificado · Colombia</footer>
+          <span class="rc-profile">Solo/a · 1 noche</span>
+          <time class="rc-date" datetime="2023-09-29">Septiembre 2023</time>
           <span class="rc-source">Booking.com</span>
         </article>
         <article class="review-card">
           <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
-          <blockquote class="rc-text">&#8220;Un fin de semana en pareja que superó todas las expectativas. El apartaestudio Reserva con ambientes separados nos dio privacidad y comodidad. La ciudad desde la ventana es una postal. Volveremos definitivamente.&#8221;</blockquote>
-          <footer class="rc-author">Andrés &amp; Sofía · Cali</footer>
+          <blockquote class="rc-text">&#8220;El personal de recepción y la señora Marta tuvieron un 10 en su disposición y con el desayuno. Las instalaciones y la ubicación hacen de Estar una excelente alternativa en Manizales.&#8221;</blockquote>
+          <footer class="rc-author">Rodrigo · Chile</footer>
+          <span class="rc-profile">Solo/a · 2 noches</span>
+          <time class="rc-date" datetime="2024-05-10">Mayo 2024</time>
+          <span class="rc-source">Booking.com</span>
+        </article>
+        <article class="review-card">
+          <div class="rc-score">10 <span aria-hidden="true">✶</span></div>
+          <blockquote class="rc-text">&#8220;Excelente ubicación, lo cual facilitaba mucho el movimiento por la ciudad. El espacio fue totalmente satisfactorio y la cama es sumamente cómoda. Una experiencia muy buena.&#8221;</blockquote>
+          <footer class="rc-author">Jose · Colombia</footer>
+          <span class="rc-profile">Pareja · 1 noche</span>
+          <time class="rc-date" datetime="2023-09-29">Septiembre 2023</time>
           <span class="rc-source">Booking.com</span>
         </article>
       </div>
@@ -965,6 +1034,10 @@
       <div class="footer-brand">
         <div class="brand-stack" aria-hidden="true"></div>
         <p data-i18n-html="footer_desc">Hospedaje en el corazón de Manizales pensado para <span class="serif-italic">estar</span> en casa.</p>
+        <address class="footer-address">
+          <span>Cl. 61 #23-36, La Estrella · Manizales, Caldas</span>
+          <a href="mailto:reservas@estar.com.co">reservas@estar.com.co</a>
+        </address>
       </div>
       <div class="footer-col">
         <p class="footer-col-heading" data-i18n="footer_estadias">Estadías</p>
@@ -1036,6 +1109,23 @@
   var t=new Date(),t2=new Date();t2.setDate(t2.getDate()+1);
   function fmt(d){return d.toISOString().split('T')[0];}
   function cop(n){return '$'+Math.round(n).toLocaleString('es-CO');}
+  fetch('/api/get-booking-rating')
+    .then(function(r){return r.ok?r.json():Promise.reject();})
+    .then(function(d){
+      if(!d.rating||!d.reviewsCount)return;
+      var ld=document.querySelector('script[type="application/ld+json"]');
+      if(!ld)return;
+      try{
+        var schema=JSON.parse(ld.textContent);
+        var biz=Array.isArray(schema)?schema.find(function(s){return s['@type']==='LodgingBusiness';}):schema;
+        if(biz&&biz.aggregateRating){
+          biz.aggregateRating.ratingValue=d.rating;
+          biz.aggregateRating.reviewCount=d.reviewsCount;
+          ld.textContent=JSON.stringify(schema);
+        }
+      }catch(e){}
+    })
+    .catch(function(){});
   fetch('/api/check-availability?checkin='+fmt(t)+'&checkout='+fmt(t2)+'&guests=1')
     .then(function(r){return r.ok?r.json():Promise.reject();})
     .then(function(d){
