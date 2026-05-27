@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { authenticateAdmin } = require('./_firebase-auth');
+const { getQuoteStore, loadQuote } = require('./_quotes-store');
 
 function loadEnv() {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
@@ -310,23 +311,33 @@ exports.handler = async (event, context) => {
       return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'quoteId inválido' }) };
     }
 
-    /* Extract and decode quote data from the share URL's ?d= parameter */
-    let quoteData;
+    /* Load the quote: prefer the stored copy (id-based links); fall back to legacy ?d= */
+    let quoteData = null;
     try {
-      const urlObj = new URL(quoteUrl);
-      const encoded = urlObj.searchParams.get('d');
-      if (!encoded) throw new Error('missing d param');
-      
-      // Decode manually to support older Node runtimes that lack base64url support
-      const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
-      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
-      quoteData = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
-    } catch (err) {
-      console.error('[send-quote-email] decode error:', err.message);
-      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'quoteUrl inválida o corrompida' }) };
+      const store = getQuoteStore();
+      quoteData = await loadQuote(store, quoteId);
+    } catch (e) {
+      quoteData = null;
     }
 
-    if (!quoteData || quoteData.quoteId !== quoteId) {
+    if (!quoteData) {
+      try {
+        const urlObj = new URL(quoteUrl);
+        const encoded = urlObj.searchParams.get('d');
+        if (encoded) {
+          const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+          const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+          quoteData = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+        }
+      } catch (err) {
+        console.error('[send-quote-email] decode error:', err.message);
+      }
+    }
+
+    if (!quoteData) {
+      return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización no encontrada' }) };
+    }
+    if (quoteData.quoteId !== quoteId) {
       return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'quoteId no coincide con los datos de la cotización' }) };
     }
 

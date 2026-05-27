@@ -364,6 +364,44 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .btn[disabled] { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+/* ── Tabs ── */
+.admin-tabs { display: flex; gap: 4px; background: var(--paper-200); border-radius: 8px; padding: 4px; }
+.admin-tab {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-label); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-500);
+  padding: 10px 18px; border-radius: 6px; transition: all var(--dur-fast) var(--ease-out);
+}
+.admin-tab:hover { color: var(--ink); }
+.admin-tab.is-active { background: var(--ink); color: var(--paper); }
+
+/* ── Lista ── */
+.lista-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 24px; flex-wrap: wrap; }
+.lista-table { min-width: 760px; }
+.lista-table td { font-family: var(--font-body); font-size: 13px; color: var(--ink); }
+.lista-id { font-family: var(--font-label); font-size: 11px; letter-spacing: 0.04em; color: var(--ink-700); white-space: nowrap; }
+.lista-total { font-family: var(--font-label); font-weight: 700; white-space: nowrap; }
+.lista-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.lista-actions button {
+  background: none; border: 1px solid var(--paper-400); border-radius: 4px;
+  color: var(--ink-700); cursor: pointer; font-family: var(--font-label);
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 6px 9px; transition: all var(--dur-fast) var(--ease-out); white-space: nowrap;
+}
+.lista-actions button:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.lista-actions button.danger:hover { background: var(--error-700); border-color: var(--error-700); color: var(--white); }
+
+.badge {
+  display: inline-block; font-family: var(--font-label); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 9px; border-radius: 100px;
+  white-space: nowrap;
+}
+.badge-activa    { background: var(--paper-300); color: var(--ink-700); }
+.badge-vista     { background: #DCE7F0; color: #2E5A82; }
+.badge-aceptada  { background: #D8EBD8; color: #2E6B3A; }
+.badge-cancelada { background: #F0DCDC; color: #8A2E2E; }
+.badge-vencida   { background: #EDE6D6; color: #8A6A2E; }
 </style>
 </head>
 <body>
@@ -399,8 +437,20 @@
     <div class="admin-page-header">
       <div>
         <p class="eyebrow terracotta">Hotel Estar — Portal B2B</p>
-        <h1>Nueva cotización</h1>
+        <h1 id="pageTitle">Nueva cotización</h1>
       </div>
+      <div class="admin-tabs">
+        <button type="button" class="admin-tab is-active" data-view="nueva">Nueva cotización</button>
+        <button type="button" class="admin-tab" data-view="lista">Cotizaciones</button>
+      </div>
+    </div>
+
+    <!-- ══════════════ VIEW: Nueva / Editar ══════════════ -->
+    <div id="viewNueva">
+
+    <div id="editBanner" style="display:none; background:var(--terracotta-100); border:1px solid var(--terracotta-300); border-radius:8px; padding:14px 18px; margin-bottom:24px; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+      <span style="font-family:var(--font-label); font-size:12px; letter-spacing:0.06em; color:var(--ink);">Editando cotización <strong id="editBannerId"></strong></span>
+      <button type="button" id="cancelEditBtn" class="btn btn-ghost-dark" style="padding:8px 14px; font-size:11px;">Descartar y crear nueva</button>
     </div>
 
     <!-- ── 1. Datos del cliente ── -->
@@ -625,6 +675,37 @@
       <div class="success-btn-row">
         <a id="viewQuoteLink" href="#" target="_blank" class="btn btn-ghost-dark">Ver cotización →</a>
         <button id="newQuoteBtn" class="btn btn-ghost-dark">Nueva cotización</button>
+      </div>
+    </div>
+
+    </div><!-- end #viewNueva -->
+
+    <!-- ══════════════ VIEW: Lista de cotizaciones ══════════════ -->
+    <div id="viewLista" style="display:none">
+      <div class="lista-toolbar">
+        <input type="search" id="listSearch" class="it-input" style="min-width:unset; max-width:320px" placeholder="Buscar por empresa o ID…">
+        <button type="button" id="refreshListBtn" class="btn btn-ghost-dark" style="padding:10px 16px; font-size:11px;">Actualizar</button>
+      </div>
+
+      <div id="listLoading" style="display:none; padding:48px; text-align:center; font-family:var(--font-label); font-size:12px; color:var(--ink-500); letter-spacing:0.08em;">Cargando cotizaciones…</div>
+      <div id="listEmpty" style="display:none; padding:48px; text-align:center; font-family:var(--font-body); font-size:14px; color:var(--ink-500);">Aún no hay cotizaciones creadas.</div>
+      <div id="listError" style="display:none; padding:24px; text-align:center; font-family:var(--font-label); font-size:12px; color:var(--error-700);"></div>
+
+      <div class="items-table-wrap" id="listTableWrap" style="display:none">
+        <table class="items-table lista-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Empresa</th>
+              <th>Estadía</th>
+              <th>Total</th>
+              <th>Estado</th>
+              <th>Vistas</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="listBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -921,14 +1002,13 @@ document.getElementById('otrosBody').addEventListener('click', function(e) {
 
 /* ── Collect form data ── */
 function collectFormData() {
-  const n = stayNights();
   const items = [];
   document.querySelectorAll('#itemsBody tr').forEach(tr => {
     const habitacion = tr.querySelector('[data-field="habitacion"]').value;
     const u = Math.max(1, parseInt(tr.querySelector('[data-field="unidades"]').value) || 1);
     const base = Math.max(0, parseFloat(tr.querySelector('[data-field="tarifa"]').value) || 0);
-    const t = effectiveTarifa(base); // precio inflado con comisión — la comisión nunca se envía
-    items.push({ habitacion, roomTypeId: ROOM_NAME_TO_ID[habitacion] || '', unidades: u, noches: n, tarifaPorNoche: t, subtotal: u * n * t });
+    /* Send the base rate + commission; the server inflates and the commission never reaches the client. */
+    items.push({ habitacion, roomTypeId: ROOM_NAME_TO_ID[habitacion] || '', unidades: u, tarifaBase: base });
   });
 
   const servicios = { otros: [] };
@@ -961,6 +1041,7 @@ function collectFormData() {
     checkin: document.getElementById('qCheckin').value,
     checkout: document.getElementById('qCheckout').value,
     numPersonas: numPersonas(),
+    comision: comisionPct(),
     items,
     servicios,
     descuento: {
@@ -971,7 +1052,9 @@ function collectFormData() {
   };
 }
 
-/* ── Create quote ── */
+/* ── Create / save quote ── */
+let editingQuoteId = null; // null = creating, otherwise editing this id
+
 document.getElementById('createQuoteBtn').addEventListener('click', async function() {
   const errEl = document.getElementById('formError');
   errEl.style.display = 'none';
@@ -984,30 +1067,33 @@ document.getElementById('createQuoteBtn').addEventListener('click', async functi
   if (stayNights() <= 0) { showToast('El check-out debe ser posterior al check-in.'); return; }
   if (data.items.length === 0) { showToast('Agrega al menos un ítem.'); return; }
 
+  const isEdit = !!editingQuoteId;
   const btn = this;
   btn.disabled = true;
-  document.getElementById('createBtnText').textContent = 'Creando...';
+  document.getElementById('createBtnText').textContent = isEdit ? 'Guardando...' : 'Creando...';
   document.getElementById('createBtnArrow').style.display = 'none';
   document.getElementById('createSpinner').style.display = 'inline-block';
 
   try {
     const token = await window.getAuthToken();
+    const url = isEdit ? '/api/update-quote' : '/api/create-quote';
+    const payload = isEdit ? Object.assign({ quoteId: editingQuoteId }, data) : data;
 
-    const res = await fetch('/api/create-quote', {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify(data)
+      body: JSON.stringify(payload)
     });
 
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Error al crear cotización');
+    if (!res.ok) throw new Error(json.error || 'Error al guardar la cotización');
 
-    showSuccessPanel(json.quoteId, json.shareUrl, data.email);
+    showSuccessPanel(json.quoteId, json.shareUrl, data.email, isEdit);
   } catch (err) {
     errEl.textContent = err.message;
     errEl.style.display = 'block';
     btn.disabled = false;
-    document.getElementById('createBtnText').textContent = 'Crear cotización';
+    document.getElementById('createBtnText').textContent = editingQuoteId ? 'Guardar cambios' : 'Crear cotización';
     document.getElementById('createBtnArrow').style.display = 'inline';
     document.getElementById('createSpinner').style.display = 'none';
   }
@@ -1015,19 +1101,20 @@ document.getElementById('createQuoteBtn').addEventListener('click', async functi
 
 let currentQuoteId = null;
 
-function showSuccessPanel(quoteId, shareUrl, clientEmail) {
+function showSuccessPanel(quoteId, shareUrl, clientEmail, isEdit) {
   currentQuoteId = quoteId;
   document.getElementById('successQuoteId').textContent = quoteId;
   document.getElementById('quoteUrlInput').value = shareUrl;
   document.getElementById('sendToEmail').value = clientEmail || '';
-  document.getElementById('viewQuoteLink').href = shareUrl;
+  document.getElementById('viewQuoteLink').href = shareUrl + (shareUrl.includes('?') ? '&' : '?') + 'preview=1';
   document.getElementById('emailStatus').style.display = 'none';
+  document.querySelector('#successPanel .eyebrow').textContent = isEdit ? 'Cotización actualizada correctamente' : 'Cotización creada correctamente';
 
   document.getElementById('successPanel').style.display = 'block';
   document.getElementById('createQuoteBtn').style.display = 'none';
 
   document.getElementById('successPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  showToast('Cotización creada con éxito ✓', 3000);
+  showToast(isEdit ? 'Cambios guardados ✓' : 'Cotización creada con éxito ✓', 3000);
 }
 
 /* ── Copy link ── */
@@ -1089,24 +1176,34 @@ document.getElementById('sendEmailBtn').addEventListener('click', async function
   }
 });
 
-/* ── New quote ── */
-document.getElementById('newQuoteBtn').addEventListener('click', function() {
+function defaultValidity() {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  return d.toISOString().split('T')[0];
+}
+
+/* ── Reset the form to a clean "create" state ── */
+function resetForm() {
+  editingQuoteId = null;
   currentQuoteId = null;
+  document.getElementById('pageTitle').textContent = 'Nueva cotización';
+  document.getElementById('editBanner').style.display = 'none';
   document.getElementById('successPanel').style.display = 'none';
-  document.getElementById('createQuoteBtn').style.display = 'flex';
-  document.getElementById('createQuoteBtn').disabled = false;
+  const btn = document.getElementById('createQuoteBtn');
+  btn.style.display = 'flex';
+  btn.disabled = false;
   document.getElementById('createBtnText').textContent = 'Crear cotización';
   document.getElementById('createBtnArrow').style.display = 'inline';
   document.getElementById('createSpinner').style.display = 'none';
   document.getElementById('formError').style.display = 'none';
 
-  // Reset form fields
-  ['qEmpresa','qContacto','qEmail','qTelefono','qNit','qReferencia','qReferencia','qCondiciones'].forEach(id => {
+  ['qEmpresa','qContacto','qEmail','qTelefono','qNit','qReferencia','qCondiciones'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
   document.getElementById('qDescValor').value = '0';
   document.querySelector('input[name="descTipo"][value="porcentaje"]').checked = true;
+  document.getElementById('qValidaHasta').value = defaultValidity();
   document.getElementById('qCheckin').value = '';
   document.getElementById('qCheckout').value = '';
   document.getElementById('qPersonas').value = '1';
@@ -1115,16 +1212,233 @@ document.getElementById('newQuoteBtn').addEventListener('click', function() {
   initServicesTable();
   updateNightsLabel();
   updateTotals();
+}
+
+document.getElementById('newQuoteBtn').addEventListener('click', function() {
+  resetForm();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-/* ── Set default validity date (30 days from today) ── */
-(function setDefaultDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + 30);
-  document.getElementById('qValidaHasta').value = d.toISOString().split('T')[0];
-})();
+document.getElementById('cancelEditBtn').addEventListener('click', function() {
+  resetForm();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
 
+/* ════════════════ Tabs ════════════════ */
+function switchView(view) {
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.toggle('is-active', t.dataset.view === view));
+  document.getElementById('viewNueva').style.display = view === 'nueva' ? 'block' : 'none';
+  document.getElementById('viewLista').style.display = view === 'lista' ? 'block' : 'none';
+  if (view === 'lista') loadQuotesList();
+}
+document.querySelectorAll('.admin-tab').forEach(t => {
+  t.addEventListener('click', () => switchView(t.dataset.view));
+});
+
+/* ════════════════ Quote list ════════════════ */
+const STATUS_LABEL = { activa: 'Activa', vista: 'Vista', aceptada: 'Aceptada', cancelada: 'Cancelada', vencida: 'Vencida' };
+let LIST_CACHE = [];
+
+function computeQuoteTotal(q) {
+  const subtotalItems = (q.items || []).reduce((s, it) => s + (it.subtotal || 0), 0);
+  const sv = q.servicios || {};
+  let baseIva = 0, baseInc = 0, baseNone = 0;
+  ['parqueadero', 'personaAdicional'].forEach(k => { const s = sv[k]; if (s) baseIva += (s.cantidad || 0) * (s.precioUnitario || 0); });
+  ['desayuno', 'almuerzo', 'cena'].forEach(k => { const s = sv[k]; if (s) baseInc += (s.cantidad || 0) * (s.precioUnitario || 0); });
+  (sv.otros || []).forEach(o => {
+    const sub = (o.cantidad || 0) * (o.precioUnitario || 0);
+    if (o.impuesto === 'iva') baseIva += sub; else if (o.impuesto === 'inc') baseInc += sub; else baseNone += sub;
+  });
+  const subtotal = subtotalItems + baseIva + baseInc + baseNone;
+  let desc = 0;
+  if (q.descuento && q.descuento.valor > 0) desc = q.descuento.tipo === 'porcentaje' ? subtotal * (q.descuento.valor / 100) : q.descuento.valor;
+  desc = Math.min(desc, subtotal);
+  const ivaRate = (q.impuestos && q.impuestos.ivaRate) || 0.19;
+  const incRate = (q.impuestos && q.impuestos.incRate) || 0.08;
+  const factor = subtotal > 0 ? (subtotal - desc) / subtotal : 0;
+  const iva = (subtotalItems + baseIva) * factor * ivaRate;
+  const inc = baseInc * factor * incRate;
+  return (subtotal - desc) + iva + inc;
+}
+
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function fmtShortDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  return d.getUTCDate() + '/' + (d.getUTCMonth() + 1) + '/' + String(d.getUTCFullYear()).slice(2);
+}
+
+async function loadQuotesList() {
+  const setBlock = (id, on) => { document.getElementById(id).style.display = on ? '' : 'none'; };
+  setBlock('listLoading', true); setBlock('listEmpty', false); setBlock('listError', false); setBlock('listTableWrap', false);
+  try {
+    const token = await window.getAuthToken();
+    const res = await fetch('/api/list-quotes', { headers: { 'Authorization': `Bearer ${token}` } });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Error al cargar');
+    LIST_CACHE = json.quotes || [];
+    setBlock('listLoading', false);
+    renderQuotesList();
+  } catch (err) {
+    setBlock('listLoading', false);
+    const el = document.getElementById('listError');
+    el.textContent = '✗ ' + err.message;
+    el.style.display = '';
+  }
+}
+
+function renderQuotesList() {
+  const term = (document.getElementById('listSearch').value || '').toLowerCase().trim();
+  const rows = LIST_CACHE.filter(q =>
+    !term || (q.empresa || '').toLowerCase().includes(term) || (q.quoteId || '').toLowerCase().includes(term)
+  );
+  const wrap = document.getElementById('listTableWrap');
+  const empty = document.getElementById('listEmpty');
+  if (!rows.length) { wrap.style.display = 'none'; empty.style.display = ''; return; }
+  empty.style.display = 'none'; wrap.style.display = '';
+
+  document.getElementById('listBody').innerHTML = rows.map(q => {
+    const st = q.statusEfectivo || 'activa';
+    const stay = (q.checkin && q.checkout) ? `${fmtShortDate(q.checkin)} → ${fmtShortDate(q.checkout)}` : '—';
+    const canCancel = st !== 'cancelada';
+    const canReactivate = q.status === 'cancelada';
+    return `
+      <tr data-id="${escHtml(q.quoteId)}">
+        <td class="lista-id">${escHtml(q.quoteId)}</td>
+        <td>${escHtml(q.empresa)}</td>
+        <td style="white-space:nowrap">${stay}</td>
+        <td class="lista-total">${formatCOP(computeQuoteTotal(q))}</td>
+        <td><span class="badge badge-${st}">${STATUS_LABEL[st] || st}</span></td>
+        <td style="text-align:center">${q.views || 0}</td>
+        <td>
+          <div class="lista-actions">
+            <button data-act="view">Ver</button>
+            <button data-act="copy">Enlace</button>
+            <button data-act="edit">Editar</button>
+            ${canReactivate ? '<button data-act="reactivate">Reactivar</button>' : ''}
+            ${canCancel ? '<button data-act="cancel" class="danger">Cancelar</button>' : ''}
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+document.getElementById('listSearch').addEventListener('input', renderQuotesList);
+document.getElementById('refreshListBtn').addEventListener('click', loadQuotesList);
+
+function quoteShareUrl(id) {
+  return window.location.origin + '/cotizacion.html?id=' + id;
+}
+
+document.getElementById('listBody').addEventListener('click', async function(e) {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const tr = btn.closest('tr');
+  const id = tr.dataset.id;
+  const act = btn.dataset.act;
+  const quote = LIST_CACHE.find(q => q.quoteId === id);
+  if (!quote) return;
+
+  if (act === 'view') {
+    window.open(quoteShareUrl(id) + '&preview=1', '_blank');
+  } else if (act === 'copy') {
+    navigator.clipboard.writeText(quoteShareUrl(id))
+      .then(() => showToast('Enlace copiado ✓'))
+      .catch(() => showToast('No se pudo copiar.'));
+  } else if (act === 'edit') {
+    loadQuoteIntoForm(quote);
+  } else if (act === 'cancel') {
+    if (!confirm('¿Cancelar la cotización ' + id + '? El cliente ya no podrá verla.')) return;
+    await quoteStatusAction(id, 'cancel');
+  } else if (act === 'reactivate') {
+    await quoteStatusAction(id, 'reactivate');
+  }
+});
+
+async function quoteStatusAction(id, action) {
+  try {
+    const token = await window.getAuthToken();
+    const res = await fetch('/api/update-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ quoteId: id, action })
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Error');
+    showToast(action === 'cancel' ? 'Cotización cancelada ✓' : 'Cotización reactivada ✓');
+    loadQuotesList();
+  } catch (err) {
+    showToast('✗ ' + err.message);
+  }
+}
+
+/* ════════════════ Load a quote into the form for editing ════════════════ */
+function loadQuoteIntoForm(q) {
+  resetForm();
+  editingQuoteId = q.quoteId;
+  document.getElementById('pageTitle').textContent = 'Editar cotización';
+  document.getElementById('editBannerId').textContent = q.quoteId;
+  document.getElementById('editBanner').style.display = 'flex';
+  document.getElementById('createBtnText').textContent = 'Guardar cambios';
+
+  document.getElementById('qEmpresa').value = q.empresa || '';
+  document.getElementById('qContacto').value = q.contacto || '';
+  document.getElementById('qEmail').value = q.email || '';
+  document.getElementById('qTelefono').value = q.telefono || '';
+  document.getElementById('qNit').value = q.nit || '';
+  document.getElementById('qReferencia').value = q.referencia || '';
+  document.getElementById('qCondiciones').value = q.condiciones || '';
+  document.getElementById('qValidaHasta').value = q.expiresAt ? q.expiresAt.split('T')[0] : defaultValidity();
+  document.getElementById('qCheckin').value = q.checkin || '';
+  document.getElementById('qCheckout').value = q.checkout || '';
+  document.getElementById('qPersonas').value = q.numPersonas || 1;
+  document.getElementById('qComision').value = q.comision || 0;
+  document.getElementById('qDescValor').value = (q.descuento && q.descuento.valor) || 0;
+  const descTipo = (q.descuento && q.descuento.tipo) === 'fijo' ? 'fijo' : 'porcentaje';
+  document.querySelector(`input[name="descTipo"][value="${descTipo}"]`).checked = true;
+
+  /* Rooms — use base rate (tarifaBase) so commission stays separate */
+  const tbody = document.getElementById('itemsBody');
+  tbody.innerHTML = '';
+  rowIdCounter = 0;
+  (q.items || []).forEach(it => {
+    tbody.appendChild(createRow({ habitacion: it.habitacion, unidades: it.unidades, tarifa: it.tarifaBase != null ? it.tarifaBase : it.tarifaPorNoche }));
+  });
+  if (!(q.items || []).length) tbody.appendChild(createRow());
+
+  /* Services */
+  const sv = q.servicios || {};
+  document.querySelectorAll('#serviciosBody tr').forEach(tr => {
+    const s = sv[tr.dataset.svcKey];
+    if (s) {
+      tr.querySelector('[data-field="cantidad"]').value = s.cantidad || 0;
+      tr.querySelector('[data-field="cantidad"]').dataset.touched = '1';
+      tr.querySelector('[data-field="precio"]').value = s.precioUnitario || 0;
+    }
+  });
+  const otrosBody = document.getElementById('otrosBody');
+  otrosBody.innerHTML = '';
+  (sv.otros || []).forEach(o => {
+    const row = createOtroRow();
+    otrosBody.appendChild(row);
+    row.querySelector('[data-field="descripcion"]').value = o.descripcion || '';
+    row.querySelector('[data-field="cantidad"]').value = o.cantidad || 0;
+    row.querySelector('[data-field="precio"]').value = o.precioUnitario || 0;
+    row.querySelector('[data-field="impuesto"]').value = o.impuesto || 'ninguno';
+  });
+
+  updateNightsLabel();
+  updateTotals();
+  switchView('nueva');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ── Init ── */
+document.getElementById('qValidaHasta').value = defaultValidity();
 initItemsTable();
 initServicesTable();
 updateNightsLabel();
