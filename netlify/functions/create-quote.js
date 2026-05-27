@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const { getStore } = require('@netlify/blobs');
 
 function loadEnv() {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
@@ -103,11 +102,12 @@ async function handleRequest(event, context, corsHeaders) {
   };
 
   try {
+    const { getStore } = require('@netlify/blobs');
     const store = getStore('quotes');
     await store.setJSON(quoteId, quoteData);
   } catch (err) {
     console.error('[create-quote] Blobs error:', err.message, err.stack);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error al guardar la cotización: ' + err.message }) };
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error al guardar: ' + err.message }) };
   }
 
   const base = (process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
