@@ -5931,7 +5931,15 @@ body[data-atmosphere="crepusculo"] .room-info .room-price { border-top-color: va
    Quote Request Section — empresas.html
    ============================================================ */
 
-.quote-request-section { background: var(--paper); }
+.quote-request-section {
+  background: var(--paper);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  scroll-margin-top: 0;
+}
+#cotizar { scroll-margin-top: 72px; }
 
 .quote-request-card {
   background: var(--ink);

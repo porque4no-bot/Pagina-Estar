@@ -846,10 +846,10 @@ document.getElementById('newQuoteBtn').addEventListener('click', function() {
   document.getElementById('qValidaHasta').value = d.toISOString().split('T')[0];
 })();
 
-/* ── Netlify Identity auth ── */
-document.addEventListener('DOMContentLoaded', function() {
-  initItemsTable();
+initItemsTable();
 
+/* ── Netlify Identity auth ── */
+(function initAuth() {
   const identity = window.netlifyIdentity;
 
   if (!identity) {
@@ -872,13 +872,12 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('userEmailDisplay').textContent = '';
   }
 
+  /* Handle init event — also check currentUser() in case init already fired */
   identity.on('init', function(user) {
-    if (user) {
-      showAdmin(user);
-    } else {
-      showLogin();
-    }
+    if (user) { showAdmin(user); } else { showLogin(); }
   });
+  const alreadyLoggedIn = identity.currentUser();
+  if (alreadyLoggedIn) { showAdmin(alreadyLoggedIn); }
 
   identity.on('login', function(user) {
     identity.close();
@@ -896,7 +895,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('logoutBtn').addEventListener('click', function() {
     identity.logout();
   });
-});
+}());
 </script>
 </body>
 </html>

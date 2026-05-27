@@ -26,7 +26,7 @@
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' https://unpkg.com https://checkout.wompi.co https://www.googletagmanager.com https://identity.netlify.com; style-src 'self' 'unsafe-inline'; img-src 'self' https:; font-src 'self'; connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identity.netlify.com; frame-src https://checkout.wompi.co"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://unpkg.com https://checkout.wompi.co https://www.googletagmanager.com https://identity.netlify.com; style-src 'self' 'unsafe-inline'; img-src 'self' https:; font-src 'self'; connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identity.netlify.com; frame-src https://checkout.wompi.co https://app.netlify.com https://identity.netlify.com"
 
 [[headers]]
   for = "/api/*"
