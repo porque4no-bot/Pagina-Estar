@@ -888,6 +888,13 @@ initItemsTable();
     showLogin();
   });
 
+  identity.on('error', function(err) {
+    var msg = (err && err.message) ? err.message : String(err);
+    document.getElementById('authOverlay').innerHTML =
+      '<div class="auth-card"><img src="assets/logo.png" alt="estar"><h2>Error de Identity</h2><p style="color:var(--terracotta)">' +
+      msg + '</p><p style="font-size:13px;margin-top:12px">Verifica que Netlify Identity esté habilitado y que el sitio esté desplegado en Netlify.</p></div>';
+  });
+
   document.getElementById('loginBtn').addEventListener('click', function() {
     identity.open('login');
   });
