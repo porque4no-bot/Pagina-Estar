@@ -51,6 +51,7 @@ exports.handler = async (event, context) => {
         store = getQuoteStore();
         quote = await loadQuote(store, id);
       } catch (e) {
+        console.error('[get-quote] blob store unavailable:', e.message, e.stack);
         return { statusCode: 503, headers: corsHeaders, body: JSON.stringify({ error: 'Almacenamiento no disponible' }) };
       }
 

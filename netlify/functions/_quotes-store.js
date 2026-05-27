@@ -20,7 +20,7 @@ const VALID_ROOM_IDS = new Set(Object.values(ROOM_NAME_TO_ID));
 
 /* ── Blob store accessors (graceful when unavailable locally) ── */
 function getQuoteStore() {
-  return getStore({ name: STORE_NAME, consistency: 'strong' });
+  return getStore({ name: STORE_NAME, consistency: 'eventual' });
 }
 
 async function loadQuote(store, id) {

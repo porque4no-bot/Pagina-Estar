@@ -76,7 +76,7 @@ exports.handler = async (event, context) => {
       const store = getQuoteStore();
       await saveQuote(store, quoteData);
     } catch (e) {
-      console.error('[create-quote] blob store unavailable:', e.message);
+      console.error('[create-quote] blob store unavailable:', e.message, e.stack);
       return { statusCode: 503, headers: corsHeaders, body: JSON.stringify({ error: 'Almacenamiento no disponible. Intenta de nuevo.' }) };
     }
 
