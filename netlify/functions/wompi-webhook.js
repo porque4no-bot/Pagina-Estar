@@ -5,6 +5,7 @@ const { getStore } = require('@netlify/blobs');
 const {
   getQuoteStore, loadQuote, saveQuote, effectiveStatus, computeQuoteTotal
 } = require('./_quotes-store');
+const { getAvailabilityByType, findUnavailable } = require('./_otasync');
 
 const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
 
@@ -281,6 +282,33 @@ async function handleQuotePayment(transaction, corsHeaders) {
     quote.updatedAt = now;
     try { await saveQuote(store, quote); } catch (e) { /* non-fatal */ }
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, mock: true, quoteId }) };
+  }
+
+  // Final availability check before booking. Payment already happened, so if
+  // rooms are no longer free we must NOT overbook: mark paid but leave the
+  // reservation pending for manual handling and log critically.
+  if (quote.checkin && quote.checkout) {
+    try {
+      const { availByType, isMock } = await getAvailabilityByType(quote.checkin, quote.checkout);
+      if (!isMock) {
+        const shortfalls = findUnavailable(quote.items, availByType);
+        if (shortfalls.length > 0) {
+          console.error(`[wompi-webhook] PAID but UNAVAILABLE for quote ${quoteId}, tx ${transaction.id}: ${JSON.stringify(shortfalls)}. Reservation NOT created; manual handling required.`);
+          quote.status = 'aceptada';
+          quote.paidAt = now;
+          quote.transactionId = transaction.id;
+          quote.bookingCodes = [];
+          quote.reservationPending = true;
+          quote.availabilityOk = false;
+          quote.unavailable = shortfalls;
+          quote.updatedAt = now;
+          try { await saveQuote(store, quote); } catch (e) { /* non-fatal */ }
+          return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
+        }
+      }
+    } catch (e) {
+      console.error('[wompi-webhook] availability re-check failed (continuing to book):', e.message);
+    }
   }
 
   let roomDetails = {};

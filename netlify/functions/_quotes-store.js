@@ -216,7 +216,9 @@ function toPublic(quote) {
   if (!quote) return quote;
   const {
     createdBy, comision, status, views, firstViewedAt, lastViewedAt,
-    cancelledAt, cancelledBy, updatedAt, paidAt, transactionId, bookingCodes, ...rest
+    cancelledAt, cancelledBy, updatedAt, paidAt, transactionId, bookingCodes,
+    availabilityOk, availabilityCheckedAt, unavailable, reservationPending,
+    bloquearHabitaciones, holdReservationIds, ...rest
   } = quote;
   rest.items = (rest.items || []).map(it => {
     const { tarifaBase, ...pub } = it;

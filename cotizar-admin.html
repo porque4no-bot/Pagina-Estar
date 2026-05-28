@@ -402,6 +402,7 @@
 .badge-aceptada  { background: #D8EBD8; color: #2E6B3A; }
 .badge-cancelada { background: #F0DCDC; color: #8A2E2E; }
 .badge-vencida   { background: #EDE6D6; color: #8A6A2E; }
+.badge-unavailable { background: #F7D9C4; color: #9A3B12; margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -1312,7 +1313,11 @@ function renderQuotesList() {
         <td>${escHtml(q.empresa)}</td>
         <td style="white-space:nowrap">${stay}</td>
         <td class="lista-total">${formatCOP(computeQuoteTotal(q))}</td>
-        <td><span class="badge badge-${st}">${STATUS_LABEL[st] || st}</span></td>
+        <td>
+          <span class="badge badge-${st}">${STATUS_LABEL[st] || st}</span>
+          ${q.availabilityOk === false ? '<span class="badge badge-unavailable" title="' + escHtml((q.unavailable || []).map(u => u.habitacion + ' (' + u.available + '/' + u.requested + ')').join(', ')) + '">Sin disponibilidad</span>' : ''}
+          ${q.reservationPending ? '<span class="badge badge-unavailable" title="Pagada pero la reserva no se pudo crear automáticamente">Reserva pendiente</span>' : ''}
+        </td>
         <td style="text-align:center">${q.views || 0}</td>
         <td>
           <div class="lista-actions">

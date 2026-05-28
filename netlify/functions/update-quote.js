@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { authenticateAdmin } = require('./_firebase-auth');
 const { getQuoteStore, loadQuote, saveQuote, sanitizeQuoteInput, effectiveStatus } = require('./_quotes-store');
+const { getAvailabilityByType, findUnavailable } = require('./_otasync');
 
 function loadEnv() {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
@@ -84,6 +85,23 @@ exports.handler = async (event, context) => {
     }
 
     const sanitized = sanitizeQuoteInput(body);
+
+    /* Availability gate (same as create): block edits that can't be booked. */
+    if (sanitized.checkin && sanitized.checkout) {
+      try {
+        const { availByType, isMock } = await getAvailabilityByType(sanitized.checkin, sanitized.checkout);
+        if (!isMock) {
+          const shortfalls = findUnavailable(sanitized.items, availByType);
+          if (shortfalls.length > 0) {
+            return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ error: 'Sin disponibilidad para las fechas seleccionadas', unavailable: shortfalls }) };
+          }
+        }
+      } catch (e) {
+        console.error('[update-quote] availability check failed:', e.message);
+        return { statusCode: 502, headers: corsHeaders, body: JSON.stringify({ error: 'No se pudo verificar la disponibilidad. Intenta de nuevo.' }) };
+      }
+    }
+
     const updated = {
       ...existing,
       ...sanitized,
@@ -94,6 +112,8 @@ exports.handler = async (event, context) => {
       firstViewedAt: existing.firstViewedAt || null,
       lastViewedAt: existing.lastViewedAt || null,
       status: (existing.firstViewedAt) ? 'vista' : 'activa',
+      availabilityOk: true,
+      availabilityCheckedAt: now,
       updatedAt: now
     };
     delete updated.cancelledAt;

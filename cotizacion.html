@@ -446,7 +446,7 @@ function showPayMessage(text, kind) {
   el.style.color = kind === 'error' ? 'var(--terracotta-700)' : 'var(--olive-700)';
 }
 
-function startQuotePayment() {
+async function startQuotePayment() {
   if (!QUOTE_PAY) return;
   if (IS_PREVIEW) { showPayMessage('Vista previa: el pago está deshabilitado.', 'error'); return; }
   if (typeof window.WidgetCheckout === 'undefined') {
@@ -455,6 +455,23 @@ function startQuotePayment() {
   }
   const btn = document.getElementById('acceptPayBtn');
   if (btn) btn.disabled = true;
+
+  /* Re-check availability before charging */
+  showPayMessage('Verificando disponibilidad…', 'ok');
+  try {
+    const r = await fetch('/api/quote-availability?id=' + encodeURIComponent(QUOTE_PAY.id));
+    const a = await r.json();
+    if (!a.available) {
+      const names = (a.unavailable || []).map(u => u.habitacion).join(', ');
+      showPayMessage(names
+        ? 'Ya no hay disponibilidad para: ' + names + '. Contáctanos para ajustar tu cotización.'
+        : 'La cotización ya no está disponible. Contáctanos para una nueva.', 'error');
+      if (btn) btn.disabled = false;
+      return;
+    }
+  } catch (e) { /* fail open — webhook re-checks before booking */ }
+  showPayMessage('', 'ok');
+  document.getElementById('payMessage').style.display = 'none';
 
   const checkout = new window.WidgetCheckout({
     currency: 'COP',
