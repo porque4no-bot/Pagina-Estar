@@ -2,6 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { getStore } = require('@netlify/blobs');
+const {
+  getQuoteStore, loadQuote, saveQuote, effectiveStatus, computeQuoteTotal
+} = require('./_quotes-store');
+
+const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
 
 // Helper to load local .env variables if not already set (e.g. local development)
 function loadEnv() {
@@ -172,6 +177,217 @@ function decodeReference(ref) {
 function obfuscateReference(ref) {
   if (!ref || typeof ref !== 'string') return '';
   return ref.length > 8 ? `${ref.substring(0, 4)}...${ref.substring(ref.length - 4)}` : '***';
+}
+
+// Build OTASync reservation rooms array from quote items (expands `unidades`).
+function buildQuoteRooms(quote, roomDetails) {
+  const rooms = [];
+  (quote.items || []).forEach(it => {
+    const nights = it.noches || 1;
+    const avgPrice = it.tarifaPorNoche || 0;
+    const totalPrice = avgPrice * nights;
+    const matched = roomDetails[it.roomTypeId];
+    const roomName = (matched && matched.name) || it.habitacion || 'Clásica';
+
+    const nightsArray = [];
+    const baseDate = new Date(quote.checkin);
+    for (let n = 0; n < nights; n++) {
+      const d = new Date(baseDate);
+      d.setDate(d.getDate() + n);
+      nightsArray.push({
+        night_date: d.toISOString().split('T')[0],
+        price: avgPrice,
+        original_price: avgPrice,
+        breakfast: 0, lunch: 0, dinner: 0
+      });
+    }
+
+    const units = Math.max(1, it.unidades || 1);
+    for (let u = 0; u < units; u++) {
+      rooms.push({
+        id_room_types: parseInt(it.roomTypeId) || 0,
+        id_rooms: 0,
+        room_type: roomName,
+        room_number: "",
+        avg_price: avgPrice,
+        total_price: totalPrice,
+        children_1: 0, children_2: 0, children_3: 0,
+        adults: 1, seniors: 0,
+        extras: [],
+        payments: [],
+        overbooking: 0,
+        nights: nightsArray
+      });
+    }
+  });
+  return rooms;
+}
+
+// Handle a Wompi payment whose reference is a stored quote id (COT-...).
+// Loads the quote, verifies the amount, creates the OTASync reservation and
+// marks the quote as 'aceptada'. Returns a Netlify response object.
+async function handleQuotePayment(transaction, corsHeaders) {
+  const quoteId = transaction.reference;
+
+  let store, quote;
+  try {
+    store = getQuoteStore();
+    quote = await loadQuote(store, quoteId);
+  } catch (e) {
+    console.error('[wompi-webhook] quote store unavailable:', e.message);
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Quote store unavailable; logged for manual follow-up' }) };
+  }
+
+  if (!quote) {
+    console.error(`[wompi-webhook] quote ${quoteId} not found for paid transaction ${transaction.id}`);
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Quote not found' }) };
+  }
+
+  // Idempotent: already accepted
+  if (quote.status === 'aceptada') {
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ received: true, duplicate: true }) };
+  }
+
+  const status = effectiveStatus(quote);
+  if (status === 'cancelada' || status === 'vencida') {
+    console.error(`[wompi-webhook] paid transaction ${transaction.id} for ${status} quote ${quoteId}. Manual follow-up required.`);
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: `Quote is ${status}; logged for manual follow-up` }) };
+  }
+
+  // Verify the paid amount matches the server-computed total (anti-tampering).
+  const { totalCents } = computeQuoteTotal(quote);
+  const paidCents = transaction.amount_in_cents;
+  if (Math.abs(paidCents - totalCents) > 100) {
+    console.error(`[wompi-webhook] amount mismatch for quote ${quoteId}: paid=${paidCents} expected=${totalCents}, tx=${transaction.id}. Reservation NOT created; manual follow-up required.`);
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Amount mismatch; logged for manual follow-up' }) };
+  }
+
+  const now = new Date().toISOString();
+  const paidAmount = paidCents / 100;
+
+  // Kunas credentials
+  const token = process.env.OTASYNC_TOKEN || '';
+  const username = process.env.OTASYNC_USERNAME || '';
+  const password = process.env.OTASYNC_PASSWORD || '';
+  const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
+  const hasCredentials = token && username && password;
+
+  // Without PMS credentials we still mark the quote paid (mock / local).
+  if (!hasCredentials) {
+    quote.status = 'aceptada';
+    quote.paidAt = now;
+    quote.transactionId = transaction.id;
+    quote.bookingCodes = [];
+    quote.updatedAt = now;
+    try { await saveQuote(store, quote); } catch (e) { /* non-fatal */ }
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, mock: true, quoteId }) };
+  }
+
+  let roomDetails = {};
+  try {
+    const dbPath = path.join(__dirname, '../../rooms_db.json');
+    if (fs.existsSync(dbPath)) roomDetails = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+  } catch (e) { /* names fall back to quote item habitacion */ }
+
+  const pkey = await getSessionKey(token, username, password);
+
+  const rooms = buildQuoteRooms(quote, roomDetails);
+  const roomsPrice = rooms.reduce((s, r) => s + r.total_price, 0);
+  const totalGuests = quote.numPersonas || rooms.length || 1;
+
+  const contacto = (quote.contacto || quote.empresa || 'Empresa').trim();
+  const nameParts = contacto.split(/\s+/);
+  const firstName = nameParts.shift() || quote.empresa || 'Empresa';
+  const lastName = nameParts.join(' ') || quote.empresa || '';
+
+  const nights = Math.max(1, Math.round((new Date(quote.checkout) - new Date(quote.checkin)) / 86400000) || 1);
+  const nightsDates = [];
+  for (let n = 0; n < nights; n++) {
+    const d = new Date(quote.checkin);
+    d.setDate(d.getDate() + n);
+    nightsDates.push(d.toISOString().split('T')[0]);
+  }
+
+  const paymentInfo = [{
+    amount: paidAmount,
+    date_payment: now.split('T')[0],
+    payment_method: 'card',
+    note: `Wompi ID: ${transaction.id}, Cotización: ${quoteId}, Status: APPROVED`
+  }];
+
+  const note = `Reserva corporativa desde cotización ${quoteId}. Empresa: ${escapeHtml(quote.empresa || '')}. NIT: ${escapeHtml(quote.nit || 'N/D')}. Contacto: ${escapeHtml(contacto)} / ${sanitizePhone(quote.telefono)} / ${escapeHtml(quote.email || '')}. Total pagado: ${paidAmount}. ID Transacción: ${transaction.id}`;
+
+  const reservationPayload = {
+    key: pkey,
+    id_properties: propertyId,
+    token: token,
+    status: "confirmed",
+    rooms,
+    guests: [{ first_name: firstName, last_name: lastName, id_guests: 0, guest_type: "adults" }],
+    extras: [],
+    payments: paymentInfo,
+    children_1: 0, children_2: 0, children_3: 0,
+    adults: totalGuests, seniors: 0,
+    total_guests: totalGuests,
+    discount_type: "percent",
+    discount_amount: 0,
+    discount_note: "",
+    rooms_price: roomsPrice,
+    rooms_discounted: roomsPrice,
+    extras_price: 0,
+    board_price: 0,
+    city_tax_price: 0,
+    insurance_price: 0,
+    total_price: roomsPrice,
+    id_boards: "",
+    id_reservations: 0,
+    nights: nights,
+    nights_dates: nightsDates,
+    reservation_type: "web",
+    active_id_room_types: String((quote.items[0] && quote.items[0].roomTypeId) || ''),
+    preselected_id_rooms: 0,
+    reference: quoteId,
+    id_contigents: 0,
+    date_arrival: quote.checkin,
+    date_departure: quote.checkout,
+    id_channels: "392",
+    channel: "Private reservation",
+    note
+  };
+
+  const insertController = new AbortController();
+  const insertTimeoutId = setTimeout(() => insertController.abort(), 10000);
+  let response;
+  try {
+    response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reservationPayload),
+      signal: insertController.signal
+    });
+    clearTimeout(insertTimeoutId);
+  } catch (err) {
+    clearTimeout(insertTimeoutId);
+    console.error(`[wompi-webhook] OTASync insert failed for quote ${quoteId}, tx ${transaction.id}:`, err.message);
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Failed to create reservation in PMS' }) };
+  }
+
+  if (!response.ok) {
+    console.error(`[wompi-webhook] OTASync returned ${response.status} for quote ${quoteId}, tx ${transaction.id}`);
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'PMS rejected reservation' }) };
+  }
+
+  const data = await response.json();
+  const bookingCode = data.id_reservations || quoteId;
+
+  quote.status = 'aceptada';
+  quote.paidAt = now;
+  quote.transactionId = transaction.id;
+  quote.bookingCodes = [bookingCode];
+  quote.updatedAt = now;
+  try { await saveQuote(store, quote); } catch (e) { console.error('[wompi-webhook] failed to mark quote accepted:', e.message); }
+
+  return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, bookingCode }) };
 }
 
 exports.handler = async (event, context) => {
@@ -349,6 +565,16 @@ exports.handler = async (event, context) => {
     } catch (e) {
       if (process.env.DEBUG) console.warn('[dedup] Failed to check persistent store:', e.message);
     }
+  }
+
+  // Corporate quote payment: reference is a stored quote id (COT-...).
+  if (QUOTE_ID_RE.test(transaction.reference || '')) {
+    // Mark processed before doing work to avoid duplicate reservations on retries
+    processedTransactionIds.add(transaction.id);
+    if (txStore) {
+      try { await txStore.set(String(transaction.id), '1', { ttl: 86400 }); } catch (e) { /* non-fatal */ }
+    }
+    return await handleQuotePayment(transaction, corsHeaders);
   }
 
   // Decode the reservation details from the transaction reference

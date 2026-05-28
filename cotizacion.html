@@ -12,7 +12,9 @@
 <link rel="stylesheet" href="styles.css?v=3">
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
 <script src="https://unpkg.com/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js" defer></script>
+<script src="https://checkout.wompi.co/widget.js"></script>
 <style>
+.quote-pay-msg { margin: 12px 0 0; font-family: var(--font-body); font-size: 14px; font-weight: 600; }
 /* ══ Section padding inside the quote doc ══ */
 .quote-section { padding: 28px 48px; }
 @media (max-width: 600px) { .quote-section { padding: 22px 24px; } }
@@ -336,10 +338,11 @@
       <!-- CTAs (hidden in print) -->
       <div class="quote-ctas no-print">
         <div class="quote-ctas-inner">
-          <a href="reservar.html" class="btn btn-primary">Aceptar y reservar <span aria-hidden="true">→</span></a>
+          <button id="acceptPayBtn" type="button" class="btn btn-primary">Aceptar y reservar <span aria-hidden="true">→</span></button>
           <a id="quoteWaLink" href="https://api.whatsapp.com/send/?phone=573102490414&text=Hola%2C+quisiera+proceder+con+la+cotizaci%C3%B3n" target="_blank" rel="noopener noreferrer" class="btn btn-ghost-dark">Contactar por WhatsApp</a>
           <button id="downloadPdfBtn" type="button" class="btn btn-ghost-dark">Descargar PDF</button>
         </div>
+        <p id="payMessage" class="quote-pay-msg" style="display:none"></p>
       </div>
 
     </div>
@@ -430,6 +433,59 @@ function setHtml(id, html) {
   if (el) el.innerHTML = html || '';
 }
 
+/* ── Wompi payment ── */
+var WOMPI_PUBLIC_KEY = 'pub_prod_Hg7duVIJOzWuU1fNYipC5rs0Hzet2BLL';
+var QUOTE_PAY = null;        // { id, totalCents, email, fullName, phone }
+var IS_PREVIEW = false;
+
+function showPayMessage(text, kind) {
+  const el = document.getElementById('payMessage');
+  if (!el) return;
+  el.textContent = text;
+  el.style.display = 'block';
+  el.style.color = kind === 'error' ? 'var(--terracotta-700)' : 'var(--olive-700)';
+}
+
+function startQuotePayment() {
+  if (!QUOTE_PAY) return;
+  if (IS_PREVIEW) { showPayMessage('Vista previa: el pago está deshabilitado.', 'error'); return; }
+  if (typeof window.WidgetCheckout === 'undefined') {
+    showPayMessage('La pasarela de pago no se cargó. Recarga la página e inténtalo de nuevo.', 'error');
+    return;
+  }
+  const btn = document.getElementById('acceptPayBtn');
+  if (btn) btn.disabled = true;
+
+  const checkout = new window.WidgetCheckout({
+    currency: 'COP',
+    amountInCents: QUOTE_PAY.totalCents,
+    reference: QUOTE_PAY.id,
+    publicKey: WOMPI_PUBLIC_KEY,
+    customerData: {
+      email: QUOTE_PAY.email || '',
+      fullName: QUOTE_PAY.fullName || '',
+      phoneNumber: QUOTE_PAY.phone || '',
+      phoneNumberPrefix: '+57'
+    }
+  });
+
+  checkout.open(function (result) {
+    if (btn) btn.disabled = false;
+    const tx = result && result.transaction;
+    if (!tx) return;
+    if (tx.status === 'APPROVED') {
+      showPayMessage('¡Pago aprobado! Tu reserva se está confirmando. Recibirás la confirmación por correo.', 'ok');
+      if (btn) { btn.disabled = true; btn.textContent = 'Pago confirmado ✓'; }
+    } else if (tx.status === 'PENDING') {
+      showPayMessage('Tu pago quedó pendiente de confirmación. Te avisaremos cuando se apruebe.', 'ok');
+    } else if (tx.status === 'DECLINED') {
+      showPayMessage('El pago fue rechazado. Verifica los datos de tu medio de pago e inténtalo de nuevo.', 'error');
+    } else {
+      showPayMessage('No se pudo completar el pago. Inténtalo de nuevo o contáctanos.', 'error');
+    }
+  });
+}
+
 /* ── Room metadata (galleries) ── */
 let ROOMS_DB = {};
 function roomMetaFor(item) {
@@ -487,6 +543,7 @@ async function loadQuote() {
   const id = params.get('id');
   const d = params.get('d');
   const preview = params.get('preview') === '1';
+  IS_PREVIEW = preview;
 
   if (!id && !d) {
     showError('Cotización no encontrada', 'No se proporcionó un enlace de cotización válido.');
@@ -634,6 +691,15 @@ function renderQuote(q) {
   const inc = incBaseNet * incRate;
   const total = (subtotal - descuentoAmt) + iva + inc;
 
+  /* Stash payment data (Wompi reference = quoteId, amount = server total) */
+  QUOTE_PAY = {
+    id: q.quoteId,
+    totalCents: Math.round(total * 100),
+    email: q.email || '',
+    fullName: (q.contacto || q.empresa || '').trim(),
+    phone: q.telefono || ''
+  };
+
   setText('totalSubtotal', formatCOP(subtotal));
   setText('totalFinal', formatCOP(total));
 
@@ -712,7 +778,10 @@ async function downloadPDF() {
 }
 
 document.addEventListener('click', function(e) {
-  if (e.target && e.target.id === 'downloadPdfBtn') downloadPDF();
+  const t = e.target.closest ? e.target.closest('#downloadPdfBtn, #acceptPayBtn') : e.target;
+  if (!t) return;
+  if (t.id === 'downloadPdfBtn') downloadPDF();
+  else if (t.id === 'acceptPayBtn') startQuotePayment();
 });
 
 loadQuote();

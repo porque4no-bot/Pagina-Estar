@@ -162,12 +162,61 @@ function sanitizeQuoteInput(body) {
   };
 }
 
+/* Compute the quote total server-side. Mirrors the math in cotizacion.html:
+   IVA 19% on rooms + IVA-tagged services, INC 8% on food, discount pro-rated
+   across taxable bases. Returns peso amounts plus totalCents for Wompi checks. */
+function computeQuoteTotal(quote) {
+  const q = quote || {};
+  const subtotalItems = (q.items || []).reduce((s, it) => s + (it.subtotal || 0), 0);
+
+  const SVC_TAX = { desayuno: 'inc', almuerzo: 'inc', cena: 'inc', parqueadero: 'iva', personaAdicional: 'iva' };
+  const sv = q.servicios || {};
+  let baseIvaSvc = 0, baseInc = 0, baseNone = 0;
+
+  ['desayuno', 'almuerzo', 'cena', 'parqueadero', 'personaAdicional'].forEach(k => {
+    const s = sv[k];
+    if (!s || !s.cantidad || !s.precioUnitario) return;
+    const sub = s.cantidad * s.precioUnitario;
+    if (SVC_TAX[k] === 'iva') baseIvaSvc += sub; else baseInc += sub;
+  });
+  (sv.otros || []).forEach(o => {
+    if (!o || !o.cantidad || !o.precioUnitario) return;
+    const sub = o.cantidad * o.precioUnitario;
+    if (o.impuesto === 'iva') baseIvaSvc += sub;
+    else if (o.impuesto === 'inc') baseInc += sub;
+    else baseNone += sub;
+  });
+
+  const subtotal = subtotalItems + baseIvaSvc + baseInc + baseNone;
+
+  let descuentoAmt = 0;
+  if (q.descuento && q.descuento.valor > 0) {
+    descuentoAmt = q.descuento.tipo === 'porcentaje'
+      ? subtotal * (q.descuento.valor / 100)
+      : q.descuento.valor;
+  }
+  descuentoAmt = Math.min(descuentoAmt, subtotal);
+
+  const ivaRate = (q.impuestos && q.impuestos.ivaRate) || IVA_RATE;
+  const incRate = (q.impuestos && q.impuestos.incRate) || INC_RATE;
+  const factor = subtotal > 0 ? (subtotal - descuentoAmt) / subtotal : 0;
+  const iva = (subtotalItems + baseIvaSvc) * factor * ivaRate;
+  const inc = baseInc * factor * incRate;
+  const total = (subtotal - descuentoAmt) + iva + inc;
+
+  return {
+    subtotal, descuentoAmt, iva, inc,
+    total: Math.round(total),
+    totalCents: Math.round(total * 100)
+  };
+}
+
 /* Strip internal-only fields before sending to the client/public link. */
 function toPublic(quote) {
   if (!quote) return quote;
   const {
     createdBy, comision, status, views, firstViewedAt, lastViewedAt,
-    cancelledAt, cancelledBy, updatedAt, ...rest
+    cancelledAt, cancelledBy, updatedAt, paidAt, transactionId, bookingCodes, ...rest
   } = quote;
   rest.items = (rest.items || []).map(it => {
     const { tarifaBase, ...pub } = it;
@@ -179,5 +228,5 @@ function toPublic(quote) {
 module.exports = {
   IVA_RATE, INC_RATE, ROOM_NAME_TO_ID, VALID_ROOM_IDS,
   getQuoteStore, loadQuote, saveQuote, listAllQuotes,
-  effectiveStatus, sanitizeQuoteInput, toPublic, nightsBetween
+  effectiveStatus, sanitizeQuoteInput, toPublic, nightsBetween, computeQuoteTotal
 };
