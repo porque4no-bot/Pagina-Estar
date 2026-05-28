@@ -5,7 +5,7 @@ const { getStore } = require('@netlify/blobs');
 const {
   getQuoteStore, loadQuote, saveQuote, effectiveStatus, computeQuoteTotal
 } = require('./_quotes-store');
-const { getAvailabilityByType, findUnavailable } = require('./_otasync');
+const { getAvailabilityByType, findUnavailable, releaseHold } = require('./_otasync');
 
 const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
 
@@ -284,10 +284,21 @@ async function handleQuotePayment(transaction, corsHeaders) {
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, mock: true, quoteId }) };
   }
 
-  // Final availability check before booking. Payment already happened, so if
-  // rooms are no longer free we must NOT overbook: mark paid but leave the
-  // reservation pending for manual handling and log critically.
-  if (quote.checkin && quote.checkout) {
+  const hasHold = Array.isArray(quote.holdReservationIds) && quote.holdReservationIds.length > 0;
+
+  // Release any tentative hold first so the units free up for the confirmed
+  // reservation (and so the availability check below doesn't see our own hold).
+  if (hasHold) {
+    for (const holdId of quote.holdReservationIds) {
+      try { await releaseHold(holdId); } catch (e) { console.error('[wompi-webhook] releaseHold failed for', quoteId, holdId, e.message); }
+    }
+    quote.holdReservationIds = [];
+  }
+
+  // Final availability check before booking (skipped when a hold guaranteed the
+  // rooms). Payment already happened, so if rooms are no longer free we must NOT
+  // overbook: mark paid but leave the reservation pending for manual handling.
+  if (!hasHold && quote.checkin && quote.checkout) {
     try {
       const { availByType, isMock } = await getAvailabilityByType(quote.checkin, quote.checkout);
       if (!isMock) {

@@ -2,6 +2,9 @@
    Used by create-quote, update-quote and the scheduled revalidation job
    so the auth + getRooms logic lives in one place. */
 
+const fs = require('fs');
+const path = require('path');
+
 let sessionCache = { pkey: null, expiresAt: null, promise: null };
 
 function otasyncCreds() {
@@ -129,6 +132,141 @@ function findUnavailable(items, availByType) {
   return shortfalls;
 }
 
+/* ── Room holds (tentative reservations that block availability) ── */
+
+let _roomsDb = null;
+function roomsDb() {
+  if (_roomsDb) return _roomsDb;
+  try {
+    const p = path.join(__dirname, '../../rooms_db.json');
+    _roomsDb = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : {};
+  } catch (e) { _roomsDb = {}; }
+  return _roomsDb;
+}
+
+function nightsBetween(checkin, checkout) {
+  return Math.max(1, Math.round((new Date(checkout) - new Date(checkin)) / 86400000) || 1);
+}
+
+// Expand quote items into an OTASync rooms array (one entry per unit).
+function buildRoomsFromQuote(quote) {
+  const details = roomsDb();
+  const rooms = [];
+  const nights = nightsBetween(quote.checkin, quote.checkout);
+  (quote.items || []).forEach(it => {
+    const avgPrice = it.tarifaPorNoche || 0;
+    const totalPrice = avgPrice * nights;
+    const matched = details[it.roomTypeId];
+    const roomName = (matched && matched.name) || it.habitacion || 'Clásica';
+    const nightsArray = [];
+    for (let n = 0; n < nights; n++) {
+      const d = new Date(quote.checkin);
+      d.setDate(d.getDate() + n);
+      nightsArray.push({ night_date: d.toISOString().split('T')[0], price: avgPrice, original_price: avgPrice, breakfast: 0, lunch: 0, dinner: 0 });
+    }
+    const units = Math.max(1, parseInt(it.unidades) || 1);
+    for (let u = 0; u < units; u++) {
+      rooms.push({
+        id_room_types: parseInt(it.roomTypeId) || 0,
+        id_rooms: 0, room_type: roomName, room_number: "",
+        avg_price: avgPrice, total_price: totalPrice,
+        children_1: 0, children_2: 0, children_3: 0,
+        adults: 1, seniors: 0, extras: [], payments: [], overbooking: 0,
+        nights: nightsArray
+      });
+    }
+  });
+  return { rooms, nights };
+}
+
+async function insertReservation(payload) {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 10000);
+  let res;
+  try {
+    res = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload), signal: ctrl.signal
+    });
+    clearTimeout(tid);
+  } catch (err) {
+    clearTimeout(tid);
+    throw err.name === 'AbortError' ? new Error('Request timeout during reservation insert') : err;
+  }
+  if (!res.ok) throw new Error(`insert/reservation returned status ${res.status}`);
+  return res.json();
+}
+
+/* Create a tentative reservation that holds the quoted rooms. Returns the
+   created reservation id. Hold status is configurable (OTASYNC_HOLD_STATUS). */
+async function createHold(quote) {
+  if (!hasOtasyncCreds()) return null;
+  const { token, propertyId } = otasyncCreds();
+  const pkey = await getSessionKey();
+  const holdStatus = process.env.OTASYNC_HOLD_STATUS || 'tentative';
+
+  const { rooms, nights } = buildRoomsFromQuote(quote);
+  if (!rooms.length) return null;
+  const roomsPrice = rooms.reduce((s, r) => s + r.total_price, 0);
+  const totalGuests = quote.numPersonas || rooms.length || 1;
+
+  const nightsDates = [];
+  for (let n = 0; n < nights; n++) {
+    const d = new Date(quote.checkin); d.setDate(d.getDate() + n);
+    nightsDates.push(d.toISOString().split('T')[0]);
+  }
+
+  const payload = {
+    key: pkey, id_properties: propertyId, token,
+    status: holdStatus,
+    rooms,
+    guests: [{ first_name: 'BLOQUEO', last_name: (quote.empresa || 'Cotización').slice(0, 60), id_guests: 0, guest_type: 'adults' }],
+    extras: [], payments: [],
+    children_1: 0, children_2: 0, children_3: 0,
+    adults: totalGuests, seniors: 0, total_guests: totalGuests,
+    discount_type: 'percent', discount_amount: 0, discount_note: '',
+    rooms_price: roomsPrice, rooms_discounted: roomsPrice,
+    extras_price: 0, board_price: 0, city_tax_price: 0, insurance_price: 0,
+    total_price: roomsPrice, id_boards: '', id_reservations: 0,
+    nights, nights_dates: nightsDates,
+    reservation_type: 'web',
+    active_id_room_types: String((quote.items[0] && quote.items[0].roomTypeId) || ''),
+    preselected_id_rooms: 0,
+    reference: quote.quoteId,
+    id_contigents: 0,
+    date_arrival: quote.checkin, date_departure: quote.checkout,
+    id_channels: '392', channel: 'Private reservation',
+    note: `BLOQUEO temporal por cotización ${quote.quoteId} (${quote.empresa || ''}). No es una venta confirmada.`
+  };
+
+  const data = await insertReservation(payload);
+  return data.id_reservations || null;
+}
+
+/* Release a hold by deleting the tentative reservation
+   (OTASync: reservation/delete/reservation). */
+async function releaseHold(idReservations) {
+  if (!hasOtasyncCreds() || !idReservations) return;
+  const { token, propertyId } = otasyncCreds();
+  const pkey = await getSessionKey();
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 10000);
+  let res;
+  try {
+    res = await fetch('https://app.otasync.me/api/reservation/delete/reservation', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: pkey, token, id_properties: propertyId, id_reservations: idReservations }),
+      signal: ctrl.signal
+    });
+    clearTimeout(tid);
+  } catch (err) {
+    clearTimeout(tid);
+    throw err.name === 'AbortError' ? new Error('Request timeout during reservation delete') : err;
+  }
+  if (!res.ok) throw new Error(`delete/reservation returned status ${res.status}`);
+}
+
 module.exports = {
-  hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable
+  hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
+  buildRoomsFromQuote, createHold, releaseHold
 };

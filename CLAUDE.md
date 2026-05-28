@@ -69,9 +69,18 @@ All functions authenticate against OTASync via a cached session key (`pkey`, val
 | `send-confirmation` | Sends email confirmation to guest |
 | `get-booking` | Retrieves a booking by reference code for guest self-service |
 | `get-booking-rating` | Fetches Booking.com rating via `PROXY_URL`; returns hardcoded fallback if unconfigured |
-| `wompi-webhook` | Handles async payment confirmation from Wompi gateway |
+| `wompi-webhook` | Handles async payment confirmation from Wompi; for quote payments (reference `COT-...`) it loads the quote, verifies the amount, creates the OTASync reservation and marks it `aceptada` |
+| `create-quote` / `get-quote` / `list-quotes` / `update-quote` | Corporate quote CRUD, persisted in Netlify Blobs (`quotes` store). Create/edit block when rooms lack availability |
+| `quote-availability` | Public re-check of a stored quote's room availability (called before opening Wompi) |
+| `revalidate-quotes` | Scheduled (every 6h) re-check of active quotes; flags lost availability and releases holds on expired/cancelled quotes |
+| `otasync-webhook` | Receives OTASync webhooks; on `avail` changes re-validates affected active quotes |
+| `_quotes-store` / `_otasync` | Shared modules: quote persistence + tax math; OTASync auth, availability lookup and room holds |
 
 API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlify.toml`).
+
+OTASync/Kunas API reference: `docs/kunas-api.md`. Note OTASync supports native webhooks (`reservation` insert/edit/cancel, `avail` edit, `prices`, `restrictions`) and a `reservation/delete/reservation` endpoint used to release quote holds.
+
+**Quote availability & holds:** quotes can optionally place a tentative hold in Kunas (`bloquearHabitaciones`) via `_otasync.createHold`; held rooms are guaranteed so availability checks are skipped. Holds are released on cancel, on expiry (cron) and converted to a confirmed reservation on payment. Hold status is configurable via `OTASYNC_HOLD_STATUS` (default `tentative`).
 
 ### Build process
 

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { authenticateAdmin } = require('./_firebase-auth');
 const { getQuoteStore, loadQuote, saveQuote, sanitizeQuoteInput, effectiveStatus } = require('./_quotes-store');
-const { getAvailabilityByType, findUnavailable } = require('./_otasync');
+const { getAvailabilityByType, findUnavailable, releaseHold, createHold } = require('./_otasync');
 
 function loadEnv() {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
@@ -63,6 +63,11 @@ exports.handler = async (event, context) => {
 
     /* ── Status-only actions ── */
     if (body.action === 'cancel') {
+      // Release any Kunas hold so the rooms free up
+      for (const holdId of (existing.holdReservationIds || [])) {
+        try { await releaseHold(holdId); } catch (e) { console.error('[update-quote] releaseHold failed for', quoteId, holdId, e.message); }
+      }
+      existing.holdReservationIds = [];
       existing.status = 'cancelada';
       existing.cancelledAt = now;
       existing.cancelledBy = auth.email || 'admin';
@@ -85,6 +90,13 @@ exports.handler = async (event, context) => {
     }
 
     const sanitized = sanitizeQuoteInput(body);
+    const wantsHold = body.bloquearHabitaciones === true;
+
+    /* Release existing hold first so the edited quote's own units don't count
+       against its availability (and the old hold may no longer match). */
+    for (const holdId of (existing.holdReservationIds || [])) {
+      try { await releaseHold(holdId); } catch (e) { console.error('[update-quote] releaseHold failed for', quoteId, holdId, e.message); }
+    }
 
     /* Availability gate (same as create): block edits that can't be booked. */
     if (sanitized.checkin && sanitized.checkout) {
@@ -114,12 +126,24 @@ exports.handler = async (event, context) => {
       status: (existing.firstViewedAt) ? 'vista' : 'activa',
       availabilityOk: true,
       availabilityCheckedAt: now,
+      bloquearHabitaciones: wantsHold,
+      holdReservationIds: [],
       updatedAt: now
     };
     delete updated.cancelledAt;
     delete updated.cancelledBy;
 
     await saveQuote(store, updated);
+
+    /* Recreate the hold if requested */
+    if (wantsHold && updated.checkin && updated.checkout) {
+      try {
+        const holdId = await createHold(updated);
+        if (holdId) { updated.holdReservationIds = [holdId]; await saveQuote(store, updated); }
+      } catch (e) {
+        console.error('[update-quote] hold creation failed for', quoteId, ':', e.message);
+      }
+    }
 
     const base = (process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ quoteId, shareUrl: `${base}/cotizacion.html?id=${quoteId}` }) };

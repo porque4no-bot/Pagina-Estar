@@ -37,6 +37,11 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ available: true }) };
   }
 
+  // A tentative hold already guarantees the rooms for this quote
+  if (Array.isArray(quote.holdReservationIds) && quote.holdReservationIds.length) {
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ available: true, held: true }) };
+  }
+
   try {
     const { availByType, isMock } = await getAvailabilityByType(quote.checkin, quote.checkout);
     if (isMock) return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ available: true, mock: true }) };

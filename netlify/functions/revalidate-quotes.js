@@ -1,5 +1,5 @@
 const { getQuoteStore, listAllQuotes, saveQuote, effectiveStatus } = require('./_quotes-store');
-const { getAvailabilityByType, findUnavailable, hasOtasyncCreds } = require('./_otasync');
+const { getAvailabilityByType, findUnavailable, hasOtasyncCreds, releaseHold } = require('./_otasync');
 
 /* Scheduled job: re-checks availability for every active/viewed quote and
    flags the ones that lost availability (availabilityOk:false + unavailable[]).
@@ -56,6 +56,20 @@ exports.handler = async () => {
     }
   }
 
-  console.log(`[revalidate-quotes] checked ${active.length}, updated ${changed}, lost availability ${lost}`);
-  return { statusCode: 200, body: `checked ${active.length}, updated ${changed}, lost ${lost}` };
+  // Release holds left on expired/cancelled quotes
+  let released = 0;
+  for (const q of quotes) {
+    if (!Array.isArray(q.holdReservationIds) || !q.holdReservationIds.length) continue;
+    const st = effectiveStatus(q);
+    if (st === 'vencida' || st === 'cancelada') {
+      for (const holdId of q.holdReservationIds) {
+        try { await releaseHold(holdId); released++; } catch (e) { console.error(`[revalidate-quotes] releaseHold failed for ${q.quoteId}:`, e.message); }
+      }
+      q.holdReservationIds = [];
+      try { await saveQuote(store, q); } catch (e) { /* non-fatal */ }
+    }
+  }
+
+  console.log(`[revalidate-quotes] checked ${active.length}, updated ${changed}, lost availability ${lost}, holds released ${released}`);
+  return { statusCode: 200, body: `checked ${active.length}, updated ${changed}, lost ${lost}, released ${released}` };
 };

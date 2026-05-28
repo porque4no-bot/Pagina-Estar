@@ -528,6 +528,17 @@
           Las tarifas de habitación se inflan este porcentaje antes de mostrarse al cliente. Es un dato interno: <strong>no</strong> se incluye en la cotización ni en el enlace.
         </p>
       </div>
+      <div class="field" style="max-width:520px; margin-bottom:20px">
+        <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-weight:normal">
+          <input id="qBloquear" type="checkbox" style="margin-top:3px; width:18px; height:18px; flex-shrink:0">
+          <span>
+            <strong>Bloquear habitaciones en Kunas</strong>
+            <span style="display:block; font-family:var(--font-body); font-size:12px; color:var(--ink-500); margin-top:4px; line-height:1.5;">
+              Crea una reserva tentativa en el PMS para retener el cupo mientras la cotización está vigente. Se libera automáticamente al cancelar, al vencer, o se convierte en reserva confirmada al pagar.
+            </span>
+          </span>
+        </label>
+      </div>
       <div class="items-table-wrap">
         <table class="items-table">
           <thead>
@@ -1043,6 +1054,7 @@ function collectFormData() {
     checkout: document.getElementById('qCheckout').value,
     numPersonas: numPersonas(),
     comision: comisionPct(),
+    bloquearHabitaciones: document.getElementById('qBloquear').checked,
     items,
     servicios,
     descuento: {
@@ -1087,11 +1099,16 @@ document.getElementById('createQuoteBtn').addEventListener('click', async functi
     });
 
     const json = await res.json();
+    if (res.status === 409 && Array.isArray(json.unavailable)) {
+      const lines = json.unavailable.map(u => `• ${u.habitacion}: pediste ${u.requested}, disponibles ${u.available}`).join('\n');
+      throw new Error('Sin disponibilidad para las fechas seleccionadas:\n' + lines);
+    }
     if (!res.ok) throw new Error(json.error || 'Error al guardar la cotización');
 
     showSuccessPanel(json.quoteId, json.shareUrl, data.email, isEdit);
   } catch (err) {
     errEl.textContent = err.message;
+    errEl.style.whiteSpace = 'pre-line';
     errEl.style.display = 'block';
     btn.disabled = false;
     document.getElementById('createBtnText').textContent = editingQuoteId ? 'Guardar cambios' : 'Crear cotización';
@@ -1209,6 +1226,7 @@ function resetForm() {
   document.getElementById('qCheckout').value = '';
   document.getElementById('qPersonas').value = '1';
   document.getElementById('qComision').value = '0';
+  document.getElementById('qBloquear').checked = false;
   initItemsTable();
   initServicesTable();
   updateNightsLabel();
@@ -1402,6 +1420,7 @@ function loadQuoteIntoForm(q) {
   document.getElementById('qCheckout').value = q.checkout || '';
   document.getElementById('qPersonas').value = q.numPersonas || 1;
   document.getElementById('qComision').value = q.comision || 0;
+  document.getElementById('qBloquear').checked = q.bloquearHabitaciones === true;
   document.getElementById('qDescValor').value = (q.descuento && q.descuento.valor) || 0;
   const descTipo = (q.descuento && q.descuento.tipo) === 'fijo' ? 'fijo' : 'porcentaje';
   document.querySelector(`input[name="descTipo"][value="${descTipo}"]`).checked = true;
