@@ -8,6 +8,10 @@
   node_bundler = "esbuild"
   external_node_modules = ["@netlify/blobs"]
 
+# Re-check room availability for active quotes a few times a day
+[functions."revalidate-quotes"]
+  schedule = "0 */6 * * *"
+
 [build.environment]
   NODE_VERSION = "20"
   # The Firebase web apiKey is public by design (it ships in client-side HTML);

@@ -12,7 +12,9 @@
 <link rel="stylesheet" href="styles.css?v=3">
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
 <script src="https://unpkg.com/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js" defer></script>
+<script src="https://checkout.wompi.co/widget.js"></script>
 <style>
+.quote-pay-msg { margin: 12px 0 0; font-family: var(--font-body); font-size: 14px; font-weight: 600; }
 /* ══ Section padding inside the quote doc ══ */
 .quote-section { padding: 28px 48px; }
 @media (max-width: 600px) { .quote-section { padding: 22px 24px; } }
@@ -97,6 +99,22 @@
 .quote-tax-line { display: flex; justify-content: space-between; padding: 5px 0; font-family: var(--font-body); font-size: 13px; color: var(--ink-700); }
 .quote-tax-line .tax-base { color: var(--ink-500); font-size: 12px; margin-left: 6px; }
 
+/* Mobile: stack the room header so facts and price don't collide */
+@media (max-width: 600px) {
+  .qr-summary { flex-wrap: wrap; gap: 10px 12px; padding: 12px 14px; }
+  .qr-thumb { width: 56px; height: 48px; }
+  .qr-head-main { flex: 1 1 0; }
+  .qr-name { font-size: 16px; }
+  .qr-facts { white-space: normal; }
+  .qr-chev { order: 2; }
+  .qr-price {
+    order: 3; flex: 1 1 100%; text-align: left;
+    display: flex; align-items: baseline; justify-content: space-between;
+    border-top: 1px solid var(--paper-300); padding-top: 10px;
+  }
+  .qr-units { display: inline; }
+}
+
 /* Expand everything when printing to PDF */
 @media print {
   .quote-room > .qr-panel { display: block !important; }
@@ -110,10 +128,13 @@
 .pdf-export .quote-room > .qr-panel { display: block !important; }
 .pdf-export .qr-chev { display: none !important; }
 .pdf-export .qr-gallery { overflow: visible; flex-wrap: wrap; }
+.pdf-export .qr-gallery { display: none !important; }
 .pdf-export .quote-room,
 .pdf-export .quote-stay,
 .pdf-export .quote-totals,
 .pdf-export .quote-services-table tr { page-break-inside: avoid; break-inside: avoid; }
+.pdf-export .quote-room { break-inside: avoid; }
+.pdf-export details.quote-room > .qr-panel { padding-top: 4px; }
 </style>
 </head>
 <body data-screen-label="Cotización" data-header="dark">
@@ -336,10 +357,11 @@
       <!-- CTAs (hidden in print) -->
       <div class="quote-ctas no-print">
         <div class="quote-ctas-inner">
-          <a href="reservar.html" class="btn btn-primary">Aceptar y reservar <span aria-hidden="true">→</span></a>
+          <button id="acceptPayBtn" type="button" class="btn btn-primary">Aceptar y reservar <span aria-hidden="true">→</span></button>
           <a id="quoteWaLink" href="https://api.whatsapp.com/send/?phone=573102490414&text=Hola%2C+quisiera+proceder+con+la+cotizaci%C3%B3n" target="_blank" rel="noopener noreferrer" class="btn btn-ghost-dark">Contactar por WhatsApp</a>
           <button id="downloadPdfBtn" type="button" class="btn btn-ghost-dark">Descargar PDF</button>
         </div>
+        <p id="payMessage" class="quote-pay-msg" style="display:none"></p>
       </div>
 
     </div>
@@ -430,6 +452,92 @@ function setHtml(id, html) {
   if (el) el.innerHTML = html || '';
 }
 
+/* ── Wompi payment ── */
+var WOMPI_PUBLIC_KEY = 'pub_prod_Hg7duVIJOzWuU1fNYipC5rs0Hzet2BLL';
+var QUOTE_PAY = null;        // { id, totalCents, email, fullName, phone }
+var IS_PREVIEW = false;
+
+function showPayMessage(text, kind) {
+  const el = document.getElementById('payMessage');
+  if (!el) return;
+  el.textContent = text;
+  el.style.display = 'block';
+  el.style.color = kind === 'error' ? 'var(--terracotta-700)' : 'var(--olive-700)';
+}
+
+async function startQuotePayment() {
+  if (!QUOTE_PAY) return;
+  if (IS_PREVIEW) {
+    const payUrl = window.location.origin + window.location.pathname + '?id=' + encodeURIComponent(QUOTE_PAY.id);
+    try {
+      await navigator.clipboard.writeText(payUrl);
+      showPayMessage('Link de pago copiado ✓ — envíaselo al cliente para que pague esta cotización.', 'ok');
+    } catch (e) {
+      showPayMessage('Link de pago: ' + payUrl, 'ok');
+    }
+    return;
+  }
+  if (typeof window.WidgetCheckout === 'undefined') {
+    showPayMessage('La pasarela de pago no se cargó. Recarga la página e inténtalo de nuevo.', 'error');
+    return;
+  }
+  const btn = document.getElementById('acceptPayBtn');
+  if (btn) btn.disabled = true;
+
+  /* Re-check availability before charging */
+  showPayMessage('Verificando disponibilidad…', 'ok');
+  try {
+    const r = await fetch('/api/quote-availability?id=' + encodeURIComponent(QUOTE_PAY.id));
+    const a = await r.json();
+    if (!a.available) {
+      let msg;
+      if (a.reason === 'aceptada') msg = 'Esta cotización ya fue pagada y reservada. Si tienes dudas, contáctanos.';
+      else if (a.reason === 'cancelada') msg = 'Esta cotización fue cancelada. Contáctanos para solicitar una nueva.';
+      else if (a.reason === 'vencida') msg = 'Esta cotización venció. Contáctanos para obtener una nueva.';
+      else {
+        const names = (a.unavailable || []).map(u => u.habitacion).join(', ');
+        msg = names
+          ? 'Ya no hay disponibilidad para: ' + names + '. Contáctanos para ajustar tu cotización.'
+          : 'La cotización ya no está disponible. Contáctanos para una nueva.';
+      }
+      showPayMessage(msg, 'error');
+      if (a.reason === 'aceptada' && btn) { btn.style.display = 'none'; } else if (btn) { btn.disabled = false; }
+      return;
+    }
+  } catch (e) { /* fail open — webhook re-checks before booking */ }
+  showPayMessage('', 'ok');
+  document.getElementById('payMessage').style.display = 'none';
+
+  const checkout = new window.WidgetCheckout({
+    currency: 'COP',
+    amountInCents: QUOTE_PAY.totalCents,
+    reference: QUOTE_PAY.id,
+    publicKey: WOMPI_PUBLIC_KEY,
+    customerData: {
+      email: QUOTE_PAY.email || '',
+      fullName: QUOTE_PAY.fullName || '',
+      phoneNumber: QUOTE_PAY.phone || '',
+      phoneNumberPrefix: '+57'
+    }
+  });
+
+  checkout.open(function (result) {
+    if (btn) btn.disabled = false;
+    const tx = result && result.transaction;
+    if (!tx) return;
+    if (tx.status === 'APPROVED') {
+      showPayMessage('¡Pago aprobado! Tu reserva se está confirmando. Recibirás la confirmación por correo.', 'ok');
+      if (btn) { btn.disabled = true; btn.textContent = 'Pago confirmado ✓'; }
+    } else if (tx.status === 'PENDING') {
+      showPayMessage('Tu pago quedó pendiente de confirmación. Te avisaremos cuando se apruebe.', 'ok');
+    } else if (tx.status === 'DECLINED') {
+      showPayMessage('El pago fue rechazado. Verifica los datos de tu medio de pago e inténtalo de nuevo.', 'error');
+    } else {
+      showPayMessage('No se pudo completar el pago. Inténtalo de nuevo o contáctanos.', 'error');
+    }
+  });
+}
+
 /* ── Room metadata (galleries) ── */
 let ROOMS_DB = {};
 function roomMetaFor(item) {
@@ -487,6 +595,7 @@ async function loadQuote() {
   const id = params.get('id');
   const d = params.get('d');
   const preview = params.get('preview') === '1';
+  IS_PREVIEW = preview;
 
   if (!id && !d) {
     showError('Cotización no encontrada', 'No se proporcionó un enlace de cotización válido.');
@@ -634,6 +743,15 @@ function renderQuote(q) {
   const inc = incBaseNet * incRate;
   const total = (subtotal - descuentoAmt) + iva + inc;
 
+  /* Stash payment data (Wompi reference = quoteId, amount = server total) */
+  QUOTE_PAY = {
+    id: q.quoteId,
+    totalCents: Math.round(total * 100),
+    email: q.email || '',
+    fullName: (q.contacto || q.empresa || '').trim(),
+    phone: q.telefono || ''
+  };
+
   setText('totalSubtotal', formatCOP(subtotal));
   setText('totalFinal', formatCOP(total));
 
@@ -670,6 +788,20 @@ function renderQuote(q) {
   const waMsg = encodeURIComponent('Hola, quisiera proceder con la cotización ' + q.quoteId + ' de ' + q.empresa + '.');
   document.getElementById('quoteWaLink').href = 'https://api.whatsapp.com/send/?phone=573102490414&text=' + waMsg;
 
+  /* Already paid: hide the pay button and show a confirmation banner */
+  if (q.paid) {
+    const payBtn = document.getElementById('acceptPayBtn');
+    if (payBtn) payBtn.style.display = 'none';
+    showPayMessage(q.bookingCode
+      ? 'Esta cotización ya fue pagada y reservada. Código de reserva: ' + q.bookingCode + '.'
+      : 'Esta cotización ya fue pagada y reservada.', 'ok');
+  } else if (IS_PREVIEW) {
+    /* Preview mode (admin): relabel the button to copy the client payment link */
+    const payBtn = document.getElementById('acceptPayBtn');
+    if (payBtn) payBtn.textContent = 'Copiar link de pago';
+    showPayMessage('Vista previa — el cliente verá aquí "Aceptar y reservar". Usa este botón para copiar y enviarle el link de pago.', 'ok');
+  }
+
   /* Show document */
   document.getElementById('quoteLoading').style.display = 'none';
   document.getElementById('quoteDocument').style.display = 'block';
@@ -689,6 +821,19 @@ async function downloadPDF() {
   const prevOpen = accs.map(a => a.open);
   accs.forEach(a => { a.open = true; });
   doc.classList.add('pdf-export');
+
+  /* Make sure visible images are fully loaded before rasterizing */
+  const imgs = Array.from(doc.querySelectorAll('img')).filter(im => im.offsetParent !== null || im.closest('.qr-summary'));
+  await Promise.all(imgs.map(im => {
+    im.loading = 'eager';
+    if (im.complete && im.naturalWidth) return Promise.resolve();
+    return new Promise(res => {
+      const done = () => res();
+      im.addEventListener('load', done, { once: true });
+      im.addEventListener('error', done, { once: true });
+      setTimeout(done, 3000);
+    });
+  }));
 
   const idText = (document.getElementById('quoteIdDisplay').textContent || 'cotizacion').trim();
   const opt = {
@@ -712,7 +857,10 @@ async function downloadPDF() {
 }
 
 document.addEventListener('click', function(e) {
-  if (e.target && e.target.id === 'downloadPdfBtn') downloadPDF();
+  const t = e.target.closest ? e.target.closest('#downloadPdfBtn, #acceptPayBtn') : e.target;
+  if (!t) return;
+  if (t.id === 'downloadPdfBtn') downloadPDF();
+  else if (t.id === 'acceptPayBtn') startQuotePayment();
 });
 
 loadQuote();

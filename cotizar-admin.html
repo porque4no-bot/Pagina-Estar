@@ -392,6 +392,34 @@
 .lista-actions button:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .lista-actions button.danger:hover { background: var(--error-700); border-color: var(--error-700); color: var(--white); }
 
+/* Mobile: turn the quote table into stacked cards (no horizontal scroll) */
+@media (max-width: 720px) {
+  #listTableWrap { overflow: visible; }
+  .lista-table { min-width: 0; width: 100%; }
+  .lista-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .lista-table tbody { display: block; }
+  .lista-table tr {
+    display: block; border: 1px solid var(--paper-400); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 14px; background: var(--white);
+  }
+  .lista-table td {
+    display: flex; justify-content: space-between; align-items: center; gap: 14px;
+    padding: 7px 0; border: none; text-align: right;
+  }
+  .lista-table td::before {
+    content: attr(data-label); text-align: left;
+    font-family: var(--font-label); font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-500);
+    flex-shrink: 0;
+  }
+  .lista-table td.lista-total { font-size: 18px; color: var(--ink); padding: 10px 0; }
+  .lista-table td[data-label="Estado"] { flex-wrap: wrap; justify-content: flex-end; }
+  .lista-table td:last-child { padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--paper-300); }
+  .lista-table td:last-child::before { display: none; }
+  .lista-actions { width: 100%; justify-content: stretch; gap: 8px; }
+  .lista-actions button { flex: 1 1 auto; padding: 11px 10px; font-size: 11px; }
+}
+
 .badge {
   display: inline-block; font-family: var(--font-label); font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 9px; border-radius: 100px;
@@ -402,6 +430,7 @@
 .badge-aceptada  { background: #D8EBD8; color: #2E6B3A; }
 .badge-cancelada { background: #F0DCDC; color: #8A2E2E; }
 .badge-vencida   { background: #EDE6D6; color: #8A6A2E; }
+.badge-unavailable { background: #F7D9C4; color: #9A3B12; margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -521,12 +550,28 @@
     <div class="admin-card">
       <p class="admin-card-title">04 · Habitaciones</p>
       <div class="field" style="max-width:320px; margin-bottom:20px">
-        <label for="qComision">Comisión interna (%)</label>
+        <label for="qComision" style="display:flex; align-items:center; gap:8px;">
+          Comisión interna (%)
+          <button type="button" id="comisionInfoBtn" aria-label="Más información"
+            style="width:18px; height:18px; flex-shrink:0; border-radius:50%; border:1px solid var(--ink-300); background:var(--paper-100); color:var(--ink-700); font-family:var(--font-label); font-size:11px; font-weight:700; line-height:1; cursor:pointer; padding:0;">i</button>
+        </label>
         <input id="qComision" type="number" class="it-input" style="min-width:unset" value="0" min="0" max="100" step="0.1" placeholder="0">
-        <p style="font-family:var(--font-body); font-size:12px; color:var(--ink-500); margin:6px 0 0; line-height:1.5;">
+        <p id="comisionInfo" style="display:none; font-family:var(--font-body); font-size:12px; color:var(--ink-500); margin:8px 0 0; line-height:1.5;">
           Las tarifas de habitación se inflan este porcentaje antes de mostrarse al cliente. Es un dato interno: <strong>no</strong> se incluye en la cotización ni en el enlace.
         </p>
       </div>
+      <div class="field" style="max-width:520px; margin-bottom:20px">
+        <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-weight:normal">
+          <input id="qBloquear" type="checkbox" style="width:18px; height:18px; flex-shrink:0">
+          <strong>Bloquear habitaciones en Kunas</strong>
+          <button type="button" id="bloquearInfoBtn" aria-label="Más información"
+            style="width:18px; height:18px; flex-shrink:0; border-radius:50%; border:1px solid var(--ink-300); background:var(--paper-100); color:var(--ink-700); font-family:var(--font-label); font-size:11px; font-weight:700; line-height:1; cursor:pointer; padding:0;">i</button>
+        </label>
+        <p id="bloquearInfo" style="display:none; font-family:var(--font-body); font-size:12px; color:var(--ink-500); margin:8px 0 0 28px; line-height:1.5;">
+          Crea una reserva tentativa en el PMS para retener el cupo mientras la cotización está vigente. Se libera automáticamente al cancelar, al vencer, o se convierte en reserva confirmada al pagar.
+        </p>
+      </div>
+      <p id="ratesNote" style="font-family:var(--font-label); font-size:11px; color:var(--olive-700); margin:0 0 10px; letter-spacing:0.04em;"></p>
       <div class="items-table-wrap">
         <table class="items-table">
           <thead>
@@ -737,6 +782,55 @@ const ROOM_NAME_TO_ID = { 'Clásica': '31348', 'Selección': '31349', 'Reserva':
 const DEFAULT_RATES = { 'Clásica': 220000, 'Selección': 265000, 'Reserva': 320000, 'Origen': 385000, 'Especial': 450000 };
 let rowIdCounter = 0;
 
+/* ── Live rates pulled from Kunas for the selected dates ── */
+let KUNAS_RATES = {};
+let _ratesKey = '';
+let _ratesInFlight = false;
+
+function rateFor(habitacion) {
+  return KUNAS_RATES[habitacion] || DEFAULT_RATES[habitacion] || 220000;
+}
+
+async function fetchKunasRates() {
+  const ci = document.getElementById('qCheckin').value;
+  const co = document.getElementById('qCheckout').value;
+  if (!ci || !co || stayNights() <= 0) return;
+  const key = ci + '|' + co + '|' + numPersonas();
+  if (key === _ratesKey || _ratesInFlight) return;
+  _ratesInFlight = true;
+  const note = document.getElementById('ratesNote');
+  if (note) note.textContent = 'Consultando precios en Kunas…';
+  try {
+    const res = await fetch('/api/check-availability?checkin=' + encodeURIComponent(ci) + '&checkout=' + encodeURIComponent(co) + '&guests=' + numPersonas());
+    if (!res.ok) { if (note) note.textContent = ''; return; }
+    const data = await res.json();
+    const rates = {};
+    (data.rooms || []).forEach(r => { if (r.name && r.avgPrice) rates[r.name] = Math.round(r.avgPrice); });
+    KUNAS_RATES = rates;
+    _ratesKey = key;
+    applyKunasRates();
+    if (note) note.textContent = Object.keys(rates).length
+      ? (data.isMock ? 'Precios de referencia (Kunas no configurado).' : 'Tarifas precargadas desde Kunas para estas fechas.')
+      : '';
+  } catch (e) {
+    if (note) note.textContent = '';
+  } finally {
+    _ratesInFlight = false;
+  }
+}
+
+/* Fill room rows with the Kunas rate, skipping rows the admin edited by hand. */
+function applyKunasRates() {
+  document.querySelectorAll('#itemsBody tr').forEach(tr => {
+    const sel = tr.querySelector('[data-field="habitacion"]');
+    const tar = tr.querySelector('[data-field="tarifa"]');
+    if (!sel || !tar || tar.dataset.touched === '1') return;
+    const r = KUNAS_RATES[sel.value];
+    if (r) tar.value = r;
+  });
+  updateTotals();
+}
+
 /* ── Nights between check-in / check-out ── */
 function stayNights() {
   const ci = document.getElementById('qCheckin').value;
@@ -765,7 +859,8 @@ function createRow(defaults) {
   const id = ++rowIdCounter;
   const habitacion = (defaults && defaults.habitacion) || 'Clásica';
   const unidades = (defaults && defaults.unidades) || 1;
-  const tarifa = (defaults && defaults.tarifa) || DEFAULT_RATES[habitacion] || 220000;
+  const hasExplicitRate = defaults && defaults.tarifa != null;
+  const tarifa = hasExplicitRate ? defaults.tarifa : rateFor(habitacion);
 
   const tr = document.createElement('tr');
   tr.dataset.rowId = id;
@@ -777,7 +872,7 @@ function createRow(defaults) {
     </td>
     <td><input type="number" class="it-input" data-field="unidades" value="${unidades}" min="1" max="100"></td>
     <td class="it-noches" data-field="noches" style="font-family:var(--font-label); font-size:13px; font-weight:700; color:var(--ink);">${stayNights()}</td>
-    <td><input type="number" class="it-input" data-field="tarifa" value="${tarifa}" min="0" step="1000"></td>
+    <td><input type="number" class="it-input" data-field="tarifa" value="${tarifa}" min="0" step="1000"${hasExplicitRate ? ' data-touched="1"' : ''}></td>
     <td class="it-subtotal">${formatCOP(unidades * stayNights() * effectiveTarifa(tarifa))}</td>
     <td><button type="button" class="it-remove" title="Eliminar fila">✕</button></td>
   `;
@@ -937,7 +1032,9 @@ document.getElementById('addItemBtn').addEventListener('click', function() {
 });
 
 document.getElementById('itemsBody').addEventListener('input', function(e) {
-  if (e.target.closest('tr')) updateTotals();
+  if (!e.target.closest('tr')) return;
+  if (e.target.dataset.field === 'tarifa') e.target.dataset.touched = '1';
+  updateTotals();
 });
 
 document.getElementById('itemsBody').addEventListener('change', function(e) {
@@ -945,8 +1042,10 @@ document.getElementById('itemsBody').addEventListener('change', function(e) {
   if (!tr) return;
   if (e.target.dataset.field === 'habitacion') {
     const tarInput = tr.querySelector('[data-field="tarifa"]');
-    if (parseFloat(tarInput.value) === 0) {
-      tarInput.value = DEFAULT_RATES[e.target.value] || 220000;
+    // Refill from Kunas/default unless the admin set this rate by hand
+    if (tarInput.dataset.touched !== '1' || parseFloat(tarInput.value) === 0) {
+      tarInput.value = rateFor(e.target.value);
+      delete tarInput.dataset.touched;
     }
   }
   updateTotals();
@@ -974,10 +1073,19 @@ function onStayChange() {
   autofillServiceQtys();
   updateNightsLabel();
   updateTotals();
+  fetchKunasRates();
 }
 ['qCheckin', 'qCheckout', 'qPersonas'].forEach(id => {
   document.getElementById(id).addEventListener('input', onStayChange);
   document.getElementById(id).addEventListener('change', onStayChange);
+});
+
+/* Info toggle buttons */
+[['bloquearInfoBtn', 'bloquearInfo'], ['comisionInfoBtn', 'comisionInfo']].forEach(([btn, info]) => {
+  document.getElementById(btn).addEventListener('click', function() {
+    const el = document.getElementById(info);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  });
 });
 
 document.getElementById('qComision').addEventListener('input', updateTotals);
@@ -1042,6 +1150,7 @@ function collectFormData() {
     checkout: document.getElementById('qCheckout').value,
     numPersonas: numPersonas(),
     comision: comisionPct(),
+    bloquearHabitaciones: document.getElementById('qBloquear').checked,
     items,
     servicios,
     descuento: {
@@ -1086,11 +1195,16 @@ document.getElementById('createQuoteBtn').addEventListener('click', async functi
     });
 
     const json = await res.json();
+    if (res.status === 409 && Array.isArray(json.unavailable)) {
+      const lines = json.unavailable.map(u => `• ${u.habitacion}: pediste ${u.requested}, disponibles ${u.available}`).join('\n');
+      throw new Error('Sin disponibilidad para las fechas seleccionadas:\n' + lines);
+    }
     if (!res.ok) throw new Error(json.error || 'Error al guardar la cotización');
 
     showSuccessPanel(json.quoteId, json.shareUrl, data.email, isEdit);
   } catch (err) {
     errEl.textContent = err.message;
+    errEl.style.whiteSpace = 'pre-line';
     errEl.style.display = 'block';
     btn.disabled = false;
     document.getElementById('createBtnText').textContent = editingQuoteId ? 'Guardar cambios' : 'Crear cotización';
@@ -1208,6 +1322,7 @@ function resetForm() {
   document.getElementById('qCheckout').value = '';
   document.getElementById('qPersonas').value = '1';
   document.getElementById('qComision').value = '0';
+  document.getElementById('qBloquear').checked = false;
   initItemsTable();
   initServicesTable();
   updateNightsLabel();
@@ -1304,21 +1419,27 @@ function renderQuotesList() {
   document.getElementById('listBody').innerHTML = rows.map(q => {
     const st = q.statusEfectivo || 'activa';
     const stay = (q.checkin && q.checkout) ? `${fmtShortDate(q.checkin)} → ${fmtShortDate(q.checkout)}` : '—';
-    const canCancel = st !== 'cancelada';
+    const isPaid = st === 'aceptada';
+    const canCancel = st !== 'cancelada' && !isPaid;
     const canReactivate = q.status === 'cancelada';
     return `
       <tr data-id="${escHtml(q.quoteId)}">
-        <td class="lista-id">${escHtml(q.quoteId)}</td>
-        <td>${escHtml(q.empresa)}</td>
-        <td style="white-space:nowrap">${stay}</td>
-        <td class="lista-total">${formatCOP(computeQuoteTotal(q))}</td>
-        <td><span class="badge badge-${st}">${STATUS_LABEL[st] || st}</span></td>
-        <td style="text-align:center">${q.views || 0}</td>
+        <td class="lista-id" data-label="ID">${escHtml(q.quoteId)}</td>
+        <td data-label="Empresa">${escHtml(q.empresa)}</td>
+        <td style="white-space:nowrap" data-label="Estadía">${stay}</td>
+        <td class="lista-total" data-label="Total">${formatCOP(computeQuoteTotal(q))}</td>
+        <td data-label="Estado">
+          <span class="badge badge-${st}">${STATUS_LABEL[st] || st}</span>
+          ${q.availabilityOk === false ? '<span class="badge badge-unavailable" title="' + escHtml((q.unavailable || []).map(u => u.habitacion + ' (' + u.available + '/' + u.requested + ')').join(', ')) + '">Sin disponibilidad</span>' : ''}
+          ${q.reservationPending ? '<span class="badge badge-unavailable" title="Pagada pero la reserva no se pudo crear automáticamente">Reserva pendiente</span>' : ''}
+        </td>
+        <td style="text-align:center" data-label="Vistas">${q.views || 0}</td>
         <td>
           <div class="lista-actions">
             <button data-act="view">Ver</button>
             <button data-act="copy">Enlace</button>
-            <button data-act="edit">Editar</button>
+            ${!isPaid ? '<button data-act="edit">Editar</button>' : ''}
+            ${q.reservationPending ? '<button data-act="retry">Reintentar reserva</button>' : ''}
             ${canReactivate ? '<button data-act="reactivate">Reactivar</button>' : ''}
             ${canCancel ? '<button data-act="cancel" class="danger">Cancelar</button>' : ''}
           </div>
@@ -1356,8 +1477,37 @@ document.getElementById('listBody').addEventListener('click', async function(e) 
     await quoteStatusAction(id, 'cancel');
   } else if (act === 'reactivate') {
     await quoteStatusAction(id, 'reactivate');
+  } else if (act === 'retry') {
+    await retryBooking(id, btn);
   }
 });
+
+async function retryBooking(id, btn) {
+  if (!confirm('¿Reintentar crear la reserva en Kunas para ' + id + '?')) return;
+  const prev = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Reintentando…';
+  try {
+    const token = await window.getAuthToken();
+    const res = await fetch('/api/retry-quote-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ quoteId: id })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      if (json.unavailable && json.unavailable.length) {
+        const lines = json.unavailable.map(u => `• ${u.habitacion}: ${u.available}/${u.requested}`).join('\n');
+        throw new Error('Aún sin disponibilidad:\n' + lines);
+      }
+      throw new Error(json.error || 'Error');
+    }
+    showToast('Reserva creada ✓ ' + (json.bookingCode || ''));
+    loadQuotesList();
+  } catch (err) {
+    btn.disabled = false; btn.textContent = prev;
+    alert('✗ ' + err.message);
+  }
+}
 
 async function quoteStatusAction(id, action) {
   try {
@@ -1397,6 +1547,7 @@ function loadQuoteIntoForm(q) {
   document.getElementById('qCheckout').value = q.checkout || '';
   document.getElementById('qPersonas').value = q.numPersonas || 1;
   document.getElementById('qComision').value = q.comision || 0;
+  document.getElementById('qBloquear').checked = q.bloquearHabitaciones === true;
   document.getElementById('qDescValor').value = (q.descuento && q.descuento.valor) || 0;
   const descTipo = (q.descuento && q.descuento.tipo) === 'fijo' ? 'fijo' : 'porcentaje';
   document.querySelector(`input[name="descTipo"][value="${descTipo}"]`).checked = true;

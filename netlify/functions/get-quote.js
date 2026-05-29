@@ -77,7 +77,12 @@ exports.handler = async (event, context) => {
         try { await saveQuote(store, quote); } catch (e) { /* non-fatal */ }
       }
 
-      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(toPublic(quote)) };
+      const pub = toPublic(quote);
+      if (status === 'aceptada') {
+        pub.paid = true;
+        pub.bookingCode = (quote.bookingCodes && quote.bookingCodes[0]) || null;
+      }
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(pub) };
     }
 
     /* ── Legacy encoded quote (?d=) ── */
