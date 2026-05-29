@@ -641,7 +641,16 @@
         
         // Translate track
         track.style.transform = `translateX(-${currentIndex * 100}%)`;
-        
+
+        // Load deferred image on demand
+        const dImg = slides[currentIndex].querySelector('img[data-src]');
+        if (dImg) {
+          dImg.src = dImg.dataset.src;
+          if (dImg.dataset.srcset) dImg.srcset = dImg.dataset.srcset;
+          dImg.removeAttribute('data-src');
+          dImg.removeAttribute('data-srcset');
+        }
+
         // Update indicators
         indicators.forEach((ind, i) => {
           ind.classList.toggle('active', i === currentIndex);
