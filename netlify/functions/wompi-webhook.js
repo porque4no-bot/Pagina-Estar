@@ -330,13 +330,40 @@ async function handleQuotePayment(transaction, corsHeaders) {
     }
   }
 
+  // Payment is already captured and this tx is deduped, so any failure while
+  // creating the reservation must NOT be lost: record the quote as paid+pending
+  // and alert the admin so it can be retried from the portal.
+  const recordPending = async (reason) => {
+    quote.status = 'aceptada';
+    quote.paidAt = now;
+    quote.transactionId = transaction.id;
+    quote.bookingCodes = [];
+    quote.reservationPending = true;
+    quote.updatedAt = now;
+    try { await saveQuote(store, quote); } catch (e) { /* non-fatal */ }
+    try {
+      await sendEmail({
+        to: adminEmail(),
+        subject: `⚠ Pago sin reserva — ${quoteId}`,
+        html: adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [] })
+      });
+    } catch (e) { console.error('[wompi-webhook] admin alert email failed:', e.message); }
+    console.error(`[wompi-webhook] reservation ${reason} for quote ${quoteId}, tx ${transaction.id}; marked reservationPending.`);
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
+  };
+
   let roomDetails = {};
   try {
     const dbPath = path.join(__dirname, '../../rooms_db.json');
     if (fs.existsSync(dbPath)) roomDetails = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
   } catch (e) { /* names fall back to quote item habitacion */ }
 
-  const pkey = await getSessionKey(token, username, password);
+  let pkey;
+  try {
+    pkey = await getSessionKey(token, username, password);
+  } catch (e) {
+    return await recordPending('auth failed: ' + e.message);
+  }
 
   const rooms = buildQuoteRooms(quote, roomDetails);
   const roomsPrice = rooms.reduce((s, r) => s + r.total_price, 0);
@@ -405,28 +432,6 @@ async function handleQuotePayment(transaction, corsHeaders) {
   const insertController = new AbortController();
   const insertTimeoutId = setTimeout(() => insertController.abort(), 10000);
 
-  // Payment is already captured and this tx is deduped, so a failed insert
-  // must NOT be lost: record the quote as paid+pending and alert the admin so
-  // it can be retried from the portal.
-  const recordPending = async (reason) => {
-    quote.status = 'aceptada';
-    quote.paidAt = now;
-    quote.transactionId = transaction.id;
-    quote.bookingCodes = [];
-    quote.reservationPending = true;
-    quote.updatedAt = now;
-    try { await saveQuote(store, quote); } catch (e) { /* non-fatal */ }
-    try {
-      await sendEmail({
-        to: adminEmail(),
-        subject: `⚠ Pago sin reserva — ${quoteId}`,
-        html: adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [] })
-      });
-    } catch (e) { console.error('[wompi-webhook] admin alert email failed:', e.message); }
-    console.error(`[wompi-webhook] reservation insert ${reason} for quote ${quoteId}, tx ${transaction.id}; marked reservationPending.`);
-    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
-  };
-
   let response;
   try {
     response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
@@ -445,7 +450,12 @@ async function handleQuotePayment(transaction, corsHeaders) {
     return await recordPending('returned status ' + response.status);
   }
 
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch (e) {
+    return await recordPending('returned non-JSON body');
+  }
   const bookingCode = data.id_reservations || quoteId;
 
   quote.status = 'aceptada';

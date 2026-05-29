@@ -96,9 +96,17 @@ exports.handler = async (event, context) => {
     const wantsHold = body.bloquearHabitaciones === true;
 
     /* Release existing hold first so the edited quote's own units don't count
-       against its availability (and the old hold may no longer match). */
-    for (const holdId of (existing.holdReservationIds || [])) {
-      try { await releaseHold(holdId); } catch (e) { console.error('[update-quote] releaseHold failed for', quoteId, holdId, e.message); }
+       against its availability (and the old hold may no longer match).
+       Persist the cleared hold list immediately: otherwise an early return
+       below (409/502) would leave the quote referencing a hold that no longer
+       exists in Kunas, which quote-availability/wompi-webhook would treat as
+       "rooms guaranteed" → overbooking. */
+    if ((existing.holdReservationIds || []).length) {
+      for (const holdId of existing.holdReservationIds) {
+        try { await releaseHold(holdId); } catch (e) { console.error('[update-quote] releaseHold failed for', quoteId, holdId, e.message); }
+      }
+      existing.holdReservationIds = [];
+      try { await saveQuote(store, existing); } catch (e) { /* non-fatal */ }
     }
 
     /* Availability gate (same as create): block edits that can't be booked. */
