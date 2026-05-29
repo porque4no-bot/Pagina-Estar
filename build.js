@@ -350,6 +350,16 @@ async function build() {
   if (fs.existsSync(distEnDir)) {
     optimizeHtmlDir(distEnDir, '../', new Set(['reservar.html']));
   }
+
+  // 404.html needs absolute asset paths so it works from any URL depth on Netlify
+  const err404Path = path.join(distDir, '404.html');
+  if (fs.existsSync(err404Path)) {
+    let c = fs.readFileSync(err404Path, 'utf8');
+    c = c.replace(/href="bundle\.css\?v=\d+"/, 'href="/bundle.css?v=3"');
+    c = c.replace(/src="assets\/logo\.png"/, 'src="/assets/logo.png"');
+    c = c.replace(/href="assets\/favicon\.png"/g, 'href="/assets/favicon.png"');
+    fs.writeFileSync(err404Path, c);
+  }
 }
 
 build().catch(err => {
