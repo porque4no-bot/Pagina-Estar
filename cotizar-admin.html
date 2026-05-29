@@ -1438,6 +1438,7 @@ function renderQuotesList() {
             <button data-act="view">Ver</button>
             <button data-act="copy">Enlace</button>
             <button data-act="edit">Editar</button>
+            ${q.reservationPending ? '<button data-act="retry">Reintentar reserva</button>' : ''}
             ${canReactivate ? '<button data-act="reactivate">Reactivar</button>' : ''}
             ${canCancel ? '<button data-act="cancel" class="danger">Cancelar</button>' : ''}
           </div>
@@ -1475,8 +1476,37 @@ document.getElementById('listBody').addEventListener('click', async function(e) 
     await quoteStatusAction(id, 'cancel');
   } else if (act === 'reactivate') {
     await quoteStatusAction(id, 'reactivate');
+  } else if (act === 'retry') {
+    await retryBooking(id, btn);
   }
 });
+
+async function retryBooking(id, btn) {
+  if (!confirm('¿Reintentar crear la reserva en Kunas para ' + id + '?')) return;
+  const prev = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Reintentando…';
+  try {
+    const token = await window.getAuthToken();
+    const res = await fetch('/api/retry-quote-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ quoteId: id })
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      if (json.unavailable && json.unavailable.length) {
+        const lines = json.unavailable.map(u => `• ${u.habitacion}: ${u.available}/${u.requested}`).join('\n');
+        throw new Error('Aún sin disponibilidad:\n' + lines);
+      }
+      throw new Error(json.error || 'Error');
+    }
+    showToast('Reserva creada ✓ ' + (json.bookingCode || ''));
+    loadQuotesList();
+  } catch (err) {
+    btn.disabled = false; btn.textContent = prev;
+    alert('✗ ' + err.message);
+  }
+}
 
 async function quoteStatusAction(id, action) {
   try {

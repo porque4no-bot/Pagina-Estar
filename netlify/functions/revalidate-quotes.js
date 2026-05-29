@@ -1,5 +1,6 @@
 const { getQuoteStore, listAllQuotes, saveQuote, effectiveStatus } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable, hasOtasyncCreds, releaseHold } = require('./_otasync');
+const { sendEmail, adminEmail, adminAvailabilityLostHtml } = require('./_email');
 
 /* Scheduled job: re-checks availability for every active/viewed quote and
    flags the ones that lost availability (availabilityOk:false + unavailable[]).
@@ -44,12 +45,22 @@ exports.handler = async () => {
       const prevOk = q.availabilityOk !== false;
 
       if (nowOk !== prevOk || (!nowOk && JSON.stringify(q.unavailable) !== JSON.stringify(shortfalls))) {
+        const justLost = !nowOk && prevOk;
         q.availabilityOk = nowOk;
         q.availabilityCheckedAt = new Date().toISOString();
         if (nowOk) delete q.unavailable; else q.unavailable = shortfalls;
         await saveQuote(store, q);
         changed++;
         if (!nowOk) lost++;
+        if (justLost) {
+          try {
+            await sendEmail({
+              to: adminEmail(),
+              subject: `Cotización sin disponibilidad — ${q.quoteId}`,
+              html: adminAvailabilityLostHtml({ quote: q, shortfalls })
+            });
+          } catch (e) { console.error('[revalidate-quotes] availability email failed:', e.message); }
+        }
       }
     } catch (e) {
       console.error(`[revalidate-quotes] check failed for ${q.quoteId}:`, e.message);

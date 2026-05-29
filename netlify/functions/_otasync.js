@@ -266,7 +266,65 @@ async function releaseHold(idReservations) {
   if (!res.ok) throw new Error(`delete/reservation returned status ${res.status}`);
 }
 
+/* Create a CONFIRMED reservation for a paid quote. Returns the booking code.
+   Shared by the Wompi webhook (on payment) and the admin retry endpoint. */
+async function createConfirmedReservation(quote, opts) {
+  opts = opts || {};
+  const { token, propertyId } = otasyncCreds();
+  const pkey = await getSessionKey();
+
+  const { rooms, nights } = buildRoomsFromQuote(quote);
+  if (!rooms.length) throw new Error('Quote has no rooms');
+  const roomsPrice = rooms.reduce((s, r) => s + r.total_price, 0);
+  const totalGuests = quote.numPersonas || rooms.length || 1;
+
+  const nightsDates = [];
+  for (let n = 0; n < nights; n++) {
+    const d = new Date(quote.checkin); d.setDate(d.getDate() + n);
+    nightsDates.push(d.toISOString().split('T')[0]);
+  }
+
+  const contacto = (quote.contacto || quote.empresa || 'Empresa').trim();
+  const parts = contacto.split(/\s+/);
+  const firstName = parts.shift() || quote.empresa || 'Empresa';
+  const lastName = parts.join(' ') || quote.empresa || '';
+
+  const paidAmount = opts.paidAmount != null ? opts.paidAmount : roomsPrice;
+  const payments = [{
+    amount: paidAmount,
+    date_payment: new Date().toISOString().split('T')[0],
+    payment_method: 'card',
+    note: `Cotización: ${quote.quoteId}${opts.transactionId ? ', Wompi ID: ' + opts.transactionId : ''}, Status: APPROVED`
+  }];
+
+  const payload = {
+    key: pkey, id_properties: propertyId, token,
+    status: 'confirmed',
+    rooms,
+    guests: [{ first_name: firstName, last_name: lastName, id_guests: 0, guest_type: 'adults' }],
+    extras: [], payments,
+    children_1: 0, children_2: 0, children_3: 0,
+    adults: totalGuests, seniors: 0, total_guests: totalGuests,
+    discount_type: 'percent', discount_amount: 0, discount_note: '',
+    rooms_price: roomsPrice, rooms_discounted: roomsPrice,
+    extras_price: 0, board_price: 0, city_tax_price: 0, insurance_price: 0,
+    total_price: roomsPrice, id_boards: '', id_reservations: 0,
+    nights, nights_dates: nightsDates,
+    reservation_type: 'web',
+    active_id_room_types: String((quote.items[0] && quote.items[0].roomTypeId) || ''),
+    preselected_id_rooms: 0,
+    reference: quote.quoteId,
+    id_contigents: 0,
+    date_arrival: quote.checkin, date_departure: quote.checkout,
+    id_channels: '392', channel: 'Private reservation',
+    note: `Reserva corporativa desde cotización ${quote.quoteId}. Empresa: ${quote.empresa || ''}. NIT: ${quote.nit || 'N/D'}. Total pagado: ${paidAmount}.${opts.transactionId ? ' ID Transacción: ' + opts.transactionId : ''}`
+  };
+
+  const data = await insertReservation(payload);
+  return data.id_reservations || quote.quoteId;
+}
+
 module.exports = {
   hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
-  buildRoomsFromQuote, createHold, releaseHold
+  buildRoomsFromQuote, createHold, releaseHold, createConfirmedReservation
 };

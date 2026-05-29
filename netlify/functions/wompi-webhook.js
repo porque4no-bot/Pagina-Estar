@@ -6,6 +6,7 @@ const {
   getQuoteStore, loadQuote, saveQuote, effectiveStatus, computeQuoteTotal
 } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable, releaseHold } = require('./_otasync');
+const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
 
 const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
 
@@ -314,6 +315,13 @@ async function handleQuotePayment(transaction, corsHeaders) {
           quote.unavailable = shortfalls;
           quote.updatedAt = now;
           try { await saveQuote(store, quote); } catch (e) { /* non-fatal */ }
+          try {
+            await sendEmail({
+              to: adminEmail(),
+              subject: `⚠ Pago sin reserva — ${quoteId}`,
+              html: adminPendingHtml({ quote, transactionId: transaction.id, shortfalls })
+            });
+          } catch (e) { console.error('[wompi-webhook] admin alert email failed:', e.message); }
           return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
         }
       }
@@ -423,8 +431,20 @@ async function handleQuotePayment(transaction, corsHeaders) {
   quote.paidAt = now;
   quote.transactionId = transaction.id;
   quote.bookingCodes = [bookingCode];
+  quote.reservationPending = false;
   quote.updatedAt = now;
   try { await saveQuote(store, quote); } catch (e) { console.error('[wompi-webhook] failed to mark quote accepted:', e.message); }
+
+  try {
+    if (quote.email) {
+      await sendEmail({
+        to: quote.email,
+        cc: adminEmail(),
+        subject: `Reserva confirmada ${bookingCode} — Hotel Estar`,
+        html: paymentConfirmationHtml({ quote, bookingCode, total: paidAmount })
+      });
+    }
+  } catch (e) { console.error('[wompi-webhook] confirmation email failed:', e.message); }
 
   return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, bookingCode }) };
 }
