@@ -490,11 +490,18 @@ async function startQuotePayment() {
     const r = await fetch('/api/quote-availability?id=' + encodeURIComponent(QUOTE_PAY.id));
     const a = await r.json();
     if (!a.available) {
-      const names = (a.unavailable || []).map(u => u.habitacion).join(', ');
-      showPayMessage(names
-        ? 'Ya no hay disponibilidad para: ' + names + '. Contáctanos para ajustar tu cotización.'
-        : 'La cotización ya no está disponible. Contáctanos para una nueva.', 'error');
-      if (btn) btn.disabled = false;
+      let msg;
+      if (a.reason === 'aceptada') msg = 'Esta cotización ya fue pagada y reservada. Si tienes dudas, contáctanos.';
+      else if (a.reason === 'cancelada') msg = 'Esta cotización fue cancelada. Contáctanos para solicitar una nueva.';
+      else if (a.reason === 'vencida') msg = 'Esta cotización venció. Contáctanos para obtener una nueva.';
+      else {
+        const names = (a.unavailable || []).map(u => u.habitacion).join(', ');
+        msg = names
+          ? 'Ya no hay disponibilidad para: ' + names + '. Contáctanos para ajustar tu cotización.'
+          : 'La cotización ya no está disponible. Contáctanos para una nueva.';
+      }
+      showPayMessage(msg, 'error');
+      if (a.reason === 'aceptada' && btn) { btn.style.display = 'none'; } else if (btn) { btn.disabled = false; }
       return;
     }
   } catch (e) { /* fail open — webhook re-checks before booking */ }
@@ -781,8 +788,15 @@ function renderQuote(q) {
   const waMsg = encodeURIComponent('Hola, quisiera proceder con la cotización ' + q.quoteId + ' de ' + q.empresa + '.');
   document.getElementById('quoteWaLink').href = 'https://api.whatsapp.com/send/?phone=573102490414&text=' + waMsg;
 
-  /* Preview mode (admin): relabel the button to copy the client payment link */
-  if (IS_PREVIEW) {
+  /* Already paid: hide the pay button and show a confirmation banner */
+  if (q.paid) {
+    const payBtn = document.getElementById('acceptPayBtn');
+    if (payBtn) payBtn.style.display = 'none';
+    showPayMessage(q.bookingCode
+      ? 'Esta cotización ya fue pagada y reservada. Código de reserva: ' + q.bookingCode + '.'
+      : 'Esta cotización ya fue pagada y reservada.', 'ok');
+  } else if (IS_PREVIEW) {
+    /* Preview mode (admin): relabel the button to copy the client payment link */
     const payBtn = document.getElementById('acceptPayBtn');
     if (payBtn) payBtn.textContent = 'Copiar link de pago';
     showPayMessage('Vista previa — el cliente verá aquí "Aceptar y reservar". Usa este botón para copiar y enviarle el link de pago.', 'ok');

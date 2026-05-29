@@ -29,7 +29,7 @@ exports.handler = async (event) => {
   if (!quote) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización no encontrada' }) };
 
   const status = effectiveStatus(quote);
-  if (status === 'cancelada' || status === 'vencida') {
+  if (status === 'cancelada' || status === 'vencida' || status === 'aceptada') {
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ available: false, reason: status }) };
   }
 

@@ -1,5 +1,6 @@
 const { getQuoteStore, listAllQuotes, saveQuote, effectiveStatus } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable, hasOtasyncCreds } = require('./_otasync');
+const { sendEmail, adminEmail, adminAvailabilityLostHtml } = require('./_email');
 
 /* Receives OTASync webhooks. We act on availability-change events
    (data_type="avail", action="edit", data={ id_room_types: { date: value } })
@@ -91,12 +92,18 @@ exports.handler = async (event) => {
       const nowOk = shortfalls.length === 0;
       const prevOk = q.availabilityOk !== false;
       if (nowOk !== prevOk || (!nowOk && JSON.stringify(q.unavailable) !== JSON.stringify(shortfalls))) {
+        const justLost = !nowOk && prevOk;
         q.availabilityOk = nowOk;
         q.availabilityCheckedAt = new Date().toISOString();
         if (nowOk) delete q.unavailable; else q.unavailable = shortfalls;
         await saveQuote(store, q);
         updated++;
         if (!nowOk) lost++;
+        if (justLost) {
+          try {
+            await sendEmail({ to: adminEmail(), subject: `Cotización sin disponibilidad — ${q.quoteId}`, html: adminAvailabilityLostHtml({ quote: q, shortfalls }) });
+          } catch (e) { console.error('[otasync-webhook] availability email failed:', e.message); }
+        }
       }
     } catch (e) {
       console.error(`[otasync-webhook] re-check failed for ${q.quoteId}:`, e.message);

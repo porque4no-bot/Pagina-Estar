@@ -404,6 +404,29 @@ async function handleQuotePayment(transaction, corsHeaders) {
 
   const insertController = new AbortController();
   const insertTimeoutId = setTimeout(() => insertController.abort(), 10000);
+
+  // Payment is already captured and this tx is deduped, so a failed insert
+  // must NOT be lost: record the quote as paid+pending and alert the admin so
+  // it can be retried from the portal.
+  const recordPending = async (reason) => {
+    quote.status = 'aceptada';
+    quote.paidAt = now;
+    quote.transactionId = transaction.id;
+    quote.bookingCodes = [];
+    quote.reservationPending = true;
+    quote.updatedAt = now;
+    try { await saveQuote(store, quote); } catch (e) { /* non-fatal */ }
+    try {
+      await sendEmail({
+        to: adminEmail(),
+        subject: `⚠ Pago sin reserva — ${quoteId}`,
+        html: adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [] })
+      });
+    } catch (e) { console.error('[wompi-webhook] admin alert email failed:', e.message); }
+    console.error(`[wompi-webhook] reservation insert ${reason} for quote ${quoteId}, tx ${transaction.id}; marked reservationPending.`);
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
+  };
+
   let response;
   try {
     response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
@@ -415,13 +438,11 @@ async function handleQuotePayment(transaction, corsHeaders) {
     clearTimeout(insertTimeoutId);
   } catch (err) {
     clearTimeout(insertTimeoutId);
-    console.error(`[wompi-webhook] OTASync insert failed for quote ${quoteId}, tx ${transaction.id}:`, err.message);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Failed to create reservation in PMS' }) };
+    return await recordPending('threw: ' + err.message);
   }
 
   if (!response.ok) {
-    console.error(`[wompi-webhook] OTASync returned ${response.status} for quote ${quoteId}, tx ${transaction.id}`);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'PMS rejected reservation' }) };
+    return await recordPending('returned status ' + response.status);
   }
 
   const data = await response.json();

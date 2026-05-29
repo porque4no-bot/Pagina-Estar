@@ -85,6 +85,9 @@ exports.handler = async (event, context) => {
     }
 
     /* ── Full edit ── */
+    if (effectiveStatus(existing) === 'aceptada') {
+      return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ error: 'No se puede editar una cotización que ya fue pagada.' }) };
+    }
     if (!body.empresa || !body.email || !Array.isArray(body.items) || body.items.length === 0) {
       return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Faltan campos: empresa, email, items' }) };
     }
