@@ -20,10 +20,13 @@ exports.handler = async () => {
     return { statusCode: 503, body: 'store unavailable' };
   }
 
-  // Only quotes a client could still act on
+  // Only quotes a client could still act on (skip held quotes — the hold guarantees availability)
   const active = quotes.filter(q => {
     const st = effectiveStatus(q);
-    return (st === 'activa' || st === 'vista') && q.checkin && q.checkout && Array.isArray(q.items) && q.items.length;
+    if (st !== 'activa' && st !== 'vista') return false;
+    if (!q.checkin || !q.checkout || !Array.isArray(q.items) || !q.items.length) return false;
+    if (Array.isArray(q.holdReservationIds) && q.holdReservationIds.length) return false;
+    return true;
   });
 
   // Cache availability per date range to avoid duplicate PMS calls

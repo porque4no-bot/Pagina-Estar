@@ -5,7 +5,7 @@ const { getStore } = require('@netlify/blobs');
 const {
   getQuoteStore, loadQuote, saveQuote, effectiveStatus, computeQuoteTotal
 } = require('./_quotes-store');
-const { getAvailabilityByType, findUnavailable, releaseHold } = require('./_otasync');
+const { getAvailabilityByType, findUnavailable, releaseHold, buildExtrasFromQuote } = require('./_otasync');
 const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
 
 const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
@@ -367,6 +367,7 @@ async function handleQuotePayment(transaction, corsHeaders) {
 
   const rooms = buildQuoteRooms(quote, roomDetails);
   const roomsPrice = rooms.reduce((s, r) => s + r.total_price, 0);
+  const { extras: quoteExtras, extrasPrice } = buildExtrasFromQuote(quote);
   const totalGuests = quote.numPersonas || rooms.length || 1;
 
   const contacto = (quote.contacto || quote.empresa || 'Empresa').trim();
@@ -398,7 +399,7 @@ async function handleQuotePayment(transaction, corsHeaders) {
     status: "confirmed",
     rooms,
     guests: [{ first_name: firstName, last_name: lastName, id_guests: 0, guest_type: "adults" }],
-    extras: [],
+    extras: quoteExtras,
     payments: paymentInfo,
     children_1: 0, children_2: 0, children_3: 0,
     adults: totalGuests, seniors: 0,
@@ -408,11 +409,11 @@ async function handleQuotePayment(transaction, corsHeaders) {
     discount_note: "",
     rooms_price: roomsPrice,
     rooms_discounted: roomsPrice,
-    extras_price: 0,
+    extras_price: extrasPrice,
     board_price: 0,
     city_tax_price: 0,
     insurance_price: 0,
-    total_price: roomsPrice,
+    total_price: roomsPrice + extrasPrice,
     id_boards: "",
     id_reservations: 0,
     nights: nights,

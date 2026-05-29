@@ -148,6 +148,34 @@ function nightsBetween(checkin, checkout) {
   return Math.max(1, Math.round((new Date(checkout) - new Date(checkin)) / 86400000) || 1);
 }
 
+// Convert quote.servicios into an OTASync extras array + total price.
+function buildExtrasFromQuote(quote) {
+  const sv = (quote && quote.servicios) || {};
+  const extras = [];
+
+  const named = [
+    { key: 'desayuno', name: 'Desayuno' },
+    { key: 'almuerzo', name: 'Almuerzo' },
+    { key: 'cena', name: 'Cena' },
+    { key: 'parqueadero', name: 'Parqueadero' },
+    { key: 'personaAdicional', name: 'Persona Adicional' }
+  ];
+  for (const { key, name } of named) {
+    const s = sv[key];
+    if (!s || !s.cantidad || !s.precioUnitario) continue;
+    const totalPrice = s.cantidad * s.precioUnitario;
+    extras.push({ id_extras: 0, name, qty: s.cantidad, price: s.precioUnitario, total_price: totalPrice });
+  }
+  for (const o of (sv.otros || [])) {
+    if (!o || !o.cantidad || !o.precioUnitario || !o.descripcion) continue;
+    const totalPrice = o.cantidad * o.precioUnitario;
+    extras.push({ id_extras: 0, name: String(o.descripcion).slice(0, 100), qty: o.cantidad, price: o.precioUnitario, total_price: totalPrice });
+  }
+
+  const extrasPrice = extras.reduce((s, e) => s + e.total_price, 0);
+  return { extras, extrasPrice };
+}
+
 // Expand quote items into an OTASync rooms array (one entry per unit).
 function buildRoomsFromQuote(quote) {
   const details = roomsDb();
@@ -276,6 +304,7 @@ async function createConfirmedReservation(quote, opts) {
   const { rooms, nights } = buildRoomsFromQuote(quote);
   if (!rooms.length) throw new Error('Quote has no rooms');
   const roomsPrice = rooms.reduce((s, r) => s + r.total_price, 0);
+  const { extras, extrasPrice } = buildExtrasFromQuote(quote);
   const totalGuests = quote.numPersonas || rooms.length || 1;
 
   const nightsDates = [];
@@ -302,13 +331,13 @@ async function createConfirmedReservation(quote, opts) {
     status: 'confirmed',
     rooms,
     guests: [{ first_name: firstName, last_name: lastName, id_guests: 0, guest_type: 'adults' }],
-    extras: [], payments,
+    extras, payments,
     children_1: 0, children_2: 0, children_3: 0,
     adults: totalGuests, seniors: 0, total_guests: totalGuests,
     discount_type: 'percent', discount_amount: 0, discount_note: '',
     rooms_price: roomsPrice, rooms_discounted: roomsPrice,
-    extras_price: 0, board_price: 0, city_tax_price: 0, insurance_price: 0,
-    total_price: roomsPrice, id_boards: '', id_reservations: 0,
+    extras_price: extrasPrice, board_price: 0, city_tax_price: 0, insurance_price: 0,
+    total_price: roomsPrice + extrasPrice, id_boards: '', id_reservations: 0,
     nights, nights_dates: nightsDates,
     reservation_type: 'web',
     active_id_room_types: String((quote.items[0] && quote.items[0].roomTypeId) || ''),
@@ -326,5 +355,5 @@ async function createConfirmedReservation(quote, opts) {
 
 module.exports = {
   hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
-  buildRoomsFromQuote, createHold, releaseHold, createConfirmedReservation
+  buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, createConfirmedReservation
 };
