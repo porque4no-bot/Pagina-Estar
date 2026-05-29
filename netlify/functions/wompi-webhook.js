@@ -326,7 +326,23 @@ async function handleQuotePayment(transaction, corsHeaders) {
         }
       }
     } catch (e) {
-      console.error('[wompi-webhook] availability re-check failed (continuing to book):', e.message);
+      console.error('[wompi-webhook] availability re-check failed; marking reservation pending:', e.message);
+      quote.status = 'aceptada';
+      quote.paidAt = now;
+      quote.transactionId = transaction.id;
+      quote.bookingCodes = [];
+      quote.reservationPending = true;
+      quote.availabilityOk = false;
+      quote.updatedAt = now;
+      try { await saveQuote(store, quote); } catch (saveErr) { console.error('[wompi-webhook] failed to mark pending:', saveErr.message); }
+      try {
+        await sendEmail({
+          to: adminEmail(),
+          subject: `Pago pendiente de verificación — ${quoteId}`,
+          html: adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [{ reason: 'availability_check_failed' }] })
+        });
+      } catch (mailErr) { console.error('[wompi-webhook] admin alert email failed:', mailErr.message); }
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
     }
   }
 
@@ -575,7 +591,9 @@ exports.handler = async (event, context) => {
       .update(dataToSign)
       .digest('hex');
 
-    if (receivedSignature !== expectedSignature) {
+    const receivedBuf = Buffer.from(String(receivedSignature), 'hex');
+    const expectedBuf = Buffer.from(expectedSignature, 'hex');
+    if (receivedBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(receivedBuf, expectedBuf)) {
       console.error("Wompi signature verification failed");
       return {
         statusCode: 401,

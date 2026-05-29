@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 
 function loadEnv() {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
@@ -190,6 +191,8 @@ exports.handler = async (event, context) => {
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
+  const limited = await checkRateLimit(event, { name: 'request-quote', limit: 8, windowMs: 15 * 60 * 1000 });
+  if (!limited.ok) return rateLimitResponse(corsHeaders, limited.retryAfter);
 
   if (event.body && event.body.length > 5000) return { statusCode: 413, headers: corsHeaders, body: JSON.stringify({ error: 'Payload demasiado grande' }) };
 
