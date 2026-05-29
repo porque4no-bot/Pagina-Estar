@@ -112,10 +112,13 @@
 .pdf-export .quote-room > .qr-panel { display: block !important; }
 .pdf-export .qr-chev { display: none !important; }
 .pdf-export .qr-gallery { overflow: visible; flex-wrap: wrap; }
+.pdf-export .qr-gallery { display: none !important; }
 .pdf-export .quote-room,
 .pdf-export .quote-stay,
 .pdf-export .quote-totals,
 .pdf-export .quote-services-table tr { page-break-inside: avoid; break-inside: avoid; }
+.pdf-export .quote-room { break-inside: avoid; }
+.pdf-export details.quote-room > .qr-panel { padding-top: 4px; }
 </style>
 </head>
 <body data-screen-label="Cotización" data-header="dark">
@@ -753,6 +756,13 @@ function renderQuote(q) {
   const waMsg = encodeURIComponent('Hola, quisiera proceder con la cotización ' + q.quoteId + ' de ' + q.empresa + '.');
   document.getElementById('quoteWaLink').href = 'https://api.whatsapp.com/send/?phone=573102490414&text=' + waMsg;
 
+  /* Preview mode (admin): hide the pay button, show a note instead */
+  if (IS_PREVIEW) {
+    const payBtn = document.getElementById('acceptPayBtn');
+    if (payBtn) payBtn.style.display = 'none';
+    showPayMessage('Vista previa — el cliente verá aquí el botón "Aceptar y reservar".', 'ok');
+  }
+
   /* Show document */
   document.getElementById('quoteLoading').style.display = 'none';
   document.getElementById('quoteDocument').style.display = 'block';
@@ -772,6 +782,19 @@ async function downloadPDF() {
   const prevOpen = accs.map(a => a.open);
   accs.forEach(a => { a.open = true; });
   doc.classList.add('pdf-export');
+
+  /* Make sure visible images are fully loaded before rasterizing */
+  const imgs = Array.from(doc.querySelectorAll('img')).filter(im => im.offsetParent !== null || im.closest('.qr-summary'));
+  await Promise.all(imgs.map(im => {
+    im.loading = 'eager';
+    if (im.complete && im.naturalWidth) return Promise.resolve();
+    return new Promise(res => {
+      const done = () => res();
+      im.addEventListener('load', done, { once: true });
+      im.addEventListener('error', done, { once: true });
+      setTimeout(done, 3000);
+    });
+  }));
 
   const idText = (document.getElementById('quoteIdDisplay').textContent || 'cotizacion').trim();
   const opt = {
