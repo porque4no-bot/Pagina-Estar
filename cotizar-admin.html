@@ -550,9 +550,13 @@
     <div class="admin-card">
       <p class="admin-card-title">04 · Habitaciones</p>
       <div class="field" style="max-width:320px; margin-bottom:20px">
-        <label for="qComision">Comisión interna (%)</label>
+        <label for="qComision" style="display:flex; align-items:center; gap:8px;">
+          Comisión interna (%)
+          <button type="button" id="comisionInfoBtn" aria-label="Más información"
+            style="width:18px; height:18px; flex-shrink:0; border-radius:50%; border:1px solid var(--ink-300); background:var(--paper-100); color:var(--ink-700); font-family:var(--font-label); font-size:11px; font-weight:700; line-height:1; cursor:pointer; padding:0;">i</button>
+        </label>
         <input id="qComision" type="number" class="it-input" style="min-width:unset" value="0" min="0" max="100" step="0.1" placeholder="0">
-        <p style="font-family:var(--font-body); font-size:12px; color:var(--ink-500); margin:6px 0 0; line-height:1.5;">
+        <p id="comisionInfo" style="display:none; font-family:var(--font-body); font-size:12px; color:var(--ink-500); margin:8px 0 0; line-height:1.5;">
           Las tarifas de habitación se inflan este porcentaje antes de mostrarse al cliente. Es un dato interno: <strong>no</strong> se incluye en la cotización ni en el enlace.
         </p>
       </div>
@@ -1076,10 +1080,12 @@ function onStayChange() {
   document.getElementById(id).addEventListener('change', onStayChange);
 });
 
-/* Info button for the room-hold option */
-document.getElementById('bloquearInfoBtn').addEventListener('click', function() {
-  const info = document.getElementById('bloquearInfo');
-  info.style.display = info.style.display === 'none' ? 'block' : 'none';
+/* Info toggle buttons */
+[['bloquearInfoBtn', 'bloquearInfo'], ['comisionInfoBtn', 'comisionInfo']].forEach(([btn, info]) => {
+  document.getElementById(btn).addEventListener('click', function() {
+    const el = document.getElementById(info);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  });
 });
 
 document.getElementById('qComision').addEventListener('input', updateTotals);
