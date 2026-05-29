@@ -99,6 +99,22 @@
 .quote-tax-line { display: flex; justify-content: space-between; padding: 5px 0; font-family: var(--font-body); font-size: 13px; color: var(--ink-700); }
 .quote-tax-line .tax-base { color: var(--ink-500); font-size: 12px; margin-left: 6px; }
 
+/* Mobile: stack the room header so facts and price don't collide */
+@media (max-width: 600px) {
+  .qr-summary { flex-wrap: wrap; gap: 10px 12px; padding: 12px 14px; }
+  .qr-thumb { width: 56px; height: 48px; }
+  .qr-head-main { flex: 1 1 0; }
+  .qr-name { font-size: 16px; }
+  .qr-facts { white-space: normal; }
+  .qr-chev { order: 2; }
+  .qr-price {
+    order: 3; flex: 1 1 100%; text-align: left;
+    display: flex; align-items: baseline; justify-content: space-between;
+    border-top: 1px solid var(--paper-300); padding-top: 10px;
+  }
+  .qr-units { display: inline; }
+}
+
 /* Expand everything when printing to PDF */
 @media print {
   .quote-room > .qr-panel { display: block !important; }

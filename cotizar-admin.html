@@ -392,6 +392,34 @@
 .lista-actions button:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .lista-actions button.danger:hover { background: var(--error-700); border-color: var(--error-700); color: var(--white); }
 
+/* Mobile: turn the quote table into stacked cards (no horizontal scroll) */
+@media (max-width: 720px) {
+  #listTableWrap { overflow: visible; }
+  .lista-table { min-width: 0; width: 100%; }
+  .lista-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .lista-table tbody { display: block; }
+  .lista-table tr {
+    display: block; border: 1px solid var(--paper-400); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 14px; background: var(--white);
+  }
+  .lista-table td {
+    display: flex; justify-content: space-between; align-items: center; gap: 14px;
+    padding: 7px 0; border: none; text-align: right;
+  }
+  .lista-table td::before {
+    content: attr(data-label); text-align: left;
+    font-family: var(--font-label); font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-500);
+    flex-shrink: 0;
+  }
+  .lista-table td.lista-total { font-size: 18px; color: var(--ink); padding: 10px 0; }
+  .lista-table td[data-label="Estado"] { flex-wrap: wrap; justify-content: flex-end; }
+  .lista-table td:last-child { padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--paper-300); }
+  .lista-table td:last-child::before { display: none; }
+  .lista-actions { width: 100%; justify-content: stretch; gap: 8px; }
+  .lista-actions button { flex: 1 1 auto; padding: 11px 10px; font-size: 11px; }
+}
+
 .badge {
   display: inline-block; font-family: var(--font-label); font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 9px; border-radius: 100px;
@@ -1389,16 +1417,16 @@ function renderQuotesList() {
     const canReactivate = q.status === 'cancelada';
     return `
       <tr data-id="${escHtml(q.quoteId)}">
-        <td class="lista-id">${escHtml(q.quoteId)}</td>
-        <td>${escHtml(q.empresa)}</td>
-        <td style="white-space:nowrap">${stay}</td>
-        <td class="lista-total">${formatCOP(computeQuoteTotal(q))}</td>
-        <td>
+        <td class="lista-id" data-label="ID">${escHtml(q.quoteId)}</td>
+        <td data-label="Empresa">${escHtml(q.empresa)}</td>
+        <td style="white-space:nowrap" data-label="Estadía">${stay}</td>
+        <td class="lista-total" data-label="Total">${formatCOP(computeQuoteTotal(q))}</td>
+        <td data-label="Estado">
           <span class="badge badge-${st}">${STATUS_LABEL[st] || st}</span>
           ${q.availabilityOk === false ? '<span class="badge badge-unavailable" title="' + escHtml((q.unavailable || []).map(u => u.habitacion + ' (' + u.available + '/' + u.requested + ')').join(', ')) + '">Sin disponibilidad</span>' : ''}
           ${q.reservationPending ? '<span class="badge badge-unavailable" title="Pagada pero la reserva no se pudo crear automáticamente">Reserva pendiente</span>' : ''}
         </td>
-        <td style="text-align:center">${q.views || 0}</td>
+        <td style="text-align:center" data-label="Vistas">${q.views || 0}</td>
         <td>
           <div class="lista-actions">
             <button data-act="view">Ver</button>
