@@ -1,6 +1,7 @@
 const { getQuoteStore, listAllQuotes, saveQuote, effectiveStatus } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable, hasOtasyncCreds } = require('./_otasync');
 const { sendEmail, adminEmail, adminAvailabilityLostHtml } = require('./_email');
+const crypto = require('crypto');
 
 /* Receives OTASync webhooks. We act on availability-change events
    (data_type="avail", action="edit", data={ id_room_types: { date: value } })
@@ -22,11 +23,18 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-  // Optional shared-secret check (configure webhook URL with ?secret=...)
   const expected = process.env.OTASYNC_WEBHOOK_SECRET;
-  if (expected) {
-    const got = (event.queryStringParameters || {}).secret;
-    if (got !== expected) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
+  if (!expected) {
+    console.error('[otasync-webhook] OTASYNC_WEBHOOK_SECRET is not configured. Rejecting webhook.');
+    return { statusCode: 503, headers, body: JSON.stringify({ error: 'Webhook secret not configured' }) };
+  }
+  const got = (event.headers && (event.headers['x-otasync-secret'] || event.headers['X-OTASYNC-Secret'])) ||
+    (event.queryStringParameters || {}).secret ||
+    '';
+  const gotBuf = Buffer.from(String(got));
+  const expectedBuf = Buffer.from(String(expected));
+  if (gotBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(gotBuf, expectedBuf)) {
+    return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
   }
 
   if (!hasOtasyncCreds()) return { statusCode: 200, headers, body: JSON.stringify({ message: 'no credentials; ignored' }) };

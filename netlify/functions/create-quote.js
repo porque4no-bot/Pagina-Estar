@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { authenticateAdmin } = require('./_firebase-auth');
 const { getQuoteStore, saveQuote, sanitizeQuoteInput } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable, createHold } = require('./_otasync');
@@ -27,6 +28,10 @@ function generateQuoteId() {
   let s = '';
   for (let i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
   return `COT-${year}-${s}`;
+}
+
+function generatePublicToken() {
+  return crypto.randomBytes(24).toString('base64url');
 }
 
 exports.handler = async (event, context) => {
@@ -93,6 +98,7 @@ exports.handler = async (event, context) => {
       createdBy: auth.email || 'admin',
       availabilityOk,
       availabilityCheckedAt: now.toISOString(),
+      publicToken: generatePublicToken(),
       bloquearHabitaciones: body.bloquearHabitaciones === true,
       holdReservationIds: [],
       ...sanitized
@@ -122,7 +128,7 @@ exports.handler = async (event, context) => {
     }
 
     const base = (process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
-    const shareUrl = `${base}/cotizacion.html?id=${quoteId}`;
+    const shareUrl = `${base}/cotizacion.html?id=${quoteId}&t=${quoteData.publicToken}`;
 
     return {
       statusCode: 200,

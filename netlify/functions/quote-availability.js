@@ -1,5 +1,6 @@
 const { getQuoteStore, loadQuote, effectiveStatus } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable } = require('./_otasync');
+const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 
 /* Public re-check of a stored quote's room availability, called right before
    the client opens the Wompi widget so we don't charge for unavailable rooms. */
@@ -14,8 +15,12 @@ exports.handler = async (event) => {
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
   if (event.httpMethod !== 'GET') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
+  const limited = await checkRateLimit(event, { name: 'quote-availability', limit: 40, windowMs: 15 * 60 * 1000 });
+  if (!limited.ok) return rateLimitResponse(corsHeaders, limited.retryAfter);
 
-  const id = (event.queryStringParameters || {}).id || '';
+  const params = event.queryStringParameters || {};
+  const id = params.id || '';
+  const token = String(params.t || '').trim();
   if (!/^COT-\d{4}-[A-Z0-9]{5}$/.test(id)) {
     return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'id inválido' }) };
   }
@@ -27,6 +32,10 @@ exports.handler = async (event) => {
     return { statusCode: 503, headers: corsHeaders, body: JSON.stringify({ error: 'Almacenamiento no disponible' }) };
   }
   if (!quote) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización no encontrada' }) };
+
+  if (quote.publicToken && token !== quote.publicToken) {
+    return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotizacion no encontrada' }) };
+  }
 
   const status = effectiveStatus(quote);
   if (status === 'cancelada' || status === 'vencida' || status === 'aceptada') {

@@ -4,6 +4,7 @@
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>Portal de Cotizaciones — Hotel Estar</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="colors_and_type.css?v=2">
@@ -1452,7 +1453,8 @@ document.getElementById('listSearch').addEventListener('input', renderQuotesList
 document.getElementById('refreshListBtn').addEventListener('click', loadQuotesList);
 
 function quoteShareUrl(id) {
-  return window.location.origin + '/cotizacion.html?id=' + id;
+  const quote = LIST_CACHE.find(q => q.quoteId === id);
+  return window.location.origin + '/cotizacion.html?id=' + id + (quote && quote.publicToken ? '&t=' + encodeURIComponent(quote.publicToken) : '');
 }
 
 document.getElementById('listBody').addEventListener('click', async function(e) {

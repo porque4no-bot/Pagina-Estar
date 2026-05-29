@@ -1,8 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { getStore } = require('@netlify/blobs');
-
-const bookingRateLimit = new Map(); // ip -> last request timestamp
+const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 
 // Helper to load local .env variables if not already set
 function loadEnv() {
@@ -170,26 +169,8 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Rate limiter: 1 booking request per IP per 10 seconds
-  const clientIp = event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-                   event.headers['x-nf-client-connection-ip'] || 'unknown';
-  const now = Date.now();
-  const lastBooking = bookingRateLimit.get(clientIp);
-  if (lastBooking && now - lastBooking < 10000) {
-    return {
-      statusCode: 429,
-      headers: { ...corsHeaders, 'Retry-After': '10' },
-      body: JSON.stringify({ error: 'Too many requests. Please wait a moment.' })
-    };
-  }
-  bookingRateLimit.set(clientIp, now);
-  // Cleanup old entries periodically
-  if (bookingRateLimit.size > 500) {
-    const cutoff = now - 60000;
-    for (const [ip, ts] of bookingRateLimit) {
-      if (ts < cutoff) bookingRateLimit.delete(ip);
-    }
-  }
+  const limited = await checkRateLimit(event, { name: 'create-booking', limit: 6, windowMs: 60 * 1000 });
+  if (!limited.ok) return rateLimitResponse(corsHeaders, limited.retryAfter);
 
   const MAX_BODY_SIZE = 10000; // 10 KB
   if (event.body && event.body.length > MAX_BODY_SIZE) {

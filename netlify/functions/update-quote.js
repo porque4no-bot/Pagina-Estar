@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { authenticateAdmin } = require('./_firebase-auth');
 const { getQuoteStore, loadQuote, saveQuote, sanitizeQuoteInput, effectiveStatus } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable, releaseHold, createHold } = require('./_otasync');
@@ -140,6 +141,7 @@ exports.handler = async (event, context) => {
       status: (existing.firstViewedAt) ? 'vista' : 'activa',
       availabilityOk: true,
       availabilityCheckedAt: now,
+      publicToken: existing.publicToken || crypto.randomBytes(24).toString('base64url'),
       bloquearHabitaciones: wantsHold,
       holdReservationIds: [],
       updatedAt: now
@@ -160,7 +162,7 @@ exports.handler = async (event, context) => {
     }
 
     const base = (process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
-    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ quoteId, shareUrl: `${base}/cotizacion.html?id=${quoteId}` }) };
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ quoteId, shareUrl: `${base}/cotizacion.html?id=${quoteId}&t=${updated.publicToken}` }) };
   } catch (err) {
     console.error('[update-quote] error:', err);
     return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error interno del servidor', details: err.message }) };

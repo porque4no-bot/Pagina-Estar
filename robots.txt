@@ -3,6 +3,8 @@ Allow: /
 Disallow: /admin/
 Disallow: /api/
 Disallow: /.netlify/
+Disallow: /cotizar-admin.html
+Disallow: /cotizacion.html
 Disallow: /node_modules/
 Disallow: /uploads/
 

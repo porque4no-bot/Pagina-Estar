@@ -468,7 +468,7 @@ function showPayMessage(text, kind) {
 async function startQuotePayment() {
   if (!QUOTE_PAY) return;
   if (IS_PREVIEW) {
-    const payUrl = window.location.origin + window.location.pathname + '?id=' + encodeURIComponent(QUOTE_PAY.id);
+    const payUrl = window.location.origin + window.location.pathname + '?id=' + encodeURIComponent(QUOTE_PAY.id) + (QUOTE_PAY.token ? '&t=' + encodeURIComponent(QUOTE_PAY.token) : '');
     try {
       await navigator.clipboard.writeText(payUrl);
       showPayMessage('Link de pago copiado ✓ — envíaselo al cliente para que pague esta cotización.', 'ok');
@@ -487,7 +487,7 @@ async function startQuotePayment() {
   /* Re-check availability before charging */
   showPayMessage('Verificando disponibilidad…', 'ok');
   try {
-    const r = await fetch('/api/quote-availability?id=' + encodeURIComponent(QUOTE_PAY.id));
+    const r = await fetch('/api/quote-availability?id=' + encodeURIComponent(QUOTE_PAY.id) + (QUOTE_PAY.token ? '&t=' + encodeURIComponent(QUOTE_PAY.token) : ''));
     const a = await r.json();
     if (!a.available) {
       let msg;
@@ -593,6 +593,7 @@ function renderRoomCards(items) {
 async function loadQuote() {
   const params = new URLSearchParams(window.location.search);
   const id = params.get('id');
+  const token = params.get('t') || '';
   const d = params.get('d');
   const preview = params.get('preview') === '1';
   IS_PREVIEW = preview;
@@ -609,7 +610,7 @@ async function loadQuote() {
   } catch (e) {}
 
   const query = id
-    ? 'id=' + encodeURIComponent(id) + (preview ? '&preview=1' : '')
+    ? 'id=' + encodeURIComponent(id) + (token ? '&t=' + encodeURIComponent(token) : '') + (preview ? '&preview=1' : '')
     : 'd=' + encodeURIComponent(d);
 
   try {
@@ -746,6 +747,7 @@ function renderQuote(q) {
   /* Stash payment data (Wompi reference = quoteId, amount = server total) */
   QUOTE_PAY = {
     id: q.quoteId,
+    token: new URLSearchParams(window.location.search).get('t') || '',
     totalCents: Math.round(total * 100),
     email: q.email || '',
     fullName: (q.contacto || q.empresa || '').trim(),

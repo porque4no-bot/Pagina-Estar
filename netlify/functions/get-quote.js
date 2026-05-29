@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { getQuoteStore, loadQuote, saveQuote, effectiveStatus, toPublic } = require('./_quotes-store');
+const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 
 function loadEnv() {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
@@ -38,9 +39,12 @@ exports.handler = async (event, context) => {
 
   try {
     if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
+    const limited = await checkRateLimit(event, { name: 'get-quote', limit: 60, windowMs: 15 * 60 * 1000 });
+    if (!limited.ok) return rateLimitResponse(corsHeaders, limited.retryAfter);
 
     const params = event.queryStringParameters || {};
     const id = params.id;
+    const token = String(params.t || '').trim();
     const encoded = params.d;
     const isPreview = params.preview === '1';
 
@@ -57,6 +61,10 @@ exports.handler = async (event, context) => {
 
       if (!quote) {
         return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización no encontrada', expired: false }) };
+      }
+
+      if (quote.publicToken && token !== quote.publicToken) {
+        return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotizacion no encontrada', expired: false }) };
       }
 
       const status = effectiveStatus(quote);
