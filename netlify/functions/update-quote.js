@@ -63,6 +63,9 @@ exports.handler = async (event, context) => {
 
     /* ── Status-only actions ── */
     if (body.action === 'cancel') {
+      if (effectiveStatus(existing) === 'aceptada') {
+        return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ error: 'No se puede cancelar una cotización ya pagada. Gestiona la reserva directamente en Kunas.' }) };
+      }
       // Release any Kunas hold so the rooms free up
       for (const holdId of (existing.holdReservationIds || [])) {
         try { await releaseHold(holdId); } catch (e) { console.error('[update-quote] releaseHold failed for', quoteId, holdId, e.message); }

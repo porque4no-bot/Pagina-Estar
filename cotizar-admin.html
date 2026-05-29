@@ -1419,7 +1419,8 @@ function renderQuotesList() {
   document.getElementById('listBody').innerHTML = rows.map(q => {
     const st = q.statusEfectivo || 'activa';
     const stay = (q.checkin && q.checkout) ? `${fmtShortDate(q.checkin)} → ${fmtShortDate(q.checkout)}` : '—';
-    const canCancel = st !== 'cancelada';
+    const isPaid = st === 'aceptada';
+    const canCancel = st !== 'cancelada' && !isPaid;
     const canReactivate = q.status === 'cancelada';
     return `
       <tr data-id="${escHtml(q.quoteId)}">
@@ -1437,7 +1438,7 @@ function renderQuotesList() {
           <div class="lista-actions">
             <button data-act="view">Ver</button>
             <button data-act="copy">Enlace</button>
-            <button data-act="edit">Editar</button>
+            ${!isPaid ? '<button data-act="edit">Editar</button>' : ''}
             ${q.reservationPending ? '<button data-act="retry">Reintentar reserva</button>' : ''}
             ${canReactivate ? '<button data-act="reactivate">Reactivar</button>' : ''}
             ${canCancel ? '<button data-act="cancel" class="danger">Cancelar</button>' : ''}
