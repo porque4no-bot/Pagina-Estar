@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<link rel="icon" type="image/png" href="/assets/favicon.png">
+<link rel="apple-touch-icon" href="/assets/favicon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#9b9065">
+<title>Página no encontrada — Estar Manizales</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="colors_and_type.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
+<style>
+  .error-page {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  .error-header {
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .error-header a {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+  }
+
+  .error-main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-6) var(--space-5);
+  }
+
+  .error-content {
+    max-width: 520px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .error-number {
+    font-size: clamp(80px, 20vw, 200px);
+    line-height: 1;
+    color: var(--terracotta);
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    margin: 0 0 var(--space-3);
+  }
+
+  .error-heading {
+    margin: 0 0 var(--space-3);
+  }
+
+  .error-message {
+    color: var(--fg-muted);
+    margin: 0 0 var(--space-6);
+  }
+
+  .error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    justify-content: center;
+  }
+
+  .error-footer {
+    padding: var(--space-4) var(--space-5);
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--fg-muted);
+  }
+</style>
+</head>
+<body>
+<div class="error-page">
+
+  <header class="error-header">
+    <a href="/">
+      <img src="/assets/logo.png" alt="estar" width="120" height="32">
+    </a>
+  </header>
+
+  <main class="error-main">
+    <div class="error-content">
+      <p class="error-number" aria-hidden="true">404</p>
+
+      <h1 class="t-h2 error-heading">
+        <span class="lang-es" lang="es">Página no encontrada</span>
+        <span class="lang-en" lang="en">Page not found</span>
+      </h1>
+
+      <p class="t-body error-message">
+        <span class="lang-es" lang="es">El enlace que seguiste ya no existe o fue movido.</span>
+        <span class="lang-en" lang="en">The link you followed no longer exists or has been moved.</span>
+      </p>
+
+      <div class="error-actions">
+        <a href="/" class="btn btn-primary">
+          <span class="lang-es" lang="es">Volver al inicio</span>
+          <span class="lang-en" lang="en">Back to home</span>
+        </a>
+        <a href="/#habitaciones" class="btn btn-ghost-dark">
+          <span class="lang-es" lang="es">Ver habitaciones</span>
+          <span class="lang-en" lang="en">See rooms</span>
+        </a>
+        <a href="/reservar" class="btn btn-ghost-dark">
+          <span class="lang-es" lang="es">Reservar</span>
+          <span class="lang-en" lang="en">Book now</span>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="error-footer">
+    <p class="t-body-sm">© 2026 Hotel Estar · Manizales, Colombia</p>
+  </footer>
+
+</div>
+</body>
+</html>
