@@ -451,7 +451,16 @@ function showPayMessage(text, kind) {
 
 async function startQuotePayment() {
   if (!QUOTE_PAY) return;
-  if (IS_PREVIEW) { showPayMessage('Vista previa: el pago está deshabilitado.', 'error'); return; }
+  if (IS_PREVIEW) {
+    const payUrl = window.location.origin + window.location.pathname + '?id=' + encodeURIComponent(QUOTE_PAY.id);
+    try {
+      await navigator.clipboard.writeText(payUrl);
+      showPayMessage('Link de pago copiado ✓ — envíaselo al cliente para que pague esta cotización.', 'ok');
+    } catch (e) {
+      showPayMessage('Link de pago: ' + payUrl, 'ok');
+    }
+    return;
+  }
   if (typeof window.WidgetCheckout === 'undefined') {
     showPayMessage('La pasarela de pago no se cargó. Recarga la página e inténtalo de nuevo.', 'error');
     return;
@@ -756,11 +765,11 @@ function renderQuote(q) {
   const waMsg = encodeURIComponent('Hola, quisiera proceder con la cotización ' + q.quoteId + ' de ' + q.empresa + '.');
   document.getElementById('quoteWaLink').href = 'https://api.whatsapp.com/send/?phone=573102490414&text=' + waMsg;
 
-  /* Preview mode (admin): hide the pay button, show a note instead */
+  /* Preview mode (admin): relabel the button to copy the client payment link */
   if (IS_PREVIEW) {
     const payBtn = document.getElementById('acceptPayBtn');
-    if (payBtn) payBtn.style.display = 'none';
-    showPayMessage('Vista previa — el cliente verá aquí el botón "Aceptar y reservar".', 'ok');
+    if (payBtn) payBtn.textContent = 'Copiar link de pago';
+    showPayMessage('Vista previa — el cliente verá aquí "Aceptar y reservar". Usa este botón para copiar y enviarle el link de pago.', 'ok');
   }
 
   /* Show document */
