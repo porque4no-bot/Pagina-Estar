@@ -35,15 +35,17 @@ function clean(value, max) {
   return String(value || '').trim().slice(0, max || 200);
 }
 
-function shouldUseSandboxCheckout() {
+function shouldUseSandboxCheckout(event) {
   const mode = String(process.env.MERCADOPAGO_CHECKOUT_MODE || '').toLowerCase();
   if (mode === 'sandbox' || mode === 'test') return true;
   if (mode === 'production' || mode === 'prod') return false;
+  const host = String((event && event.headers && event.headers.host) || '').toLowerCase();
+  if (host.includes('deploy-preview-') || host.includes('--')) return true;
   return process.env.CONTEXT && process.env.CONTEXT !== 'production';
 }
 
-function selectedCheckoutPoint(mp) {
-  const useSandbox = shouldUseSandboxCheckout();
+function selectedCheckoutPoint(mp, event) {
+  const useSandbox = shouldUseSandboxCheckout(event);
   return {
     checkoutMode: useSandbox ? 'sandbox' : 'production',
     initPoint: useSandbox && mp.sandbox_init_point ? mp.sandbox_init_point : mp.init_point
@@ -133,7 +135,7 @@ async function preferenceForQuote(body, event) {
   };
 
   const mp = await createPreference(preference);
-  const checkout = selectedCheckoutPoint(mp);
+  const checkout = selectedCheckoutPoint(mp, event);
   return json(200, {
     provider: 'mercadopago',
     checkout_mode: checkout.checkoutMode,
@@ -197,7 +199,7 @@ async function preferenceForDirectBooking(body, event) {
   };
 
   const mp = await createPreference(preference);
-  const checkout = selectedCheckoutPoint(mp);
+  const checkout = selectedCheckoutPoint(mp, event);
   return json(200, {
     provider: 'mercadopago',
     checkout_mode: checkout.checkoutMode,
