@@ -515,12 +515,12 @@ async function startQuotePayment() {
     });
     const data = await pref.json();
     if (!pref.ok || !data.init_point) {
-      throw new Error(data.error || 'No se pudo crear la preferencia de pago.');
+      throw new Error(data.message || data.error || 'No se pudo crear la preferencia de pago.');
     }
     window.location.href = data.init_point;
   } catch (e) {
     if (btn) btn.disabled = false;
-    showPayMessage('No se pudo iniciar Mercado Pago. Inténtalo de nuevo o contáctanos.', 'error');
+    showPayMessage(e.message || 'No se pudo iniciar Mercado Pago. Inténtalo de nuevo o contáctanos.', 'error');
   }
 }
 

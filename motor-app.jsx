@@ -915,13 +915,14 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
         });
         const data = await response.json();
         if (!response.ok || !data.init_point) {
-          throw new Error(data.error || 'Mercado Pago preference failed');
+          const publicMessage = data.message || data.error || 'Mercado Pago preference failed';
+          throw new Error(publicMessage);
         }
         window.location.href = data.init_point;
       } catch (e) {
         console.error('[PaymentPanel] Mercado Pago error:', e.message);
         setLoading(false);
-        setPaymentError(t.paymentErrorFailed);
+        setPaymentError(e.message || t.paymentErrorFailed);
       }
       return;
     }

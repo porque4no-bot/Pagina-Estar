@@ -35,9 +35,18 @@ function clean(value, max) {
   return String(value || '').trim().slice(0, max || 200);
 }
 
+function paymentError(message, statusCode, code) {
+  const err = new Error(message);
+  err.statusCode = statusCode || 500;
+  err.code = code || 'mercadopago_preference_error';
+  return err;
+}
+
 async function createPreference(preference) {
   const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-  if (!accessToken) throw new Error('MERCADOPAGO_ACCESS_TOKEN is not configured');
+  if (!accessToken) {
+    throw paymentError('MERCADOPAGO_ACCESS_TOKEN is not configured', 503, 'mercadopago_access_token_missing');
+  }
 
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort(), 12000);
@@ -60,7 +69,8 @@ async function createPreference(preference) {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(`Mercado Pago preference failed with status ${res.status}: ${JSON.stringify(data).slice(0, 500)}`);
+    const message = data.message || data.error || 'Mercado Pago rejected the preference';
+    throw paymentError(`Mercado Pago preference failed with status ${res.status}: ${message}`, 502, 'mercadopago_preference_rejected');
   }
   return data;
 }
@@ -195,6 +205,12 @@ exports.handler = async (event) => {
     return await preferenceForDirectBooking(body, event);
   } catch (e) {
     console.error('[create-mercadopago-preference]', e.message);
-    return json(500, { error: 'Failed to create Mercado Pago preference' });
+    return json(e.statusCode || 500, {
+      error: 'Failed to create Mercado Pago preference',
+      code: e.code || 'mercadopago_preference_error',
+      message: e.code === 'mercadopago_access_token_missing'
+        ? 'Mercado Pago access token is not configured in Netlify.'
+        : 'Mercado Pago could not create the checkout preference.'
+    });
   }
 };
