@@ -210,7 +210,7 @@ exports.handler = async (event) => {
       code: e.code || 'mercadopago_preference_error',
       message: e.code === 'mercadopago_access_token_missing'
         ? 'Mercado Pago access token is not configured in Netlify.'
-        : 'Mercado Pago could not create the checkout preference.'
+        : e.message.replace(/^Mercado Pago preference failed with status \d+:\s*/, '')
     });
   }
 };
