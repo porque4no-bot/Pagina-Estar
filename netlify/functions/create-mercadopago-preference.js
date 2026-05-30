@@ -35,6 +35,21 @@ function clean(value, max) {
   return String(value || '').trim().slice(0, max || 200);
 }
 
+function shouldUseSandboxCheckout() {
+  const mode = String(process.env.MERCADOPAGO_CHECKOUT_MODE || '').toLowerCase();
+  if (mode === 'sandbox' || mode === 'test') return true;
+  if (mode === 'production' || mode === 'prod') return false;
+  return process.env.CONTEXT && process.env.CONTEXT !== 'production';
+}
+
+function selectedCheckoutPoint(mp) {
+  const useSandbox = shouldUseSandboxCheckout();
+  return {
+    checkoutMode: useSandbox ? 'sandbox' : 'production',
+    initPoint: useSandbox && mp.sandbox_init_point ? mp.sandbox_init_point : mp.init_point
+  };
+}
+
 function paymentError(message, statusCode, code) {
   const err = new Error(message);
   err.statusCode = statusCode || 500;
@@ -118,10 +133,13 @@ async function preferenceForQuote(body, event) {
   };
 
   const mp = await createPreference(preference);
+  const checkout = selectedCheckoutPoint(mp);
   return json(200, {
     provider: 'mercadopago',
+    checkout_mode: checkout.checkoutMode,
     id: mp.id,
-    init_point: mp.init_point,
+    init_point: checkout.initPoint,
+    production_init_point: mp.init_point,
     sandbox_init_point: mp.sandbox_init_point,
     reference: quoteId,
     amountCents: totalCents
@@ -179,10 +197,13 @@ async function preferenceForDirectBooking(body, event) {
   };
 
   const mp = await createPreference(preference);
+  const checkout = selectedCheckoutPoint(mp);
   return json(200, {
     provider: 'mercadopago',
+    checkout_mode: checkout.checkoutMode,
     id: mp.id,
-    init_point: mp.init_point,
+    init_point: checkout.initPoint,
+    production_init_point: mp.init_point,
     sandbox_init_point: mp.sandbox_init_point,
     reference,
     bookingCode,
