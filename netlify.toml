@@ -18,6 +18,9 @@
   # security is enforced by Firebase authorized domains + the server-side
   # ADMIN_EMAILS allowlist. Exclude it from secret scanning.
   SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "AIzaSyAwgKBDAsDb51tZor9vFWo8AnOho5HFPyU"
+  # These values are intentionally public/client-visible. Keep secret scanning
+  # active for real secrets such as access tokens and webhook secrets.
+  SECRETS_SCAN_OMIT_KEYS = "PAYMENT_PROVIDER,MERCADOPAGO_PUBLIC_KEY"
 
 # Configuration for Netlify deployment and serverless redirects
 [[redirects]]
