@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Book · estar · Manizales</title>
-  <meta name="description" content="Book your studio apartment at Estar, Manizales. Choose dates, room type and pay securely with Wompi.">
+  <meta name="description" content="Book your studio apartment at Estar, Manizales. Choose dates, room type and pay securely with Mercado Pago.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Estar — Studio Apartments Manizales">
   <meta property="og:title" content="Book · estar · Manizales">
-  <meta property="og:description" content="Book your studio apartment at Estar, Manizales. Choose dates, room type and pay securely with Wompi.">
+  <meta property="og:description" content="Book your studio apartment at Estar, Manizales. Choose dates, room type and pay securely with Mercado Pago.">
   <meta property="og:image" content="https://estar.com.co/assets/photos/fachada.webp">
   <meta property="og:url" content="https://estar.com.co/en/reservar.html">
   <meta name="twitter:card" content="summary_large_image">
@@ -22,8 +22,7 @@
   <link rel="stylesheet" href="../colors_and_type.css?v=2">
   <link rel="stylesheet" href="../styles.css?v=3">
   <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
-  <!-- Wompi Web Checkout Widget -->
-  <script type="text/javascript" src="https://checkout.wompi.co/widget.js"></script>
+  <!-- Wompi rollback: to reactivate, set PAYMENT_PROVIDER=wompi and restore the widget script. -->
   <style>
     /* ─── Booking engine namespace ───────────────────────────────────────
        All rules live under .be-* so they never clash with styles.css.
@@ -503,7 +502,9 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
 
 <script>
-  window.WOMPI_PUBLIC_KEY = 'pub_prod_Hg7duVIJOzWuU1fNYipC5rs0Hzet2BLL';
+  window.PAYMENT_PROVIDER = 'mercadopago';
+  window.MERCADOPAGO_PUBLIC_KEY = 'APP_USR-03c489c4-c422-4bf9-8017-843995e960cf';
+  // window.WOMPI_PUBLIC_KEY = '';
 
   const BE_ROOMS = [
     { id:'clasica', roomTypeId:'31348', num:'01', name:'Clásica', area:28, capacity:2, bed:'1 Queen size', view:'City view',
@@ -536,7 +537,8 @@
     { id:'tour', name:'Manizales tour', desc:'4 hours with a certified local guide', price:80000, unit:'/person', icon:'map-pin' }
   ];
   const BE_PAYMENTS = [
-    { id:'wompi', name:'Secure online payment (Wompi)', desc:'Credit card, PSE, Nequi', icon:'credit-card' }
+    { id:'mercadopago', name:'Secure online payment (Mercado Pago)', desc:'Credit card, debit card, PSE, and other methods', icon:'credit-card' }
+    // Rollback Wompi: { id:'wompi', name:'Secure online payment (Wompi)', desc:'Credit card, PSE, Nequi', icon:'credit-card' }
   ];
   function dateDiff(a,b){const d1=new Date(a+'T00:00:00'),d2=new Date(b+'T00:00:00');return Math.max(1,Math.round((d2-d1)/86400000))}
   function formatCOP(n){return '$ '+Number(n).toLocaleString('es-CO').replace(/,/g,'.')}

@@ -70,9 +70,10 @@ const i18nEngine = {
     paymentIntro: "Elige cómo quieres pagar.",
     paymentHotelInfo: "Tu reserva queda confirmada sin cargo previo. Pagas al hacer check-in. Cancelación gratuita hasta 24h antes.",
     paymentTransferInfo: "Recibirás los datos bancarios por correo. Tienes 24 horas para realizar la transferencia y confirmar tu reserva.",
-    paymentWompiInfo: "Paga de manera segura con tu tarjeta de crédito, PSE o cuenta Nequi a través de Wompi. Tu reserva se confirmará inmediatamente.",
+    paymentWompiInfo: "Wompi queda disponible como respaldo técnico. Para reactivarlo: PAYMENT_PROVIDER=wompi y restaurar las variables WOMPI_PUBLIC_KEY/WOMPI_WEBHOOK_SECRET.",
+    paymentMercadoPagoInfo: "Paga de manera segura con tarjeta, PSE u otros medios disponibles en Mercado Pago. Tu reserva se confirmará cuando el pago sea aprobado.",
     paymentErrorDeclined: "La transacción fue declinada por la pasarela de pagos. Por favor, intenta de nuevo con otra tarjeta o medio de pago.",
-    paymentErrorFailed: "Ocurrió un error al procesar el pago con Wompi. Por favor intenta de nuevo.",
+    paymentErrorFailed: "Ocurrió un error al procesar el pago. Por favor intenta de nuevo.",
     confirmBooking: "Confirmar reserva →",
     emptySummary: "Elige tu habitación para ver el resumen aquí.",
     successTitle: "¡Reserva confirmada!",
@@ -172,11 +173,13 @@ const i18nEngine = {
     
     // Payments translations
     paymentNames: {
+      mercadopago: "Pago en línea seguro (Mercado Pago)",
       wompi: "Pago en línea seguro (Wompi)",
       hotel: "Pagar en el hotel",
       transfer: "Transferencia bancaria"
     },
     paymentDescs: {
+      mercadopago: "Tarjeta de crédito, débito, PSE y otros medios",
       wompi: "Tarjeta de crédito, PSE, Nequi",
       hotel: "Reserva sin cargo previo, pago al llegar",
       transfer: "Te enviamos los datos por correo"
@@ -232,9 +235,10 @@ const i18nEngine = {
     paymentIntro: "Choose how you would like to pay.",
     paymentHotelInfo: "Your reservation is confirmed without prior charge. You pay upon check-in. Free cancellation up to 24 hours prior.",
     paymentTransferInfo: "You will receive bank details by email. You have 24 hours to complete the transfer and confirm your booking.",
-    paymentWompiInfo: "Pay securely with your credit card, PSE, or Nequi via Wompi. Your booking will be confirmed instantly.",
+    paymentWompiInfo: "Wompi remains available as a technical fallback. To reactivate it: PAYMENT_PROVIDER=wompi and restore WOMPI_PUBLIC_KEY/WOMPI_WEBHOOK_SECRET.",
+    paymentMercadoPagoInfo: "Pay securely by card, PSE, or other methods available in Mercado Pago. Your booking will be confirmed when the payment is approved.",
     paymentErrorDeclined: "The transaction was declined by the payment gateway. Please try again with another card or payment method.",
-    paymentErrorFailed: "An error occurred while processing the payment with Wompi. Please try again.",
+    paymentErrorFailed: "An error occurred while processing the payment. Please try again.",
     confirmBooking: "Confirm booking →",
     emptySummary: "Choose your apartaestudio to view the summary here.",
     successTitle: "Booking confirmed!",
@@ -334,11 +338,13 @@ const i18nEngine = {
     
     // Payments translations
     paymentNames: {
+      mercadopago: "Secure online payment (Mercado Pago)",
       wompi: "Secure online payment (Wompi)",
       hotel: "Pay at hotel",
       transfer: "Bank transfer"
     },
     paymentDescs: {
+      mercadopago: "Credit card, debit card, PSE, and other methods",
       wompi: "Credit card, PSE, Nequi",
       hotel: "Book now without prepay, pay upon check-in",
       transfer: "We will email you our bank details"
@@ -357,7 +363,42 @@ function parseQueryParams() {
   let roomParam = params.get('room');
   if (roomParam === 'clasic') roomParam = 'clasica'; // compatibility mapping
   
-  return { checkin, checkout, guests, roomParam };
+  const payment = params.get('payment') || '';
+  return { checkin, checkout, guests, roomParam, payment };
+}
+
+function PaymentReturnNotice({ status, lang }) {
+  if (!status) return null;
+  const copy = {
+    success: {
+      icon: 'check-circle',
+      title: lang === 'es' ? 'Pago recibido' : 'Payment received',
+      text: lang === 'es'
+        ? 'Estamos confirmando tu reserva con Kunas. Recibirás la confirmación por correo cuando el webhook termine el proceso.'
+        : 'We are confirming your booking with Kunas. You will receive an email confirmation once the webhook finishes processing.'
+    },
+    pending: {
+      icon: 'clock',
+      title: lang === 'es' ? 'Pago pendiente' : 'Payment pending',
+      text: lang === 'es'
+        ? 'Tu pago quedó pendiente de aprobación. La reserva se confirmará automáticamente cuando Mercado Pago apruebe la transacción.'
+        : 'Your payment is pending approval. The booking will be confirmed automatically once Mercado Pago approves the transaction.'
+    },
+    failure: {
+      icon: 'alert-triangle',
+      title: lang === 'es' ? 'Pago no completado' : 'Payment not completed',
+      text: lang === 'es'
+        ? 'No se completó el pago. Puedes intentarlo de nuevo o escribirnos por WhatsApp.'
+        : 'The payment was not completed. You can try again or contact us on WhatsApp.'
+    }
+  }[status];
+  if (!copy) return null;
+  return (
+    <div className={`be-info-box${status === 'failure' ? ' be-info-error' : ''}`} style={{ marginBottom: 20 }}>
+      <Icon name={copy.icon} size={18} />
+      <p><strong>{copy.title}.</strong> {copy.text}</p>
+    </div>
+  );
 }
 
 /* ── SearchBar ────────────────────────────────────── */
@@ -841,9 +882,52 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
   const isBusinessTrip = booking.guest?.motivo === 'Trabajo / Negocios' || booking.guest?.motivo === 'Work / Business';
   const mustPayIVA = isColombian || isBusinessTrip;
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     setPaymentError(null);
 
+    if (paymentMethod === 'mercadopago') {
+      setLoading(true);
+      const code = genCode();
+      const extrasKeys = ['desayuno', 'parqueadero', 'late', 'early', 'traslado', 'tour'];
+      const extrasMask = extrasKeys.map(k => booking.extras[k] ? '1' : '0').join('');
+
+      try {
+        const response = await fetch('/api/create-mercadopago-preference', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'direct',
+            bookingCode: code,
+            amountCents: Math.round(calc.subtotal * 100),
+            checkin: search.checkin,
+            checkout: search.checkout,
+            guestsCount: search.guests,
+            roomTypeId: booking.room.roomTypeId || "31349",
+            roomName: booking.room.name,
+            firstName: booking.guest?.nombre || '',
+            lastName: booking.guest?.apellido || '',
+            email: booking.guest?.email || '',
+            phone: booking.guest?.tel || '',
+            extrasMask,
+            isColombian,
+            isBusiness: isBusinessTrip
+          })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.init_point) {
+          throw new Error(data.error || 'Mercado Pago preference failed');
+        }
+        window.location.href = data.init_point;
+      } catch (e) {
+        console.error('[PaymentPanel] Mercado Pago error:', e.message);
+        setLoading(false);
+        setPaymentError(t.paymentErrorFailed);
+      }
+      return;
+    }
+
+    // Wompi rollback path: to reactivate, set PAYMENT_PROVIDER=wompi and
+    // restore the Wompi widget script + WOMPI_PUBLIC_KEY/WOMPI_WEBHOOK_SECRET.
     if (paymentMethod === 'wompi') {
       if (typeof window.WidgetCheckout === 'undefined') {
         setPaymentError(
@@ -915,7 +999,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       checkout.open(function (result) {
         setLoading(false);
         const transaction = result.transaction;
-        if (process.env.NODE_ENV !== 'production') console.log('Wompi Transaction Callback:', transaction);
+        console.log('Wompi Transaction Callback:', transaction);
 
         if (transaction.status === 'APPROVED' || transaction.status === 'PENDING') {
           onConfirm(code, {
@@ -936,10 +1020,6 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       setTimeout(() => {
         setLoading(false);
       }, 1000);
-    } else {
-      setLoading(true);
-      const code = genCode();
-      onConfirm(code, null);
     }
   };
 
@@ -1054,6 +1134,13 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
             onClick={() => setPaymentError(null)}>
             {lang === 'es' ? 'Intentar de nuevo' : 'Try again'}
           </button>
+        </div>
+      )}
+
+      {paymentMethod === 'mercadopago' && !paymentError && (
+        <div className="be-info-box">
+          <Icon name="credit-card" size={16} style={{ color: 'var(--sand-700)', marginTop: 1 }} />
+          <p>{t.paymentMercadoPagoInfo}</p>
         </div>
       )}
 
@@ -1488,7 +1575,7 @@ function BookingEngine() {
   const [ratePerRoom, setRatePerRoom] = useState({});
   const [extras, setExtras] = useState({});
   const [guestData, setGuestData] = useState({});
-  const [paymentMethod, setPaymentMethod] = useState('wompi');
+  const [paymentMethod, setPaymentMethod] = useState(window.PAYMENT_PROVIDER === 'wompi' ? 'wompi' : 'mercadopago');
   const [bookingCode, setBookingCode] = useState(null);
   const [paymentDetails, setPaymentDetails] = useState(null);
 
@@ -1608,7 +1695,7 @@ function BookingEngine() {
     setSelectedRate('flexible');
     setExtras({});
     setGuestData({});
-    setPaymentMethod('wompi');
+    setPaymentMethod(window.PAYMENT_PROVIDER === 'wompi' ? 'wompi' : 'mercadopago');
     setBookingCode(null);
     setPaymentDetails(null);
   }
@@ -1645,7 +1732,7 @@ function BookingEngine() {
     })
     .then(res => res.json())
     .then(data => {
-      if (process.env.NODE_ENV !== 'production') console.log('Kunas PMS Booking Response:', data);
+      console.log('Kunas PMS Booking Response:', data);
       const finalCode = (data.success && data.bookingCode) ? data.bookingCode : code;
       if (data.success && data.bookingCode) {
         setBookingCode(data.bookingCode);
@@ -1676,7 +1763,7 @@ function BookingEngine() {
         })
         .then(r => r.json())
         .then(emailData => {
-          if (process.env.NODE_ENV !== 'production') console.log('[send-confirmation] Result:', emailData);
+          console.log('[send-confirmation] Result:', emailData);
         })
         .catch(emailErr => {
           // Non-blocking: email failure should never prevent the booking confirmation screen
@@ -1742,6 +1829,7 @@ function BookingEngine() {
   return (
     <div className="be-app" data-theme="editorial">
       <div className="be-page-inner">
+        <PaymentReturnNotice status={initialParams.payment} lang={lang} />
         <SearchBar search={search} onSearch={handleSearch} lang={lang} />
         <StepProgress currentStep={currentStep} lang={lang} />
         <div className="be-body">

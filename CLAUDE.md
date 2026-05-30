@@ -69,7 +69,9 @@ All functions authenticate against OTASync via a cached session key (`pkey`, val
 | `send-confirmation` | Sends email confirmation to guest |
 | `get-booking` | Retrieves a booking by reference code for guest self-service |
 | `get-booking-rating` | Fetches Booking.com rating via `PROXY_URL`; returns hardcoded fallback if unconfigured |
-| `wompi-webhook` | Handles async payment confirmation from Wompi; for quote payments (reference `COT-...`) it loads the quote, verifies the amount, creates the OTASync reservation and marks it `aceptada` |
+| `create-mercadopago-preference` | Creates Mercado Pago Checkout Pro preferences for direct bookings and quotes |
+| `mercadopago-webhook` | Validates Mercado Pago webhook signatures, verifies the real payment with Mercado Pago, then creates/updates the OTASync reservation through shared payment logic |
+| `wompi-webhook` | Kept as rollback payment confirmation handler; not used by the active checkout flow unless Wompi is reactivated |
 | `create-quote` / `get-quote` / `list-quotes` / `update-quote` | Corporate quote CRUD, persisted in Netlify Blobs (`quotes` store). Create/edit block when rooms lack availability |
 | `quote-availability` | Public re-check of a stored quote's room availability (called before opening Wompi) |
 | `revalidate-quotes` | Scheduled (every 6h) re-check of active quotes; flags lost availability and releases holds on expired/cancelled quotes |
@@ -116,8 +118,16 @@ OTASYNC_TOKEN=
 OTASYNC_USERNAME=
 OTASYNC_PASSWORD=
 OTASYNC_PROPERTY_ID=9889
+PAYMENT_PROVIDER=mercadopago
+MERCADOPAGO_PUBLIC_KEY=
+MERCADOPAGO_ACCESS_TOKEN=
+MERCADOPAGO_WEBHOOK_SECRET=
+MERCADOPAGO_SUCCESS_URL=https://estar.com.co/reservar.html?payment=success
+MERCADOPAGO_FAILURE_URL=https://estar.com.co/reservar.html?payment=failure
+MERCADOPAGO_PENDING_URL=https://estar.com.co/reservar.html?payment=pending
 ALLOWED_ORIGIN=http://localhost:8888
 PROXY_URL=
 ```
 
-Wompi-related variables (public key, events secret, etc.) are also read by the webhook function. In production these are set in the Netlify dashboard.
+Mercado Pago Checkout Pro is the active payment provider. Wompi remains available as rollback code (`wompi-webhook.js`); to reactivate it, restore the Wompi widget/public key in the booking pages and set `PAYMENT_PROVIDER=wompi` plus `WOMPI_WEBHOOK_SECRET` in Netlify.
+Register Mercado Pago notifications against `/api/mercadopago-webhook` and use `MERCADOPAGO_WEBHOOK_SECRET` as the webhook secret.
