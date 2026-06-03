@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="styles.css?v=3">
 <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
 <script src="https://unpkg.com/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js" defer></script>
-<!-- Wompi rollback: restore https://checkout.wompi.co/widget.js and set PAYMENT_PROVIDER=wompi if needed. -->
+<script src="https://checkout.wompi.co/widget.js"></script>
 <style>
 .quote-pay-msg { margin: 12px 0 0; font-family: var(--font-body); font-size: 14px; font-weight: 600; }
 /* ══ Section padding inside the quote doc ══ */
@@ -456,10 +456,11 @@ function setHtml(id, html) {
   if (el) el.innerHTML = html || '';
 }
 
-/* Payment: Mercado Pago active, Wompi kept as rollback in backend. */
-var PAYMENT_PROVIDER = 'mercadopago';
-var MERCADOPAGO_PUBLIC_KEY = 'APP_USR-03c489c4-c422-4bf9-8017-843995e960cf';
-// var WOMPI_PUBLIC_KEY = '';
+/* Payment: Wompi active. Replace with the public key from the new Wompi account. */
+var PAYMENT_PROVIDER = 'wompi';
+var WOMPI_PUBLIC_KEY = '__WOMPI_PUBLIC_KEY__';
+// var PAYMENT_PROVIDER = 'mercadopago';
+// var MERCADOPAGO_PUBLIC_KEY = '';
 var QUOTE_PAY = null;        // { id, totalCents, email, fullName, phone }
 var IS_PREVIEW = false;
 
@@ -510,7 +511,73 @@ async function startQuotePayment() {
   showPayMessage('', 'ok');
   document.getElementById('payMessage').style.display = 'none';
 
-  showPayMessage('Creando enlace seguro de Mercado Pago...', 'ok');
+  if (PAYMENT_PROVIDER === 'wompi') {
+    if (typeof window.WidgetCheckout === 'undefined') {
+      showPayMessage('La pasarela de pago Wompi no se cargó correctamente. Recarga la página e inténtalo de nuevo.', 'error');
+      if (btn) btn.disabled = false;
+      return;
+    }
+    if (!WOMPI_PUBLIC_KEY) {
+      showPayMessage('La llave pública de Wompi no está configurada. Contáctanos para completar el pago.', 'error');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    let wompiSignature;
+    try {
+      const sigRes = await fetch('/api/create-wompi-signature', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reference: QUOTE_PAY.id,
+          amountInCents: QUOTE_PAY.totalCents,
+          currency: 'COP'
+        })
+      });
+      const sigData = await sigRes.json();
+      if (!sigRes.ok || !sigData.signature || !sigData.signature.integrity) {
+        throw new Error(sigData.error || 'No se pudo firmar la transacción.');
+      }
+      wompiSignature = sigData.signature;
+    } catch (e) {
+      showPayMessage('No se pudo preparar la firma de seguridad de Wompi. Inténtalo de nuevo o contáctanos.', 'error');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    const checkout = new window.WidgetCheckout({
+      currency: 'COP',
+      amountInCents: QUOTE_PAY.totalCents,
+      reference: QUOTE_PAY.id,
+      publicKey: WOMPI_PUBLIC_KEY,
+      signature: wompiSignature,
+      customerData: {
+        email: QUOTE_PAY.email || '',
+        fullName: QUOTE_PAY.fullName || '',
+        phoneNumber: QUOTE_PAY.phone || '',
+        phoneNumberPrefix: '+57'
+      }
+    });
+
+    checkout.open(function (result) {
+      if (btn) btn.disabled = false;
+      const tx = result && result.transaction;
+      if (!tx) return;
+      if (tx.status === 'APPROVED') {
+        showPayMessage('¡Pago aprobado! Tu reserva se está confirmando. Recibirás la confirmación por correo.', 'ok');
+        if (btn) { btn.disabled = true; btn.textContent = 'Pago confirmado ✓'; }
+      } else if (tx.status === 'PENDING') {
+        showPayMessage('Tu pago quedó pendiente de confirmación. Te avisaremos cuando se apruebe.', 'ok');
+      } else if (tx.status === 'DECLINED') {
+        showPayMessage('El pago fue rechazado. Verifica los datos de tu medio de pago e inténtalo de nuevo.', 'error');
+      } else {
+        showPayMessage('No se pudo completar el pago. Inténtalo de nuevo o contáctanos.', 'error');
+      }
+    });
+    return;
+  }
+
+  /* Mercado Pago rollback path. */
   try {
     const pref = await fetch('/api/create-mercadopago-preference', {
       method: 'POST',
@@ -518,13 +585,11 @@ async function startQuotePayment() {
       body: JSON.stringify({ type: 'quote', quoteId: QUOTE_PAY.id })
     });
     const data = await pref.json();
-    if (!pref.ok || !data.init_point) {
-      throw new Error(data.message || data.error || 'No se pudo crear la preferencia de pago.');
-    }
+    if (!pref.ok || !data.init_point) throw new Error(data.message || data.error || 'No se pudo crear la preferencia de pago.');
     window.location.href = data.init_point;
   } catch (e) {
     if (btn) btn.disabled = false;
-    showPayMessage(e.message || 'No se pudo iniciar Mercado Pago. Inténtalo de nuevo o contáctanos.', 'error');
+    showPayMessage(e.message || 'No se pudo iniciar la pasarela de pago. Inténtalo de nuevo o contáctanos.', 'error');
   }
 }
 
@@ -734,7 +799,7 @@ function renderQuote(q) {
   const inc = incBaseNet * incRate;
   const total = (subtotal - descuentoAmt) + iva + inc;
 
-  /* Stash payment data (Mercado Pago external_reference = quoteId, amount = server total) */
+  /* Stash payment data (Wompi reference = quoteId, amount = server total) */
   QUOTE_PAY = {
     id: q.quoteId,
     token: new URLSearchParams(window.location.search).get('t') || '',
@@ -799,7 +864,7 @@ function renderQuote(q) {
       const payBtn = document.getElementById('acceptPayBtn');
       if (payBtn) payBtn.disabled = true;
     } else if (paymentStatus === 'pending') {
-      showPayMessage('Tu pago quedó pendiente de aprobación. Te avisaremos cuando Mercado Pago lo confirme.', 'ok');
+      showPayMessage('Tu pago quedó pendiente de aprobación. Te avisaremos cuando Wompi lo confirme.', 'ok');
     } else if (paymentStatus === 'failure') {
       showPayMessage('No se completó el pago. Puedes intentarlo de nuevo o contactarnos.', 'error');
     }

@@ -70,7 +70,7 @@ const i18nEngine = {
     paymentIntro: "Elige cómo quieres pagar.",
     paymentHotelInfo: "Tu reserva queda confirmada sin cargo previo. Pagas al hacer check-in. Cancelación gratuita hasta 24h antes.",
     paymentTransferInfo: "Recibirás los datos bancarios por correo. Tienes 24 horas para realizar la transferencia y confirmar tu reserva.",
-    paymentWompiInfo: "Wompi queda disponible como respaldo técnico. Para reactivarlo: PAYMENT_PROVIDER=wompi y restaurar las variables WOMPI_PUBLIC_KEY/WOMPI_WEBHOOK_SECRET.",
+    paymentWompiInfo: "Paga de manera segura con tarjeta de crédito, PSE o Nequi a través de Wompi. Tu reserva se confirmará cuando el pago sea aprobado.",
     paymentMercadoPagoInfo: "Paga de manera segura con tarjeta, PSE u otros medios disponibles en Mercado Pago. Tu reserva se confirmará cuando el pago sea aprobado.",
     paymentErrorDeclined: "La transacción fue declinada por la pasarela de pagos. Por favor, intenta de nuevo con otra tarjeta o medio de pago.",
     paymentErrorFailed: "Ocurrió un error al procesar el pago. Por favor intenta de nuevo.",
@@ -235,7 +235,7 @@ const i18nEngine = {
     paymentIntro: "Choose how you would like to pay.",
     paymentHotelInfo: "Your reservation is confirmed without prior charge. You pay upon check-in. Free cancellation up to 24 hours prior.",
     paymentTransferInfo: "You will receive bank details by email. You have 24 hours to complete the transfer and confirm your booking.",
-    paymentWompiInfo: "Wompi remains available as a technical fallback. To reactivate it: PAYMENT_PROVIDER=wompi and restore WOMPI_PUBLIC_KEY/WOMPI_WEBHOOK_SECRET.",
+    paymentWompiInfo: "Pay securely with credit card, PSE, or Nequi through Wompi. Your booking will be confirmed when the payment is approved.",
     paymentMercadoPagoInfo: "Pay securely by card, PSE, or other methods available in Mercado Pago. Your booking will be confirmed when the payment is approved.",
     paymentErrorDeclined: "The transaction was declined by the payment gateway. Please try again with another card or payment method.",
     paymentErrorFailed: "An error occurred while processing the payment. Please try again.",
@@ -927,8 +927,8 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       return;
     }
 
-    // Wompi rollback path: to reactivate, set PAYMENT_PROVIDER=wompi and
-    // restore the Wompi widget script + WOMPI_PUBLIC_KEY/WOMPI_WEBHOOK_SECRET.
+    // Wompi active path. Mercado Pago remains available as rollback via
+    // PAYMENT_PROVIDER=mercadopago and the Mercado Pago Netlify variables.
     if (paymentMethod === 'wompi') {
       if (typeof window.WidgetCheckout === 'undefined') {
         setPaymentError(
@@ -984,11 +984,39 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
         .replace(/\//g, '_')
         .replace(/=+$/, '');
 
+      let wompiSignature;
+      try {
+        const sigRes = await fetch('/api/create-wompi-signature', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reference: encodedRef,
+            amountInCents: Math.round(calc.subtotal * 100),
+            currency: 'COP'
+          })
+        });
+        const sigData = await sigRes.json();
+        if (!sigRes.ok || !sigData.signature || !sigData.signature.integrity) {
+          throw new Error(sigData.error || 'Wompi signature failed');
+        }
+        wompiSignature = sigData.signature;
+      } catch (e) {
+        console.error('[PaymentPanel] Wompi signature error:', e.message);
+        setLoading(false);
+        setPaymentError(
+          lang === 'es'
+            ? 'No se pudo preparar la firma de seguridad de Wompi. Por favor intenta de nuevo o contáctanos.'
+            : 'Could not prepare the Wompi security signature. Please try again or contact us.'
+        );
+        return;
+      }
+
       const checkout = new window.WidgetCheckout({
         currency: 'COP',
         amountInCents: Math.round(calc.subtotal * 100),
         reference: encodedRef,
         publicKey: wompiKey,
+        signature: wompiSignature,
         customerData: {
           email: booking.guest?.email || '',
           fullName: `${booking.guest?.nombre || ''} ${booking.guest?.apellido || ''}`.trim(),
