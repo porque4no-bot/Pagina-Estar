@@ -58,7 +58,10 @@
 .qr-price { text-align: right; flex-shrink: 0; }
 .qr-units { font-family: var(--font-label); font-size: 9px; letter-spacing: 0.035em; color: var(--ink-500); display: block; line-height: 1.2; }
 .qr-line-total { font-family: var(--font-heading); font-size: 15px; font-weight: 700; color: var(--ink); line-height: 1.15; }
-.qr-chev { flex-shrink: 0; color: var(--ink-500); transition: transform var(--dur-base) var(--ease-out); }
+.qr-chev {
+  width: 18px !important; height: 18px !important; flex: 0 0 18px;
+  color: var(--ink-500); transition: transform var(--dur-base) var(--ease-out);
+}
 .quote-room[open] .qr-chev { transform: rotate(180deg); }
 .qr-panel { padding: 0 18px 18px; }
 .qr-gallery { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 12px; scrollbar-width: thin; }
