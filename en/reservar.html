@@ -22,7 +22,6 @@
   <link rel="stylesheet" href="../colors_and_type.css?v=2">
   <link rel="stylesheet" href="../styles.css?v=3">
   <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
-  <!-- Wompi Web Checkout Widget -->
   <script type="text/javascript" src="https://checkout.wompi.co/widget.js"></script>
   <style>
     /* ─── Booking engine namespace ───────────────────────────────────────
@@ -503,7 +502,12 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
 
 <script>
-  window.WOMPI_PUBLIC_KEY = 'pub_prod_Hg7duVIJOzWuU1fNYipC5rs0Hzet2BLL';
+  // Active payment provider. Replace WOMPI_PUBLIC_KEY with the public key
+  // from the new company's Wompi account. Mercado Pago remains as rollback.
+  window.PAYMENT_PROVIDER = 'wompi';
+  window.WOMPI_PUBLIC_KEY = '__WOMPI_PUBLIC_KEY__';
+  // window.PAYMENT_PROVIDER = 'mercadopago';
+  // window.MERCADOPAGO_PUBLIC_KEY = '';
 
   const BE_ROOMS = [
     { id:'clasica', roomTypeId:'31348', num:'01', name:'Clásica', area:28, capacity:2, bed:'1 Queen size', view:'City view',
@@ -537,6 +541,7 @@
   ];
   const BE_PAYMENTS = [
     { id:'wompi', name:'Secure online payment (Wompi)', desc:'Credit card, PSE, Nequi', icon:'credit-card' }
+    // Rollback Mercado Pago: { id:'mercadopago', name:'Secure online payment (Mercado Pago)', desc:'Credit card, debit card, PSE, and other methods', icon:'credit-card' }
   ];
   function dateDiff(a,b){const d1=new Date(a+'T00:00:00'),d2=new Date(b+'T00:00:00');return Math.max(1,Math.round((d2-d1)/86400000))}
   function formatCOP(n){return '$ '+Number(n).toLocaleString('es-CO').replace(/,/g,'.')}

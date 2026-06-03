@@ -18,6 +18,9 @@
   # security is enforced by Firebase authorized domains + the server-side
   # ADMIN_EMAILS allowlist. Exclude it from secret scanning.
   SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "AIzaSyAwgKBDAsDb51tZor9vFWo8AnOho5HFPyU"
+  # These values are intentionally public/client-visible. Keep secret scanning
+  # active for real secrets such as access tokens and webhook secrets.
+  SECRETS_SCAN_OMIT_KEYS = "PAYMENT_PROVIDER,WOMPI_PUBLIC_KEY,MERCADOPAGO_PUBLIC_KEY"
 
 # Configuration for Netlify deployment and serverless redirects
 [[redirects]]
@@ -43,7 +46,8 @@
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://checkout.wompi.co https://www.googletagmanager.com https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self'; connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://estar-4d0da.firebaseapp.com; frame-src https://checkout.wompi.co https://estar-4d0da.firebaseapp.com https://accounts.google.com https://apis.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
+    # Mercado Pago rollback: keep mercadopago.com.co/com + api.mercadopago.com allowed while Wompi is active.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://checkout.wompi.co https://www.googletagmanager.com https://www.gstatic.com https://apis.google.com https://www.mercadopago.com.co https://www.mercadopago.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self'; connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.mercadopago.com https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://estar-4d0da.firebaseapp.com; frame-src https://checkout.wompi.co https://www.mercadopago.com.co https://www.mercadopago.com https://estar-4d0da.firebaseapp.com https://accounts.google.com https://apis.google.com; object-src 'none'; base-uri 'self'; form-action 'self' https://checkout.wompi.co https://www.mercadopago.com.co https://www.mercadopago.com; frame-ancestors 'self'; upgrade-insecure-requests"
 
 [[headers]]
   for = "/cotizar-admin.html"

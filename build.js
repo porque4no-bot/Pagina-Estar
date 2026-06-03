@@ -184,6 +184,27 @@ if (fs.existsSync(distEnDir)) {
   });
 }
 
+function injectPublicEnvPlaceholders(dir) {
+  const replacements = {
+    '__WOMPI_PUBLIC_KEY__': process.env.WOMPI_PUBLIC_KEY || '',
+    '__MERCADOPAGO_PUBLIC_KEY__': process.env.MERCADOPAGO_PUBLIC_KEY || ''
+  };
+  fs.readdirSync(dir).forEach(entry => {
+    const fullPath = path.join(dir, entry);
+    if (fs.lstatSync(fullPath).isDirectory()) {
+      injectPublicEnvPlaceholders(fullPath);
+    } else if (entry.endsWith('.html') || entry.endsWith('.js')) {
+      let content = fs.readFileSync(fullPath, 'utf8');
+      for (const [token, value] of Object.entries(replacements)) {
+        content = content.split(token).join(value);
+      }
+      fs.writeFileSync(fullPath, content);
+    }
+  });
+}
+console.log('Injecting public payment configuration...');
+injectPublicEnvPlaceholders(distDir);
+
 async function convertLogosToWebP(sharp) {
   const logosToConvert = ['logo-cotelco.png', 'logo-asohost.png'];
   for (const logo of logosToConvert) {

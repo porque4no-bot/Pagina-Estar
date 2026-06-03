@@ -319,11 +319,12 @@ async function createConfirmedReservation(quote, opts) {
   const lastName = parts.join(' ') || quote.empresa || '';
 
   const paidAmount = opts.paidAmount != null ? opts.paidAmount : roomsPrice;
+  const providerLabel = opts.paymentProvider || 'payment';
   const payments = [{
     amount: paidAmount,
     date_payment: new Date().toISOString().split('T')[0],
     payment_method: 'card',
-    note: `Cotización: ${quote.quoteId}${opts.transactionId ? ', Wompi ID: ' + opts.transactionId : ''}, Status: APPROVED`
+    note: `Cotización: ${quote.quoteId}${opts.transactionId ? ', ' + providerLabel + ' ID: ' + opts.transactionId : ''}, Status: APPROVED`
   }];
 
   const payload = {
@@ -346,7 +347,7 @@ async function createConfirmedReservation(quote, opts) {
     id_contigents: 0,
     date_arrival: quote.checkin, date_departure: quote.checkout,
     id_channels: '392', channel: 'Private reservation',
-    note: `Reserva corporativa desde cotización ${quote.quoteId}. Empresa: ${quote.empresa || ''}. NIT: ${quote.nit || 'N/D'}. Total pagado: ${paidAmount}.${opts.transactionId ? ' ID Transacción: ' + opts.transactionId : ''}`
+    note: `Reserva corporativa desde cotización ${quote.quoteId}. Empresa: ${quote.empresa || ''}. NIT: ${quote.nit || 'N/D'}. Total pagado: ${paidAmount}.${opts.transactionId ? ' ID Transacción ' + providerLabel + ': ' + opts.transactionId : ''}`
   };
 
   const data = await insertReservation(payload);
@@ -354,6 +355,6 @@ async function createConfirmedReservation(quote, opts) {
 }
 
 module.exports = {
-  hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
+  otasyncCreds, hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
   buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, createConfirmedReservation
 };
