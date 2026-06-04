@@ -402,6 +402,31 @@ function PaymentReturnNotice({ status, lang }) {
 }
 
 /* ── SearchBar ────────────────────────────────────── */
+function normalizeChoice(value) {
+  return String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function guestCountry(guest) {
+  return (guest && guest.pais) || 'Colombia';
+}
+
+function guestMotive(guest, lang) {
+  return (guest && guest.motivo) || (lang === 'es' ? 'Turismo / Vacaciones' : 'Tourism / Vacation');
+}
+
+function isColombianGuest(guest) {
+  return normalizeChoice(guestCountry(guest)) === 'colombia';
+}
+
+function isBusinessGuest(guest, lang) {
+  const motive = normalizeChoice(guestMotive(guest, lang));
+  return motive.includes('negocio') || motive.includes('trabajo') || motive.includes('business') || motive.includes('work');
+}
+
+function mustChargeIva(guest, lang) {
+  return isColombianGuest(guest) || isBusinessGuest(guest, lang);
+}
+
 function SearchBar({ search, onSearch, lang }) {
   const [s, setS] = useState(search);
   const [expanded, setExpanded] = useState(false);
@@ -785,7 +810,15 @@ function ExtrasPanel({ extras, setExtras, search, onContinue, lang }) {
 function GuestForm({ guest, setGuest, onContinue, lang }) {
   const t = i18nEngine[lang];
   function set(field, val) { setGuest(prev => ({ ...prev, [field]: val })); }
-  function submit(e) { e.preventDefault(); onContinue(); }
+  function submit(e) {
+    e.preventDefault();
+    setGuest(prev => ({
+      ...prev,
+      pais: guestCountry(prev),
+      motivo: guestMotive(prev, lang)
+    }));
+    onContinue();
+  }
 
   const countries = lang === 'es'
     ? ['Colombia','Venezuela','Ecuador','Perú','México','Argentina','España','Estados Unidos','Otro']
@@ -878,9 +911,9 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
 
   const translatedRoomName = t.roomNames[booking.room.id] || booking.room.name;
 
-  const isColombian = booking.guest?.pais === 'Colombia';
-  const isBusinessTrip = booking.guest?.motivo === 'Trabajo / Negocios' || booking.guest?.motivo === 'Work / Business';
-  const mustPayIVA = isColombian || isBusinessTrip;
+  const isColombian = isColombianGuest(booking.guest);
+  const isBusinessTrip = isBusinessGuest(booking.guest, lang);
+  const mustPayIVA = mustChargeIva(booking.guest, lang);
 
   const handlePayment = async () => {
     setPaymentError(null);
@@ -1040,13 +1073,19 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
         const transaction = result.transaction;
         console.log('Wompi Transaction Callback:', transaction);
 
-        if (transaction.status === 'APPROVED' || transaction.status === 'PENDING') {
+        if (transaction.status === 'APPROVED') {
           onConfirm(code, {
             id: transaction.id,
             status: transaction.status,
             paymentMethod: transaction.payment_method_type,
             reference: transaction.reference
           });
+        } else if (transaction.status === 'PENDING') {
+          setPaymentError(
+            lang === 'es'
+              ? 'Tu pago quedo pendiente de aprobacion. La reserva se confirmara cuando Wompi apruebe la transaccion.'
+              : 'Your payment is pending approval. The booking will be confirmed when Wompi approves the transaction.'
+          );
         } else if (transaction.status === 'DECLINED') {
           setPaymentError(t.paymentErrorDeclined);
         } else {
@@ -1209,9 +1248,9 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
 /* ── BookingSummary (sidebar editorial) ───────────── */
 function BookingSummary({ booking, search, lang }) {
   const t = i18nEngine[lang];
-  const isColombian = booking.guest?.pais === 'Colombia';
-  const isBusinessTrip = booking.guest?.motivo === 'Trabajo / Negocios' || booking.guest?.motivo === 'Work / Business';
-  const mustPayIVA = isColombian || isBusinessTrip;
+  const isColombian = isColombianGuest(booking.guest);
+  const isBusinessTrip = isBusinessGuest(booking.guest, lang);
+  const mustPayIVA = mustChargeIva(booking.guest, lang);
   if (!booking.room) {
     return (
       <div style={{ background: 'var(--paper-200)', border: '1px solid var(--paper-400)', borderRadius: 'var(--radius-xl)', padding: 24, textAlign: 'center' }}>
@@ -1313,9 +1352,9 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
   const roomName = t.roomNames[booking.room.id] || booking.room.name;
   const rateLabel = booking.rate === 'flexible' ? `${t.flexible} — ${t.refundable}` : `${t.bestPrice} — ${t.nonRefundable}`;
 
-  const isColombian = booking.guest?.pais === 'Colombia';
-  const isBusinessTrip = booking.guest?.motivo === 'Trabajo / Negocios' || booking.guest?.motivo === 'Work / Business';
-  const mustPayIVA = isColombian || isBusinessTrip;
+  const isColombian = isColombianGuest(booking.guest);
+  const isBusinessTrip = isBusinessGuest(booking.guest, lang);
+  const mustPayIVA = mustChargeIva(booking.guest, lang);
 
   return (
     <div className="be-confirmation">
@@ -1750,9 +1789,9 @@ function BookingEngine() {
     setBookingCode(code);
     setPaymentDetails(details);
 
-    const isColombian = booking.guest?.pais === 'Colombia';
-    const isBusinessTrip = booking.guest?.motivo === 'Trabajo / Negocios' || booking.guest?.motivo === 'Work / Business';
-    const mustPayIVA = isColombian || isBusinessTrip;
+    const isColombian = isColombianGuest(booking.guest);
+    const isBusinessTrip = isBusinessGuest(booking.guest, lang);
+    const mustPayIVA = mustChargeIva(booking.guest, lang);
     const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
     const roomPriceVal = mustPayIVA ? calc.total : calc.subtotal;
 
@@ -1766,6 +1805,7 @@ function BookingEngine() {
         guestsCount: search.guests,
         roomTypeId: booking.room.roomTypeId || "31349",
         roomName: booking.room.name,
+        roomRate: booking.rate,
         roomPrice: roomPriceVal,
         paidAmount: calc.subtotal,
         firstName: booking.guest?.nombre || '',

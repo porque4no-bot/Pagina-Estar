@@ -101,6 +101,59 @@ async function getSessionKey(token, username, password) {
   return data.pkey;
 }
 
+async function readResponseSnippet(response) {
+  try {
+    const text = await response.text();
+    return String(text || '').replace(/\s+/g, ' ').slice(0, 1000);
+  } catch (e) {
+    return '';
+  }
+}
+
+async function findAvailableRoomId({ token, pkey, propertyId, checkin, checkout, roomTypeId }) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  let response;
+  try {
+    response = await fetch('https://app.otasync.me/api/room/data/available_rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        key: pkey,
+        id_properties: propertyId,
+        dfrom: checkin,
+        dto: checkout,
+        id_room_types: parseInt(roomTypeId, 10),
+        include_id_reservations: 0,
+        exclude_id_rooms: []
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (process.env.DEBUG) console.warn('[wompi-webhook] available room lookup failed:', err.message);
+    return 0;
+  }
+
+  if (!response.ok) {
+    const detail = await readResponseSnippet(response);
+    console.warn(`[wompi-webhook] available_rooms returned ${response.status}${detail ? ': ' + detail : ''}`);
+    return 0;
+  }
+
+  try {
+    const data = await response.json();
+    const rooms = Array.isArray(data.rooms) ? data.rooms : [];
+    const first = rooms.find(r => String(r.id_room_types) === String(roomTypeId) && r.id_rooms) || rooms.find(r => r.id_rooms);
+    return first && first.id_rooms ? parseInt(first.id_rooms, 10) || 0 : 0;
+  } catch (e) {
+    console.warn('[wompi-webhook] available_rooms returned invalid JSON:', e.message);
+    return 0;
+  }
+}
+
 // Sanitize phone: only digits, +, spaces
 function sanitizePhone(raw) {
   if (!raw || typeof raw !== 'string') return '';
@@ -729,6 +782,14 @@ exports.handler = async (event, context) => {
 
   try {
     const pkey = await getSessionKey(token, username, password);
+    const selectedRoomId = await findAvailableRoomId({
+      token,
+      pkey,
+      propertyId,
+      checkin: decoded.checkin,
+      checkout: decoded.checkout,
+      roomTypeId: decoded.roomTypeId
+    });
 
     // Calculate dates & nights
     const checkinDate = new Date(decoded.checkin);
@@ -816,7 +877,7 @@ exports.handler = async (event, context) => {
       rooms: [
         {
           id_room_types: parseInt(decoded.roomTypeId),
-          id_rooms: 0, // Auto-assign room in Kunas
+          id_rooms: selectedRoomId,
           room_type: roomName,
           room_number: "",
           avg_price: avgPrice,
@@ -894,6 +955,8 @@ exports.handler = async (event, context) => {
     }
 
     if (!response.ok) {
+      const detail = await readResponseSnippet(response);
+      console.error(`[wompi-webhook] Kunas insert failed. status=${response.status}, roomTypeId=${decoded.roomTypeId}, id_rooms=${selectedRoomId || 0}, bookingCode=${decoded.bookingCode}, tx=${transaction.id}, amount=${transaction.amount_in_cents}${detail ? ', body=' + detail : ''}`);
       throw new Error(`Kunas API booking submission returned status ${response.status}`);
     }
 
