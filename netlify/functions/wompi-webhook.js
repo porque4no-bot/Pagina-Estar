@@ -325,7 +325,7 @@ async function handleQuotePayment(transaction, corsHeaders) {
   const username = process.env.OTASYNC_USERNAME || '';
   const password = process.env.OTASYNC_PASSWORD || '';
   const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
-  const channelId = process.env.OTASYNC_CHANNEL_ID || '';
+  const channelId = process.env.OTASYNC_USE_CHANNEL === 'true' ? (process.env.OTASYNC_CHANNEL_ID || '') : '';
   const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Private reservation';
   const hasCredentials = token && username && password;
 
@@ -766,7 +766,7 @@ exports.handler = async (event, context) => {
   const username = process.env.OTASYNC_USERNAME || '';
   const password = process.env.OTASYNC_PASSWORD || '';
   const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
-  const channelId = process.env.OTASYNC_CHANNEL_ID || '';
+  const channelId = process.env.OTASYNC_USE_CHANNEL === 'true' ? (process.env.OTASYNC_CHANNEL_ID || '') : '';
   const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Private reservation';
 
   const hasCredentials = token && username && password;

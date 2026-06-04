@@ -1348,6 +1348,7 @@ function BookingSummary({ booking, search, lang }) {
 function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, lang }) {
   const t = i18nEngine[lang];
   const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
+  const reservationPending = !!(paymentDetails && paymentDetails.reservationPending);
 
   const roomName = t.roomNames[booking.room.id] || booking.room.name;
   const rateLabel = booking.rate === 'flexible' ? `${t.flexible} — ${t.refundable}` : `${t.bestPrice} — ${t.nonRefundable}`;
@@ -1360,10 +1361,25 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
     <div className="be-confirmation">
       <div className="be-confirm-hero">
         <span className="be-confirm-icon">✶</span>
-        <h2>{t.successTitle}</h2>
-        <p>{t.successCode} <strong>{code}</strong></p>
-        <p style={{ marginTop: 8 }}>{t.successSent} <strong>{booking.guest?.email || 'tu correo'}</strong></p>
+        <h2>{reservationPending ? (lang === 'es' ? 'Pago recibido' : 'Payment received') : t.successTitle}</h2>
+        <p>{reservationPending ? (lang === 'es' ? 'Referencia:' : 'Reference:') : t.successCode} <strong>{code}</strong></p>
+        <p style={{ marginTop: 8 }}>
+          {reservationPending
+            ? (lang === 'es' ? 'Guardamos esta referencia para seguimiento manual.' : 'We saved this reference for manual follow-up.')
+            : <>{t.successSent} <strong>{booking.guest?.email || 'tu correo'}</strong></>}
+        </p>
       </div>
+      {reservationPending && (
+        <div className="be-info-box" style={{ marginBottom: 16, backgroundColor: 'var(--sand-100)', borderColor: 'var(--terracotta-300)' }}>
+          <Icon name="clock" size={18} />
+          <p>
+            <strong>{lang === 'es' ? 'Reserva pendiente de confirmacion.' : 'Booking pending confirmation.'}</strong>{' '}
+            {lang === 'es'
+              ? 'Tu pago fue aprobado, pero Kunas no creo la reserva automaticamente. Nuestro equipo debe confirmarla manualmente y te contactara con el codigo final.'
+              : 'Your payment was approved, but Kunas did not create the booking automatically. Our team must confirm it manually and will contact you with the final code.'}
+          </p>
+        </div>
+      )}
       <div className="be-confirm-card">
         <div className="be-confirm-row">
           <span className="be-eyebrow">{t.stepRoom}</span>
@@ -1823,6 +1839,8 @@ function BookingEngine() {
         setBookingCode(data.bookingCode);
       } else {
         console.error('Kunas PMS booking was not created; skipping confirmation email.', data);
+        setPaymentDetails({ ...(details || {}), reservationPending: true });
+        setBookingCode(code);
         return;
       }
 
@@ -1861,6 +1879,8 @@ function BookingEngine() {
     })
     .catch(err => {
       console.error('Error saving booking to Kunas PMS:', err);
+      setPaymentDetails({ ...(details || {}), reservationPending: true });
+      setBookingCode(code);
     });
   }
 
