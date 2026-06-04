@@ -325,7 +325,7 @@ async function processDirectPayment(transaction, corsHeaders) {
   const fs = require('fs');
   const path = require('path');
   const { otasyncCreds, getSessionKey } = require('./_otasync');
-  const { token, propertyId } = otasyncCreds();
+  const { token, propertyId, channelId, channelName } = otasyncCreds();
   const pkey = await getSessionKey();
 
   let roomDetails = {};
@@ -421,8 +421,7 @@ async function processDirectPayment(transaction, corsHeaders) {
     id_contigents: 0,
     date_arrival: decoded.checkin,
     date_departure: decoded.checkout,
-    id_channels: '392',
-    channel: 'Private reservation',
+    ...(channelId ? { id_channels: channelId, channel: channelName } : {}),
     note: `Telefono del huesped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${mustPayIva ? 'POR COBRAR EN HOTEL (' + Math.round(paidAmount * 0.19) + ')' : 'EXENTO'}. Creado por Webhook ${transaction.provider}. ID Transaccion: ${transaction.id}`
   };
 

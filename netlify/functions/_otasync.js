@@ -12,7 +12,9 @@ function otasyncCreds() {
     token: process.env.OTASYNC_TOKEN || '',
     username: process.env.OTASYNC_USERNAME || '',
     password: process.env.OTASYNC_PASSWORD || '',
-    propertyId: process.env.OTASYNC_PROPERTY_ID || '9889'
+    propertyId: process.env.OTASYNC_PROPERTY_ID || '9889',
+    channelId: process.env.OTASYNC_USE_CHANNEL === 'true' ? (process.env.OTASYNC_CHANNEL_ID || '') : '',
+    channelName: process.env.OTASYNC_CHANNEL_NAME || 'Private reservation'
   };
 }
 
@@ -229,7 +231,7 @@ async function insertReservation(payload) {
    created reservation id. Hold status is configurable (OTASYNC_HOLD_STATUS). */
 async function createHold(quote) {
   if (!hasOtasyncCreds()) return null;
-  const { token, propertyId } = otasyncCreds();
+  const { token, propertyId, channelId, channelName } = otasyncCreds();
   const pkey = await getSessionKey();
   const holdStatus = process.env.OTASYNC_HOLD_STATUS || 'tentative';
 
@@ -263,7 +265,7 @@ async function createHold(quote) {
     reference: quote.quoteId,
     id_contigents: 0,
     date_arrival: quote.checkin, date_departure: quote.checkout,
-    id_channels: '392', channel: 'Private reservation',
+    ...(channelId ? { id_channels: channelId, channel: channelName } : {}),
     note: `BLOQUEO temporal por cotización ${quote.quoteId} (${quote.empresa || ''}). No es una venta confirmada.`
   };
 
@@ -275,7 +277,7 @@ async function createHold(quote) {
    (OTASync: reservation/delete/reservation). */
 async function releaseHold(idReservations) {
   if (!hasOtasyncCreds() || !idReservations) return;
-  const { token, propertyId } = otasyncCreds();
+  const { token, propertyId, channelId, channelName } = otasyncCreds();
   const pkey = await getSessionKey();
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort(), 10000);
@@ -346,7 +348,7 @@ async function createConfirmedReservation(quote, opts) {
     reference: quote.quoteId,
     id_contigents: 0,
     date_arrival: quote.checkin, date_departure: quote.checkout,
-    id_channels: '392', channel: 'Private reservation',
+    ...(channelId ? { id_channels: channelId, channel: channelName } : {}),
     note: `Reserva corporativa desde cotización ${quote.quoteId}. Empresa: ${quote.empresa || ''}. NIT: ${quote.nit || 'N/D'}. Total pagado: ${paidAmount}.${opts.transactionId ? ' ID Transacción ' + providerLabel + ': ' + opts.transactionId : ''}`
   };
 

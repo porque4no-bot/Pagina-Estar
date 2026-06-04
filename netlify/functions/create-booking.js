@@ -98,6 +98,59 @@ async function getSessionKey(token, username, password) {
   }
 }
 
+async function readResponseSnippet(response) {
+  try {
+    const text = await response.text();
+    return String(text || '').replace(/\s+/g, ' ').slice(0, 1000);
+  } catch (e) {
+    return '';
+  }
+}
+
+async function findAvailableRoomId({ token, pkey, propertyId, checkin, checkout, roomTypeId }) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  let response;
+  try {
+    response = await fetch('https://app.otasync.me/api/room/data/available_rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        key: pkey,
+        id_properties: propertyId,
+        dfrom: checkin,
+        dto: checkout,
+        id_room_types: parseInt(roomTypeId, 10),
+        include_id_reservations: 0,
+        exclude_id_rooms: []
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (process.env.DEBUG) console.warn('[create-booking] available room lookup failed:', err.message);
+    return 0;
+  }
+
+  if (!response.ok) {
+    const detail = await readResponseSnippet(response);
+    console.warn(`[create-booking] available_rooms returned ${response.status}${detail ? ': ' + detail : ''}`);
+    return 0;
+  }
+
+  try {
+    const data = await response.json();
+    const rooms = Array.isArray(data.rooms) ? data.rooms : [];
+    const first = rooms.find(r => String(r.id_room_types) === String(roomTypeId) && r.id_rooms) || rooms.find(r => r.id_rooms);
+    return first && first.id_rooms ? parseInt(first.id_rooms, 10) || 0 : 0;
+  } catch (e) {
+    console.warn('[create-booking] available_rooms returned invalid JSON:', e.message);
+    return 0;
+  }
+}
+
 function decodeReference(ref) {
   try {
     if (!ref || !/^[a-zA-Z0-9\-_]+$/.test(ref)) {
@@ -277,6 +330,8 @@ exports.handler = async (event, context) => {
   const username = process.env.OTASYNC_USERNAME || '';
   const password = process.env.OTASYNC_PASSWORD || '';
   const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
+  const channelId = process.env.OTASYNC_USE_CHANNEL === 'true' ? (process.env.OTASYNC_CHANNEL_ID || '') : '';
+  const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Private reservation';
 
   const hasCredentials = token && username && password;
 
@@ -319,6 +374,7 @@ exports.handler = async (event, context) => {
   // 2. REAL OTASYNC INTEGRATION
   try {
     const pkey = await getSessionKey(token, username, password);
+    const selectedRoomId = await findAvailableRoomId({ token, pkey, propertyId, checkin, checkout, roomTypeId });
 
     // Build the night-by-night breakdown array
     const nightsArray = [];
@@ -367,7 +423,7 @@ exports.handler = async (event, context) => {
       rooms: [
         {
           id_room_types: parseInt(roomTypeId),
-          id_rooms: 0, // Auto-assign room in Kunas
+          id_rooms: selectedRoomId,
           room_type: roomName,
           room_number: "",
           avg_price: avgPrice,
@@ -420,8 +476,7 @@ exports.handler = async (event, context) => {
       id_contigents: 0,
       date_arrival: checkin,
       date_departure: checkout,
-      id_channels: "392", // Default channel ID for private/direct reservations
-      channel: "Private reservation",
+      ...(channelId ? { id_channels: channelId, channel: channelName } : {}),
       note: `Teléfono: ${phone.replace(/[^\d+\s]/g, '').trim().substring(0, 20)}. Notas: ${(notes || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0, 500) || 'Ninguna'}`
     };
 
@@ -445,6 +500,8 @@ exports.handler = async (event, context) => {
     }
 
     if (!response.ok) {
+      const detail = await readResponseSnippet(response);
+      console.error(`[create-booking] Kunas insert failed. status=${response.status}, roomTypeId=${roomTypeId}, id_rooms=${selectedRoomId || 0}, reference=${cleanReference || 'n/a'}${detail ? ', body=' + detail : ''}`);
       throw new Error(`Kunas API booking submission returned status ${response.status}`);
     }
 
