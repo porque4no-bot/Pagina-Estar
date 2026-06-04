@@ -16,7 +16,25 @@ function json(statusCode, body) {
 }
 
 function cleanReference(value) {
-  return String(value || '').trim().slice(0, 80);
+  return String(value || '').trim();
+}
+
+function cleanEnv(value) {
+  return String(value || '').trim();
+}
+
+function wompiModeFromPublicKey(value) {
+  const key = cleanEnv(value);
+  if (key.startsWith('pub_prod_')) return 'prod';
+  if (key.startsWith('pub_test_')) return 'test';
+  return '';
+}
+
+function wompiModeFromIntegritySecret(value) {
+  const secret = cleanEnv(value);
+  if (secret.startsWith('prod_integrity_')) return 'prod';
+  if (secret.startsWith('test_integrity_')) return 'test';
+  return '';
 }
 
 exports.handler = async (event) => {
@@ -25,10 +43,17 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed. Use POST.' });
   if (event.body && event.body.length > 3000) return json(413, { error: 'Payload too large' });
 
-  const secret = process.env.WOMPI_INTEGRITY_SECRET;
+  const secret = cleanEnv(process.env.WOMPI_INTEGRITY_SECRET);
   if (!secret) {
     console.error('CRITICAL: WOMPI_INTEGRITY_SECRET is not configured.');
     return json(503, { error: 'Wompi integrity secret is not configured' });
+  }
+
+  const publicKeyMode = wompiModeFromPublicKey(process.env.WOMPI_PUBLIC_KEY);
+  const integrityMode = wompiModeFromIntegritySecret(secret);
+  if (publicKeyMode && integrityMode && publicKeyMode !== integrityMode) {
+    console.error(`CRITICAL: Wompi key mode mismatch. public=${publicKeyMode}, integrity=${integrityMode}`);
+    return json(503, { error: 'Wompi public key and integrity secret belong to different environments' });
   }
 
   let body;
@@ -39,7 +64,7 @@ exports.handler = async (event) => {
   const amountInCents = parseInt(body.amountInCents, 10);
   const currency = String(body.currency || 'COP').trim().toUpperCase();
 
-  if (!reference || !Number.isFinite(amountInCents) || amountInCents <= 0 || currency !== 'COP') {
+  if (!reference || reference.length > 255 || !Number.isFinite(amountInCents) || amountInCents <= 0 || currency !== 'COP') {
     return json(400, { error: 'Invalid Wompi signature payload' });
   }
 

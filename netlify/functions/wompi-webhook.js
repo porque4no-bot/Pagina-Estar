@@ -763,6 +763,10 @@ exports.handler = async (event, context) => {
       mustPayIva = cleanPhone.startsWith('+57') || cleanPhone.startsWith('57') || (cleanPhone.length === 10 && cleanPhone.startsWith('3'));
     }
 
+    const ivaAmount = Math.round(paidAmount * 0.19);
+    const ivaNote = mustPayIva
+      ? `POR COBRAR EN ALOJAMIENTO (${ivaAmount})`
+      : `EXENTO PRELIMINAR - validar documento y motivo; si no corresponde, cobrar IVA (${ivaAmount})`;
     const roomPrice = mustPayIva ? Math.round(paidAmount * 1.19) : paidAmount;
     const avgPrice = Math.round(roomPrice / nights);
 
@@ -867,7 +871,7 @@ exports.handler = async (event, context) => {
       date_departure: decoded.checkout,
       id_channels: "392", // Default channel ID for private/direct reservations
       channel: "Private reservation",
-      note: `Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${mustPayIva ? 'POR COBRAR EN HOTEL (' + Math.round(paidAmount * 0.19) + ')' : 'EXENTO'}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
+      note: `Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${ivaNote}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
     };
 
     const insertController = new AbortController();
