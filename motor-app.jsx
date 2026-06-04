@@ -1786,7 +1786,6 @@ function BookingEngine() {
   }
 
   function handleConfirmBooking(code, details = null) {
-    setBookingCode(code);
     setPaymentDetails(details);
 
     const isColombian = isColombianGuest(booking.guest);
@@ -1822,6 +1821,9 @@ function BookingEngine() {
       const finalCode = (data.success && data.bookingCode) ? data.bookingCode : code;
       if (data.success && data.bookingCode) {
         setBookingCode(data.bookingCode);
+      } else {
+        console.error('Kunas PMS booking was not created; skipping confirmation email.', data);
+        return;
       }
 
       // Send confirmation email via Resend once the PMS booking is registered

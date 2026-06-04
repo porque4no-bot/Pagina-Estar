@@ -421,8 +421,7 @@ async function processDirectPayment(transaction, corsHeaders) {
     id_contigents: 0,
     date_arrival: decoded.checkin,
     date_departure: decoded.checkout,
-    id_channels: channelId,
-    channel: channelName,
+    ...(channelId ? { id_channels: channelId, channel: channelName } : {}),
     note: `Telefono del huesped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${mustPayIva ? 'POR COBRAR EN HOTEL (' + Math.round(paidAmount * 0.19) + ')' : 'EXENTO'}. Creado por Webhook ${transaction.provider}. ID Transaccion: ${transaction.id}`
   };
 

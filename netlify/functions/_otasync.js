@@ -265,7 +265,7 @@ async function createHold(quote) {
     reference: quote.quoteId,
     id_contigents: 0,
     date_arrival: quote.checkin, date_departure: quote.checkout,
-    id_channels: channelId, channel: channelName,
+    ...(channelId ? { id_channels: channelId, channel: channelName } : {}),
     note: `BLOQUEO temporal por cotización ${quote.quoteId} (${quote.empresa || ''}). No es una venta confirmada.`
   };
 
@@ -348,7 +348,7 @@ async function createConfirmedReservation(quote, opts) {
     reference: quote.quoteId,
     id_contigents: 0,
     date_arrival: quote.checkin, date_departure: quote.checkout,
-    id_channels: channelId, channel: channelName,
+    ...(channelId ? { id_channels: channelId, channel: channelName } : {}),
     note: `Reserva corporativa desde cotización ${quote.quoteId}. Empresa: ${quote.empresa || ''}. NIT: ${quote.nit || 'N/D'}. Total pagado: ${paidAmount}.${opts.transactionId ? ' ID Transacción ' + providerLabel + ': ' + opts.transactionId : ''}`
   };
 

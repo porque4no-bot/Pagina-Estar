@@ -496,8 +496,7 @@ async function handleQuotePayment(transaction, corsHeaders) {
     id_contigents: 0,
     date_arrival: quote.checkin,
     date_departure: quote.checkout,
-    id_channels: channelId,
-    channel: channelName,
+    ...(channelId ? { id_channels: channelId, channel: channelName } : {}),
     note
   };
 
@@ -934,8 +933,7 @@ exports.handler = async (event, context) => {
       id_contigents: 0,
       date_arrival: decoded.checkin,
       date_departure: decoded.checkout,
-      id_channels: channelId,
-      channel: channelName,
+      ...(channelId ? { id_channels: channelId, channel: channelName } : {}),
       note: `Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${ivaNote}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
     };
 

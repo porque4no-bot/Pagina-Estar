@@ -476,8 +476,7 @@ exports.handler = async (event, context) => {
       id_contigents: 0,
       date_arrival: checkin,
       date_departure: checkout,
-      id_channels: channelId,
-      channel: channelName,
+      ...(channelId ? { id_channels: channelId, channel: channelName } : {}),
       note: `Teléfono: ${phone.replace(/[^\d+\s]/g, '').trim().substring(0, 20)}. Notas: ${(notes || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0, 500) || 'Ninguna'}`
     };
 
