@@ -708,7 +708,7 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
           <span className="be-room-total">{formatCOP(activePrice * nights)} <span>{t.plusTax}</span></span>
         </div>
         <p style={{ fontSize: 11, color: 'var(--ink-300)', fontStyle: 'italic', margin: '4px 0 8px 0', lineHeight: 1.4 }}>
-          {lang === 'es' ? '* IVA (19%) se cobra en el hotel' : '* VAT (19%) collected at hotel'}
+          {lang === 'es' ? '* IVA (19%) segun nacionalidad y motivo del viaje' : '* VAT (19%) depends on nationality and travel purpose'}
         </p>
         {isAvailable ? (
           <button className="be-btn-primary be-room-select-btn" onClick={() => onSelect(room, rate)}>
@@ -984,6 +984,16 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
         .replace(/\//g, '_')
         .replace(/=+$/, '');
 
+      if (encodedRef.length > 255) {
+        setLoading(false);
+        setPaymentError(
+          lang === 'es'
+            ? 'Los datos de la reserva son demasiado largos para iniciar el pago. Acorta nombres, telefono o notas e intentalo de nuevo.'
+            : 'The reservation data is too long to start payment. Shorten names, phone, or notes and try again.'
+        );
+        return;
+      }
+
       let wompiSignature;
       try {
         const sigRes = await fetch('/api/create-wompi-signature', {
@@ -1073,8 +1083,8 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
               </div>
             )}
             <div className="be-summary-line">
-              <span>{t.iva} (19%)*</span>
-              <span>{formatCOP(calc.iva)}</span>
+              <span>{mustPayIVA ? (lang === 'es' ? 'IVA a pagar en alojamiento (19%)*' : 'VAT due at property (19%)*') : (lang === 'es' ? 'IVA exento sujeto a validacion*' : 'VAT exempt, subject to validation*')}</span>
+              <span style={!mustPayIVA ? { textDecoration: 'line-through', opacity: 0.75 } : undefined}>{formatCOP(calc.iva)}</span>
             </div>
             <div className="be-summary-line be-summary-total">
               <span>{lang === 'es' ? 'Total a pagar hoy' : 'Total to pay today'}</span>
@@ -1091,11 +1101,11 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
                 <p style={{ margin: '4px 0 0 0', opacity: 0.9 }}>
                   {lang === 'es' ? (
                     <>
-                      Hoy solo cancelas el valor neto. Al ser residente extranjero (origen: <strong>{booking.guest?.pais || 'Otro'}</strong>) y viajar por motivos personales o turismo, estás exento del impuesto del IVA (¡te ahorras {formatCOP(calc.iva)}!).
+                      Hoy solo cancelas el valor neto. Al declarar origen <strong>{booking.guest?.pais || 'Otro'}</strong> y viaje por turismo/ocio, el IVA queda exento de forma preliminar. Esta exencion se valida con tu documento y motivo real de viaje; si la informacion no corresponde, el IVA ({formatCOP(calc.iva)}) se cobrara en el alojamiento.
                     </>
                   ) : (
                     <>
-                      Today you only pay the net value. Since you reside abroad (origin: <strong>{booking.guest?.pais || 'Other'}</strong>) and are traveling for personal or tourism reasons, you are exempt from VAT (saving {formatCOP(calc.iva)}!).
+                      Today you only pay the net value. With declared origin <strong>{booking.guest?.pais || 'Other'}</strong> and a tourism/leisure trip, VAT is preliminarily exempt. This exemption is validated against your document and actual travel purpose; if the information does not match, VAT ({formatCOP(calc.iva)}) will be charged at the property.
                     </>
                   )}
                 </p>
@@ -1275,12 +1285,19 @@ function BookingSummary({ booking, search, lang }) {
               </div>
             );
           })}
-          <div className="be-summary-line sm"><span>{t.iva} (19%)*</span><span>{formatCOP(calc.iva)}</span></div>
+          <div className="be-summary-line sm">
+            <span>{mustPayIVA ? (lang === 'es' ? 'IVA a pagar en alojamiento (19%)*' : 'VAT due at property (19%)*') : (lang === 'es' ? 'IVA exento sujeto a validacion*' : 'VAT exempt, subject to validation*')}</span>
+            <span style={!mustPayIVA ? { textDecoration: 'line-through', opacity: 0.75 } : undefined}>{formatCOP(calc.iva)}</span>
+          </div>
           <div className="be-summary-line total"><span>{lang === 'es' ? 'Total online hoy' : 'Total online today'}</span><span>{formatCOP(calc.subtotal)}</span></div>
           <p style={{ fontSize: 10, opacity: 0.8, fontStyle: 'italic', margin: '6px 0 0 0', lineHeight: 1.3 }}>
             {lang === 'es' 
-              ? `* El IVA se paga en el hotel (${isBusinessTrip ? 'requerido por viaje de negocios' : 'solo residentes en Colombia'}).` 
-              : `* VAT is paid at the hotel (${isBusinessTrip ? 'required for business travel' : 'Colombian residents only'}).`}
+              ? (mustPayIVA
+                ? `* El IVA se paga en el alojamiento (${isBusinessTrip ? 'requerido por viaje de negocios' : 'aplica para residentes en Colombia'}).`
+                : '* Exencion preliminar para extranjero en turismo/ocio; se validara al llegar y se cobrara IVA si la informacion no corresponde.')
+              : (mustPayIVA
+                ? `* VAT is paid at the property (${isBusinessTrip ? 'required for business travel' : 'applies to Colombian residents'}).`
+                : '* Preliminary exemption for foreign tourism/leisure travel; it will be validated on arrival and VAT will be charged if the information does not match.')}
           </p>
         </div>
       )}
@@ -1356,8 +1373,8 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
             <p className="be-confirm-val" style={{ fontSize: 14, color: 'var(--olive-700)', margin: '4px 0 0 0', textDecoration: 'line-through' }}>{formatCOP(calc.iva)}</p>
             <p style={{ fontSize: 11, color: 'var(--olive-700)', margin: '4px 0 0 0', lineHeight: 1.4, fontWeight: 'bold' }}>
               {lang === 'es' 
-                ? '¡Estás exento de pagar IVA por ser extranjero viajando por turismo/ocio!' 
-                : 'You are exempt from paying VAT as a visitor from abroad traveling for tourism/leisure!'}
+                ? 'Exencion preliminar por extranjero en turismo/ocio. Se validara la informacion al llegar; si no corresponde, se cobrara IVA en el alojamiento.'
+                : 'Preliminary exemption for foreign tourism/leisure travel. Information will be validated on arrival; if it does not match, VAT will be charged at the property.'}
             </p>
           </div>
         )}
@@ -1755,7 +1772,7 @@ function BookingEngine() {
         lastName: booking.guest?.apellido || '',
         email: booking.guest?.email || '',
         phone: booking.guest?.tel || '',
-        notes: `Motivo de viaje: ${booking.guest?.motivo || 'No especificado'}. IVA (19%): ${mustPayIVA ? 'POR COBRAR EN HOTEL (' + formatCOP(calc.iva) + ')' : 'EXENTO'}. Notas: ${booking.guest?.notas || 'Ninguna'}`,
+        notes: `Motivo de viaje: ${booking.guest?.motivo || 'No especificado'}. Pais/origen: ${booking.guest?.pais || 'No especificado'}. IVA (19%): ${mustPayIVA ? 'POR COBRAR EN ALOJAMIENTO (' + formatCOP(calc.iva) + ')' : 'EXENTO PRELIMINAR - validar documento y motivo; si no corresponde, cobrar IVA (' + formatCOP(calc.iva) + ')'}. Notas: ${booking.guest?.notas || 'Ninguna'}`,
         paymentDetails: details
       })
     })
