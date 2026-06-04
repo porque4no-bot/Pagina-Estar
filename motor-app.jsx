@@ -1679,6 +1679,7 @@ function BookingEngine() {
   const [paymentMethod, setPaymentMethod] = useState(window.PAYMENT_PROVIDER === 'wompi' ? 'wompi' : 'mercadopago');
   const [bookingCode, setBookingCode] = useState(null);
   const [paymentDetails, setPaymentDetails] = useState(null);
+  const [creatingReservation, setCreatingReservation] = useState(false);
 
   // Fetch availability from Netlify serverless function
   const fetchAvailability = async () => {
@@ -1803,6 +1804,7 @@ function BookingEngine() {
 
   function handleConfirmBooking(code, details = null) {
     setPaymentDetails(details);
+    setCreatingReservation(true);
 
     const isColombian = isColombianGuest(booking.guest);
     const isBusinessTrip = isBusinessGuest(booking.guest, lang);
@@ -1833,12 +1835,14 @@ function BookingEngine() {
     })
     .then(res => res.json())
     .then(data => {
-      console.log('Kunas PMS Booking Response:', data);
+      console.log('Kunas PMS Booking Response:', JSON.stringify(data));
       const finalCode = (data.success && data.bookingCode) ? data.bookingCode : code;
       if (data.success && data.bookingCode) {
+        setCreatingReservation(false);
         setBookingCode(data.bookingCode);
       } else {
         console.error('Kunas PMS booking was not created; skipping confirmation email.', data);
+        setCreatingReservation(false);
         setPaymentDetails({ ...(details || {}), reservationPending: true });
         setBookingCode(code);
         return;
@@ -1879,6 +1883,7 @@ function BookingEngine() {
     })
     .catch(err => {
       console.error('Error saving booking to Kunas PMS:', err);
+      setCreatingReservation(false);
       setPaymentDetails({ ...(details || {}), reservationPending: true });
       setBookingCode(code);
     });
@@ -1891,6 +1896,25 @@ function BookingEngine() {
   }
 
   const extraCount = Object.values(extras).filter(Boolean).length;
+
+  /* ── Creating reservation loading screen ── */
+  if (creatingReservation && !bookingCode) {
+    return (
+      <div className="be-app" data-theme="editorial">
+        <div className="be-page-inner" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 340, gap: 24, textAlign: 'center', padding: '48px 24px' }}>
+          <div style={{ width: 56, height: 56, border: '3px solid var(--border)', borderTopColor: 'var(--olive)', borderRadius: '50%', animation: 'booking-spin 0.9s linear infinite' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p className="t-h4" style={{ margin: 0 }}>
+              {lang === 'es' ? 'Estamos confirmando tu reserva' : 'Confirming your reservation'}
+            </p>
+            <p className="t-body-sm" style={{ margin: 0, color: 'var(--fg-muted)' }}>
+              {lang === 'es' ? 'Tu pago fue aprobado. Esto puede tomar unos segundos…' : 'Your payment was approved. This may take a few seconds…'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   /* ── Confirmation ── */
   if (bookingCode) {

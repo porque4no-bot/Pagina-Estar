@@ -540,6 +540,7 @@ exports.handler = async (event, context) => {
     }
 
     const data = await response.json();
+    console.log(`[create-booking] OTASync insert response: ${JSON.stringify(data)}`);
 
     // Check if reservation insertion was successful in Kunas response
     const bookingCode = data.id_reservations || cleanReference || `ESTAR-PMS-${Date.now().toString().slice(-6)}`;

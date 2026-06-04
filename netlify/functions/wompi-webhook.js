@@ -983,7 +983,7 @@ exports.handler = async (event, context) => {
 
     const data = await response.json();
     const finalBookingCode = data.id_reservations || decoded.bookingCode;
-    if (process.env.DEBUG) console.log("Kunas API webhook insertion successful, reservation ID:", finalBookingCode);
+    console.log(`[wompi-webhook] OTASync insert response: ${JSON.stringify(data)}, finalBookingCode=${finalBookingCode}`);
 
     // Store result so create-booking knows not to duplicate this reservation
     if (directBookingResultStore) {
