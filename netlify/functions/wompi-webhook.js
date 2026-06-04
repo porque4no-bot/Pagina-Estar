@@ -761,6 +761,25 @@ exports.handler = async (event, context) => {
     }
   }
 
+  // Check if create-booking already registered this reservation (prevents duplicate OTASync insertion)
+  let directBookingResultStore;
+  try {
+    directBookingResultStore = getStore({ name: 'booking-results', consistency: 'strong' });
+    const cached = await directBookingResultStore.get(`direct-${decoded.bookingCode}`);
+    if (cached) {
+      const cachedData = JSON.parse(cached);
+      if (process.env.DEBUG) console.log(`[wompi-webhook] Booking ${decoded.bookingCode} already in booking-results (created by create-booking). Skipping duplicate OTASync insertion.`);
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({ success: true, bookingCode: cachedData.bookingCode, duplicate: true })
+      };
+    }
+  } catch (e) {
+    if (process.env.DEBUG) console.warn('[wompi-webhook] booking-results store check failed:', e.message);
+    directBookingResultStore = null;
+  }
+
   // Kunas Credentials from Environment
   const token = process.env.OTASYNC_TOKEN || '';
   const username = process.env.OTASYNC_USERNAME || '';
@@ -963,25 +982,49 @@ exports.handler = async (event, context) => {
     }
 
     const data = await response.json();
-    if (process.env.DEBUG) console.log("Kunas API webhook insertion successful, reservation ID:", data.id_reservations || decoded.bookingCode);
+    const finalBookingCode = data.id_reservations || decoded.bookingCode;
+    if (process.env.DEBUG) console.log("Kunas API webhook insertion successful, reservation ID:", finalBookingCode);
+
+    // Store result so create-booking knows not to duplicate this reservation
+    if (directBookingResultStore) {
+      try {
+        await directBookingResultStore.set(`direct-${decoded.bookingCode}`, JSON.stringify({ bookingCode: finalBookingCode }), { ttl: 86400 * 7 });
+      } catch (e) { /* non-fatal */ }
+    }
 
     return {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
         success: true,
-        bookingCode: data.id_reservations || decoded.bookingCode
+        bookingCode: finalBookingCode
       })
     };
   } catch (err) {
-    console.error("Error creating booking in Kunas from webhook:", err.message);
+    console.error(`[wompi-webhook] Error creating direct booking in Kunas: ${err.message}. bookingCode=${decoded.bookingCode}, tx=${transaction.id}`);
+    // Alert admin so the reservation can be manually created — the transaction is already
+    // deduped so Wompi retries will be no-ops; manual intervention is required.
+    try {
+      await sendEmail({
+        to: adminEmail(),
+        subject: `⚠ Pago sin reserva directa — ${decoded.bookingCode}`,
+        html: `<p>Falló la creación de reserva en OTASync tras pago Wompi confirmado.</p>
+               <ul>
+                 <li><strong>Código:</strong> ${decoded.bookingCode}</li>
+                 <li><strong>Huésped:</strong> ${decoded.firstName} ${decoded.lastName} — ${decoded.email}</li>
+                 <li><strong>Check-in / Check-out:</strong> ${decoded.checkin} → ${decoded.checkout}</li>
+                 <li><strong>ID Transacción Wompi:</strong> ${transaction.id}</li>
+                 <li><strong>Error:</strong> ${err.message}</li>
+               </ul>
+               <p>La transacción está marcada como procesada. Crear manualmente en OTASync.</p>`
+      });
+    } catch (mailErr) {
+      console.error('[wompi-webhook] admin alert for failed direct booking failed:', mailErr.message);
+    }
     return {
-      statusCode: 500,
+      statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({
-        error: 'Failed to create booking in PMS',
-        message: 'An unexpected error occurred while processing the webhook.'
-      })
+      body: JSON.stringify({ error: 'Failed to create booking in PMS; admin alerted for manual follow-up.' })
     };
   }
 };

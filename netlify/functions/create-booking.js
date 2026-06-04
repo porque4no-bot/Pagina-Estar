@@ -404,6 +404,40 @@ exports.handler = async (event, context) => {
       }
     }
 
+    // Check if wompi-webhook already registered this reservation (prevents duplicate OTASync insertion)
+    if (decodedRef && decodedRef.bookingCode) {
+      try {
+        const resultStore = getStore({ name: 'booking-results', consistency: 'strong' });
+        const cached = await resultStore.get(`direct-${decodedRef.bookingCode}`);
+        if (cached) {
+          const cachedData = JSON.parse(cached);
+          if (process.env.DEBUG) console.log(`[create-booking] Booking ${decodedRef.bookingCode} already in booking-results (created by webhook). Returning cached.`);
+          const cachedResult = {
+            success: true,
+            bookingCode: cachedData.bookingCode,
+            isMock: false,
+            reservation: {
+              code: cachedData.bookingCode,
+              guestName: `${firstName} ${lastName}`,
+              email,
+              roomName: roomRecord.name,
+              checkin,
+              checkout,
+              nights,
+              totalPrice: roomPrice,
+              status: 'Confirmed'
+            }
+          };
+          if (blobStore) {
+            try { await blobStore.set(idempKey, JSON.stringify(cachedResult), { ttl: 86400 }); } catch (e) { /* non-fatal */ }
+          }
+          return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(cachedResult) };
+        }
+      } catch (e) {
+        if (process.env.DEBUG) console.warn('[create-booking] booking-results store check failed:', e.message);
+      }
+    }
+
     const paymentInfo = [];
     if (paymentDetails && (paymentDetails.status === 'APPROVED' || paymentDetails.status === 'PENDING')) {
       paymentInfo.push({
@@ -533,6 +567,14 @@ exports.handler = async (event, context) => {
       } catch (e) {
         if (process.env.DEBUG) console.warn('[idempotency] Failed to cache booking result:', e.message);
       }
+    }
+
+    // Store result so wompi-webhook knows not to duplicate this reservation
+    if (decodedRef && decodedRef.bookingCode) {
+      try {
+        const resultStore = getStore({ name: 'booking-results', consistency: 'strong' });
+        await resultStore.set(`direct-${decodedRef.bookingCode}`, JSON.stringify({ bookingCode }), { ttl: 86400 * 7 });
+      } catch (e) { /* non-fatal */ }
     }
 
     return {
