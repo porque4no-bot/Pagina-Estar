@@ -330,6 +330,8 @@ exports.handler = async (event, context) => {
   const username = process.env.OTASYNC_USERNAME || '';
   const password = process.env.OTASYNC_PASSWORD || '';
   const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
+  const channelId = process.env.OTASYNC_CHANNEL_ID || '';
+  const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Private reservation';
 
   const hasCredentials = token && username && password;
 
@@ -474,8 +476,8 @@ exports.handler = async (event, context) => {
       id_contigents: 0,
       date_arrival: checkin,
       date_departure: checkout,
-      id_channels: "392", // Default channel ID for private/direct reservations
-      channel: "Private reservation",
+      id_channels: channelId,
+      channel: channelName,
       note: `Teléfono: ${phone.replace(/[^\d+\s]/g, '').trim().substring(0, 20)}. Notas: ${(notes || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0, 500) || 'Ninguna'}`
     };
 

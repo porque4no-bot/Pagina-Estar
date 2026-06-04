@@ -325,6 +325,8 @@ async function handleQuotePayment(transaction, corsHeaders) {
   const username = process.env.OTASYNC_USERNAME || '';
   const password = process.env.OTASYNC_PASSWORD || '';
   const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
+  const channelId = process.env.OTASYNC_CHANNEL_ID || '';
+  const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Private reservation';
   const hasCredentials = token && username && password;
 
   // Without PMS credentials we still mark the quote paid (mock / local).
@@ -494,8 +496,8 @@ async function handleQuotePayment(transaction, corsHeaders) {
     id_contigents: 0,
     date_arrival: quote.checkin,
     date_departure: quote.checkout,
-    id_channels: "392",
-    channel: "Private reservation",
+    id_channels: channelId,
+    channel: channelName,
     note
   };
 
@@ -765,6 +767,8 @@ exports.handler = async (event, context) => {
   const username = process.env.OTASYNC_USERNAME || '';
   const password = process.env.OTASYNC_PASSWORD || '';
   const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
+  const channelId = process.env.OTASYNC_CHANNEL_ID || '';
+  const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Private reservation';
 
   const hasCredentials = token && username && password;
   if (!hasCredentials) {
@@ -930,8 +934,8 @@ exports.handler = async (event, context) => {
       id_contigents: 0,
       date_arrival: decoded.checkin,
       date_departure: decoded.checkout,
-      id_channels: "392", // Default channel ID for private/direct reservations
-      channel: "Private reservation",
+      id_channels: channelId,
+      channel: channelName,
       note: `Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${ivaNote}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
     };
 
