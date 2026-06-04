@@ -1750,76 +1750,46 @@ function BookingEngine() {
     setBookingCode(code);
     setPaymentDetails(details);
 
+    // Kunas reservation is created server-side by wompi-webhook.js using the
+    // verified transaction amount. Calling create-booking here too would result
+    // in a duplicate reservation with incorrect static pricing.
+
     const isColombian = booking.guest?.pais === 'Colombia';
     const isBusinessTrip = booking.guest?.motivo === 'Trabajo / Negocios' || booking.guest?.motivo === 'Work / Business';
     const mustPayIVA = isColombian || isBusinessTrip;
     const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
     const roomPriceVal = mustPayIVA ? calc.total : calc.subtotal;
 
-    // Send the booking details to the Netlify serverless function to register it in Kunas PMS
-    fetch('/api/create-booking', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        checkin: search.checkin,
-        checkout: search.checkout,
-        guestsCount: search.guests,
-        roomTypeId: booking.room.roomTypeId || "31349",
-        roomName: booking.room.name,
-        roomPrice: roomPriceVal,
-        paidAmount: calc.subtotal,
-        firstName: booking.guest?.nombre || '',
-        lastName: booking.guest?.apellido || '',
-        email: booking.guest?.email || '',
-        phone: booking.guest?.tel || '',
-        notes: `Motivo de viaje: ${booking.guest?.motivo || 'No especificado'}. Pais/origen: ${booking.guest?.pais || 'No especificado'}. IVA (19%): ${mustPayIVA ? 'POR COBRAR EN ALOJAMIENTO (' + formatCOP(calc.iva) + ')' : 'EXENTO PRELIMINAR - validar documento y motivo; si no corresponde, cobrar IVA (' + formatCOP(calc.iva) + ')'}. Notas: ${booking.guest?.notas || 'Ninguna'}`,
-        paymentDetails: details
+    const guestEmail = booking.guest?.email || '';
+    const guestName = `${booking.guest?.nombre || ''} ${booking.guest?.apellido || ''}`.trim();
+    const nights = dateDiff(search.checkin, search.checkout);
+    const roomName = booking.room.name || '';
+
+    if (guestEmail) {
+      fetch('/api/send-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          guestEmail,
+          guestName,
+          bookingCode: code,
+          roomName,
+          checkIn: search.checkin,
+          checkOut: search.checkout,
+          nights,
+          totalAmount: roomPriceVal,
+          paidAmount: calc.subtotal,
+          phone: booking.guest?.tel || ''
+        })
       })
-    })
-    .then(res => res.json())
-    .then(data => {
-      console.log('Kunas PMS Booking Response:', data);
-      const finalCode = (data.success && data.bookingCode) ? data.bookingCode : code;
-      if (data.success && data.bookingCode) {
-        setBookingCode(data.bookingCode);
-      }
-
-      // Send confirmation email via Resend once the PMS booking is registered
-      const guestEmail = booking.guest?.email || '';
-      const guestName = `${booking.guest?.nombre || ''} ${booking.guest?.apellido || ''}`.trim();
-      const nights = dateDiff(search.checkin, search.checkout);
-      const roomName = booking.room.name || '';
-
-      if (guestEmail) {
-        fetch('/api/send-confirmation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            guestEmail,
-            guestName,
-            bookingCode: finalCode,
-            roomName,
-            checkIn: search.checkin,
-            checkOut: search.checkout,
-            nights,
-            totalAmount: roomPriceVal,
-            paidAmount: calc.subtotal,
-            phone: booking.guest?.tel || ''
-          })
-        })
-        .then(r => r.json())
-        .then(emailData => {
-          console.log('[send-confirmation] Result:', emailData);
-        })
-        .catch(emailErr => {
-          // Non-blocking: email failure should never prevent the booking confirmation screen
-          console.error('[send-confirmation] Error sending confirmation email:', emailErr);
-        });
-      }
-    })
-    .catch(err => {
-      console.error('Error saving booking to Kunas PMS:', err);
-    });
+      .then(r => r.json())
+      .then(emailData => {
+        console.log('[send-confirmation] Result:', emailData);
+      })
+      .catch(emailErr => {
+        console.error('[send-confirmation] Error sending confirmation email:', emailErr);
+      });
+    }
   }
 
   function goToStep(id) {
