@@ -1619,12 +1619,7 @@ const firebaseConfig = {
 
 /* Allowlist for UX gating only — the authoritative check is server-side
    (ADMIN_EMAILS env var). Keep both in sync. */
-const ALLOWED_EMAILS = [
-  'reservas@estar.com.co',
-  'porque4no@gmail.com',
-  'rafael.castano@grupopinao.com',
-  'daniela.castano@grupopinao.com'
-];
+const CLIENT_AUTH_NOTE = 'Authorization is enforced server-side by ADMIN_EMAILS in Netlify Functions.';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -1660,12 +1655,6 @@ setPersistence(auth, browserLocalPersistence).catch(() => {});
 
 onAuthStateChanged(auth, function(user) {
   if (!user) { showLogin(); return; }
-  const email = (user.email || '').toLowerCase();
-  if (!ALLOWED_EMAILS.includes(email)) {
-    signOut(auth);
-    showLogin('La cuenta ' + email + ' no está autorizada para este portal.');
-    return;
-  }
   showAdmin(user);
 });
 
