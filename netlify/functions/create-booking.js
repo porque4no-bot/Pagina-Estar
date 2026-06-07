@@ -477,6 +477,7 @@ exports.handler = async (event, context) => {
         {
           first_name: firstName,
           last_name: lastName,
+          email: email,
           id_guests: 0,
           guest_type: "adults"
         }

@@ -469,7 +469,7 @@ async function handleQuotePayment(transaction, corsHeaders) {
     token: token,
     status: "confirmed",
     rooms,
-    guests: [{ first_name: firstName, last_name: lastName, id_guests: 0, guest_type: "adults" }],
+    guests: [{ first_name: firstName, last_name: lastName, email: quote.email || '', id_guests: 0, guest_type: "adults" }],
     extras: quoteExtras,
     payments: paymentInfo,
     children_1: 0, children_2: 0, children_3: 0,
@@ -920,6 +920,7 @@ exports.handler = async (event, context) => {
         {
           first_name: decoded.firstName,
           last_name: decoded.lastName,
+          email: decoded.email,
           id_guests: 0,
           guest_type: "adults"
         }
