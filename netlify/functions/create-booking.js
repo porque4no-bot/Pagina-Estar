@@ -330,8 +330,8 @@ exports.handler = async (event, context) => {
   const username = process.env.OTASYNC_USERNAME || '';
   const password = process.env.OTASYNC_PASSWORD || '';
   const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
-  const channelId = process.env.OTASYNC_CHANNEL_ID || '392';
-  const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Private reservation';
+  const channelId = process.env.OTASYNC_CHANNEL_ID || '58533';
+  const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Motor de Reserva - Hotel Estar';
 
   const hasCredentials = token && username && password;
 
