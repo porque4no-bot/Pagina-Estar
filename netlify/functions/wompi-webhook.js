@@ -325,8 +325,8 @@ async function handleQuotePayment(transaction, corsHeaders) {
   const username = process.env.OTASYNC_USERNAME || '';
   const password = process.env.OTASYNC_PASSWORD || '';
   const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
-  const channelId = process.env.OTASYNC_CHANNEL_ID || '58533';
-  const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Motor de Reserva - Hotel Estar';
+  const channelId = process.env.OTASYNC_CHANNEL_ID || '66483';
+  const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Pagina web';
   const hasCredentials = token && username && password;
 
   // Without PMS credentials we still mark the quote paid (mock / local).
@@ -786,8 +786,8 @@ exports.handler = async (event, context) => {
   const username = process.env.OTASYNC_USERNAME || '';
   const password = process.env.OTASYNC_PASSWORD || '';
   const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
-  const channelId = process.env.OTASYNC_CHANNEL_ID || '58533';
-  const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Motor de Reserva - Hotel Estar';
+  const channelId = process.env.OTASYNC_CHANNEL_ID || '66483';
+  const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Pagina web';
 
   const hasCredentials = token && username && password;
   if (!hasCredentials) {

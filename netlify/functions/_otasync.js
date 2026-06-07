@@ -13,8 +13,8 @@ function otasyncCreds() {
     username: process.env.OTASYNC_USERNAME || '',
     password: process.env.OTASYNC_PASSWORD || '',
     propertyId: process.env.OTASYNC_PROPERTY_ID || '9889',
-    channelId: process.env.OTASYNC_CHANNEL_ID || '58533',
-    channelName: process.env.OTASYNC_CHANNEL_NAME || 'Motor de Reserva - Hotel Estar'
+    channelId: process.env.OTASYNC_CHANNEL_ID || '66483',
+    channelName: process.env.OTASYNC_CHANNEL_NAME || 'Pagina web'
   };
 }
 
