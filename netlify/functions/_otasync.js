@@ -324,7 +324,7 @@ async function createConfirmedReservation(quote, opts) {
   const providerLabel = opts.paymentProvider || 'payment';
   const payments = [{
     amount: paidAmount,
-    date_payment: new Date().toISOString().split('T')[0],
+    payment_date: new Date().toISOString().split('T')[0],
     payment_method: 'card',
     note: `Cotización: ${quote.quoteId}${opts.transactionId ? ', ' + providerLabel + ' ID: ' + opts.transactionId : ''}, Status: APPROVED`
   }];

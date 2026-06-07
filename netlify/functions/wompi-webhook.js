@@ -456,7 +456,7 @@ async function handleQuotePayment(transaction, corsHeaders) {
 
   const paymentInfo = [{
     amount: paidAmount,
-    date_payment: now.split('T')[0],
+    payment_date: now.split('T')[0],
     payment_method: 'card',
     note: `Wompi ID: ${transaction.id}, Cotización: ${quoteId}, Status: APPROVED`
   }];
@@ -875,7 +875,7 @@ exports.handler = async (event, context) => {
 
     const paymentInfo = [{
       amount: paidAmount,
-      date_payment: new Date().toISOString().split('T')[0],
+      payment_date: new Date().toISOString().split('T')[0],
       payment_method: 'card',
       note: `Wompi ID: ${transaction.id}, Ref: ${decoded.bookingCode}, Status: APPROVED`
     }];

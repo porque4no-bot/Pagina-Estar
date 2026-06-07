@@ -356,7 +356,7 @@ async function processDirectPayment(transaction, corsHeaders) {
 
   const paymentInfo = [{
     amount: paidAmount,
-    date_payment: new Date().toISOString().split('T')[0],
+    payment_date: new Date().toISOString().split('T')[0],
     payment_method: 'card',
     note: `${transaction.provider} ID: ${transaction.id}, Ref: ${decoded.bookingCode}, Status: APPROVED`
   }];

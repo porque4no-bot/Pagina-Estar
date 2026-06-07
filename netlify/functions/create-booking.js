@@ -442,7 +442,7 @@ exports.handler = async (event, context) => {
     if (paymentDetails && (paymentDetails.status === 'APPROVED' || paymentDetails.status === 'PENDING')) {
       paymentInfo.push({
         amount: parseFloat(paidAmount || roomPrice),
-        date_payment: new Date().toISOString().split('T')[0],
+        payment_date: new Date().toISOString().split('T')[0],
         payment_method: 'card',
         note: `Wompi ID: ${paymentDetails.id}, Ref: ${cleanReference}, Status: ${paymentDetails.status}`
       });
