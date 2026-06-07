@@ -911,7 +911,7 @@ exports.handler = async (event, context) => {
           adults: decoded.guestsCount || 1,
           seniors: 0,
           extras: [],
-          payments: paymentInfo,
+          payments: [],
           overbooking: 0,
           nights: nightsArray
         }
