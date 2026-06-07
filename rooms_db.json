@@ -9,7 +9,6 @@
     "beds": "1 Queen size",
     "area": 28,
     "view": "Vista ciudad",
-    "basePrice": 220000,
     "image": "assets/photos/tipo1/1.webp",
     "gallery": [
       "assets/photos/tipo1/1.webp",
@@ -34,7 +33,6 @@
     "beds": "1 Queen size",
     "area": 32,
     "view": "Cordillera + balcón",
-    "basePrice": 265000,
     "image": "assets/photos/tipo2/1.webp",
     "gallery": [
       "assets/photos/tipo2/1.webp",
@@ -60,7 +58,6 @@
     "beds": "1 King size",
     "area": 42,
     "view": "Vista ciudad",
-    "basePrice": 320000,
     "image": "assets/photos/tipo3/1.webp",
     "gallery": [
       "assets/photos/tipo3/1.webp",
@@ -85,7 +82,6 @@
     "beds": "1 King size",
     "area": 52,
     "view": "Panorámica",
-    "basePrice": 385000,
     "image": "assets/photos/tipo4/1.webp",
     "gallery": [
       "assets/photos/tipo4/1.webp",
@@ -112,7 +108,6 @@
     "beds": "King + sofacama",
     "area": 60,
     "view": "Panorámica premium",
-    "basePrice": 450000,
     "image": "assets/photos/tipo5/1.webp",
     "gallery": [
       "assets/photos/tipo5/1.webp",

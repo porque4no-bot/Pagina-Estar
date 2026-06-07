@@ -197,8 +197,9 @@ exports.handler = async (event, context) => {
 
     const mockRooms = Object.keys(roomDetails).map(id => {
       const details = roomDetails[id];
-      const totalPrice = details.basePrice * nights;
-      
+      const mockPrice = 195000;
+      const totalPrice = mockPrice * nights;
+
       // Calculate daily price details
       const dailyPrices = [];
       for (let i = 0; i < nights; i++) {
@@ -207,7 +208,7 @@ exports.handler = async (event, context) => {
         const dateStr = d.toISOString().split('T')[0];
         dailyPrices.push({
           date: dateStr,
-          price: details.basePrice
+          price: mockPrice
         });
       }
 
@@ -224,7 +225,7 @@ exports.handler = async (event, context) => {
         gallery: details.gallery,
         available: guests <= details.capacity,
         totalPrice: totalPrice,
-        avgPrice: details.basePrice,
+        avgPrice: mockPrice,
         nights: nights,
         dailyPrices: dailyPrices,
         currency: 'COP'
@@ -305,8 +306,7 @@ exports.handler = async (event, context) => {
         area: otaRoom.area ? `${otaRoom.area} m²` : "30 m²",
         view: "Ciudad",
         image: "assets/photos/tipo1/1.webp",
-        gallery: ["assets/photos/tipo1/1.webp"],
-        basePrice: 195000
+        gallery: ["assets/photos/tipo1/1.webp"]
       };
 
       // Check room availability (avail is the units count)
@@ -338,7 +338,7 @@ exports.handler = async (event, context) => {
       } else if (otaRoom.price) {
         avgPrice = parseFloat(otaRoom.price);
         totalPrice = avgPrice * nights;
-        
+
         // Populate dummy daily prices for display consistency
         for (let i = 0; i < nights; i++) {
           const d = new Date(checkinDate);
@@ -347,7 +347,7 @@ exports.handler = async (event, context) => {
           dailyPrices.push({ date: dateStr, price: avgPrice });
         }
       } else {
-        avgPrice = details.basePrice || 195000;
+        avgPrice = 195000;
         totalPrice = avgPrice * nights;
         
         for (let i = 0; i < nights; i++) {

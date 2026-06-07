@@ -320,10 +320,9 @@ exports.handler = async (event, context) => {
   const diffTime = checkoutDate - checkinDate;
   const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-  // Apply rate: flexible adds 10% to base price
-  const basePrice = roomRecord.basePrice;
-  const roomPrice = roomRate === 'flexible' ? Math.round(basePrice * 1.10) * nights : basePrice * nights;
-  const avgPrice = Math.round(roomPrice / nights);
+  // Use actual paid amount from OTASync dynamic pricing (via Wompi)
+  const roomPrice = parseFloat(paidAmount) || 0;
+  const avgPrice = nights > 0 ? Math.round(roomPrice / nights) : roomPrice;
 
   // Read environment variables
   const token = process.env.OTASYNC_TOKEN || '';
