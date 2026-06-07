@@ -330,7 +330,7 @@ exports.handler = async (event, context) => {
   const username = process.env.OTASYNC_USERNAME || '';
   const password = process.env.OTASYNC_PASSWORD || '';
   const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
-  const channelId = process.env.OTASYNC_USE_CHANNEL === 'true' ? (process.env.OTASYNC_CHANNEL_ID || '') : '';
+  const channelId = process.env.OTASYNC_CHANNEL_ID || '392';
   const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Private reservation';
 
   const hasCredentials = token && username && password;
@@ -510,7 +510,8 @@ exports.handler = async (event, context) => {
       id_contigents: 0,
       date_arrival: checkin,
       date_departure: checkout,
-      ...(channelId ? { id_channels: channelId, channel: channelName } : {}),
+      id_channels: channelId,
+      channel: channelName,
       note: `Teléfono: ${phone.replace(/[^\d+\s]/g, '').trim().substring(0, 20)}. Notas: ${(notes || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0, 500) || 'Ninguna'}`
     };
 
