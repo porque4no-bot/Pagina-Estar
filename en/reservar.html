@@ -532,12 +532,7 @@
       amenities:[{icon:'sun',l:'Private terrace'},{icon:'wifi',l:'Fiber WiFi'},{icon:'tv',l:'Smart TV 65"'},{icon:'cooking-pot',l:'Premium kitchen'},{icon:'users',l:'Up to 4 people'}]}
   ];
   const BE_EXTRAS = [
-    { id:'desayuno', name:'Breakfast', desc:'Coffee, fruit and eggs every morning', price:28000, unit:'/person/night', icon:'coffee' },
-    { id:'parqueadero', name:'Parking', desc:'Covered garage in the building', price:25000, unit:'/night', icon:'car' },
-    { id:'late', name:'Late check-out', desc:'Check out until 3:00 pm (subject to availability)', price:45000, unit:'per booking', icon:'clock' },
-    { id:'early', name:'Early check-in', desc:'Check in from 10:00 am (subject to availability)', price:35000, unit:'per booking', icon:'sunrise' },
-    { id:'traslado', name:'Airport transfer', desc:'To or from La Nubia airport', price:95000, unit:'per trip', icon:'plane' },
-    { id:'tour', name:'Manizales tour', desc:'4 hours with a certified local guide', price:80000, unit:'/person', icon:'map-pin' }
+    { id:'desayuno', name:'Breakfast', desc:'Coffee, fruit and eggs every morning', price:20000, unit:'/person/night', icon:'coffee' }
   ];
   const BE_PAYMENTS = [
     { id:'wompi', name:'Secure online payment (Wompi)', desc:'Credit card, PSE, Nequi', icon:'credit-card' }
@@ -555,12 +550,7 @@
     const nightly=rate==='best'?room.priceFlexible:Math.round(room.priceFlexible/0.9);
     const roomSub=nightly*nights;
     let ex=0;
-    if(extras.desayuno)ex+=28000*search.guests*nights;
-    if(extras.parqueadero)ex+=25000*nights;
-    if(extras.late)ex+=45000;
-    if(extras.early)ex+=35000;
-    if(extras.traslado)ex+=95000;
-    if(extras.tour)ex+=80000*search.guests;
+    if(extras.desayuno)ex+=20000*search.guests*nights;
     const sub=roomSub+ex,iva=Math.round(sub*.19);
     return{nights,nightly,roomSub,extrasSub:ex,subtotal:sub,iva,total:sub+iva};
   }
