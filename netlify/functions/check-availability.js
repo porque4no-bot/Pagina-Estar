@@ -195,9 +195,10 @@ exports.handler = async (event, context) => {
       };
     }
 
+    const extraGuestSurchargeMock = Math.max(0, guests - 1) * 31000;
     const mockRooms = Object.keys(roomDetails).map(id => {
       const details = roomDetails[id];
-      const mockPrice = 195000;
+      const mockPrice = 195000 + extraGuestSurchargeMock;
       const totalPrice = mockPrice * nights;
 
       // Calculate daily price details
@@ -332,11 +333,14 @@ exports.handler = async (event, context) => {
       let avgPrice = 0;
       let totalPrice = 0;
 
+      // Additional guest surcharge: $31,000/night per person beyond the first
+      const extraGuestSurcharge = Math.max(0, guests - 1) * 31000;
+
       if (count > 0) {
-        avgPrice = totalAmount / count;
-        totalPrice = totalAmount;
+        avgPrice = totalAmount / count + extraGuestSurcharge;
+        totalPrice = avgPrice * nights;
       } else if (otaRoom.price) {
-        avgPrice = parseFloat(otaRoom.price);
+        avgPrice = parseFloat(otaRoom.price) + extraGuestSurcharge;
         totalPrice = avgPrice * nights;
 
         // Populate dummy daily prices for display consistency
@@ -347,7 +351,7 @@ exports.handler = async (event, context) => {
           dailyPrices.push({ date: dateStr, price: avgPrice });
         }
       } else {
-        avgPrice = 195000;
+        avgPrice = 195000 + extraGuestSurcharge;
         totalPrice = avgPrice * nights;
         
         for (let i = 0; i < nights; i++) {
