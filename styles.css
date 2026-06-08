@@ -291,6 +291,21 @@ h1, h2, h3, h4, h5, h6 {
 @media (min-width: 1024px) {
   .header-actions { margin-right: 24px; }
 }
+.guest-entry-link {
+  color: var(--paper);
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 3px;
+}
+.is-scrolled .guest-entry-link,
+body[data-header="dark"] .site-header:not(.is-scrolled) .guest-entry-link { color: var(--ink); }
+@media (max-width: 900px) {
+  .guest-entry-link { display: none; }
+}
 .lang-toggle {
   font-family: var(--font-label);
   font-weight: 700;

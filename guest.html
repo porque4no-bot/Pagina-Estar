@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/favicon.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#28292b">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Mi estadía · estar</title>
+  <meta name="description" content="Guest app de Estar para gestionar la reserva, completar el check-in y solicitar servicios durante la estadía.">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="colors_and_type.css?v=2">
+  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="guest-app.css?v=1">
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+  <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
+  <script src="guest-app.js?v=1" defer></script>
+</head>
+<body class="guest-app-page">
+  <header class="guest-header">
+    <a href="index.html" class="guest-brand" aria-label="Estar, volver al inicio">
+      <img src="assets/logo-stacked-charcoal.png" alt="estar" width="74" height="66">
+    </a>
+    <div class="guest-header-actions">
+      <span class="guest-secure-label"><i data-lucide="shield-check"></i> Área segura</span>
+      <button class="guest-text-button" id="guestLogout" type="button" hidden>Cerrar sesión</button>
+      <a class="guest-home-link" href="index.html">Volver al hotel</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="guest-access" id="guestAccess">
+      <div class="guest-access-art" aria-hidden="true">
+        <img src="assets/photos/interior_detalle.webp" alt="">
+        <div class="guest-access-copy">
+          <p class="eyebrow on-dark">Estar contigo</p>
+          <h1>Tu estadía,<br><span class="serif-italic">en un solo lugar.</span></h1>
+          <p>Completa tu check-in, pide servicios y descubre Manizales antes de llegar.</p>
+        </div>
+      </div>
+
+      <div class="guest-access-panel">
+        <div class="guest-access-form-wrap">
+          <span class="guest-star-mark" aria-hidden="true"></span>
+          <p class="eyebrow terracotta">Guest app</p>
+          <h2>Encuentra tu reserva</h2>
+          <p class="guest-muted">Usa el código de confirmación y el apellido del titular.</p>
+
+          <form id="guestLoginForm" class="guest-form">
+            <label class="guest-field">
+              <span>Código de reserva</span>
+              <input id="bookingCode" name="bookingCode" type="text" autocomplete="off" placeholder="Ej. 45821 o EST-12345" required>
+            </label>
+            <label class="guest-field">
+              <span>Apellido del titular</span>
+              <input id="accessKey" name="accessKey" type="text" autocomplete="family-name" placeholder="Ej. Restrepo" required>
+            </label>
+            <button class="btn btn-ink guest-submit" type="submit">
+              <span>Entrar a mi estadía</span>
+              <i data-lucide="arrow-right"></i>
+            </button>
+            <p class="guest-form-status" id="loginStatus" role="status"></p>
+          </form>
+
+          <div class="guest-access-help">
+            <i data-lucide="message-circle"></i>
+            <p>¿No encuentras el código? <a href="https://wa.me/573102490414?text=Hola%2C%20necesito%20ayuda%20para%20encontrar%20mi%20reserva." target="_blank" rel="noopener noreferrer">Escríbenos por WhatsApp</a>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="guest-shell" id="guestShell" hidden>
+      <div class="guest-welcome">
+        <div>
+          <p class="eyebrow on-dark">Bienvenido a Manizales</p>
+          <h1>Hola, <span class="serif-italic" id="guestFirstName">huésped.</span></h1>
+          <p id="guestWelcomeCopy">Todo está listo para tu próxima estadía.</p>
+        </div>
+        <div class="guest-stay-chip">
+          <span id="guestStayCountdown">Próxima estadía</span>
+          <strong id="guestStayDates">—</strong>
+        </div>
+      </div>
+
+      <div class="guest-layout">
+        <nav class="guest-sidebar" aria-label="Navegación de la estadía">
+          <button class="guest-nav-button is-active" type="button" data-guest-tab="home">
+            <i data-lucide="house"></i><span>Inicio</span>
+          </button>
+          <button class="guest-nav-button" type="button" data-guest-tab="checkin">
+            <i data-lucide="scan-line"></i><span>Check-in</span>
+          </button>
+          <button class="guest-nav-button" type="button" data-guest-tab="services">
+            <i data-lucide="concierge-bell"></i><span>Servicios</span>
+          </button>
+          <button class="guest-nav-button" type="button" data-guest-tab="concierge">
+            <i data-lucide="map-pinned"></i><span>Concierge</span>
+          </button>
+          <button class="guest-nav-button" type="button" data-guest-tab="booking">
+            <i data-lucide="calendar-range"></i><span>Mi reserva</span>
+          </button>
+        </nav>
+
+        <div class="guest-content">
+          <section class="guest-panel is-active" data-guest-panel="home">
+            <div class="guest-panel-head">
+              <div>
+                <p class="eyebrow terracotta">Tu próxima visita</p>
+                <h2>Todo para <span class="serif-italic">estar bien.</span></h2>
+              </div>
+              <span class="guest-status-badge" id="bookingStatusBadge">Confirmada</span>
+            </div>
+
+            <article class="guest-booking-card">
+              <div class="guest-booking-image">
+                <img src="assets/photos/seleccion.webp" alt="Apartaestudio Estar">
+              </div>
+              <div class="guest-booking-summary">
+                <div>
+                  <p class="eyebrow">Tu apartaestudio</p>
+                  <h3 id="homeRoomName">Apartaestudio</h3>
+                  <p class="guest-muted" id="homeBookingCode">Reserva —</p>
+                </div>
+                <dl class="guest-booking-facts">
+                  <div><dt>Llegada</dt><dd id="homeCheckIn">—</dd></div>
+                  <div><dt>Salida</dt><dd id="homeCheckOut">—</dd></div>
+                  <div><dt>Noches</dt><dd id="homeNights">—</dd></div>
+                </dl>
+              </div>
+            </article>
+
+            <div class="guest-quick-grid">
+              <button class="guest-quick-card" type="button" data-open-tab="checkin">
+                <span class="guest-icon-box olive"><i data-lucide="badge-check"></i></span>
+                <span><strong>Completar check-in</strong><small>Sube tu documento y ahorra tiempo al llegar.</small></span>
+                <i data-lucide="chevron-right"></i>
+              </button>
+              <button class="guest-quick-card" type="button" data-open-tab="services">
+                <span class="guest-icon-box terracotta"><i data-lucide="coffee"></i></span>
+                <span><strong>Agregar servicios</strong><small>Desayuno, parqueadero, lavandería y más.</small></span>
+                <i data-lucide="chevron-right"></i>
+              </button>
+              <button class="guest-quick-card" type="button" data-open-tab="concierge">
+                <span class="guest-icon-box sand"><i data-lucide="map"></i></span>
+                <span><strong>Explorar la ciudad</strong><small>Nuestra selección de lugares cerca de Estar.</small></span>
+                <i data-lucide="chevron-right"></i>
+              </button>
+            </div>
+
+            <div class="guest-arrival-card">
+              <div>
+                <p class="eyebrow on-dark">Antes de llegar</p>
+                <h3>Check-in desde las 3:00 p. m.</h3>
+                <p>Cuando completes el registro te mostraremos las instrucciones de llegada y acceso.</p>
+              </div>
+              <button class="btn btn-ghost-light" type="button" data-open-tab="checkin">Empezar check-in</button>
+            </div>
+          </section>
+
+          <section class="guest-panel" data-guest-panel="checkin">
+            <div class="guest-panel-head">
+              <div>
+                <p class="eyebrow terracotta">Pre check-in</p>
+                <h2>Llega y simplemente <span class="serif-italic">empieza a estar.</span></h2>
+                <p class="guest-muted">Validaremos el documento y te pediremos confirmar los datos extraídos.</p>
+              </div>
+              <div class="guest-progress-pill" id="checkinProgress">Paso 1 de 3</div>
+            </div>
+
+            <div class="guest-checkin-layout">
+              <form id="checkinForm" class="guest-checkin-form">
+                <fieldset class="guest-form-card">
+                  <legend><span>1</span> Documento de identidad</legend>
+                  <label class="guest-upload" for="identityDocument">
+                    <input id="identityDocument" type="file" accept="image/jpeg,image/png,application/pdf" capture="environment">
+                    <span class="guest-upload-icon"><i data-lucide="scan-line"></i></span>
+                    <strong id="uploadTitle">Toma una foto o sube el documento</strong>
+                    <small id="uploadMeta">JPG, PNG o PDF. Máximo 4.5 MB.</small>
+                  </label>
+                  <div class="guest-inline-actions">
+                    <button class="btn btn-ghost-dark" id="analyzeDocument" type="button" disabled>
+                      <i data-lucide="sparkles"></i> Leer documento
+                    </button>
+                    <span class="guest-ocr-status" id="ocrStatus"></span>
+                  </div>
+                </fieldset>
+
+                <fieldset class="guest-form-card">
+                  <legend><span>2</span> Confirma tus datos</legend>
+                  <div class="guest-form-grid">
+                    <label class="guest-field"><span>Nombres *</span><input name="firstName" autocomplete="given-name" required></label>
+                    <label class="guest-field"><span>Apellidos *</span><input name="lastName" autocomplete="family-name" required></label>
+                    <label class="guest-field"><span>Tipo de documento *</span>
+                      <select name="documentType" required>
+                        <option value="">Selecciona</option>
+                        <option value="Cédula de ciudadanía">Cédula de ciudadanía</option>
+                        <option value="Cédula de extranjería">Cédula de extranjería</option>
+                        <option value="Pasaporte">Pasaporte</option>
+                        <option value="Documento nacional">Documento nacional</option>
+                      </select>
+                    </label>
+                    <label class="guest-field"><span>Número de documento *</span><input name="documentNumber" autocomplete="off" required></label>
+                    <label class="guest-field"><span>Fecha de nacimiento *</span><input name="birthDate" type="date" required></label>
+                    <label class="guest-field"><span>Vencimiento</span><input name="expirationDate" type="date"></label>
+                    <label class="guest-field"><span>Nacionalidad *</span><input name="nationality" autocomplete="country-name" required></label>
+                    <label class="guest-field"><span>Hora aproximada de llegada</span><input name="arrivalTime" type="time"></label>
+                    <label class="guest-field"><span>Correo *</span><input name="email" type="email" autocomplete="email" required></label>
+                    <label class="guest-field"><span>WhatsApp *</span><input name="phone" type="tel" autocomplete="tel" required></label>
+                    <label class="guest-field guest-field-wide"><span>Dirección de residencia</span><input name="address" autocomplete="street-address"></label>
+                    <label class="guest-field guest-field-wide"><span>Notas para el equipo</span><textarea name="notes" rows="3" placeholder="Alergias, requerimientos de movilidad o información útil para tu llegada."></textarea></label>
+                  </div>
+                  <label class="guest-consent">
+                    <input name="privacyAccepted" type="checkbox" required>
+                    <span>Acepto el tratamiento de mis datos y documentos conforme a la <a href="privacidad.html" target="_blank">Política de Privacidad</a>.</span>
+                  </label>
+                </fieldset>
+
+                <button class="btn btn-ink guest-submit" type="submit">
+                  Validar y completar check-in <i data-lucide="check"></i>
+                </button>
+                <p class="guest-form-status" id="checkinStatus" role="status"></p>
+              </form>
+
+              <aside class="guest-checkin-aside">
+                <div class="guest-trust-card">
+                  <i data-lucide="shield-check"></i>
+                  <h3>Tus datos están protegidos</h3>
+                  <p>El documento se procesa del lado del servidor. No publicamos llaves de Azure ni de OTASync en el navegador.</p>
+                </div>
+
+                <div class="guest-contract-card">
+                  <p class="eyebrow">Firma digital</p>
+                  <h3>Contrato de hospedaje</h3>
+                  <p>Firma después de confirmar tus datos. Guardaremos la evidencia de aceptación junto con el expediente de la reserva.</p>
+                  <label class="guest-field"><span>Nombre completo del firmante</span><input id="signedName" type="text"></label>
+                  <label class="guest-consent">
+                    <input id="contractAccepted" type="checkbox">
+                    <span>Leí y acepto el contrato, las políticas de convivencia y cancelación.</span>
+                  </label>
+                  <button class="btn btn-primary" id="signContract" type="button">Firmar contrato</button>
+                  <p class="guest-form-status" id="contractStatus" role="status"></p>
+                </div>
+              </aside>
+            </div>
+          </section>
+
+          <section class="guest-panel" data-guest-panel="services">
+            <div class="guest-panel-head">
+              <div>
+                <p class="eyebrow terracotta">Servicios adicionales</p>
+                <h2>Haz tu estadía <span class="serif-italic">más tuya.</span></h2>
+                <p class="guest-muted">Selecciona servicios para antes o durante tu visita.</p>
+              </div>
+              <button class="guest-cart-button" id="openCart" type="button">
+                <i data-lucide="shopping-bag"></i>
+                <span id="cartCount">0</span>
+              </button>
+            </div>
+
+            <div class="guest-service-grid">
+              <article class="guest-service-card" data-service-id="breakfast" data-service-price="28000">
+                <span class="guest-service-icon"><i data-lucide="coffee"></i></span>
+                <div><p class="eyebrow">Alimentos</p><h3>Desayuno local</h3><p>Fruta, huevos, pan artesanal, café y jugo.</p></div>
+                <footer><strong>$28.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+              </article>
+              <article class="guest-service-card" data-service-id="parking" data-service-price="25000">
+                <span class="guest-service-icon"><i data-lucide="car-front"></i></span>
+                <div><p class="eyebrow">Movilidad</p><h3>Parqueadero</h3><p>Cupo por noche sujeto a disponibilidad.</p></div>
+                <footer><strong>$25.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+              </article>
+              <article class="guest-service-card" data-service-id="laundry" data-service-price="35000">
+                <span class="guest-service-icon"><i data-lucide="shirt"></i></span>
+                <div><p class="eyebrow">Comodidad</p><h3>Lavandería express</h3><p>Bolsa de hasta 3 kg, entrega en 24 horas.</p></div>
+                <footer><strong>$35.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+              </article>
+              <article class="guest-service-card" data-service-id="late_checkout" data-service-price="80000">
+                <span class="guest-service-icon"><i data-lucide="clock-3"></i></span>
+                <div><p class="eyebrow">Tiempo</p><h3>Late check-out</h3><p>Extiende tu salida hasta las 4:00 p. m.</p></div>
+                <footer><strong>$80.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+              </article>
+              <article class="guest-service-card" data-service-id="airport_transfer" data-service-price="120000">
+                <span class="guest-service-icon"><i data-lucide="plane"></i></span>
+                <div><p class="eyebrow">Traslado</p><h3>Aeropuerto</h3><p>Recogida o traslado privado a La Nubia.</p></div>
+                <footer><strong>$120.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+              </article>
+              <article class="guest-service-card" data-service-id="city_experience" data-service-price="95000">
+                <span class="guest-service-icon"><i data-lucide="mountain-snow"></i></span>
+                <div><p class="eyebrow">Experiencia</p><h3>Ruta cafetera</h3><p>Experiencia local coordinada por nuestro concierge.</p></div>
+                <footer><strong>$95.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+              </article>
+            </div>
+
+            <aside class="guest-cart" id="guestCart" hidden>
+              <div class="guest-cart-head">
+                <div><p class="eyebrow terracotta">Tu pedido</p><h3>Servicios seleccionados</h3></div>
+                <button id="closeCart" type="button" aria-label="Cerrar carrito"><i data-lucide="x"></i></button>
+              </div>
+              <div id="cartItems" class="guest-cart-items"></div>
+              <label class="guest-field"><span>¿Cuándo lo necesitas?</span><input id="deliveryTime" type="text" placeholder="Ej. Día de llegada, 7:30 a. m."></label>
+              <label class="guest-field"><span>Notas</span><textarea id="orderNotes" rows="3"></textarea></label>
+              <label class="guest-field"><span>Forma de pago</span>
+                <select id="paymentPreference">
+                  <option value="room">Cargar a mi habitación</option>
+                  <option value="hotel">Pagar en el hotel</option>
+                  <option value="online">Pagar en línea</option>
+                </select>
+              </label>
+              <div class="guest-cart-total"><span>Total</span><strong id="cartTotal">$0</strong></div>
+              <button class="btn btn-ink guest-submit" id="submitOrder" type="button">Enviar pedido</button>
+              <p class="guest-form-status" id="orderStatus" role="status"></p>
+            </aside>
+          </section>
+
+          <section class="guest-panel" data-guest-panel="concierge">
+            <div class="guest-panel-head">
+              <div>
+                <p class="eyebrow terracotta">Concierge local</p>
+                <h2>Manizales, <span class="serif-italic">como la vivimos nosotros.</span></h2>
+                <p class="guest-muted">Recomendaciones cercanas y respuestas para moverte con facilidad.</p>
+              </div>
+              <a class="btn btn-ghost-dark" href="explora.html">Ver guía completa</a>
+            </div>
+
+            <div class="guest-recommendation-grid">
+              <a class="guest-place-card featured" href="https://maps.google.com/?q=5.059565,-75.488098" target="_blank" rel="noopener noreferrer">
+                <img src="assets/photos/yarumos.webp" alt="Bosque Popular El Prado y naturaleza de Manizales">
+                <span class="guest-place-overlay"><small>Naturaleza</small><strong>Recinto del Pensamiento</strong><em>Plan de medio día</em></span>
+              </a>
+              <a class="guest-place-card" href="https://maps.google.com/?q=El+Cable+Manizales" target="_blank" rel="noopener noreferrer">
+                <img src="assets/photos/cable.webp" alt="Sector El Cable en Manizales">
+                <span class="guest-place-overlay"><small>A 8 min caminando</small><strong>El Cable</strong><em>Restaurantes y vida urbana</em></span>
+              </a>
+              <a class="guest-place-card" href="https://maps.google.com/?q=Monumento+a+los+Colonizadores+Manizales" target="_blank" rel="noopener noreferrer">
+                <img src="assets/photos/bolivar.webp" alt="Vista urbana de Manizales">
+                <span class="guest-place-overlay"><small>Mirador</small><strong>Chipre</strong><em>Atardecer y panorámica</em></span>
+              </a>
+            </div>
+
+            <div class="guest-concierge-columns">
+              <div>
+                <p class="eyebrow terracotta">Preguntas frecuentes</p>
+                <div class="guest-faq">
+                  <details><summary>¿Cuál es el horario de check-in y check-out?</summary><p>La llegada es desde las 3:00 p. m. y la salida hasta las 12:00 m. Puedes solicitar ingreso anticipado o salida tarde según disponibilidad.</p></details>
+                  <details><summary>¿Cómo funciona el acceso al apartaestudio?</summary><p>Después de completar el check-in recibirás las instrucciones de llegada. El equipo confirmará la entrega o activación de tu acceso.</p></details>
+                  <details><summary>¿Puedo recibir domicilios o visitas?</summary><p>Sí. Las visitas deben registrarse con recepción y presentar documento. Para domicilios, recomendamos recibirlos en el acceso principal.</p></details>
+                  <details><summary>¿Hay servicio de limpieza?</summary><p>Las estancias incluyen el servicio indicado en la tarifa. Puedes solicitar limpiezas adicionales desde la sección Servicios.</p></details>
+                  <details><summary>¿El WiFi sirve para videollamadas?</summary><p>Sí. Contamos con conexión de fibra óptica diseñada para trabajo remoto y videollamadas.</p></details>
+                </div>
+              </div>
+
+              <form class="guest-support-card" id="supportForm">
+                <span class="guest-icon-box olive"><i data-lucide="headphones"></i></span>
+                <p class="eyebrow">Habla con nosotros</p>
+                <h3>Concierge digital</h3>
+                <p>¿Necesitas una recomendación o ayuda durante tu estadía?</p>
+                <label class="guest-field"><span>Tipo de solicitud</span>
+                  <select name="category">
+                    <option value="concierge">Recomendación local</option>
+                    <option value="housekeeping">Limpieza o mantenimiento</option>
+                    <option value="transport">Transporte</option>
+                    <option value="other">Otro</option>
+                  </select>
+                </label>
+                <label class="guest-field"><span>Mensaje</span><textarea name="message" rows="4" required></textarea></label>
+                <button class="btn btn-ink guest-submit" type="submit">Enviar al equipo</button>
+                <p class="guest-form-status" id="supportStatus" role="status"></p>
+              </form>
+            </div>
+          </section>
+
+          <section class="guest-panel" data-guest-panel="booking">
+            <div class="guest-panel-head">
+              <div>
+                <p class="eyebrow terracotta">Mi reserva</p>
+                <h2>Consulta y solicita <span class="serif-italic">cambios.</span></h2>
+              </div>
+            </div>
+
+            <div class="guest-booking-management">
+              <article class="guest-detail-card">
+                <div class="guest-detail-card-head">
+                  <span class="guest-icon-box olive"><i data-lucide="calendar-check-2"></i></span>
+                  <div><p class="eyebrow">Reserva</p><h3 id="manageBookingCode">—</h3></div>
+                </div>
+                <dl class="guest-detail-list">
+                  <div><dt>Huésped</dt><dd id="manageGuestName">—</dd></div>
+                  <div><dt>Alojamiento</dt><dd id="manageRoomName">—</dd></div>
+                  <div><dt>Fechas</dt><dd id="manageDates">—</dd></div>
+                  <div><dt>Total registrado</dt><dd id="manageTotal">—</dd></div>
+                </dl>
+                <a class="guest-document-link" href="#" aria-disabled="true">
+                  <i data-lucide="file-text"></i><span>Confirmación de reserva</span><small>Disponible próximamente</small>
+                </a>
+                <a class="guest-document-link" href="#" aria-disabled="true">
+                  <i data-lucide="receipt-text"></i><span>Facturas y documentos</span><small>Se mostrarán al sincronizar el archivo</small>
+                </a>
+              </article>
+
+              <form class="guest-form-card guest-change-form" id="changeForm">
+                <p class="eyebrow terracotta">Solicitud</p>
+                <h3>¿Qué quieres cambiar?</h3>
+                <label class="guest-field"><span>Tipo de solicitud</span>
+                  <select name="requestKind" id="requestKind">
+                    <option value="dates">Cambiar fechas</option>
+                    <option value="guests">Cambiar huéspedes</option>
+                    <option value="invoice">Solicitar factura</option>
+                    <option value="cancel">Solicitar cancelación</option>
+                    <option value="other">Otra solicitud</option>
+                  </select>
+                </label>
+                <div class="guest-form-grid" id="requestedDates">
+                  <label class="guest-field"><span>Nueva llegada</span><input name="requestedCheckIn" type="date"></label>
+                  <label class="guest-field"><span>Nueva salida</span><input name="requestedCheckOut" type="date"></label>
+                </div>
+                <label class="guest-field"><span>Detalles</span><textarea name="message" rows="5" placeholder="Cuéntanos qué necesitas. El equipo confirmará disponibilidad, condiciones y posibles diferencias de tarifa."></textarea></label>
+                <button class="btn btn-ink guest-submit" type="submit">Enviar solicitud</button>
+                <p class="guest-form-status" id="changeStatus" role="status"></p>
+              </form>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <nav class="guest-mobile-nav" aria-label="Navegación móvil">
+        <button class="is-active" type="button" data-guest-tab="home"><i data-lucide="house"></i><span>Inicio</span></button>
+        <button type="button" data-guest-tab="checkin"><i data-lucide="scan-line"></i><span>Check-in</span></button>
+        <button type="button" data-guest-tab="services"><i data-lucide="concierge-bell"></i><span>Servicios</span></button>
+        <button type="button" data-guest-tab="concierge"><i data-lucide="map-pinned"></i><span>Guía</span></button>
+        <button type="button" data-guest-tab="booking"><i data-lucide="calendar-range"></i><span>Reserva</span></button>
+      </nav>
+    </section>
+  </main>
+</body>
+</html>

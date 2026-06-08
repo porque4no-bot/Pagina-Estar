@@ -60,6 +60,13 @@
     X-Robots-Tag = "noindex, nofollow"
 
 [[headers]]
+  for = "/guest.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, no-cache, must-revalidate"
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=(self)"
+
+[[headers]]
   for = "/api/*"
   [headers.values]
     Cache-Control = "no-store, no-cache, must-revalidate"
