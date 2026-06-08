@@ -54,22 +54,22 @@ test('booking bar carries dates and guests into the booking engine', async ({ pa
   await expect(page).toHaveURL(/reservar\.html\?checkin=2026-08-10&checkout=2026-08-13&guests=2/);
 });
 
-test('key public pages render successfully', async ({ page }) => {
-  const pages = [
-    ['/', /Estar/i],
-    ['/reservar.html', /reserv/i],
-    ['/explora.html', /explor|Manizales/i],
-    ['/privacidad.html', /privacidad/i],
-    ['/guest.html', /estad[ií]a|guest/i],
-    ['/en/index.html', /Estar/i]
-  ];
+const publicPages = [
+  ['home', '/', /Estar/i],
+  ['booking engine', '/reservar.html', /reserv/i],
+  ['local guide', '/explora.html', /explor|Manizales/i],
+  ['privacy policy', '/privacidad.html', /privacidad/i],
+  ['guest app', '/guest.html', /estad[ií]a|guest/i],
+  ['English home', '/en/index.html', /Estar/i]
+];
 
-  for (const [url, title] of pages) {
-    const response = await page.goto(url);
+for (const [name, url, title] of publicPages) {
+  test(`${name} page renders successfully`, async ({ page }) => {
+    const response = await page.goto(url, { waitUntil: 'domcontentloaded' });
     expect(response.status(), url).toBe(200);
     await expect(page).toHaveTitle(title);
-  }
-});
+  });
+}
 
 test('mobile navigation can be opened', async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.includes('mobile'), 'Mobile-only behavior');
