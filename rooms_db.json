@@ -4,11 +4,11 @@
     "num": "01",
     "name": "Clásica",
     "sub": "Compacto, cálido, todo a la mano.",
-    "description": "Cama queen, escritorio frente a la ventana, cocina equipada con menaje completo y baño privado con ducha. La esencia de estar, en 28 m².",
+    "description": "29 m² con todo lo esencial. Cama doble, cocina equipada con estufa, microondas y cafetera, baño privado con ducha y secador de pelo.",
     "capacity": 2,
-    "beds": "1 Queen size",
-    "area": 28,
-    "view": "Vista ciudad",
+    "beds": "1 cama doble",
+    "area": 29,
+    "view": "Vista interior",
     "image": "assets/photos/tipo1/1.webp",
     "gallery": [
       "assets/photos/tipo1/1.webp",
@@ -17,22 +17,22 @@
     ],
     "amenities": [
       {"icon": "wifi", "l": "WiFi fibra"},
-      {"icon": "tv", "l": "Smart TV 43\""},
+      {"icon": "tv", "l": "TV Cable"},
       {"icon": "cooking-pot", "l": "Cocina equipada"},
       {"icon": "shower-head", "l": "Baño privado"},
-      {"icon": "sparkles", "l": "Aseo semanal"}
+      {"icon": "wind", "l": "Secador de pelo"}
     ]
   },
   "31349": {
     "id": "seleccion",
     "num": "02",
     "name": "Selección",
-    "sub": "Un poco de afuera, adentro.",
-    "description": "Balcón privado con vistas a la cordillera. Ideal para el café de las mañanas. La luz natural cambia toda la sensación del espacio.",
-    "capacity": 2,
-    "beds": "1 Queen size",
-    "area": 32,
-    "view": "Cordillera + balcón",
+    "sub": "El más versátil, hasta 5 huéspedes.",
+    "description": "36 m² con vista a la ciudad. Tres camas — king, doble y sencilla — para hasta 5 huéspedes. Cocina completa, baño privado, secador de pelo y plancha.",
+    "capacity": 5,
+    "beds": "1 king + 1 doble + 1 sencilla",
+    "area": 36,
+    "view": "Vista a la ciudad",
     "image": "assets/photos/tipo2/1.webp",
     "gallery": [
       "assets/photos/tipo2/1.webp",
@@ -41,23 +41,23 @@
       "assets/photos/tipo2/4.webp"
     ],
     "amenities": [
-      {"icon": "wind", "l": "Balcón privado"},
+      {"icon": "building-2", "l": "Vista a la ciudad"},
       {"icon": "wifi", "l": "WiFi fibra"},
-      {"icon": "tv", "l": "Smart TV 43\""},
+      {"icon": "tv", "l": "TV Cable"},
       {"icon": "cooking-pot", "l": "Cocina equipada"},
-      {"icon": "shower-head", "l": "Baño privado"}
+      {"icon": "users", "l": "Hasta 5 personas"}
     ]
   },
   "31350": {
     "id": "reserva",
     "num": "03",
     "name": "Reserva",
-    "sub": "Zona de estar separada de la cama.",
-    "description": "Dormitorio privado separado de la zona social. Escritorio ergonómico. 42 m². Cuenta con ambientes definidos, cocina y Smart TV.",
+    "sub": "Íntimo y con vista a la ciudad.",
+    "description": "24 m² con vista a la ciudad. Cama doble, cocina equipada con estufa, microondas y cafetera, baño privado con ducha y secador de pelo.",
     "capacity": 2,
-    "beds": "1 King size",
-    "area": 42,
-    "view": "Vista ciudad",
+    "beds": "1 cama doble",
+    "area": 24,
+    "view": "Vista a la ciudad",
     "image": "assets/photos/tipo3/1.webp",
     "gallery": [
       "assets/photos/tipo3/1.webp",
@@ -65,23 +65,23 @@
       "assets/photos/tipo3/3.webp"
     ],
     "amenities": [
-      {"icon": "layout", "l": "Ambientes separados"},
+      {"icon": "building-2", "l": "Vista a la ciudad"},
       {"icon": "wifi", "l": "WiFi fibra"},
-      {"icon": "tv", "l": "Smart TV 55\""},
+      {"icon": "tv", "l": "TV Cable"},
       {"icon": "cooking-pot", "l": "Cocina equipada"},
-      {"icon": "briefcase", "l": "Escritorio"}
+      {"icon": "wind", "l": "Secador de pelo"}
     ]
   },
   "31351": {
     "id": "origen",
     "num": "04",
     "name": "Origen",
-    "sub": "Nuestra tipología más espaciosa.",
-    "description": "El más espacioso. Diseño con referencia cafetera. Vista panorámica de Manizales para relajarse tras un día de trabajo.",
-    "capacity": 2,
-    "beds": "1 King size",
-    "area": 52,
-    "view": "Panorámica",
+    "sub": "Cama king más espacio para un tercero.",
+    "description": "29 m² con vista a la ciudad. Cama king para dos más cama sencilla — hasta 3 huéspedes. Cocina completa, baño privado y secador de pelo.",
+    "capacity": 3,
+    "beds": "1 king + 1 sencilla",
+    "area": 29,
+    "view": "Vista a la ciudad",
     "image": "assets/photos/tipo4/1.webp",
     "gallery": [
       "assets/photos/tipo4/1.webp",
@@ -91,23 +91,23 @@
       "assets/photos/tipo4/5.webp"
     ],
     "amenities": [
-      {"icon": "mountain", "l": "Vista panorámica"},
+      {"icon": "building-2", "l": "Vista a la ciudad"},
       {"icon": "wifi", "l": "WiFi fibra"},
-      {"icon": "tv", "l": "Smart TV 65\""},
+      {"icon": "tv", "l": "TV Cable"},
       {"icon": "cooking-pot", "l": "Cocina equipada"},
-      {"icon": "bath", "l": "Bañera"}
+      {"icon": "users", "l": "Hasta 3 personas"}
     ]
   },
   "31352": {
     "id": "especial",
     "num": "05",
     "name": "Especial",
-    "sub": "Nuestra tipología más completa.",
-    "description": "Nuestra tipología más completa. Terraza privada, cama king + sofá cama. Ideal para viajes familiares o de negocios.",
-    "capacity": 4,
-    "beds": "King + sofacama",
-    "area": 60,
-    "view": "Panorámica premium",
+    "sub": "Vista a la ciudad en un espacio independiente.",
+    "description": "27 m² con vista a la ciudad. Cama doble, cocina equipada con estufa, microondas y cafetera, baño privado con ducha, secador de pelo y plancha.",
+    "capacity": 2,
+    "beds": "1 cama doble",
+    "area": 27,
+    "view": "Vista a la ciudad",
     "image": "assets/photos/tipo5/1.webp",
     "gallery": [
       "assets/photos/tipo5/1.webp",
@@ -116,11 +116,11 @@
       "assets/photos/tipo5/4.webp"
     ],
     "amenities": [
-      {"icon": "sun", "l": "Terraza privada"},
+      {"icon": "building-2", "l": "Vista a la ciudad"},
       {"icon": "wifi", "l": "WiFi fibra"},
-      {"icon": "tv", "l": "Smart TV 65\""},
-      {"icon": "cooking-pot", "l": "Cocina premium"},
-      {"icon": "users", "l": "Hasta 4 personas"}
+      {"icon": "tv", "l": "TV Cable"},
+      {"icon": "cooking-pot", "l": "Cocina equipada"},
+      {"icon": "wind", "l": "Secador de pelo"}
     ]
   }
 }

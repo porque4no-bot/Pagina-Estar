@@ -110,18 +110,23 @@ const i18nEngine = {
       especial: "Especial"
     },
     roomDescs: {
-      clasica: "Diseño eficiente y cálido. Todo lo esencial en 28 m² bien aprovechados.",
-      seleccion: "Balcón privado con vistas a la cordillera. Ideal para el café de las mañanas.",
-      reserva: "Dormitorio privado separado de la zona social. Escritorio ergonómico. 42 m².",
-      origen: "El más espacioso. Diseño con referencia cafetera. Vista panorámica de Manizales.",
-      especial: "Nuestra tipología más completa. Terraza privada. Para quedar muy bien."
+      clasica: "Cama doble, cocina equipada y baño privado en 29 m². Acogedor y funcional.",
+      seleccion: "36 m² con vista a la ciudad. Tres camas para hasta 5 huéspedes — king, doble y sencilla.",
+      reserva: "24 m² con vista a la ciudad. Cama doble, cocina equipada y baño privado.",
+      origen: "29 m² con vista a la ciudad. Cama king para dos más cama sencilla — hasta 3 huéspedes.",
+      especial: "27 m² con vista a la ciudad. Cama doble, cocina completa y todos los servicios."
     },
     roomBeds: {
+      "1 cama doble": "1 cama doble",
+      "1 king + 1 doble + 1 sencilla": "1 king + 1 doble + 1 sencilla",
+      "1 king + 1 sencilla": "1 king + 1 sencilla",
       "1 Queen size": "1 Queen size",
       "1 King size": "1 King size",
       "King + sofacama": "1 King + sofá cama"
     },
     roomViews: {
+      "Vista a la ciudad": "Vista a la ciudad",
+      "Vista interior": "Vista interior",
       "Vista ciudad": "Vista ciudad",
       "Cordillera + balcón": "Balcón + cordillera",
       "Panorámica": "Vista panorámica",
@@ -129,12 +134,18 @@ const i18nEngine = {
     },
     roomAmenities: {
       "WiFi fibra": "WiFi fibra",
+      "TV Cable": "TV Cable",
+      "Cocina equipada": "Cocina equipada",
+      "Baño privado": "Baño privado",
+      "Secador de pelo": "Secador de pelo",
+      "Plancha y tabla": "Plancha y tabla",
+      "Vista a la ciudad": "Vista a la ciudad",
+      "Hasta 5 personas": "Hasta 5 personas",
+      "Hasta 3 personas": "Hasta 3 personas",
       "Smart TV 43\"": "Smart TV 43\"",
       "Smart TV 55\"": "Smart TV 55\"",
       "Smart TV 65\"": "Smart TV 65\"",
-      "Cocina equipada": "Cocina equipada",
       "Cocina premium": "Cocina premium",
-      "Baño privado": "Baño privado",
       "Baño privado amplio": "Baño privado amplio",
       "Aseo semanal": "Aseo semanal",
       "Balcón privado": "Balcón privado",
@@ -275,18 +286,23 @@ const i18nEngine = {
       especial: "Special"
     },
     roomDescs: {
-      clasica: "Compact, warm, and functional. Designed to optimize every square meter for a hassle-free stay.",
-      seleccion: "Private balcony with mountain views. Ideal for your morning coffee.",
-      reserva: "Private bedroom separate from the living space. Ergonomic desk. 42 sqm.",
-      origen: "Our most spacious layout. Coffee-inspired design elements. Panoramic views of Manizales.",
-      especial: "Our most complete typology. Private terrace. Ideal to make an impression."
+      clasica: "Double bed, equipped kitchen and private bathroom in 29 sqm. Cozy and functional.",
+      seleccion: "36 sqm with city view. Three beds for up to 5 guests — king, double and single.",
+      reserva: "24 sqm with city view. Double bed, equipped kitchen and private bathroom.",
+      origen: "29 sqm with city view. King bed for two plus a single bed — up to 3 guests.",
+      especial: "27 sqm with city view. Double bed, full kitchen and all amenities."
     },
     roomBeds: {
+      "1 cama doble": "1 double bed",
+      "1 king + 1 doble + 1 sencilla": "1 king + 1 double + 1 single",
+      "1 king + 1 sencilla": "1 king + 1 single bed",
       "1 Queen size": "1 Queen size bed",
       "1 King size": "1 King size bed",
       "King + sofacama": "1 King size + sofa bed"
     },
     roomViews: {
+      "Vista a la ciudad": "City view",
+      "Vista interior": "Interior view",
       "Vista ciudad": "City view",
       "Cordillera + balcón": "Mountain view + balcony",
       "Panorámica": "Panoramic view",
@@ -294,12 +310,18 @@ const i18nEngine = {
     },
     roomAmenities: {
       "WiFi fibra": "WiFi (fiber)",
+      "TV Cable": "Cable TV",
+      "Cocina equipada": "Equipped kitchen",
+      "Baño privado": "Private bathroom",
+      "Secador de pelo": "Hair dryer",
+      "Plancha y tabla": "Iron and board",
+      "Vista a la ciudad": "City view",
+      "Hasta 5 personas": "Up to 5 guests",
+      "Hasta 3 personas": "Up to 3 guests",
       "Smart TV 43\"": "Smart TV 43\"",
       "Smart TV 55\"": "Smart TV 55\"",
       "Smart TV 65\"": "Smart TV 65\"",
-      "Cocina equipada": "Equipped kitchen",
       "Cocina premium": "Premium kitchen",
-      "Baño privado": "Private bathroom",
       "Baño privado amplio": "Large private bathroom",
       "Aseo semanal": "Weekly cleaning",
       "Balcón privado": "Private balcony",
