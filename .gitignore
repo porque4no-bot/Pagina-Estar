@@ -13,6 +13,8 @@ node_modules/
 .claude/worktrees/
 dist/
 motor-app.js
+playwright-report/
+test-results/
 
 # Scraper output (generated locally, not checked in)
 scripts/booking_reviews_9plus.json
