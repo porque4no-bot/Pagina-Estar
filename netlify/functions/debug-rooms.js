@@ -27,7 +27,7 @@ exports.handler = async () => {
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Auth failed: ' + e.message }) };
   }
 
-  const base = { token, key: pkey, id_properties: propertyId };
+  const base = { token, key: pkey, id_properties: parseInt(propertyId) };
   const results = {};
 
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
@@ -71,10 +71,18 @@ exports.handler = async () => {
     results.room_prices[rtId] = r2 || r1;
   }
 
-  // 6. Restrictions
+  // 6. Restriction plans (need plan ID first)
+  results.restriction_plans = await call(
+    'https://app.otasync.me/api/restrictions/data/restrictionPlans', base
+  );
+
+  // 6b. Restrictions (try with plan ID 1 as fallback if plan list is empty)
+  const planId = (Array.isArray(results.restriction_plans.body) && results.restriction_plans.body[0])
+    ? results.restriction_plans.body[0].id_restriction_plans
+    : 1;
   results.restrictions = await call(
     'https://app.otasync.me/api/restrictions/data/restrictions',
-    { ...base, dfrom: fmt(tomorrow), dto: fmt(inWeek) }
+    { ...base, id_restriction_plans: planId, dfrom: fmt(tomorrow), dto: fmt(inWeek) }
   );
 
   return { statusCode: 200, headers, body: JSON.stringify(results, null, 2) };
