@@ -649,8 +649,8 @@
   const BE_EXTRAS = [
     { id:'desayuno', name:'Desayuno', desc:'Café, fruta y huevos cada mañana', price:20000, unit:'/persona/noche', icon:'coffee' },
     { id:'parqueadero', name:'Parqueadero', desc:'Garaje cubierto en el edificio', price:25000, unit:'/noche', icon:'car' },
-    { id:'late', name:'Late check-out', desc:'Salida hasta las 3:00 pm (sujeto a disponibilidad)', price:45000, unit:'por reserva', icon:'clock' },
-    { id:'early', name:'Early check-in', desc:'Entrada desde las 10:00 am (sujeto a disponibilidad)', price:35000, unit:'por reserva', icon:'sunrise' }
+    { id:'late', name:'Late check-out', desc:'Salida hasta las 3:00 pm (sujeto a disponibilidad)', price:60000, unit:'por reserva', icon:'clock' },
+    { id:'early', name:'Early check-in', desc:'Entrada desde las 10:00 am (sujeto a disponibilidad)', price:50000, unit:'por reserva', icon:'sunrise' }
   ];
   const BE_PAYMENTS = [
     { id:'wompi', name:'Pago en línea seguro (Wompi)', desc:'Tarjeta de crédito, PSE, Nequi', icon:'credit-card' }
@@ -670,8 +670,8 @@
     let ex=0;
     if(extras.desayuno)ex+=20000*search.guests*nights;
     if(extras.parqueadero)ex+=25000*nights;
-    if(extras.late)ex+=45000;
-    if(extras.early)ex+=35000;
+    if(extras.late)ex+=60000;
+    if(extras.early)ex+=50000;
     const sub=roomSub+ex,iva=Math.round(sub*.19);
     return{nights,nightly,roomSub,extrasSub:ex,subtotal:sub,iva,total:sub+iva};
   }
