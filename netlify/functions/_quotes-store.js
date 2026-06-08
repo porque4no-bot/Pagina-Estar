@@ -96,6 +96,7 @@ function sanitizeService(s) {
 /* Normalize and price an incoming quote body (used by create + update).
    Rooms carry both tarifaBase (internal) and tarifaPorNoche (inflated). */
 function sanitizeQuoteInput(body) {
+  body = body || {};
   const comision = Math.max(0, Math.min(100, parseFloat(body.comision) || 0));
   const checkin = isoDateOrNull(body.checkin);
   const checkout = isoDateOrNull(body.checkout);
@@ -140,9 +141,9 @@ function sanitizeQuoteInput(body) {
     : new Date(now.getTime() + 30 * 86400000).toISOString();
 
   return {
-    empresa: String(body.empresa).slice(0, 200),
+    empresa: String(body.empresa || '').slice(0, 200),
     contacto: String(body.contacto || '').slice(0, 200),
-    email: String(body.email).slice(0, 254),
+    email: String(body.email || '').slice(0, 254),
     telefono: String(body.telefono || '').slice(0, 50),
     nit: String(body.nit || '').slice(0, 50),
     referencia: String(body.referencia || '').slice(0, 300),
@@ -230,5 +231,6 @@ function toPublic(quote) {
 module.exports = {
   IVA_RATE, INC_RATE, ROOM_NAME_TO_ID, VALID_ROOM_IDS,
   getQuoteStore, loadQuote, saveQuote, listAllQuotes,
-  effectiveStatus, sanitizeQuoteInput, toPublic, nightsBetween, computeQuoteTotal
+  effectiveStatus, sanitizeQuoteInput, toPublic, nightsBetween, effectiveTarifa,
+  sanitizeService, computeQuoteTotal
 };

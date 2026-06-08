@@ -228,6 +228,71 @@ function decodeReference(ref) {
   }
 }
 
+function computeWompiChecksum(body, secret) {
+  const properties = body?.signature?.properties;
+  if (!Array.isArray(properties) || body?.timestamp === undefined || !secret) {
+    throw new Error('Firma Wompi incompleta');
+  }
+
+  let dataToSign = '';
+  for (const prop of properties) {
+    if (typeof prop !== 'string' || !/^[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$/.test(prop)) {
+      throw new Error(`Ruta de firma Wompi inválida: ${prop}`);
+    }
+
+    let value = body.data;
+    for (const key of prop.split('.')) {
+      if (value === null || typeof value !== 'object'
+        || !Object.prototype.hasOwnProperty.call(value, key)) {
+        throw new Error(`Propiedad de firma Wompi no encontrada: ${prop}`);
+      }
+      value = value[key];
+    }
+    dataToSign += String(value);
+  }
+
+  return crypto
+    .createHash('sha256')
+    .update(dataToSign + String(body.timestamp) + secret)
+    .digest('hex');
+}
+
+function verifyWompiSignature(body, receivedSignature, secret) {
+  if (typeof receivedSignature !== 'string' || !/^[a-f0-9]{64}$/i.test(receivedSignature)) {
+    return false;
+  }
+
+  const expectedSignature = computeWompiChecksum(body, secret);
+  return crypto.timingSafeEqual(
+    Buffer.from(expectedSignature, 'hex'),
+    Buffer.from(receivedSignature, 'hex')
+  );
+}
+
+function mustChargeDirectBookingIva(decoded) {
+  if (decoded?.isColombian !== undefined || decoded?.isBusiness !== undefined) {
+    return Boolean(decoded.isColombian || decoded.isBusiness);
+  }
+
+  const cleanPhone = sanitizePhone(decoded?.phone).replace(/\s+/g, '');
+  return cleanPhone.startsWith('+57')
+    || cleanPhone.startsWith('57')
+    || (cleanPhone.length === 10 && cleanPhone.startsWith('3'));
+}
+
+function directBookingPricing(decoded, paidAmount) {
+  const mustPayIva = mustChargeDirectBookingIva(decoded);
+  const ivaAmount = Math.round(paidAmount * 0.19);
+  return {
+    mustPayIva,
+    ivaAmount,
+    ivaNote: mustPayIva
+      ? `POR COBRAR EN ALOJAMIENTO (${ivaAmount})`
+      : `EXENTO PRELIMINAR - validar documento y motivo; si no corresponde, cobrar IVA (${ivaAmount})`,
+    roomPrice: mustPayIva ? Math.round(paidAmount * 1.19) : paidAmount
+  };
+}
+
 // Helper to obfuscate base64 references for logs
 function obfuscateReference(ref) {
   if (!ref || typeof ref !== 'string') return '';
@@ -281,13 +346,31 @@ function buildQuoteRooms(quote, roomDetails) {
 // Handle a Wompi payment whose reference is a stored quote id (COT-...).
 // Loads the quote, verifies the amount, creates the OTASync reservation and
 // marks the quote as 'aceptada'. Returns a Netlify response object.
-async function handleQuotePayment(transaction, corsHeaders) {
+async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
+  const deps = {
+    getQuoteStore,
+    loadQuote,
+    saveQuote,
+    effectiveStatus,
+    computeQuoteTotal,
+    releaseHold,
+    getAvailabilityByType,
+    findUnavailable,
+    buildExtrasFromQuote,
+    sendEmail,
+    adminEmail,
+    paymentConfirmationHtml,
+    adminPendingHtml,
+    getSessionKey,
+    fetch,
+    ...overrides
+  };
   const quoteId = transaction.reference;
 
   let store, quote;
   try {
-    store = getQuoteStore();
-    quote = await loadQuote(store, quoteId);
+    store = deps.getQuoteStore();
+    quote = await deps.loadQuote(store, quoteId);
   } catch (e) {
     console.error('[wompi-webhook] quote store unavailable:', e.message);
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Quote store unavailable; logged for manual follow-up' }) };
@@ -303,14 +386,14 @@ async function handleQuotePayment(transaction, corsHeaders) {
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ received: true, duplicate: true }) };
   }
 
-  const status = effectiveStatus(quote);
+  const status = deps.effectiveStatus(quote);
   if (status === 'cancelada' || status === 'vencida') {
     console.error(`[wompi-webhook] paid transaction ${transaction.id} for ${status} quote ${quoteId}. Manual follow-up required.`);
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: `Quote is ${status}; logged for manual follow-up` }) };
   }
 
   // Verify the paid amount matches the server-computed total (anti-tampering).
-  const { totalCents } = computeQuoteTotal(quote);
+  const { totalCents } = deps.computeQuoteTotal(quote);
   const paidCents = transaction.amount_in_cents;
   if (Math.abs(paidCents - totalCents) > 100) {
     console.error(`[wompi-webhook] amount mismatch for quote ${quoteId}: paid=${paidCents} expected=${totalCents}, tx=${transaction.id}. Reservation NOT created; manual follow-up required.`);
@@ -336,7 +419,7 @@ async function handleQuotePayment(transaction, corsHeaders) {
     quote.transactionId = transaction.id;
     quote.bookingCodes = [];
     quote.updatedAt = now;
-    try { await saveQuote(store, quote); } catch (e) { /* non-fatal */ }
+    try { await deps.saveQuote(store, quote); } catch (e) { /* non-fatal */ }
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, mock: true, quoteId }) };
   }
 
@@ -346,7 +429,7 @@ async function handleQuotePayment(transaction, corsHeaders) {
   // reservation (and so the availability check below doesn't see our own hold).
   if (hasHold) {
     for (const holdId of quote.holdReservationIds) {
-      try { await releaseHold(holdId); } catch (e) { console.error('[wompi-webhook] releaseHold failed for', quoteId, holdId, e.message); }
+      try { await deps.releaseHold(holdId); } catch (e) { console.error('[wompi-webhook] releaseHold failed for', quoteId, holdId, e.message); }
     }
     quote.holdReservationIds = [];
   }
@@ -356,9 +439,9 @@ async function handleQuotePayment(transaction, corsHeaders) {
   // overbook: mark paid but leave the reservation pending for manual handling.
   if (!hasHold && quote.checkin && quote.checkout) {
     try {
-      const { availByType, isMock } = await getAvailabilityByType(quote.checkin, quote.checkout);
+      const { availByType, isMock } = await deps.getAvailabilityByType(quote.checkin, quote.checkout);
       if (!isMock) {
-        const shortfalls = findUnavailable(quote.items, availByType);
+        const shortfalls = deps.findUnavailable(quote.items, availByType);
         if (shortfalls.length > 0) {
           console.error(`[wompi-webhook] PAID but UNAVAILABLE for quote ${quoteId}, tx ${transaction.id}: ${JSON.stringify(shortfalls)}. Reservation NOT created; manual handling required.`);
           quote.status = 'aceptada';
@@ -369,12 +452,12 @@ async function handleQuotePayment(transaction, corsHeaders) {
           quote.availabilityOk = false;
           quote.unavailable = shortfalls;
           quote.updatedAt = now;
-          try { await saveQuote(store, quote); } catch (e) { /* non-fatal */ }
+          try { await deps.saveQuote(store, quote); } catch (e) { /* non-fatal */ }
           try {
-            await sendEmail({
-              to: adminEmail(),
+            await deps.sendEmail({
+              to: deps.adminEmail(),
               subject: `⚠ Pago sin reserva — ${quoteId}`,
-              html: adminPendingHtml({ quote, transactionId: transaction.id, shortfalls })
+              html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls })
             });
           } catch (e) { console.error('[wompi-webhook] admin alert email failed:', e.message); }
           return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
@@ -389,12 +472,12 @@ async function handleQuotePayment(transaction, corsHeaders) {
       quote.reservationPending = true;
       quote.availabilityOk = false;
       quote.updatedAt = now;
-      try { await saveQuote(store, quote); } catch (saveErr) { console.error('[wompi-webhook] failed to mark pending:', saveErr.message); }
+      try { await deps.saveQuote(store, quote); } catch (saveErr) { console.error('[wompi-webhook] failed to mark pending:', saveErr.message); }
       try {
-        await sendEmail({
-          to: adminEmail(),
+        await deps.sendEmail({
+          to: deps.adminEmail(),
           subject: `Pago pendiente de verificación — ${quoteId}`,
-          html: adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [{ reason: 'availability_check_failed' }] })
+          html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [{ reason: 'availability_check_failed' }] })
         });
       } catch (mailErr) { console.error('[wompi-webhook] admin alert email failed:', mailErr.message); }
       return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
@@ -411,12 +494,12 @@ async function handleQuotePayment(transaction, corsHeaders) {
     quote.bookingCodes = [];
     quote.reservationPending = true;
     quote.updatedAt = now;
-    try { await saveQuote(store, quote); } catch (e) { /* non-fatal */ }
+    try { await deps.saveQuote(store, quote); } catch (e) { /* non-fatal */ }
     try {
-      await sendEmail({
-        to: adminEmail(),
+      await deps.sendEmail({
+        to: deps.adminEmail(),
         subject: `⚠ Pago sin reserva — ${quoteId}`,
-        html: adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [] })
+        html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [] })
       });
     } catch (e) { console.error('[wompi-webhook] admin alert email failed:', e.message); }
     console.error(`[wompi-webhook] reservation ${reason} for quote ${quoteId}, tx ${transaction.id}; marked reservationPending.`);
@@ -431,14 +514,14 @@ async function handleQuotePayment(transaction, corsHeaders) {
 
   let pkey;
   try {
-    pkey = await getSessionKey(token, username, password);
+    pkey = await deps.getSessionKey(token, username, password);
   } catch (e) {
     return await recordPending('auth failed: ' + e.message);
   }
 
   const rooms = buildQuoteRooms(quote, roomDetails);
   const roomsPrice = rooms.reduce((s, r) => s + r.total_price, 0);
-  const { extras: quoteExtras, extrasPrice } = buildExtrasFromQuote(quote);
+  const { extras: quoteExtras, extrasPrice } = deps.buildExtrasFromQuote(quote);
   const totalGuests = quote.numPersonas || rooms.length || 1;
 
   const contacto = (quote.contacto || quote.empresa || 'Empresa').trim();
@@ -507,7 +590,7 @@ async function handleQuotePayment(transaction, corsHeaders) {
 
   let response;
   try {
-    response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
+    response = await deps.fetch('https://app.otasync.me/api/reservation/insert/reservation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(reservationPayload),
@@ -537,15 +620,15 @@ async function handleQuotePayment(transaction, corsHeaders) {
   quote.bookingCodes = [bookingCode];
   quote.reservationPending = false;
   quote.updatedAt = now;
-  try { await saveQuote(store, quote); } catch (e) { console.error('[wompi-webhook] failed to mark quote accepted:', e.message); }
+  try { await deps.saveQuote(store, quote); } catch (e) { console.error('[wompi-webhook] failed to mark quote accepted:', e.message); }
 
   try {
     if (quote.email) {
-      await sendEmail({
+      await deps.sendEmail({
         to: quote.email,
-        cc: adminEmail(),
+        cc: deps.adminEmail(),
         subject: `Reserva confirmada ${bookingCode} — Hotel Estar`,
-        html: paymentConfirmationHtml({ quote, bookingCode, total: paidAmount })
+        html: deps.paymentConfirmationHtml({ quote, bookingCode, total: paidAmount })
       });
     }
   } catch (e) { console.error('[wompi-webhook] confirmation email failed:', e.message); }
@@ -616,40 +699,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    const ALLOWED_SIGNATURE_PROPERTIES = [
-      'transaction.id',
-      'transaction.status',
-      'transaction.amount_in_cents',
-      'transaction.currency',
-      'transaction.payment_method_type',
-      'transaction.reference'
-    ];
-    const properties = body.signature.properties;
-    let dataToSign = "";
-    properties.forEach(prop => {
-      if (!ALLOWED_SIGNATURE_PROPERTIES.includes(prop)) {
-        console.error(`Unexpected signature property: ${prop}`);
-        return; // skip unknown properties
-      }
-      const keys = prop.split('.');
-      let value = body.data;
-      keys.forEach(k => {
-        if (value) value = value[k];
-      });
-      dataToSign += value;
-    });
-
-    dataToSign += body.timestamp;
-    dataToSign += WOMPI_WEBHOOK_SECRET;
-
-    const expectedSignature = crypto
-      .createHash('sha256')
-      .update(dataToSign)
-      .digest('hex');
-
-    const receivedBuf = Buffer.from(String(receivedSignature), 'hex');
-    const expectedBuf = Buffer.from(expectedSignature, 'hex');
-    if (receivedBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(receivedBuf, expectedBuf)) {
+    if (!verifyWompiSignature(body, String(receivedSignature), WOMPI_WEBHOOK_SECRET)) {
       console.error("Wompi signature verification failed");
       return {
         statusCode: 401,
@@ -840,19 +890,7 @@ exports.handler = async (event, context) => {
     
     // Determine IVA: use flags encoded in reference first (set by front-end),
     // then fall back to phone heuristic to match front-end logic exactly.
-    let mustPayIva;
-    if (decoded.isColombian !== undefined || decoded.isBusiness !== undefined) {
-      mustPayIva = !!(decoded.isColombian || decoded.isBusiness);
-    } else {
-      const cleanPhone = sanitizePhone(decoded.phone).replace(/\s+/g, '');
-      mustPayIva = cleanPhone.startsWith('+57') || cleanPhone.startsWith('57') || (cleanPhone.length === 10 && cleanPhone.startsWith('3'));
-    }
-
-    const ivaAmount = Math.round(paidAmount * 0.19);
-    const ivaNote = mustPayIva
-      ? `POR COBRAR EN ALOJAMIENTO (${ivaAmount})`
-      : `EXENTO PRELIMINAR - validar documento y motivo; si no corresponde, cobrar IVA (${ivaAmount})`;
-    const roomPrice = mustPayIva ? Math.round(paidAmount * 1.19) : paidAmount;
+    const { ivaAmount, ivaNote, roomPrice } = directBookingPricing(decoded, paidAmount);
     const avgPrice = Math.round(roomPrice / nights);
 
     // Build the night-by-night breakdown array
@@ -1032,4 +1070,15 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ error: 'Failed to create booking in PMS; admin alerted for manual follow-up.' })
     };
   }
+};
+
+exports._test = {
+  decodeReference,
+  sanitizePhone,
+  escapeHtml,
+  computeWompiChecksum,
+  verifyWompiSignature,
+  mustChargeDirectBookingIva,
+  directBookingPricing,
+  handleQuotePayment
 };
