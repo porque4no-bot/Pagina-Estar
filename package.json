@@ -4,12 +4,18 @@
   "description": "Hotel Estar booking engine assets and build scripts.",
   "scripts": {
     "build": "node build.js",
-    "dev": "esbuild motor-app.jsx --outfile=motor-app.js --watch"
+    "dev": "esbuild motor-app.jsx --outfile=motor-app.js --watch",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "npm run build && node --test tests/unit/*.test.js",
+    "test:e2e": "npm run build && playwright test",
+    "test:smoke": "npm run build && playwright test tests/e2e/site.spec.js --project=chromium-desktop",
+    "test:report": "playwright show-report"
   },
   "dependencies": {
     "@netlify/blobs": "^8.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "esbuild": "^0.28.0",
     "sharp": "^0.34.5",
     "ttf2woff2": "8.0.1"

@@ -240,11 +240,28 @@
       const field = $(`[name="${name}"]`);
       if (!field) return;
       if (field.tagName === 'SELECT') {
-        const normalized = String(value).toLowerCase();
-        const option = Array.from(field.options).find(item =>
-          normalized.includes(item.value.toLowerCase()) ||
-          item.value.toLowerCase().includes(normalized)
-        );
+        const normalizeOption = input => String(input || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, ' ')
+          .trim();
+        const documentAliases = {
+          passport: 'pasaporte',
+          id: 'documento nacional',
+          'id card': 'documento nacional',
+          'identity card': 'documento nacional',
+          'national id': 'documento nacional'
+        };
+        const normalized = normalizeOption(value);
+        const comparable = documentAliases[normalized] || normalized;
+        const option = Array.from(field.options).find(item => {
+          const candidate = normalizeOption(item.value);
+          if (!candidate) return false;
+          return candidate === comparable ||
+            comparable.includes(candidate) ||
+            candidate.includes(comparable);
+        });
         if (option) field.value = option.value;
       } else if (!field.value) {
         field.value = value;
@@ -441,6 +458,7 @@
     if (data) {
       state.cart = {};
       renderCart();
+      $('#guestCart').hidden = true;
       if (data.paymentUrl) window.location.href = data.paymentUrl;
     }
   }

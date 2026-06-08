@@ -15,6 +15,14 @@ npm run build
 # Dev: watch mode for motor-app.jsx only (recompiles to motor-app.js on save)
 npm run dev
 
+# Full validation: structural/backend tests plus Playwright desktop/mobile flows
+npm test
+
+# Individual test layers
+npm run test:unit
+npm run test:e2e
+npm run test:smoke
+
 # Local static server: serves the ROOT directory on port 3400
 node server.js
 
@@ -22,7 +30,7 @@ node server.js
 netlify dev
 ```
 
-There are no tests or linters configured.
+Tests use Node's built-in test runner for structural/backend checks and Playwright for browser flows. The same suite runs in `.github/workflows/tests.yml` on pushes and pull requests. See `docs/testing.md` for the manual production matrix and release criteria.
 
 ## Architecture
 
