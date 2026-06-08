@@ -283,15 +283,15 @@ function inlineLucideIcons(html) {
 async function build() {
   // Minify CSS files with esbuild
   console.log('Minifying CSS files...');
-  const cssFiles = ['styles.css', 'colors_and_type.css'];
+  const cssFiles = ['styles.css', 'colors_and_type.css', 'guest-app.css'];
   for (const cssFile of cssFiles) {
     const css = fs.readFileSync(path.join(rootDir, cssFile), 'utf8');
     const result = await esbuild.transform(css, { loader: 'css', minify: true });
     fs.writeFileSync(path.join(distDir, cssFile), result.code);
   }
 
-  console.log('Minifying shell.js and kunas.js...');
-  const jsFilesToMinify = ['shell.js', 'kunas.js'];
+  console.log('Minifying shell.js, kunas.js and guest-app.js...');
+  const jsFilesToMinify = ['shell.js', 'kunas.js', 'guest-app.js'];
   for (const jsFile of jsFilesToMinify) {
     const js = fs.readFileSync(path.join(rootDir, jsFile), 'utf8');
     const result = await esbuild.transform(js, { loader: 'js', minify: true });
