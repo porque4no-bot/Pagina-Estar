@@ -320,18 +320,17 @@ exports.handler = async (event, context) => {
   const diffTime = checkoutDate - checkinDate;
   const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-  // Apply rate: flexible adds 10% to base price
-  const basePrice = roomRecord.basePrice;
-  const roomPrice = roomRate === 'flexible' ? Math.round(basePrice * 1.10) * nights : basePrice * nights;
-  const avgPrice = Math.round(roomPrice / nights);
+  // Use actual paid amount from OTASync dynamic pricing (via Wompi)
+  const roomPrice = parseFloat(paidAmount) || 0;
+  const avgPrice = nights > 0 ? Math.round(roomPrice / nights) : roomPrice;
 
   // Read environment variables
   const token = process.env.OTASYNC_TOKEN || '';
   const username = process.env.OTASYNC_USERNAME || '';
   const password = process.env.OTASYNC_PASSWORD || '';
   const propertyId = process.env.OTASYNC_PROPERTY_ID || '9889';
-  const channelId = process.env.OTASYNC_USE_CHANNEL === 'true' ? (process.env.OTASYNC_CHANNEL_ID || '') : '';
-  const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Private reservation';
+  const channelId = process.env.OTASYNC_CHANNEL_ID || '66483';
+  const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Pagina web';
 
   const hasCredentials = token && username && password;
 
@@ -404,11 +403,45 @@ exports.handler = async (event, context) => {
       }
     }
 
+    // Check if wompi-webhook already registered this reservation (prevents duplicate OTASync insertion)
+    if (decodedRef && decodedRef.bookingCode) {
+      try {
+        const resultStore = getStore({ name: 'booking-results', consistency: 'strong' });
+        const cached = await resultStore.get(`direct-${decodedRef.bookingCode}`);
+        if (cached) {
+          const cachedData = JSON.parse(cached);
+          if (process.env.DEBUG) console.log(`[create-booking] Booking ${decodedRef.bookingCode} already in booking-results (created by webhook). Returning cached.`);
+          const cachedResult = {
+            success: true,
+            bookingCode: cachedData.bookingCode,
+            isMock: false,
+            reservation: {
+              code: cachedData.bookingCode,
+              guestName: `${firstName} ${lastName}`,
+              email,
+              roomName: roomRecord.name,
+              checkin,
+              checkout,
+              nights,
+              totalPrice: roomPrice,
+              status: 'Confirmed'
+            }
+          };
+          if (blobStore) {
+            try { await blobStore.set(idempKey, JSON.stringify(cachedResult), { ttl: 86400 }); } catch (e) { /* non-fatal */ }
+          }
+          return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(cachedResult) };
+        }
+      } catch (e) {
+        if (process.env.DEBUG) console.warn('[create-booking] booking-results store check failed:', e.message);
+      }
+    }
+
     const paymentInfo = [];
     if (paymentDetails && (paymentDetails.status === 'APPROVED' || paymentDetails.status === 'PENDING')) {
       paymentInfo.push({
         amount: parseFloat(paidAmount || roomPrice),
-        date_payment: new Date().toISOString().split('T')[0],
+        payment_date: new Date().toISOString().split('T')[0],
         payment_method: 'card',
         note: `Wompi ID: ${paymentDetails.id}, Ref: ${cleanReference}, Status: ${paymentDetails.status}`
       });
@@ -434,7 +467,7 @@ exports.handler = async (event, context) => {
           adults: parseInt(guestsCount) || 1,
           seniors: 0,
           extras: [],
-          payments: paymentInfo,
+          payments: [],
           overbooking: 0,
           nights: nightsArray
         }
@@ -443,6 +476,7 @@ exports.handler = async (event, context) => {
         {
           first_name: firstName,
           last_name: lastName,
+          email: email,
           id_guests: 0,
           guest_type: "adults"
         }
@@ -476,7 +510,9 @@ exports.handler = async (event, context) => {
       id_contigents: 0,
       date_arrival: checkin,
       date_departure: checkout,
-      ...(channelId ? { id_channels: channelId, channel: channelName } : {}),
+      guest_email: email,
+      id_channels: channelId,
+      channel: channelName,
       note: `Teléfono: ${phone.replace(/[^\d+\s]/g, '').trim().substring(0, 20)}. Notas: ${(notes || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0, 500) || 'Ninguna'}`
     };
 
@@ -506,6 +542,7 @@ exports.handler = async (event, context) => {
     }
 
     const data = await response.json();
+    console.log(`[create-booking] OTASync insert response: ${JSON.stringify(data)}`);
 
     // Check if reservation insertion was successful in Kunas response
     const bookingCode = data.id_reservations || cleanReference || `ESTAR-PMS-${Date.now().toString().slice(-6)}`;
@@ -533,6 +570,14 @@ exports.handler = async (event, context) => {
       } catch (e) {
         if (process.env.DEBUG) console.warn('[idempotency] Failed to cache booking result:', e.message);
       }
+    }
+
+    // Store result so wompi-webhook knows not to duplicate this reservation
+    if (decodedRef && decodedRef.bookingCode) {
+      try {
+        const resultStore = getStore({ name: 'booking-results', consistency: 'strong' });
+        await resultStore.set(`direct-${decodedRef.bookingCode}`, JSON.stringify({ bookingCode }), { ttl: 86400 * 7 });
+      } catch (e) { /* non-fatal */ }
     }
 
     return {

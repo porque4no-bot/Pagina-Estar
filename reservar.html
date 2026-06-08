@@ -647,12 +647,10 @@
       amenities:[{icon:'sun',l:'Terraza privada'},{icon:'wifi',l:'WiFi fibra'},{icon:'tv',l:'Smart TV 65"'},{icon:'cooking-pot',l:'Cocina premium'},{icon:'users',l:'Hasta 4 personas'}]}
   ];
   const BE_EXTRAS = [
-    { id:'desayuno', name:'Desayuno', desc:'Café, fruta y huevos cada mañana', price:28000, unit:'/persona/noche', icon:'coffee' },
+    { id:'desayuno', name:'Desayuno', desc:'Café, fruta y huevos cada mañana', price:20000, unit:'/persona/noche', icon:'coffee' },
     { id:'parqueadero', name:'Parqueadero', desc:'Garaje cubierto en el edificio', price:25000, unit:'/noche', icon:'car' },
-    { id:'late', name:'Late check-out', desc:'Salida hasta las 3:00 pm (sujeto a disponibilidad)', price:45000, unit:'por reserva', icon:'clock' },
-    { id:'early', name:'Early check-in', desc:'Entrada desde las 10:00 am (sujeto a disponibilidad)', price:35000, unit:'por reserva', icon:'sunrise' },
-    { id:'traslado', name:'Traslado aeropuerto', desc:'Hacia o desde La Nubia', price:95000, unit:'por trayecto', icon:'plane' },
-    { id:'tour', name:'Tour Manizales', desc:'4 horas con guía local certificado', price:80000, unit:'/persona', icon:'map-pin' }
+    { id:'late', name:'Late check-out', desc:'Salida hasta las 3:00 pm (sujeto a disponibilidad)', price:60000, unit:'por reserva', icon:'clock' },
+    { id:'early', name:'Early check-in', desc:'Entrada desde las 10:00 am (sujeto a disponibilidad)', price:50000, unit:'por reserva', icon:'sunrise' }
   ];
   const BE_PAYMENTS = [
     { id:'wompi', name:'Pago en línea seguro (Wompi)', desc:'Tarjeta de crédito, PSE, Nequi', icon:'credit-card' }
@@ -670,12 +668,10 @@
     const nightly=rate==='best'?room.priceFlexible:Math.round(room.priceFlexible/0.9);
     const roomSub=nightly*nights;
     let ex=0;
-    if(extras.desayuno)ex+=28000*search.guests*nights;
+    if(extras.desayuno)ex+=20000*search.guests*nights;
     if(extras.parqueadero)ex+=25000*nights;
-    if(extras.late)ex+=45000;
-    if(extras.early)ex+=35000;
-    if(extras.traslado)ex+=95000;
-    if(extras.tour)ex+=80000*search.guests;
+    if(extras.late)ex+=60000;
+    if(extras.early)ex+=50000;
     const sub=roomSub+ex,iva=Math.round(sub*.19);
     return{nights,nightly,roomSub,extrasSub:ex,subtotal:sub,iva,total:sub+iva};
   }

@@ -195,10 +195,12 @@ exports.handler = async (event, context) => {
       };
     }
 
+    const extraGuestSurchargeMock = Math.max(0, guests - 1) * 31000;
     const mockRooms = Object.keys(roomDetails).map(id => {
       const details = roomDetails[id];
-      const totalPrice = details.basePrice * nights;
-      
+      const mockPrice = 195000 + extraGuestSurchargeMock;
+      const totalPrice = mockPrice * nights;
+
       // Calculate daily price details
       const dailyPrices = [];
       for (let i = 0; i < nights; i++) {
@@ -207,7 +209,7 @@ exports.handler = async (event, context) => {
         const dateStr = d.toISOString().split('T')[0];
         dailyPrices.push({
           date: dateStr,
-          price: details.basePrice
+          price: mockPrice
         });
       }
 
@@ -224,7 +226,7 @@ exports.handler = async (event, context) => {
         gallery: details.gallery,
         available: guests <= details.capacity,
         totalPrice: totalPrice,
-        avgPrice: details.basePrice,
+        avgPrice: mockPrice,
         nights: nights,
         dailyPrices: dailyPrices,
         currency: 'COP'
@@ -305,8 +307,7 @@ exports.handler = async (event, context) => {
         area: otaRoom.area ? `${otaRoom.area} m²` : "30 m²",
         view: "Ciudad",
         image: "assets/photos/tipo1/1.webp",
-        gallery: ["assets/photos/tipo1/1.webp"],
-        basePrice: 195000
+        gallery: ["assets/photos/tipo1/1.webp"]
       };
 
       // Check room availability (avail is the units count)
@@ -332,13 +333,16 @@ exports.handler = async (event, context) => {
       let avgPrice = 0;
       let totalPrice = 0;
 
+      // Additional guest surcharge: $31,000/night per person beyond the first
+      const extraGuestSurcharge = Math.max(0, guests - 1) * 31000;
+
       if (count > 0) {
-        avgPrice = totalAmount / count;
-        totalPrice = totalAmount;
-      } else if (otaRoom.price) {
-        avgPrice = parseFloat(otaRoom.price);
+        avgPrice = totalAmount / count + extraGuestSurcharge;
         totalPrice = avgPrice * nights;
-        
+      } else if (otaRoom.price) {
+        avgPrice = parseFloat(otaRoom.price) + extraGuestSurcharge;
+        totalPrice = avgPrice * nights;
+
         // Populate dummy daily prices for display consistency
         for (let i = 0; i < nights; i++) {
           const d = new Date(checkinDate);
@@ -347,7 +351,7 @@ exports.handler = async (event, context) => {
           dailyPrices.push({ date: dateStr, price: avgPrice });
         }
       } else {
-        avgPrice = details.basePrice || 195000;
+        avgPrice = 195000 + extraGuestSurcharge;
         totalPrice = avgPrice * nights;
         
         for (let i = 0; i < nights; i++) {

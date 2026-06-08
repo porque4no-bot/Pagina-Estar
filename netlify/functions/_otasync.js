@@ -13,8 +13,8 @@ function otasyncCreds() {
     username: process.env.OTASYNC_USERNAME || '',
     password: process.env.OTASYNC_PASSWORD || '',
     propertyId: process.env.OTASYNC_PROPERTY_ID || '9889',
-    channelId: process.env.OTASYNC_USE_CHANNEL === 'true' ? (process.env.OTASYNC_CHANNEL_ID || '') : '',
-    channelName: process.env.OTASYNC_CHANNEL_NAME || 'Private reservation'
+    channelId: process.env.OTASYNC_CHANNEL_ID || '66483',
+    channelName: process.env.OTASYNC_CHANNEL_NAME || 'Pagina web'
   };
 }
 
@@ -324,7 +324,7 @@ async function createConfirmedReservation(quote, opts) {
   const providerLabel = opts.paymentProvider || 'payment';
   const payments = [{
     amount: paidAmount,
-    date_payment: new Date().toISOString().split('T')[0],
+    payment_date: new Date().toISOString().split('T')[0],
     payment_method: 'card',
     note: `Cotización: ${quote.quoteId}${opts.transactionId ? ', ' + providerLabel + ' ID: ' + opts.transactionId : ''}, Status: APPROVED`
   }];
