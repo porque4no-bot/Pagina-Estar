@@ -12,6 +12,11 @@
 [functions."revalidate-quotes"]
   schedule = "0 */6 * * *"
 
+# Reconcile Wompi APPROVED transactions against processed-transactions blob
+# to catch payments whose webhook never landed. Runs every 30 minutes.
+[functions."reconcile-payments"]
+  schedule = "*/30 * * * *"
+
 [build.environment]
   NODE_VERSION = "20"
   # The Firebase web apiKey is public by design (it ships in client-side HTML);
