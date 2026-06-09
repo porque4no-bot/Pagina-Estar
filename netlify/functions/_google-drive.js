@@ -29,8 +29,19 @@ function rootFolderId() {
 function getSecretsStore() {
   try {
     const { getStore } = require('@netlify/blobs');
-    return getStore({ name: SECRETS_STORE, consistency: 'strong' });
-  } catch (e) { return null; }
+    const opts = { name: SECRETS_STORE, consistency: 'strong' };
+    /* Explicit credentials are required when the Blobs auto-discovery doesn't
+       kick in (e.g. esbuild-bundled functions on certain Netlify build paths).
+       BLOBS_TOKEN + NETLIFY_SITE_ID are already configured in this project. */
+    if (process.env.BLOBS_TOKEN && process.env.NETLIFY_SITE_ID) {
+      opts.token = process.env.BLOBS_TOKEN;
+      opts.siteID = process.env.NETLIFY_SITE_ID;
+    }
+    return getStore(opts);
+  } catch (e) {
+    console.error('[_google-drive] Blobs unavailable:', e.message);
+    return null;
+  }
 }
 
 async function readBlobCredentials() {
