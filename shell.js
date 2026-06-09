@@ -1,9 +1,12 @@
 /* ============================================================
    Hotel Estar — Shell behaviors
    - Header scroll state
-   - Tweaks panel (brand color, language, density, video on/off, variant)
-   - Custom star cursor on hero
+   - Mobile menu
    - Scroll reveal
+   - Star cursor on hero
+   - i18n (URL-derived language)
+   - Header language toggle
+   - Contact float, booking bar scroll, room sliders, etc.
    ============================================================ */
 
 (function () {
@@ -90,47 +93,11 @@
   }
 
   /* ============================================================
-     TWEAKS — Three expressive axes
-     · Atmósfera   (Amanecer / Mediodía / Crepúsculo / Bruma)
-     · Voz         (Susurro / Conversación / Manifiesto)
-     · Textura     (Lisa / Grano / Sello)
-     · Idioma      (ES / EN) — supporting toggle
+     i18n — Language is derived from the URL.
+     Root pages (/) are Spanish; pages under /en/ are English.
      ============================================================ */
 
-  const STORE_KEY = 'estar-tweaks';
-  const defaults = (typeof TWEAK_DEFAULTS !== 'undefined') ? TWEAK_DEFAULTS : {
-    atmosphere: 'mediodia',
-    voice: 'conversacion',
-    texture: 'lisa',
-    language: 'es'
-  };
-  let tweaks = { ...defaults };
-  try {
-    const stored = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
-    tweaks = { ...defaults, ...stored };
-  } catch (e) {}
-
-  // Language is always derived from the URL, never from localStorage.
-  // Root pages (/) are Spanish; pages under /en/ are English.
   const pageLang = window.location.pathname.startsWith('/en/') ? 'en' : 'es';
-  tweaks.language = pageLang;
-
-  const ATMOSPHERE_LABEL = {
-    amanecer: 'Amanecer',
-    mediodia: 'Mediodía',
-    crepusculo: 'Crepúsculo',
-    bruma: 'Bruma'
-  };
-  const VOICE_LABEL = {
-    susurro: 'Susurro',
-    conversacion: 'Conversación',
-    manifiesto: 'Manifiesto'
-  };
-  const TEXTURE_LABEL = {
-    lisa: 'Lisa',
-    grano: 'Grano',
-    sello: 'Sello'
-  };
 
   const i18n = {
     es: {
@@ -245,7 +212,7 @@
       form_politica: 'Acepto la <a href="privacidad.html" target="_blank">Política de Privacidad</a> e información de Habeas Data corporativo.',
       form_enviar: 'Enviar solicitud <span aria-hidden="true">→</span>',
       cookie_title: 'Control de Cookies',
-      cookie_desc: 'Utilizamos cookies esenciales para recordar tus preferencias (idioma y atmósfera) y analíticas para optimizar el sitio. Puedes aceptar o rechazar las de análisis.',
+      cookie_desc: 'Utilizamos cookies esenciales para recordar tus preferencias y analíticas para optimizar el sitio. Puedes aceptar o rechazar las de análisis.',
       cookie_accept: 'Aceptar',
       cookie_reject: 'Rechazar',
       cookie_policy: 'Política de Cookies'
@@ -362,20 +329,15 @@
       form_politica: 'I accept the <a href="privacidad.html" target="_blank">Privacy Policy</a> and corporate Habeas Data terms.',
       form_enviar: 'Send request <span aria-hidden="true">→</span>',
       cookie_title: 'Cookie Preferences',
-      cookie_desc: 'We use essential cookies to remember your preferences (language and atmosphere) and analytics to optimize our site. You can accept or reject analytics.',
+      cookie_desc: 'We use essential cookies to remember your preferences and analytics to optimize our site. You can accept or reject analytics.',
       cookie_accept: 'Accept',
       cookie_reject: 'Reject',
       cookie_policy: 'Cookies Policy'
     }
   };
 
-  function applyTweaks() {
-    document.body.dataset.atmosphere = tweaks.atmosphere;
-    document.body.dataset.voice = tweaks.voice;
-    document.body.dataset.texture = tweaks.texture;
-
-    // Language
-    const lang = tweaks.language;
+  function applyI18n() {
+    const lang = pageLang;
     document.documentElement.lang = lang;
     document.querySelectorAll('[data-i18n]').forEach((el) => {
       const k = el.getAttribute('data-i18n');
@@ -419,150 +381,6 @@
     });
   }
 
-  function persist() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(tweaks)); } catch (e) {}
-    if (window.parent !== window) {
-      window.parent.postMessage({ type: '__edit_mode_set_keys', edits: tweaks }, '*');
-    }
-  }
-
-  /* ----- TWEAKS PANEL UI ----- */
-  function setupPanel() {
-    if (document.querySelector('.tweaks-panel-x')) return;
-
-    // Floating action button (reuse existing styling)
-    let fab = document.createElement('button');
-    fab.className = 'tweaks-fab';
-    fab.setAttribute('aria-label', 'Abrir panel de Tweaks');
-    fab.innerHTML = '<svg width="22" height="22" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true"><path d="M50 4 L60 38 L96 38 L66 60 L78 96 L50 74 L22 96 L34 60 L4 38 L40 38 Z"/></svg>';
-    document.body.appendChild(fab);
-
-    const panel = document.createElement('div');
-    panel.className = 'tweaks-panel-x';
-    panel.setAttribute('role', 'dialog');
-    panel.setAttribute('aria-label', 'Tweaks');
-    panel.innerHTML = `
-      <div class="px-head">
-        <span class="px-title">Tweaks</span>
-        <button class="px-close" aria-label="Cerrar">✕</button>
-      </div>
-
-      <div class="px-section with-labels">
-        <div class="px-section-label">
-          <span>Atmósfera</span>
-          <span class="now" data-now="atmosphere"></span>
-        </div>
-        <div class="px-tiles" data-key="atmosphere">
-          <button class="px-tile atm-amanecer"   data-value="amanecer"  aria-label="Amanecer"><span class="px-tile-name">Amanecer</span></button>
-          <button class="px-tile atm-mediodia"   data-value="mediodia"  aria-label="Mediodía"><span class="px-tile-name">Mediodía</span></button>
-          <button class="px-tile atm-crepusculo" data-value="crepusculo" aria-label="Crepúsculo"><span class="px-tile-name">Crepúsculo</span></button>
-          <button class="px-tile atm-bruma"      data-value="bruma"     aria-label="Bruma"><span class="px-tile-name">Bruma</span></button>
-        </div>
-      </div>
-
-      <div class="px-section with-labels">
-        <div class="px-section-label">
-          <span>Voz</span>
-          <span class="now" data-now="voice"></span>
-        </div>
-        <div class="px-tiles cols-3" data-key="voice">
-          <button class="px-tile voz voz-susurro"      data-value="susurro"      aria-label="Susurro"><span class="glyph">Aa</span><span class="px-tile-name">Susurro</span></button>
-          <button class="px-tile voz voz-conversacion" data-value="conversacion" aria-label="Conversación"><span class="glyph">Aa</span><span class="px-tile-name">Conversación</span></button>
-          <button class="px-tile voz voz-manifiesto"   data-value="manifiesto"   aria-label="Manifiesto"><span class="glyph">Aa</span><span class="px-tile-name">Manifiesto</span></button>
-        </div>
-      </div>
-
-      <div class="px-section with-labels">
-        <div class="px-section-label">
-          <span>Textura</span>
-          <span class="now" data-now="texture"></span>
-        </div>
-        <div class="px-tiles cols-3" data-key="texture">
-          <button class="px-tile tex tex-lisa"  data-value="lisa"  aria-label="Lisa"><span class="px-tile-name">Lisa</span></button>
-          <button class="px-tile tex tex-grano" data-value="grano" aria-label="Grano"><span class="px-tile-name">Grano</span></button>
-          <button class="px-tile tex tex-sello" data-value="sello" aria-label="Sello"><span class="px-tile-name">Sello</span></button>
-        </div>
-      </div>
-
-      <div class="px-lang">
-        <span class="lbl">Idioma</span>
-        <div class="seg" data-key="language">
-          <button data-value="es">ES</button>
-          <button data-value="en">EN</button>
-        </div>
-      </div>
-
-      <button class="px-reset" type="button">Restablecer</button>
-    `;
-    document.body.appendChild(panel);
-
-    fab.addEventListener('click', () => panel.classList.add('open'));
-    panel.querySelector('.px-close').addEventListener('click', () => {
-      panel.classList.remove('open');
-      if (window.parent !== window) {
-        window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
-      }
-    });
-
-    function refreshPanel() {
-      panel.querySelectorAll('[data-key]').forEach((group) => {
-        const k = group.getAttribute('data-key');
-        group.querySelectorAll('button').forEach((b) => {
-          b.classList.toggle('active', b.getAttribute('data-value') === tweaks[k]);
-        });
-      });
-      const nowAtm = panel.querySelector('[data-now="atmosphere"]');
-      const nowVoz = panel.querySelector('[data-now="voice"]');
-      const nowTex = panel.querySelector('[data-now="texture"]');
-      if (nowAtm) nowAtm.textContent = ATMOSPHERE_LABEL[tweaks.atmosphere] || '';
-      if (nowVoz) nowVoz.textContent = VOICE_LABEL[tweaks.voice] || '';
-      if (nowTex) nowTex.textContent = TEXTURE_LABEL[tweaks.texture] || '';
-    }
-    refreshPanel();
-
-    panel.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-key] button');
-      if (btn) {
-        const k = btn.parentElement.getAttribute('data-key');
-        if (k === 'language') {
-          const targetLang = btn.getAttribute('data-value');
-          if (targetLang !== tweaks.language) {
-            const path = window.location.pathname;
-            window.location.href = targetLang === 'en'
-              ? '/en' + (path === '/' ? '/' : path)
-              : (path.startsWith('/en/') ? path.slice(3) || '/' : path);
-          }
-          return;
-        }
-        tweaks[k] = btn.getAttribute('data-value');
-        applyTweaks();
-        persist();
-        refreshPanel();
-        return;
-      }
-      if (e.target.closest('.px-reset')) {
-        tweaks = { ...defaults };
-        tweaks.language = pageLang;
-        applyTweaks();
-        persist();
-        refreshPanel();
-      }
-    });
-
-    // Edit mode protocol
-    window.addEventListener('message', (e) => {
-      const d = e.data || {};
-      if (d.type === '__activate_edit_mode') {
-        fab.classList.add('show');
-      } else if (d.type === '__deactivate_edit_mode') {
-        fab.classList.remove('show');
-        panel.classList.remove('open');
-      }
-    });
-    if (window.parent !== window) {
-      window.parent.postMessage({ type: '__edit_mode_available' }, '*');
-    }
-  }
 
   /* ----- HEADER LANG TOGGLE ----- */
   function setupHeaderLangToggle() {
@@ -728,7 +546,7 @@
             i18n.es.loc_location_score = data.locationRating;
             i18n.en.loc_location_score = data.locationRating;
           }
-          applyTweaks();
+          applyI18n();
         }
       })
       .catch(err => {
@@ -783,8 +601,8 @@
       const tooltip = document.createElement('div');
       tooltip.className = 'contact-tooltip';
       tooltip.innerHTML = `
-        <span>${tweaks.language === 'en' ? 'Can we help you?' : '¿Te podemos ayudar?'}</span>
-        <button class="contact-tooltip-close" aria-label="${tweaks.language === 'en' ? 'Close' : 'Cerrar'}">
+        <span>${pageLang === 'en' ? 'Can we help you?' : '¿Te podemos ayudar?'}</span>
+        <button class="contact-tooltip-close" aria-label="${pageLang === 'en' ? 'Close' : 'Cerrar'}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
       `;
@@ -844,7 +662,7 @@
     banner.innerHTML = `
       <h4 data-i18n="cookie_title">Control de Cookies</h4>
       <p>
-        <span data-i18n="cookie_desc">Utilizamos cookies esenciales para recordar tus preferencias (idioma y atmósfera) y analíticas para optimizar el sitio. Puedes aceptar o rechazar las de análisis.</span>
+        <span data-i18n="cookie_desc">Utilizamos cookies esenciales para recordar tus preferencias y analíticas para optimizar el sitio. Puedes aceptar o rechazar las de análisis.</span>
         <a href="cookies.html" target="_blank" data-i18n="cookie_policy">Política de Cookies</a>.
       </p>
       <div class="cookie-banner-actions">
@@ -950,7 +768,7 @@
         if (submitButton) {
           submitButton.disabled = true;
           originalButtonHtml = submitButton.innerHTML;
-          const lang = tweaks.language || 'es';
+          const lang = pageLang || 'es';
           submitButton.textContent = lang === 'en' ? 'Sending...' : 'Enviando...';
         }
         
@@ -974,7 +792,7 @@
             throw new Error(`Server returned status ${response.status}`);
           }
           
-          const lang = tweaks.language || 'es';
+          const lang = pageLang || 'es';
           
           if (form.classList.contains('contact-form')) {
             form.style.opacity = '0.6';
@@ -1004,7 +822,7 @@
             submitButton.disabled = false;
             submitButton.innerHTML = originalButtonHtml;
           }
-          alert(tweaks.language === 'en' 
+          alert(pageLang === 'en' 
             ? 'There was an error sending your message. Please try again or contact us via WhatsApp.' 
             : 'Ocurrió un error al enviar tu mensaje. Por favor intenta de nuevo o escríbenos por WhatsApp.'
           );
@@ -1022,7 +840,7 @@
     skip.id = 'skip-to-content';
     skip.href = '#main-content';
     skip.className = 'skip-link';
-    skip.textContent = tweaks.language === 'en' ? 'Skip to main content' : 'Saltar al contenido principal';
+    skip.textContent = pageLang === 'en' ? 'Skip to main content' : 'Saltar al contenido principal';
     document.body.insertBefore(skip, document.body.firstChild);
   }
 
@@ -1043,8 +861,7 @@
       injectSkipLink();
       markMainContent();
       setupCookieConsent();
-      applyTweaks();
-      setupPanel();
+      applyI18n();
       setupHeaderLangToggle();
       setupMobileBookingScroll();
       setupRoomSliders();
@@ -1058,8 +875,7 @@
     injectSkipLink();
     markMainContent();
     setupCookieConsent();
-    applyTweaks();
-    setupPanel();
+    applyI18n();
     setupHeaderLangToggle();
     setupMobileBookingScroll();
     setupRoomSliders();
