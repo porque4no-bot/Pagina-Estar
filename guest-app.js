@@ -291,10 +291,13 @@
         });
       }
       fillExtractedFields(data.extracted);
+      const azureFailed = data.source === 'azure-error';
       const text = data.source === 'azure'
         ? `Documento leído con ${data.confidence || 0}% de confianza. Confirma los datos.`
-        : 'OCR no configurado en este entorno. Completa los datos manualmente.';
-      setStatus($('#ocrStatus'), text, data.source === 'azure' ? 'success' : '');
+        : azureFailed
+          ? 'No fue posible leer el documento automáticamente. Completa los datos manualmente.'
+          : 'OCR no configurado en este entorno. Completa los datos manualmente.';
+      setStatus($('#ocrStatus'), text, data.source === 'azure' ? 'success' : azureFailed ? 'error' : '');
       $('#checkinProgress').textContent = 'Paso 2 de 3';
     } catch (error) {
       setStatus($('#ocrStatus'), error.message, 'error');
