@@ -234,7 +234,13 @@ exports.handler = async event => {
     const file = decodeFile(body.file);
     if (!file) return json(400, { error: 'Selecciona una foto o PDF del documento.' });
 
-    const analysis = await analyzeWithAzure(file);
+    let analysis;
+    try {
+      analysis = await analyzeWithAzure(file);
+    } catch (azureErr) {
+      console.warn('[guest-checkin] Azure analysis failed, falling back to manual:', azureErr.message);
+      analysis = { configured: false, fields: {}, confidence: 0 };
+    }
     const guest = normalizeGuest(body, analysis.fields);
     const validation = validateGuest(guest);
 

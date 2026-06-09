@@ -516,11 +516,21 @@ function writeCspHeaders() {
   collectInlineScriptHashes(distDir, hashes);
   console.log(`  Collected ${hashes.size} unique inline-script hash(es).`);
 
+  // Netlify injects snippets (e.g. Firebase app-config) as inline scripts whose
+  // hashes aren't in our source. Include them as static known-external hashes so
+  // the CSP doesn't block them in production deploys.
+  const netlifyInjectedHashes = [
+    "'sha256-GNlFtH+PFHwfrIAvlsOnxumZIKadp7VtEsbi4nj6TWY='",
+    "'sha256-n8EGvd+f0qUCWGy8Y7UVeKDrBiP6td4UjWKroJeastE='",
+    "'sha256-fI5GaoXRl/tQ8Eax1nbh1thdaUVouAvKwVlQMoiSfjA='",
+  ].join(' ');
+
   const hashList = Array.from(hashes).join(' ');
   // Mercado Pago rollback hosts retained for parity with previous CSP.
   const scriptSrc = [
     "'self'",
     hashList,
+    netlifyInjectedHashes,
     'https://unpkg.com',
     'https://checkout.wompi.co',
     'https://www.googletagmanager.com',
@@ -528,6 +538,7 @@ function writeCspHeaders() {
     'https://apis.google.com',
     'https://www.mercadopago.com.co',
     'https://www.mercadopago.com',
+    'https://static.cloudflareinsights.com',
   ].filter(Boolean).join(' ');
 
   const csp = [
