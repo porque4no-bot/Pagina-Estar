@@ -1706,17 +1706,37 @@ function BookingEngine() {
   const [paymentDetails, setPaymentDetails] = useState(null);
   const [creatingReservation, setCreatingReservation] = useState(false);
 
+  // Track the latest in-flight availability request so quick date changes
+  // never let an old response overwrite the newer one ("last write wins").
+  const availabilityAbortRef = useRef(null);
+  const availabilityRequestIdRef = useRef(0);
+
   // Fetch availability from Netlify serverless function
   const fetchAvailability = async () => {
+    /* Cancel any in-flight request and bump the request id. The completion
+       handler checks the id before touching state so a slow response from a
+       previous query can never overwrite the latest one. */
+    if (availabilityAbortRef.current) {
+      try { availabilityAbortRef.current.abort(); } catch (e) { /* noop */ }
+    }
+    const myId = ++availabilityRequestIdRef.current;
+    const controller = new AbortController();
+    availabilityAbortRef.current = controller;
+
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/check-availability?checkin=${search.checkin}&checkout=${search.checkout}&guests=${search.guests}`);
+      const response = await fetch(
+        `/api/check-availability?checkin=${search.checkin}&checkout=${search.checkout}&guests=${search.guests}`,
+        { signal: controller.signal }
+      );
+      if (myId !== availabilityRequestIdRef.current) return; /* superseded */
       if (!response.ok) {
         throw new Error(lang === 'es' ? 'No se pudo obtener la disponibilidad desde Kunas PMS.' : 'Failed to retrieve availability from Kunas PMS.');
       }
       const data = await response.json();
-      
+      if (myId !== availabilityRequestIdRef.current) return;
+
       if (data && Array.isArray(data.rooms)) {
         // Render the list of rooms dynamically from the check-availability output array.
         // Use local static BE_ROOMS for secondary metadata lookup (images, icons).
@@ -1753,16 +1773,24 @@ function BookingEngine() {
         throw new Error(lang === 'es' ? 'Respuesta de API de disponibilidad inválida.' : 'Invalid availability API response.');
       }
     } catch (err) {
+      if (err.name === 'AbortError') return; /* cancelled, not a real error */
+      if (myId !== availabilityRequestIdRef.current) return;
       console.error('Fetch availability error:', err);
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (myId === availabilityRequestIdRef.current) setLoading(false);
     }
   };
 
   // Trigger fetch on search parameters change
   useEffect(() => {
     fetchAvailability();
+    return () => {
+      /* cleanup: abort in-flight request when the effect re-runs */
+      if (availabilityAbortRef.current) {
+        try { availabilityAbortRef.current.abort(); } catch (e) { /* noop */ }
+      }
+    };
   }, [search]);
 
   // Sync selected room details (like real price) once rooms array updates from the API

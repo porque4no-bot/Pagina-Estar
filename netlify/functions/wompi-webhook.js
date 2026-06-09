@@ -42,11 +42,9 @@ function loadEnv() {
 
 loadEnv();
 
-// In-memory cache for the authentication session key (pkey)
-let sessionCache = {
-  pkey: null,
-  expiresAt: null
-};
+/* Session key (pkey) shared across functions via Netlify Blobs.
+   See _otasync.getSessionKey for the implementation. */
+const { getSessionKey: sharedGetSessionKey } = require('./_otasync');
 
 // In-memory simple processed transaction ID deduplicator (warm instances)
 const processedTransactionIds = new Set();
@@ -60,45 +58,9 @@ try {
   txStore = null;
 }
 
-// Helper to get session key from Kunas PMS
-async function getSessionKey(token, username, password) {
-  const now = Date.now();
-  if (sessionCache.pkey && sessionCache.expiresAt && sessionCache.expiresAt > now) {
-    return sessionCache.pkey;
-  }
-
-  const authController = new AbortController();
-  const authTimeoutId = setTimeout(() => authController.abort(), 10000);
-  let authResponse;
-  try {
-    authResponse = await fetch('https://app.otasync.me/api/user/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, username, password, remember: 0 }),
-      signal: authController.signal
-    });
-    clearTimeout(authTimeoutId);
-  } catch (err) {
-    clearTimeout(authTimeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error('Request timeout during authentication');
-    }
-    throw err;
-  }
-
-  if (!authResponse.ok) {
-    throw new Error(`Authentication failed with status ${authResponse.status}`);
-  }
-
-  const data = await authResponse.json();
-  if (!data.pkey) {
-    throw new Error('Authentication response did not contain a session key (pkey)');
-  }
-
-  // Cache session key for 30 minutes
-  sessionCache.pkey = data.pkey;
-  sessionCache.expiresAt = now + 30 * 60 * 1000;
-  return data.pkey;
+// Helper to get session key from Kunas PMS — delegates to shared store
+async function getSessionKey(_token, _username, _password) {
+  return sharedGetSessionKey();
 }
 
 async function readResponseSnippet(response) {

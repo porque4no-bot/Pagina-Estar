@@ -6,11 +6,16 @@
 [functions]
   included_files = ["rooms_db.json"]
   node_bundler = "esbuild"
-  external_node_modules = ["@netlify/blobs"]
+  external_node_modules = ["@netlify/blobs", "googleapis"]
 
 # Re-check room availability for active quotes a few times a day
 [functions."revalidate-quotes"]
   schedule = "0 */6 * * *"
+
+# Reconcile Wompi APPROVED transactions against processed-transactions blob
+# to catch payments whose webhook never landed. Runs every 30 minutes.
+[functions."reconcile-payments"]
+  schedule = "*/30 * * * *"
 
 [build.environment]
   NODE_VERSION = "20"

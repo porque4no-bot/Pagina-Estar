@@ -5,7 +5,80 @@
 const fs = require('fs');
 const path = require('path');
 
-let sessionCache = { pkey: null, expiresAt: null, promise: null };
+/* Session key (pkey) lives in Netlify Blobs so every function shares a
+   single auth and OTASync isn't hammered with a fresh login per cold
+   start. A small in-process memo (hotCache) cuts read latency on warm
+   invocations. inflightPromise dedupes parallel refreshes. */
+const SESSION_STORE = 'otasync-session';
+const SESSION_KEY = 'pkey';
+const PKEY_TTL_MS = 25 * 60 * 1000;        /* refresh 5 min before OTASync expires it */
+const HOT_CACHE_MS = 60 * 1000;            /* trust in-process value for 60 s */
+
+let hotCache = { pkey: null, fetchedAt: 0 };
+let inflightPromise = null;
+
+function getSessionStore() {
+  /* Lazy require so loading the module without Blobs (unit tests) still works. */
+  try {
+    const { getStore } = require('@netlify/blobs');
+    const opts = { name: SESSION_STORE, consistency: 'strong' };
+    if (process.env.BLOBS_TOKEN && process.env.NETLIFY_SITE_ID) {
+      opts.token = process.env.BLOBS_TOKEN;
+      opts.siteID = process.env.NETLIFY_SITE_ID;
+    }
+    return getStore(opts);
+  } catch (e) {
+    return null;
+  }
+}
+
+async function readSessionBlob() {
+  const store = getSessionStore();
+  if (!store) return null;
+  try {
+    const raw = await store.get(SESSION_KEY, { type: 'json' });
+    if (raw && raw.pkey && raw.expiresAt && raw.expiresAt > Date.now()) return raw;
+  } catch (e) { /* fall through to refresh */ }
+  return null;
+}
+
+async function writeSessionBlob(pkey, expiresAt) {
+  const store = getSessionStore();
+  if (!store) return;
+  try {
+    await store.setJSON(SESSION_KEY, { pkey, expiresAt });
+  } catch (e) { /* non-fatal — local cache still works */ }
+}
+
+async function clearSessionBlob() {
+  hotCache = { pkey: null, fetchedAt: 0 };
+  const store = getSessionStore();
+  if (!store) return;
+  try { await store.delete(SESSION_KEY); } catch (e) { /* non-fatal */ }
+}
+
+async function loginOtasync() {
+  const { token, username, password } = otasyncCreds();
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 10000);
+  let res;
+  try {
+    res = await fetch('https://app.otasync.me/api/user/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, username, password, remember: 0 }),
+      signal: ctrl.signal
+    });
+    clearTimeout(tid);
+  } catch (err) {
+    clearTimeout(tid);
+    throw err.name === 'AbortError' ? new Error('Request timeout during authentication') : err;
+  }
+  if (!res.ok) throw new Error(`Authentication failed with status ${res.status}`);
+  const data = await res.json();
+  if (!data.pkey) throw new Error('Authentication response did not contain a session key (pkey)');
+  return data.pkey;
+}
 
 function otasyncCreds() {
   return {
@@ -23,43 +96,51 @@ function hasOtasyncCreds() {
   return !!(c.token && c.username && c.password);
 }
 
-async function getSessionKey() {
-  const { token, username, password } = otasyncCreds();
+async function getSessionKey({ force = false } = {}) {
   const now = Date.now();
-  if (sessionCache.pkey && sessionCache.expiresAt && sessionCache.expiresAt > now) {
-    return sessionCache.pkey;
-  }
-  if (sessionCache.promise) {
-    try { return await sessionCache.promise; }
-    catch (e) { sessionCache.promise = null; }
+  if (!force && hotCache.pkey && now - hotCache.fetchedAt < HOT_CACHE_MS) {
+    return hotCache.pkey;
   }
 
-  sessionCache.promise = (async () => {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10000);
-    let res;
-    try {
-      res = await fetch('https://app.otasync.me/api/user/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, username, password, remember: 0 }),
-        signal: ctrl.signal
-      });
-      clearTimeout(tid);
-    } catch (err) {
-      clearTimeout(tid);
-      throw err.name === 'AbortError' ? new Error('Request timeout during authentication') : err;
+  if (!force) {
+    const blob = await readSessionBlob();
+    if (blob) {
+      hotCache = { pkey: blob.pkey, fetchedAt: now };
+      return blob.pkey;
     }
-    if (!res.ok) throw new Error(`Authentication failed with status ${res.status}`);
-    const data = await res.json();
-    if (!data.pkey) throw new Error('Authentication response did not contain a session key (pkey)');
-    sessionCache.pkey = data.pkey;
-    sessionCache.expiresAt = Date.now() + 30 * 60 * 1000;
-    return data.pkey;
+  }
+
+  if (inflightPromise) {
+    try { return await inflightPromise; }
+    catch (e) { inflightPromise = null; }
+  }
+
+  inflightPromise = (async () => {
+    const pkey = await loginOtasync();
+    const expiresAt = Date.now() + PKEY_TTL_MS;
+    hotCache = { pkey, fetchedAt: Date.now() };
+    await writeSessionBlob(pkey, expiresAt);
+    return pkey;
   })();
 
-  try { return await sessionCache.promise; }
-  finally { sessionCache.promise = null; }
+  try { return await inflightPromise; }
+  finally { inflightPromise = null; }
+}
+
+/* Wraps an OTASync fetch and retries once with a fresh pkey if the server
+   answers 401 / session expired. Callers must accept (key) so the second
+   attempt can supply the new pkey. */
+async function withSessionRetry(makeRequest) {
+  let pkey = await getSessionKey();
+  let res = await makeRequest(pkey);
+  if (res.status !== 401) return res;
+
+  /* Try to detect "session expired" payloads even when status is 200.
+     OTASync usually answers 401 but some endpoints return 200 with an
+     error body — we handle the unambiguous 401 case here. */
+  await clearSessionBlob();
+  pkey = await getSessionKey({ force: true });
+  return await makeRequest(pkey);
 }
 
 /* Returns available units per room type id for the given stay.
@@ -68,46 +149,46 @@ async function getSessionKey() {
    callers can decide to skip the availability gate locally. */
 async function getAvailabilityByType(checkin, checkout) {
   if (!hasOtasyncCreds()) return { availByType: {}, isMock: true };
-
   const { propertyId } = otasyncCreds();
-  const pkey = await getSessionKey();
 
-  const payload = {
-    key: pkey,
-    dfrom: checkin,
-    dto: checkout,
-    currency: 'COP',
-    id_language: 'es',
-    guests: [{ guest_filter_id: 1, adults: 1, children: 0, children_age: [] }],
-    id_properties: propertyId
+  const makeRequest = async (pkey) => {
+    const payload = {
+      key: pkey,
+      dfrom: checkin,
+      dto: checkout,
+      currency: 'COP',
+      id_language: 'es',
+      guests: [{ guest_filter_id: 1, adults: 1, children: 0, children_age: [] }],
+      id_properties: propertyId
+    };
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    try {
+      const r = await fetch('https://app.otasync.me/api/engine/data/getRooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      return r;
+    } catch (err) {
+      clearTimeout(tid);
+      throw err.name === 'AbortError' ? new Error('Request timeout during availability lookup') : err;
+    }
   };
 
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 10000);
-  let res;
-  try {
-    res = await fetch('https://app.otasync.me/api/engine/data/getRooms', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: ctrl.signal
-    });
-    clearTimeout(tid);
-  } catch (err) {
-    clearTimeout(tid);
-    throw err.name === 'AbortError' ? new Error('Request timeout during availability lookup') : err;
-  }
+  const res = await withSessionRetry(makeRequest);
   if (!res.ok) throw new Error(`getRooms returned status ${res.status}`);
-
   const data = await res.json();
   if (!Array.isArray(data.rooms)) throw new Error('Invalid getRooms response: expected rooms list');
-
   const availByType = {};
   data.rooms.forEach(r => {
     availByType[String(r.id_room_types)] = parseInt(r.avail) || 0;
   });
   return { availByType, isMock: false };
 }
+
 
 /* Given quote items, returns the list of room types whose requested units
    exceed current availability. Empty array means the stay is bookable. */
@@ -210,19 +291,23 @@ function buildRoomsFromQuote(quote) {
 }
 
 async function insertReservation(payload) {
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 10000);
-  let res;
-  try {
-    res = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload), signal: ctrl.signal
-    });
-    clearTimeout(tid);
-  } catch (err) {
-    clearTimeout(tid);
-    throw err.name === 'AbortError' ? new Error('Request timeout during reservation insert') : err;
-  }
+  const makeRequest = async (pkey) => {
+    const body = { ...payload, key: pkey };
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    try {
+      const r = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body), signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      return r;
+    } catch (err) {
+      clearTimeout(tid);
+      throw err.name === 'AbortError' ? new Error('Request timeout during reservation insert') : err;
+    }
+  };
+  const res = await withSessionRetry(makeRequest);
   if (!res.ok) throw new Error(`insert/reservation returned status ${res.status}`);
   return res.json();
 }
@@ -277,22 +362,25 @@ async function createHold(quote) {
    (OTASync: reservation/delete/reservation). */
 async function releaseHold(idReservations) {
   if (!hasOtasyncCreds() || !idReservations) return;
-  const { token, propertyId, channelId, channelName } = otasyncCreds();
-  const pkey = await getSessionKey();
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 10000);
-  let res;
-  try {
-    res = await fetch('https://app.otasync.me/api/reservation/delete/reservation', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: pkey, token, id_properties: propertyId, id_reservations: idReservations }),
-      signal: ctrl.signal
-    });
-    clearTimeout(tid);
-  } catch (err) {
-    clearTimeout(tid);
-    throw err.name === 'AbortError' ? new Error('Request timeout during reservation delete') : err;
-  }
+  const { token, propertyId } = otasyncCreds();
+
+  const makeRequest = async (pkey) => {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    try {
+      const r = await fetch('https://app.otasync.me/api/reservation/delete/reservation', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: pkey, token, id_properties: propertyId, id_reservations: idReservations }),
+        signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      return r;
+    } catch (err) {
+      clearTimeout(tid);
+      throw err.name === 'AbortError' ? new Error('Request timeout during reservation delete') : err;
+    }
+  };
+  const res = await withSessionRetry(makeRequest);
   if (!res.ok) throw new Error(`delete/reservation returned status ${res.status}`);
 }
 
