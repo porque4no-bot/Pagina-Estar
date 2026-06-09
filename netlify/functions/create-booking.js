@@ -35,67 +35,14 @@ function loadEnv() {
 
 loadEnv();
 
-// In-memory cache for the authentication session key (pkey)
-let sessionCache = {
-  pkey: null,
-  expiresAt: null,
-  promise: null
-};
+/* Session key (pkey) is shared across all OTASync-using functions via
+   Netlify Blobs — see _otasync.getSessionKey for the implementation.
+   The legacy signature is preserved so existing call sites keep working;
+   the credentials come from env vars inside the shared helper. */
+const { getSessionKey: sharedGetSessionKey } = require('./_otasync');
 
-async function getSessionKey(token, username, password) {
-  const now = Date.now();
-  if (sessionCache.pkey && sessionCache.expiresAt && sessionCache.expiresAt > now) {
-    return sessionCache.pkey;
-  }
-
-  if (sessionCache.promise) {
-    try {
-      return await sessionCache.promise;
-    } catch (err) {
-      sessionCache.promise = null;
-    }
-  }
-
-  sessionCache.promise = (async () => {
-    const authController = new AbortController();
-    const authTimeoutId = setTimeout(() => authController.abort(), 10000);
-    let response;
-    try {
-      response = await fetch('https://app.otasync.me/api/user/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, username, password, remember: 0 }),
-        signal: authController.signal
-      });
-      clearTimeout(authTimeoutId);
-    } catch (err) {
-      clearTimeout(authTimeoutId);
-      if (err.name === 'AbortError') {
-        throw new Error('Request timeout during authentication');
-      }
-      throw err;
-    }
-
-    if (!response.ok) {
-      throw new Error(`Authentication failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    if (!data.pkey) {
-      throw new Error('Authentication response did not contain a session key (pkey)');
-    }
-
-    // Cache session key for 30 minutes
-    sessionCache.pkey = data.pkey;
-    sessionCache.expiresAt = Date.now() + 30 * 60 * 1000;
-    return data.pkey;
-  })();
-
-  try {
-    return await sessionCache.promise;
-  } finally {
-    sessionCache.promise = null;
-  }
+async function getSessionKey(_token, _username, _password) {
+  return sharedGetSessionKey();
 }
 
 async function readResponseSnippet(response) {

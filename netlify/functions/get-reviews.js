@@ -25,38 +25,12 @@ function loadEnv() {
 
 loadEnv();
 
-let sessionCache = { pkey: null, expiresAt: null, promise: null };
+/* Session key (pkey) shared across functions via Netlify Blobs.
+   See _otasync.getSessionKey for the implementation. */
+const { getSessionKey: sharedGetSessionKey } = require('./_otasync');
 
-async function getSessionKey(token, username, password) {
-  const now = Date.now();
-  if (sessionCache.pkey && sessionCache.expiresAt && sessionCache.expiresAt > now) return sessionCache.pkey;
-  if (sessionCache.promise) {
-    try { return await sessionCache.promise; } catch { sessionCache.promise = null; }
-  }
-  sessionCache.promise = (async () => {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10000);
-    let res;
-    try {
-      res = await fetch('https://app.otasync.me/api/user/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, username, password, remember: 0 }),
-        signal: ctrl.signal
-      });
-      clearTimeout(tid);
-    } catch (err) {
-      clearTimeout(tid);
-      throw err.name === 'AbortError' ? new Error('Auth timeout') : err;
-    }
-    if (!res.ok) throw new Error(`Auth failed: ${res.status}`);
-    const data = await res.json();
-    if (!data.pkey) throw new Error('No pkey in auth response');
-    sessionCache.pkey = data.pkey;
-    sessionCache.expiresAt = Date.now() + 30 * 60 * 1000;
-    return data.pkey;
-  })();
-  try { return await sessionCache.promise; } finally { sessionCache.promise = null; }
+async function getSessionKey(_token, _username, _password) {
+  return sharedGetSessionKey();
 }
 
 const FALLBACK_REVIEWS = [
