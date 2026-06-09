@@ -39,11 +39,16 @@ loadEnv();
    Netlify Blobs — see _otasync.getSessionKey for the implementation.
    The legacy signature is preserved so existing call sites keep working;
    the credentials come from env vars inside the shared helper. */
-const { getSessionKey: sharedGetSessionKey } = require('./_otasync');
+const { getSessionKey: sharedGetSessionKey, getDynamicPricing } = require('./_otasync');
 
 async function getSessionKey(_token, _username, _password) {
   return sharedGetSessionKey();
 }
+
+/* Tolerance for paidAmount vs serverPrice mismatch (Colombian pesos).
+   ±$1.000 covers Wompi/Mercado Pago rounding without letting larger
+   discrepancies slip through. */
+const PRICE_MISMATCH_TOLERANCE_COP = 1000;
 
 async function readResponseSnippet(response) {
   try {
@@ -267,9 +272,58 @@ exports.handler = async (event, context) => {
   const diffTime = checkoutDate - checkinDate;
   const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-  // Use actual paid amount from OTASync dynamic pricing (via Wompi)
-  const roomPrice = parseFloat(paidAmount) || 0;
-  const avgPrice = nights > 0 ? Math.round(roomPrice / nights) : roomPrice;
+  /* AUTHORITATIVE PRICING — re-query OTASync server-side.
+     Never trust paidAmount or roomRate from the cliente; the cliente could
+     have manipulated them between the availability lookup and the booking
+     submission. We re-compute the room's avgPrice + totalPrice for the
+     same checkin/checkout/guests at the moment of insertion and use
+     THOSE values as rooms_price / total_price.
+
+     If the actual paidAmount (charged by Wompi) doesn't match the server
+     price within PRICE_MISMATCH_TOLERANCE_COP, we log a warning so the
+     admin can reconcile manually — but we still record the server price
+     because that's the canonical truth for what we were owed. */
+  let serverAvgPrice, serverTotalPrice, pricingIsMock = false;
+  try {
+    const pricing = await getDynamicPricing(checkin, checkout, guestsCount);
+    pricingIsMock = pricing.isMock;
+    const roomPricing = pricing.byRoomType[String(roomTypeId)];
+    if (!pricing.isMock && !roomPricing) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Selected room type is not bookable for those dates' })
+      };
+    }
+    if (roomPricing) {
+      serverAvgPrice = roomPricing.avgPrice;
+      serverTotalPrice = roomPricing.totalPrice;
+    }
+  } catch (e) {
+    console.error('[create-booking] server-side pricing lookup failed:', e.message);
+    return {
+      statusCode: 502,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'No se pudo verificar el precio. Intenta de nuevo.' })
+    };
+  }
+
+  /* paidAmount from the cliente reflects what Wompi actually charged. We
+     compare it against the server price to flag tampering / price drift,
+     but the SERVER price is what we record in OTASync. */
+  const clientPaidAmount = parseFloat(paidAmount) || 0;
+  const fallbackPrice = clientPaidAmount > 0 ? clientPaidAmount : 0;
+  const roomPrice = serverTotalPrice != null ? serverTotalPrice : fallbackPrice;
+  const avgPrice = serverAvgPrice != null
+    ? serverAvgPrice
+    : (nights > 0 ? Math.round(roomPrice / nights) : roomPrice);
+
+  if (serverTotalPrice != null && clientPaidAmount > 0) {
+    const delta = clientPaidAmount - serverTotalPrice;
+    if (Math.abs(delta) > PRICE_MISMATCH_TOLERANCE_COP) {
+      console.warn(`[create-booking] price mismatch for ${email} ${roomTypeId} ${checkin}->${checkout}: client paid ${clientPaidAmount}, server expected ${serverTotalPrice} (delta ${delta}). Recording server price.`);
+    }
+  }
 
   // Read environment variables
   const token = process.env.OTASYNC_TOKEN || '';
@@ -386,8 +440,12 @@ exports.handler = async (event, context) => {
 
     const paymentInfo = [];
     if (paymentDetails && (paymentDetails.status === 'APPROVED' || paymentDetails.status === 'PENDING')) {
+      /* payments[].amount records what Wompi actually collected (cliente-supplied
+         but Wompi-anchored). The reservation's rooms_price / total_price use the
+         server-recomputed price above as the canonical truth. */
+      const actuallyCollected = clientPaidAmount > 0 ? clientPaidAmount : roomPrice;
       paymentInfo.push({
-        amount: parseFloat(paidAmount || roomPrice),
+        amount: actuallyCollected,
         payment_date: new Date().toISOString().split('T')[0],
         payment_method: 'card',
         note: `Wompi ID: ${paymentDetails.id}, Ref: ${cleanReference}, Status: ${paymentDetails.status}`

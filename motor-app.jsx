@@ -1680,31 +1680,83 @@ function ManageBooking({ onBack, lang }) {
 function BookingEngine() {
   const initialParams = parseQueryParams();
   
+  /* Booking draft persistence — survives accidental refresh, back/forward
+     navigation and the Wompi/Mercado Pago return redirect that lands the
+     user back on reservar.html with a payment status in the query string.
+     Drops anything older than 30 min so an abandoned draft does not surprise
+     the next user of the same browser. */
+  const DRAFT_KEY = 'estar-booking-draft';
+  const DRAFT_TTL_MS = 30 * 60 * 1000;
+  const readDraft = () => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.savedAt || Date.now() - parsed.savedAt > DRAFT_TTL_MS) {
+        sessionStorage.removeItem(DRAFT_KEY);
+        return null;
+      }
+      return parsed;
+    } catch (e) { return null; }
+  };
+  const draft = readDraft();
+
   const [lang, setLang] = useState(window.location.pathname.startsWith('/en/') ? 'en' : 'es');
   const [mode, setMode] = useState('book'); // 'book' | 'manage'
-  const [search, setSearch] = useState({ 
-    checkin: initialParams.checkin, 
-    checkout: initialParams.checkout, 
-    guests: initialParams.guests 
-  });
-  
+  const [search, setSearch] = useState(() => (draft && draft.search) || ({
+    checkin: initialParams.checkin,
+    checkout: initialParams.checkout,
+    guests: initialParams.guests
+  }));
+
   // State for API integration
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   // Find room if pre-selected
   const matchingRoom = BE_ROOMS.find(r => r.id === initialParams.roomParam);
-  
-  const [selectedRoom, setSelectedRoom] = useState(matchingRoom || null);
-  const [selectedRate, setSelectedRate] = useState('flexible');
-  const [currentStep, setCurrentStep] = useState(matchingRoom ? 'extras' : 'rooms');
-  const [ratePerRoom, setRatePerRoom] = useState({});
-  const [extras, setExtras] = useState({});
-  const [guestData, setGuestData] = useState({});
-  const [paymentMethod, setPaymentMethod] = useState(window.PAYMENT_PROVIDER === 'wompi' ? 'wompi' : 'mercadopago');
+
+  const [selectedRoom, setSelectedRoom] = useState(() =>
+    (draft && draft.selectedRoom) || matchingRoom || null
+  );
+  const [selectedRate, setSelectedRate] = useState(() => (draft && draft.selectedRate) || 'flexible');
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (draft && draft.currentStep) return draft.currentStep;
+    return matchingRoom ? 'extras' : 'rooms';
+  });
+  const [ratePerRoom, setRatePerRoom] = useState(() => (draft && draft.ratePerRoom) || {});
+  const [extras, setExtras] = useState(() => (draft && draft.extras) || {});
+  const [guestData, setGuestData] = useState(() => (draft && draft.guestData) || {});
+  const [paymentMethod, setPaymentMethod] = useState(() =>
+    (draft && draft.paymentMethod) || (window.PAYMENT_PROVIDER === 'wompi' ? 'wompi' : 'mercadopago')
+  );
   const [bookingCode, setBookingCode] = useState(null);
   const [paymentDetails, setPaymentDetails] = useState(null);
   const [creatingReservation, setCreatingReservation] = useState(false);
+
+  /* Persist a snapshot of the draft on every meaningful change. Guest data
+     can include email/phone — we accept that risk on a session-scoped store
+     because it lets the user recover after a redirect. The draft is cleared
+     in the confirmation handler once a reservation succeeds. */
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        savedAt: Date.now(),
+        search,
+        selectedRoom: selectedRoom ? {
+          id: selectedRoom.id,
+          roomTypeId: selectedRoom.roomTypeId,
+          name: selectedRoom.name
+        } : null,
+        selectedRate,
+        currentStep,
+        ratePerRoom,
+        extras,
+        guestData,
+        paymentMethod
+      }));
+    } catch (e) { /* quota exceeded or storage disabled — silently skip */ }
+  }, [search, selectedRoom, selectedRate, currentStep, ratePerRoom, extras, guestData, paymentMethod]);
 
   // Track the latest in-flight availability request so quick date changes
   // never let an old response overwrite the newer one ("last write wins").
@@ -1893,6 +1945,9 @@ function BookingEngine() {
       if (data.success && data.bookingCode) {
         setCreatingReservation(false);
         setBookingCode(data.bookingCode);
+        /* Reservation locked in — clear the draft so a future visitor on this
+           browser does not see this guest's data pre-filled. */
+        try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) { /* noop */ }
       } else {
         console.error('Kunas PMS booking was not created; skipping confirmation email.', data);
         setCreatingReservation(false);

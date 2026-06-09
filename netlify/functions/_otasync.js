@@ -143,6 +143,92 @@ async function withSessionRetry(makeRequest) {
   return await makeRequest(pkey);
 }
 
+/* Returns the authoritative pricing for a specific stay from OTASync. This is
+   the SAME source-of-truth the cliente sees in /api/check-availability — using
+   it server-side in create-booking guarantees the cliente cannot supply an
+   arbitrary paidAmount and have it recorded as the booking total.
+
+   Returns { isMock, byRoomType: { '<id>': { avgPrice, totalPrice, dailyPrices,
+   available, nights } }, nights }. avgPrice and totalPrice include the extra
+   guest surcharge ($31,000/night per person beyond the first). */
+const EXTRA_GUEST_SURCHARGE = 31000;
+const PRICE_FALLBACK = 195000;
+
+async function getDynamicPricing(checkin, checkout, guests) {
+  const nights = nightsBetween(checkin, checkout);
+  if (!hasOtasyncCreds()) return { isMock: true, byRoomType: {}, nights };
+  const { propertyId } = otasyncCreds();
+  const guestsCount = Math.max(1, parseInt(guests) || 1);
+  const surcharge = Math.max(0, guestsCount - 1) * EXTRA_GUEST_SURCHARGE;
+
+  const makeRequest = async (pkey) => {
+    const payload = {
+      key: pkey,
+      dfrom: checkin,
+      dto: checkout,
+      currency: 'COP',
+      id_language: 'es',
+      guests: [{ guest_filter_id: 1, adults: 1, children: 0, children_age: [] }],
+      id_properties: propertyId
+    };
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    try {
+      const r = await fetch('https://app.otasync.me/api/engine/data/getRooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      return r;
+    } catch (err) {
+      clearTimeout(tid);
+      throw err.name === 'AbortError' ? new Error('Request timeout during pricing lookup') : err;
+    }
+  };
+
+  const res = await withSessionRetry(makeRequest);
+  if (!res.ok) throw new Error(`getRooms (pricing) returned status ${res.status}`);
+  const data = await res.json();
+  if (!Array.isArray(data.rooms)) throw new Error('Invalid getRooms response: expected rooms list');
+
+  const byRoomType = {};
+  data.rooms.forEach(otaRoom => {
+    const id = String(otaRoom.id_room_types);
+    const available = (parseInt(otaRoom.avail) || 0) > 0;
+    const dailyPrices = [];
+    let totalAmount = 0, count = 0;
+
+    const plan = Array.isArray(otaRoom.pricing_plans) && otaRoom.pricing_plans.length > 0 ? otaRoom.pricing_plans[0] : null;
+    if (plan && Array.isArray(plan.prices) && plan.prices.length > 0 && plan.prices[0].prices) {
+      const datePrices = plan.prices[0].prices;
+      Object.keys(datePrices).forEach(dateStr => {
+        const price = parseFloat(datePrices[dateStr]) || 0;
+        dailyPrices.push({ date: dateStr, price });
+        totalAmount += price;
+        count++;
+      });
+    }
+
+    let avgPrice, totalPrice;
+    if (count > 0) {
+      avgPrice = Math.round(totalAmount / count) + surcharge;
+      totalPrice = avgPrice * nights;
+    } else if (otaRoom.price) {
+      avgPrice = Math.round(parseFloat(otaRoom.price)) + surcharge;
+      totalPrice = avgPrice * nights;
+    } else {
+      avgPrice = PRICE_FALLBACK + surcharge;
+      totalPrice = avgPrice * nights;
+    }
+
+    byRoomType[id] = { avgPrice, totalPrice, dailyPrices, available, nights };
+  });
+
+  return { isMock: false, byRoomType, nights };
+}
+
 /* Returns available units per room type id for the given stay.
    { availByType: { '31348': 3, ... }, isMock: boolean }
    When credentials are missing returns isMock:true and an empty map so
@@ -446,5 +532,6 @@ async function createConfirmedReservation(quote, opts) {
 
 module.exports = {
   otasyncCreds, hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
-  buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, createConfirmedReservation
+  buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, createConfirmedReservation,
+  getDynamicPricing, EXTRA_GUEST_SURCHARGE
 };
