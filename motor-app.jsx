@@ -1727,8 +1727,10 @@ function BookingEngine() {
   const [ratePerRoom, setRatePerRoom] = useState(() => (draft && draft.ratePerRoom) || {});
   const [extras, setExtras] = useState(() => (draft && draft.extras) || {});
   const [guestData, setGuestData] = useState(() => (draft && draft.guestData) || {});
+  /* Default to Wompi (Colombia's primary rail). The cliente can switch to
+     Mercado Pago freely from the payment step — both flows are kept live. */
   const [paymentMethod, setPaymentMethod] = useState(() =>
-    (draft && draft.paymentMethod) || (window.PAYMENT_PROVIDER === 'wompi' ? 'wompi' : 'mercadopago')
+    (draft && draft.paymentMethod) || 'wompi'
   );
   const [bookingCode, setBookingCode] = useState(null);
   const [paymentDetails, setPaymentDetails] = useState(null);
@@ -1902,99 +1904,119 @@ function BookingEngine() {
     setSelectedRate('flexible');
     setExtras({});
     setGuestData({});
-    setPaymentMethod(window.PAYMENT_PROVIDER === 'wompi' ? 'wompi' : 'mercadopago');
+    setPaymentMethod('wompi');
     setBookingCode(null);
     setPaymentDetails(null);
   }
 
+  /* After payment lands, the cliente no longer creates the OTASync reservation
+     directly — that's now the exclusive job of the payment webhook (Wompi or
+     Mercado Pago). We poll /api/booking-status until the webhook reports the
+     booking is confirmed, then drive the confirmation UI from that. */
   function handleConfirmBooking(code, details = null) {
     setPaymentDetails(details);
     setCreatingReservation(true);
 
-    const isColombian = isColombianGuest(booking.guest);
-    const isBusinessTrip = isBusinessGuest(booking.guest, lang);
     const mustPayIVA = mustChargeIva(booking.guest, lang);
     const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
     const roomPriceVal = mustPayIVA ? calc.total : calc.subtotal;
 
-    // Send the booking details to the Netlify serverless function to register it in Kunas PMS
-    fetch('/api/create-booking', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        checkin: search.checkin,
-        checkout: search.checkout,
-        guestsCount: search.guests,
-        roomTypeId: booking.room.roomTypeId || "31349",
-        roomName: booking.room.name,
-        roomRate: booking.rate,
-        roomPrice: roomPriceVal,
-        paidAmount: calc.subtotal,
-        firstName: booking.guest?.nombre || '',
-        lastName: booking.guest?.apellido || '',
-        email: booking.guest?.email || '',
-        phone: booking.guest?.tel || '',
-        notes: `Motivo de viaje: ${booking.guest?.motivo || 'No especificado'}. Pais/origen: ${booking.guest?.pais || 'No especificado'}. IVA (19%): ${mustPayIVA ? 'POR COBRAR EN ALOJAMIENTO (' + formatCOP(calc.iva) + ')' : 'EXENTO PRELIMINAR - validar documento y motivo; si no corresponde, cobrar IVA (' + formatCOP(calc.iva) + ')'}. Notas: ${booking.guest?.notas || 'Ninguna'}`,
-        paymentDetails: details
-      })
-    })
-    .then(res => res.json())
-    .then(data => {
-      console.log('Kunas PMS Booking Response:', JSON.stringify(data));
-      const finalCode = (data.success && data.bookingCode) ? data.bookingCode : code;
-      if (data.success && data.bookingCode) {
-        setCreatingReservation(false);
-        setBookingCode(data.bookingCode);
+    /* The webhook writes booking-results['direct-<code>'] once OTASync
+       confirms. Poll for up to ~60 s with backoff to give the webhook time to
+       land. If it never lands, we still surrender the loading state and show
+       a "tu pago se está procesando" message so the user is not stuck. */
+    const MAX_POLLS = 30;          /* 30 attempts × ~2 s = 60 s max wait    */
+    const POLL_INTERVAL_MS = 2000;
+    let pollCount = 0;
+    let cancelled = false;
+
+    const stopAndShow = (success, finalCode, otasyncId = null, reservationPending = false) => {
+      if (cancelled) return;
+      setCreatingReservation(false);
+      if (success) {
+        setBookingCode(finalCode);
         /* Reservation locked in — clear the draft so a future visitor on this
            browser does not see this guest's data pre-filled. */
         try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) { /* noop */ }
       } else {
-        console.error('Kunas PMS booking was not created; skipping confirmation email.', data);
-        setCreatingReservation(false);
-        setPaymentDetails({ ...(details || {}), reservationPending: true });
-        setBookingCode(code);
-        return;
+        setPaymentDetails(prev => ({ ...(prev || details || {}), reservationPending: true }));
+        setBookingCode(finalCode);
       }
+      sendConfirmationEmailIfPossible(finalCode, roomPriceVal, calc.subtotal);
+    };
 
-      // Send confirmation email via Resend once the PMS booking is registered
+    const pollOnce = () => {
+      if (cancelled) return;
+      pollCount += 1;
+      fetch(`/api/booking-status?ref=${encodeURIComponent(code)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (cancelled) return;
+          if (data && data.status === 'confirmed' && !data.reservationPending) {
+            stopAndShow(true, data.bookingCode || code, data.otasyncId || null);
+            return;
+          }
+          if (data && data.status === 'confirmed' && data.reservationPending) {
+            /* Webhook landed but OTASync side flagged pending — show the
+               recovery copy instead of the success screen. */
+            stopAndShow(false, data.bookingCode || code, null, true);
+            return;
+          }
+          if (pollCount >= MAX_POLLS) {
+            console.warn('[booking-status] polling timed out without confirmation');
+            stopAndShow(false, code, null, true);
+            return;
+          }
+          setTimeout(pollOnce, POLL_INTERVAL_MS);
+        })
+        .catch(err => {
+          console.error('[booking-status] poll error:', err);
+          if (pollCount >= MAX_POLLS) {
+            stopAndShow(false, code, null, true);
+            return;
+          }
+          setTimeout(pollOnce, POLL_INTERVAL_MS);
+        });
+    };
+
+    /* Start polling immediately — the webhook is usually faster than the
+       cliente-side redirect, so the first poll often returns confirmed. */
+    pollOnce();
+
+    /* The setup of the polling loop captured `cancelled` via closure; if a
+       follow-up action (manage / back) needs to abort early, future work can
+       expose a ref to set cancelled=true. For now the page is a hard reload
+       after confirmation, so cancellation is not required. */
+    return;
+
+    /* Helper kept inline so the same closure has access to booking, search,
+       and lang without re-derivation. */
+    function sendConfirmationEmailIfPossible(finalCode, totalAmount, paidAmount) {
       const guestEmail = booking.guest?.email || '';
       const guestName = `${booking.guest?.nombre || ''} ${booking.guest?.apellido || ''}`.trim();
       const nights = dateDiff(search.checkin, search.checkout);
       const roomName = booking.room.name || '';
-
-      if (guestEmail) {
-        fetch('/api/send-confirmation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            guestEmail,
-            guestName,
-            bookingCode: finalCode,
-            roomName,
-            checkIn: search.checkin,
-            checkOut: search.checkout,
-            nights,
-            totalAmount: roomPriceVal,
-            paidAmount: calc.subtotal,
-            phone: booking.guest?.tel || ''
-          })
+      if (!guestEmail) return;
+      fetch('/api/send-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          guestEmail,
+          guestName,
+          bookingCode: finalCode,
+          roomName,
+          checkIn: search.checkin,
+          checkOut: search.checkout,
+          nights,
+          totalAmount,
+          paidAmount,
+          phone: booking.guest?.tel || ''
         })
-        .then(r => r.json())
-        .then(emailData => {
-          console.log('[send-confirmation] Result:', emailData);
-        })
-        .catch(emailErr => {
-          // Non-blocking: email failure should never prevent the booking confirmation screen
-          console.error('[send-confirmation] Error sending confirmation email:', emailErr);
-        });
-      }
-    })
-    .catch(err => {
-      console.error('Error saving booking to Kunas PMS:', err);
-      setCreatingReservation(false);
-      setPaymentDetails({ ...(details || {}), reservationPending: true });
-      setBookingCode(code);
-    });
+      })
+      .then(r => r.json())
+      .then(emailData => console.log('[send-confirmation] Result:', emailData))
+      .catch(emailErr => console.error('[send-confirmation] Error:', emailErr));
+    }
   }
 
   function goToStep(id) {
