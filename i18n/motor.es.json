@@ -166,5 +166,7 @@
     "wompi": "Tarjeta de crédito, PSE, Nequi",
     "hotel": "Reserva sin cargo previo, pago al llegar",
     "transfer": "Te enviamos los datos por correo"
-  }
+  },
+  "sandboxBannerTitle": "MODO PRUEBA",
+  "sandboxBannerBody": "Esta build usa credenciales de pago de prueba (sandbox). Ninguna transacción cobrará dinero real. Usa tarjetas de prueba de Wompi o Mercado Pago."
 }

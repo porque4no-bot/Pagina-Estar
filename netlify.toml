@@ -27,6 +27,49 @@
   # active for real secrets such as access tokens and webhook secrets.
   SECRETS_SCAN_OMIT_KEYS = "PAYMENT_PROVIDER,WOMPI_PUBLIC_KEY,MERCADOPAGO_PUBLIC_KEY"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Per-context payment credentials (documentation only)
+#
+# Real values are configured in the Netlify UI under Site settings →
+# Environment variables, scoped by deploy context. NEVER hardcode keys here:
+# this file is committed to git and any value placed below will leak.
+#
+# See docs/testing-production.md for a step-by-step setup and verification
+# checklist, including where to obtain Wompi sandbox keys (sandbox.wompi.co)
+# and Mercado Pago test credentials (mercadopago.com.co/developers).
+#
+# Production context (live keys, real money):
+#   [context.production.environment]
+#     PAYMENT_PROVIDER          = <set-in-netlify-ui>   # "wompi" (active) or "mercadopago" (rollback)
+#     WOMPI_PUBLIC_KEY          = <set-in-netlify-ui>   # pub_prod_*  — from production.wompi.co
+#     WOMPI_INTEGRITY_SECRET    = <set-in-netlify-ui>   # production integrity secret
+#     WOMPI_WEBHOOK_SECRET      = <set-in-netlify-ui>   # production events secret
+#     MERCADOPAGO_PUBLIC_KEY    = <set-in-netlify-ui>   # APP_USR-* (rollback only)
+#     MERCADOPAGO_ACCESS_TOKEN  = <set-in-netlify-ui>   # APP_USR-* (rollback only)
+#     MERCADOPAGO_WEBHOOK_SECRET= <set-in-netlify-ui>
+#
+# Deploy previews (every PR build — must use sandbox keys, no real money):
+#   [context.deploy-preview.environment]
+#     PAYMENT_PROVIDER          = <set-in-netlify-ui>   # match what you want to test
+#     WOMPI_PUBLIC_KEY          = <set-in-netlify-ui>   # pub_test_*  — from sandbox.wompi.co
+#     WOMPI_INTEGRITY_SECRET    = <set-in-netlify-ui>   # sandbox integrity secret
+#     WOMPI_WEBHOOK_SECRET      = <set-in-netlify-ui>   # sandbox events secret
+#     MERCADOPAGO_PUBLIC_KEY    = <set-in-netlify-ui>   # TEST-*
+#     MERCADOPAGO_ACCESS_TOKEN  = <set-in-netlify-ui>   # TEST-*
+#     MERCADOPAGO_WEBHOOK_SECRET= <set-in-netlify-ui>
+#
+# Branch deploys (any non-production branch — same sandbox keys as previews).
+# Recommended: use a stable `staging` branch and register webhook URLs against
+# its deploy URL so webhooks survive between PRs. See docs/testing-production.md.
+#   [context.branch-deploy.environment]
+#     # Mirror deploy-preview values above.
+#
+# The booking engine reads window.WOMPI_PUBLIC_KEY / window.MERCADOPAGO_PUBLIC_KEY
+# and shows a "MODO PRUEBA / TEST MODE" banner on the payment step whenever the
+# key prefix is sandbox (pub_test_ / TEST-). This banner is the visible signal
+# that a build is wired to the sandbox.
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Configuration for Netlify deployment and serverless redirects
 [[redirects]]
   from = "/en"
