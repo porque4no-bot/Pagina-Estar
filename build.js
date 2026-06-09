@@ -139,12 +139,21 @@ filesToCopy.forEach(file => {
   copyFileSync(path.join(rootDir, file), path.join(distDir, file));
 });
 
-// Copy all HTML files from root to dist
+// Copy all HTML files from root to dist (skip generator templates, prefixed `_`).
 fs.readdirSync(rootDir).forEach(file => {
-  if (file.endsWith('.html')) {
+  if (file.endsWith('.html') && !file.startsWith('_')) {
     fs.copyFileSync(path.join(rootDir, file), path.join(distDir, file));
   }
 });
+
+// Generate the 5 room pages from a single template + rooms_db.json so the
+// ES/EN versions stay in lockstep automatically. The generator writes into
+// dist (overwriting the just-copied source HTMLs); subsequent passes —
+// bilingual strip, GA4 inject, CSS bundle/Lucide inline — then process the
+// generated files the same way they process the rest of the static site.
+console.log('Generating room pages from template + rooms_db.json...');
+const { generateRoomPages } = require('./build-rooms');
+generateRoomPages({ rootDir, targetDir: distDir });
 
 // Inject GA4 into all HTML files in dist (including en/ subdir)
 const GA4_ID = 'G-9PB0Z2KQJK';
