@@ -6,15 +6,10 @@
 [functions]
   included_files = ["rooms_db.json"]
   node_bundler = "esbuild"
-  # @sparticuz/chromium ships a ~50MB Brotli-compressed Chromium binary that
-  # cannot be bundled by esbuild and must be loaded from node_modules at
-  # runtime. puppeteer-core also expects its native dependencies to stay
-  # external. Both are used by guest-drive to render the contract PDF.
   external_node_modules = [
     "@netlify/blobs",
-    "@sparticuz/chromium",
     "googleapis",
-    "puppeteer-core"
+    "pdfkit"
   ]
 
 # Re-check room availability for active quotes a few times a day
