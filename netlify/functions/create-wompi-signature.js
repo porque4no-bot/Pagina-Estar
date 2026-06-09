@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { getQuoteStore, loadQuote, effectiveStatus, computeQuoteTotal } = require('./_quotes-store');
 
 function corsHeaders() {
   const headers = {
@@ -61,11 +62,35 @@ exports.handler = async (event) => {
   catch (e) { return json(400, { error: 'Invalid JSON request body' }); }
 
   const reference = cleanReference(body.reference);
-  const amountInCents = parseInt(body.amountInCents, 10);
+  const clientAmountInCents = parseInt(body.amountInCents, 10);
   const currency = String(body.currency || 'COP').trim().toUpperCase();
 
-  if (!reference || reference.length > 255 || !Number.isFinite(amountInCents) || amountInCents <= 0 || currency !== 'COP') {
+  if (!reference || reference.length > 255 || !Number.isFinite(clientAmountInCents) || clientAmountInCents <= 0 || currency !== 'COP') {
     return json(400, { error: 'Invalid Wompi signature payload' });
+  }
+
+  /* For corporate quote payments (reference matches COT-YYYY-XXXXX), the amount
+     is NOT trusted from the cliente. We load the quote from the store, recompute
+     the total via computeQuoteTotal and sign with THAT value. This prevents a
+     cliente from initiating arbitrary-amount payments against any quote. */
+  let amountInCents = clientAmountInCents;
+  const isQuoteRef = /^COT-\d{4}-[A-Z0-9]{5}$/.test(reference);
+  if (isQuoteRef) {
+    let quote;
+    try { quote = await loadQuote(getQuoteStore(), reference); }
+    catch (e) {
+      console.error('[create-wompi-signature] quote store unavailable:', e.message);
+      return json(503, { error: 'Cotización no disponible. Intenta de nuevo.' });
+    }
+    if (!quote) return json(404, { error: 'Cotización no encontrada' });
+
+    const status = effectiveStatus(quote);
+    if (status === 'cancelada' || status === 'vencida' || status === 'aceptada') {
+      return json(409, { error: `Cotización ${status}, no se puede pagar` });
+    }
+
+    const totals = computeQuoteTotal(quote);
+    amountInCents = totals.totalCents;
   }
 
   const integrity = crypto
