@@ -16,12 +16,203 @@
       "assets/photos/tipo1/3.webp"
     ],
     "amenities": [
-      {"icon": "wifi", "l": "WiFi fibra"},
-      {"icon": "tv", "l": "TV Cable"},
-      {"icon": "cooking-pot", "l": "Cocina equipada"},
-      {"icon": "shower-head", "l": "Baño privado"},
-      {"icon": "wind", "l": "Secador de pelo"}
-    ]
+      {
+        "icon": "wifi",
+        "l": "WiFi fibra"
+      },
+      {
+        "icon": "tv",
+        "l": "TV Cable"
+      },
+      {
+        "icon": "cooking-pot",
+        "l": "Cocina equipada"
+      },
+      {
+        "icon": "shower-head",
+        "l": "Baño privado"
+      },
+      {
+        "icon": "wind",
+        "l": "Secador de pelo"
+      }
+    ],
+    "page": {
+      "seo": {
+        "title": {
+          "es": "Apartaestudio Clásica · estar · Alojamiento en Manizales",
+          "en": "Studio Clásica · estar · Accommodation in Manizales"
+        },
+        "description": {
+          "es": "Apartaestudio Clásica — alojamiento amoblado en El Cable, Manizales. Hotel boutique con cama doble, cocina equipada, baño privado y WiFi fibra en 29 m².",
+          "en": "Studio Clásica in El Cable, Manizales. Double bed, equipped kitchen, private bathroom and fiber WiFi in 29 sqm."
+        },
+        "ogImage": "https://estar.com.co/assets/photos/clasic.webp"
+      },
+      "jsonLd": {
+        "price": "140000",
+        "maxOccupancy": 2,
+        "floorSize": 29
+      },
+      "screenLabel": "03.1 Habitación Clásica",
+      "bodyExtraAttrs": "",
+      "hero": {
+        "color": "olive",
+        "pill": {
+          "es": "Tipología 01",
+          "en": "Type 01"
+        },
+        "name": {
+          "es": "Clásica.",
+          "en": "Clásica."
+        },
+        "lead": {
+          "es": "Compacto, cálido y funcional. Diseñado para optimizar cada metro cuadrado en una estancia sin complicaciones.",
+          "en_inline": "Compact, warm, and functional. Designed to optimize every square meter for a hassle-free stay.",
+          "en": "Compact, warm, and functional. Designed to optimize every square meter for a hassle-free stay."
+        }
+      },
+      "detail": {
+        "h2": {
+          "es": "Apartaestudio en El Cable y La Estrella: estancia de diseño",
+          "en_inline": "Studio apartment in El Cable & La Estrella: design stay",
+          "en": "Studio apartment in El Cable &amp; La Estrella: design stay"
+        },
+        "body": {
+          "es": "Cama doble, cocina equipada con estufa, microondas y cafetera, baño privado con ducha y secador de pelo. Todo lo que necesitas en 29 m² cálidos y bien aprovechados.",
+          "en_inline": "Double bed, kitchen with stove, microwave and coffee maker, private bathroom with shower and hair dryer. Everything you need in 29 sqm, warm and well laid out.",
+          "en": "Double bed, kitchen with stove, microwave and coffee maker, private bathroom with shower and hair dryer. Everything you need in 29 sqm, warm and well laid out."
+        },
+        "specs": {
+          "capacity": {
+            "es": "2 personas",
+            "en_inline": "2 guests",
+            "en": "2 guests"
+          },
+          "bed": {
+            "es": "1 cama doble",
+            "en_inline": "1 double bed",
+            "en": "1 double bed"
+          },
+          "area": {
+            "es": "29 m²",
+            "en_inline": "312 sq ft",
+            "en": "312 sq ft"
+          },
+          "view": {
+            "es": "Interior",
+            "en_inline": "Interior view",
+            "en": "Interior view"
+          }
+        },
+        "amenities": {
+          "es": [
+            {
+              "icon": "wifi",
+              "l_es": "WiFi fibra",
+              "l_en": "WiFi (fiber)"
+            },
+            {
+              "icon": "tv",
+              "l_es": "TV Cable",
+              "l_en": "TV Cable"
+            },
+            {
+              "icon": "cooking-pot",
+              "l_es": "Cocina equipada",
+              "l_en": "Equipped kitchen"
+            },
+            {
+              "icon": "shower-head",
+              "l_es": "Baño privado",
+              "l_en": "Private bathroom"
+            },
+            {
+              "icon": "wind",
+              "l_es": "Secador de pelo",
+              "l_en": "Hair dryer"
+            },
+            {
+              "icon": "shirt",
+              "l_es": "Plancha y tabla",
+              "l_en": "Iron and board"
+            }
+          ],
+          "en": [
+            {
+              "icon": "wifi",
+              "l": "WiFi (fiber)"
+            },
+            {
+              "icon": "tv",
+              "l": "TV Cable"
+            },
+            {
+              "icon": "cooking-pot",
+              "l": "Equipped kitchen"
+            },
+            {
+              "icon": "shower-head",
+              "l": "Private bathroom"
+            },
+            {
+              "icon": "wind",
+              "l": "Hair dryer"
+            },
+            {
+              "icon": "shirt",
+              "l": "Iron and board"
+            }
+          ]
+        }
+      },
+      "pricing": {
+        "h2": {
+          "es": "Tarifas de alquiler mensual y estancias turísticas <span class=\"serif-italic\">en Manizales.</span>",
+          "en_inline": "Monthly rental and tourist stay rates <span class=\"serif-italic\">in Manizales.</span>",
+          "en": "Monthly rental and tourist stay rates <span class=\"serif-italic\">in Manizales.</span>"
+        },
+        "tiers": [
+          {
+            "featured": false,
+            "amount": "$ 2.800.000",
+            "save": {
+              "es": "Sin descuento",
+              "en": "No discount"
+            }
+          },
+          {
+            "featured": false,
+            "amount": "$ 2.000.000",
+            "save": {
+              "es": "Ahorras 29%",
+              "en": "Save 29%"
+            }
+          },
+          {
+            "featured": true,
+            "amount": "$ 1.800.000",
+            "save": {
+              "es": "Más pedido — 36%",
+              "en": "Best seller — 36%"
+            }
+          },
+          {
+            "featured": false,
+            "amount": "$ 1.700.000",
+            "save": {
+              "es": "Ahorras 39%",
+              "en": "Save 39%"
+            }
+          }
+        ]
+      },
+      "sliderImages": [
+        "assets/photos/tipo1/1.webp",
+        "assets/photos/tipo1/2.webp",
+        "assets/photos/tipo1/3.webp"
+      ]
+    }
   },
   "31349": {
     "id": "seleccion",
@@ -41,12 +232,204 @@
       "assets/photos/tipo2/4.webp"
     ],
     "amenities": [
-      {"icon": "building-2", "l": "Vista a la ciudad"},
-      {"icon": "wifi", "l": "WiFi fibra"},
-      {"icon": "tv", "l": "TV Cable"},
-      {"icon": "cooking-pot", "l": "Cocina equipada"},
-      {"icon": "users", "l": "Hasta 5 personas"}
-    ]
+      {
+        "icon": "building-2",
+        "l": "Vista a la ciudad"
+      },
+      {
+        "icon": "wifi",
+        "l": "WiFi fibra"
+      },
+      {
+        "icon": "tv",
+        "l": "TV Cable"
+      },
+      {
+        "icon": "cooking-pot",
+        "l": "Cocina equipada"
+      },
+      {
+        "icon": "users",
+        "l": "Hasta 5 personas"
+      }
+    ],
+    "page": {
+      "seo": {
+        "title": {
+          "es": "Apartaestudio Selección · estar · Alojamiento en Manizales",
+          "en": "Studio Selección · estar · Accommodation in Manizales"
+        },
+        "description": {
+          "es": "Apartaestudio Selección — alojamiento boutique en Manizales con vista a la ciudad. Hotel boutique Estar en El Cable: 36 m², hasta 5 huéspedes, 1 king + 1 doble + 1 sencilla, WiFi fibra.",
+          "en": "Studio Selección — boutique lodging in Manizales with city view. Estar boutique hotel in El Cable: 36 sqm, up to 5 guests, 1 king + 1 double + 1 single bed, fiber WiFi."
+        },
+        "ogImage": "https://estar.com.co/assets/photos/fachada.webp"
+      },
+      "jsonLd": {
+        "price": "224000",
+        "maxOccupancy": 5,
+        "floorSize": 36
+      },
+      "screenLabel": "03.2 Habitación Selección",
+      "bodyExtraAttrs": "",
+      "hero": {
+        "color": "terracotta",
+        "pill": {
+          "es": "Tipología 02",
+          "en": "Type 02"
+        },
+        "name": {
+          "es": "Selección.",
+          "en": "Selección."
+        },
+        "lead": {
+          "es": "Apartaestudio de 36 m² con vista a la ciudad y tres camas para hasta 5 huéspedes. Cocina completa, baño privado con secador de pelo y todo lo que necesitas para estar bien.",
+          "en_inline": "36 sqm studio with city view and three beds for up to 5 guests. Full kitchen, private bathroom with hair dryer and everything you need for a great stay.",
+          "en": "36 sqm studio with city view and three beds for up to 5 guests. Full kitchen, private bathroom with hair dryer and everything you need for a great stay."
+        }
+      },
+      "detail": {
+        "h2": {
+          "es": "Apartaestudio amoblado en La Estrella y El Cable para hasta 5 huéspedes",
+          "en_inline": "Furnished studio apartment in La Estrella &amp; El Cable for up to 5 guests",
+          "en": "Furnished studio apartment in La Estrella &amp; El Cable for up to 5 guests"
+        },
+        "body": {
+          "es": "Con 36 m² y vista a la ciudad, Selección es el apartaestudio más versátil del hotel. Tres camas —king, doble y sencilla— permiten alojar hasta 5 personas con total comodidad. Cocina equipada con estufa, microondas y cafetera, baño privado con ducha y secador de pelo.",
+          "en_inline": "At 36 sqm with city view, Selección is the hotel's most versatile studio. Three beds — king, double and single — accommodate up to 5 guests comfortably. Equipped kitchen with stove, microwave and coffee maker, private bathroom with shower and hair dryer.",
+          "en": "At 36 sqm with city view, Selección is the hotel's most versatile studio. Three beds — king, double and single — accommodate up to 5 guests comfortably. Equipped kitchen with stove, microwave and coffee maker, private bathroom with shower and hair dryer."
+        },
+        "specs": {
+          "capacity": {
+            "es": "5 personas",
+            "en_inline": "5 guests",
+            "en": "5 guests"
+          },
+          "bed": {
+            "es": "1 king + 1 doble + 1 sencilla",
+            "en_inline": "1 king + 1 double + 1 single",
+            "en": "1 king + 1 double + 1 single"
+          },
+          "area": {
+            "es": "36 m²",
+            "en_inline": "388 sq ft",
+            "en": "388 sq ft"
+          },
+          "view": {
+            "es": "Ciudad",
+            "en_inline": "City view",
+            "en": "City view"
+          }
+        },
+        "amenities": {
+          "es": [
+            {
+              "icon": "building-2",
+              "l_es": "Vista a la ciudad",
+              "l_en": "City view"
+            },
+            {
+              "icon": "wifi",
+              "l_es": "WiFi fibra",
+              "l_en": "WiFi (fiber)"
+            },
+            {
+              "icon": "tv",
+              "l_es": "TV Cable",
+              "l_en": "TV Cable"
+            },
+            {
+              "icon": "cooking-pot",
+              "l_es": "Cocina equipada",
+              "l_en": "Equipped kitchen"
+            },
+            {
+              "icon": "shower-head",
+              "l_es": "Baño privado",
+              "l_en": "Private bathroom"
+            },
+            {
+              "icon": "wind",
+              "l_es": "Secador de pelo",
+              "l_en": "Hair dryer"
+            }
+          ],
+          "en": [
+            {
+              "icon": "building-2",
+              "l": "City view"
+            },
+            {
+              "icon": "wifi",
+              "l": "WiFi (fiber)"
+            },
+            {
+              "icon": "tv",
+              "l": "TV Cable"
+            },
+            {
+              "icon": "cooking-pot",
+              "l": "Equipped kitchen"
+            },
+            {
+              "icon": "shower-head",
+              "l": "Private bathroom"
+            },
+            {
+              "icon": "wind",
+              "l": "Hair dryer"
+            }
+          ]
+        }
+      },
+      "pricing": {
+        "h2": {
+          "es": "Tarifas de estancias turísticas y apartaestudios <span class=\"serif-italic\">en Manizales.</span>",
+          "en_inline": "Rates for tourist stays and studio apartments <span class=\"serif-italic\">in Manizales.</span>",
+          "en": "Rates for tourist stays and studio apartments <span class=\"serif-italic\">in Manizales.</span>"
+        },
+        "tiers": [
+          {
+            "featured": false,
+            "amount": "$ 3.200.000",
+            "save": {
+              "es": "Sin descuento",
+              "en": "No discount"
+            }
+          },
+          {
+            "featured": false,
+            "amount": "$ 2.400.000",
+            "save": {
+              "es": "Ahorras 25%",
+              "en": "Save 25%"
+            }
+          },
+          {
+            "featured": true,
+            "amount": "$ 2.100.000",
+            "save": {
+              "es": "Más pedido — 34%",
+              "en": "Best seller — 34%"
+            }
+          },
+          {
+            "featured": false,
+            "amount": "$ 2.000.000",
+            "save": {
+              "es": "Ahorras 38%",
+              "en": "Save 38%"
+            }
+          }
+        ]
+      },
+      "sliderImages": [
+        "assets/photos/tipo2/1.webp",
+        "assets/photos/tipo2/2.webp",
+        "assets/photos/tipo2/3.webp",
+        "assets/photos/tipo2/4.webp"
+      ]
+    }
   },
   "31350": {
     "id": "reserva",
@@ -65,12 +448,203 @@
       "assets/photos/tipo3/3.webp"
     ],
     "amenities": [
-      {"icon": "building-2", "l": "Vista a la ciudad"},
-      {"icon": "wifi", "l": "WiFi fibra"},
-      {"icon": "tv", "l": "TV Cable"},
-      {"icon": "cooking-pot", "l": "Cocina equipada"},
-      {"icon": "wind", "l": "Secador de pelo"}
-    ]
+      {
+        "icon": "building-2",
+        "l": "Vista a la ciudad"
+      },
+      {
+        "icon": "wifi",
+        "l": "WiFi fibra"
+      },
+      {
+        "icon": "tv",
+        "l": "TV Cable"
+      },
+      {
+        "icon": "cooking-pot",
+        "l": "Cocina equipada"
+      },
+      {
+        "icon": "wind",
+        "l": "Secador de pelo"
+      }
+    ],
+    "page": {
+      "seo": {
+        "title": {
+          "es": "Apartaestudio Reserva · estar · Alojamiento en Manizales",
+          "en": "Studio Reserva · estar · Accommodation in Manizales"
+        },
+        "description": {
+          "es": "Apartaestudio Reserva — alojamiento en El Cable, Manizales. 24 m² con vista a la ciudad, cama doble, cocina equipada y baño privado. Hotel boutique Estar.",
+          "en": "Studio Reserva — accommodation in El Cable, Manizales. 24 sqm with city view, double bed, equipped kitchen and private bathroom. Estar boutique hotel."
+        },
+        "ogImage": "https://estar.com.co/assets/photos/reserva.webp"
+      },
+      "jsonLd": {
+        "price": "172000",
+        "maxOccupancy": 2,
+        "floorSize": 24
+      },
+      "screenLabel": "03.3 Habitación Reserva",
+      "bodyExtraAttrs": "",
+      "hero": {
+        "color": "olive",
+        "pill": {
+          "es": "Tipología 03",
+          "en": "Type 03"
+        },
+        "name": {
+          "es": "Reserva.",
+          "en": "Reserva."
+        },
+        "lead": {
+          "es": "24 m² con vista a la ciudad. Cama doble, cocina equipada y baño privado con secador de pelo. Compacto, bien resuelto y con todo lo esencial.",
+          "en_inline": "24 sqm with city view. Double bed, equipped kitchen and private bathroom with hair dryer. Compact, well designed and with all the essentials.",
+          "en": "More space, greater comfort. Clearly defined areas to separate rest from work or leisure."
+        }
+      },
+      "detail": {
+        "h2": {
+          "es": "Apartaestudio íntimo con vista a la ciudad en La Estrella y El Cable",
+          "en_inline": "Cozy studio apartment with city view in La Estrella &amp; El Cable",
+          "en": "Cozy studio apartment with city view in La Estrella &amp; El Cable"
+        },
+        "body": {
+          "es": "24 m² con vista a la ciudad. Cama doble, cocina equipada con estufa, microondas y cafetera, baño privado con ducha y secador de pelo. Compacto, bien resuelto y con todo lo esencial.",
+          "en_inline": "24 sqm with city view. Double bed, kitchen with stove, microwave and coffee maker, private bathroom with shower and hair dryer. Compact, well designed and with all the essentials.",
+          "en": "24 sqm with city view. Double bed, kitchen with stove, microwave and coffee maker, private bathroom with shower and hair dryer. Compact, well designed and with all the essentials."
+        },
+        "specs": {
+          "capacity": {
+            "es": "2 personas",
+            "en_inline": "2 guests",
+            "en": "2 guests"
+          },
+          "bed": {
+            "es": "1 cama doble",
+            "en_inline": "1 double bed",
+            "en": "1 double bed"
+          },
+          "area": {
+            "es": "24 m²",
+            "en_inline": "258 sq ft",
+            "en": "258 sq ft"
+          },
+          "view": {
+            "es": "Ciudad",
+            "en_inline": "City view",
+            "en": "City view"
+          }
+        },
+        "amenities": {
+          "es": [
+            {
+              "icon": "building-2",
+              "l_es": "Vista a la ciudad",
+              "l_en": "City view"
+            },
+            {
+              "icon": "wifi",
+              "l_es": "WiFi fibra",
+              "l_en": "WiFi (fiber)"
+            },
+            {
+              "icon": "tv",
+              "l_es": "TV Cable",
+              "l_en": "TV Cable"
+            },
+            {
+              "icon": "cooking-pot",
+              "l_es": "Cocina equipada",
+              "l_en": "Equipped kitchen"
+            },
+            {
+              "icon": "shower-head",
+              "l_es": "Baño privado",
+              "l_en": "Private bathroom"
+            },
+            {
+              "icon": "wind",
+              "l_es": "Secador de pelo",
+              "l_en": "Hair dryer"
+            }
+          ],
+          "en": [
+            {
+              "icon": "building-2",
+              "l": "City view"
+            },
+            {
+              "icon": "wifi",
+              "l": "WiFi (fiber)"
+            },
+            {
+              "icon": "tv",
+              "l": "TV Cable"
+            },
+            {
+              "icon": "cooking-pot",
+              "l": "Equipped kitchen"
+            },
+            {
+              "icon": "shower-head",
+              "l": "Private bathroom"
+            },
+            {
+              "icon": "wind",
+              "l": "Hair dryer"
+            }
+          ]
+        }
+      },
+      "pricing": {
+        "h2": {
+          "es": "Tarifas de estancias turísticas y apartaestudios <span class=\"serif-italic\">en Manizales.</span>",
+          "en_inline": "Rates for tourist stays and studio apartments <span class=\"serif-italic\">in Manizales.</span>",
+          "en": "Rates for tourist stays and studio apartments <span class=\"serif-italic\">in Manizales.</span>"
+        },
+        "tiers": [
+          {
+            "featured": false,
+            "amount": "$ 3.000.000",
+            "save": {
+              "es": "Sin descuento",
+              "en": "No discount"
+            }
+          },
+          {
+            "featured": false,
+            "amount": "$ 2.200.000",
+            "save": {
+              "es": "Ahorras 27%",
+              "en": "Save 27%"
+            }
+          },
+          {
+            "featured": true,
+            "amount": "$ 2.000.000",
+            "save": {
+              "es": "Más pedido — 33%",
+              "en": "Best seller — 33%"
+            }
+          },
+          {
+            "featured": false,
+            "amount": "$ 1.850.000",
+            "save": {
+              "es": "Ahorras 38%",
+              "en": "Save 38%"
+            }
+          }
+        ]
+      },
+      "sliderImages": [
+        "assets/photos/tipo3/1.webp",
+        "assets/photos/tipo3/2.webp",
+        "assets/photos/tipo3/3.webp"
+      ]
+    }
   },
   "31351": {
     "id": "origen",
@@ -91,12 +665,205 @@
       "assets/photos/tipo4/5.webp"
     ],
     "amenities": [
-      {"icon": "building-2", "l": "Vista a la ciudad"},
-      {"icon": "wifi", "l": "WiFi fibra"},
-      {"icon": "tv", "l": "TV Cable"},
-      {"icon": "cooking-pot", "l": "Cocina equipada"},
-      {"icon": "users", "l": "Hasta 3 personas"}
-    ]
+      {
+        "icon": "building-2",
+        "l": "Vista a la ciudad"
+      },
+      {
+        "icon": "wifi",
+        "l": "WiFi fibra"
+      },
+      {
+        "icon": "tv",
+        "l": "TV Cable"
+      },
+      {
+        "icon": "cooking-pot",
+        "l": "Cocina equipada"
+      },
+      {
+        "icon": "users",
+        "l": "Hasta 3 personas"
+      }
+    ],
+    "page": {
+      "seo": {
+        "title": {
+          "es": "Apartaestudio Origen · estar · Alojamiento en Manizales",
+          "en": "Studio Origen · estar · Accommodation in Manizales"
+        },
+        "description": {
+          "es": "Apartaestudio Origen — alojamiento en Manizales con vista a la ciudad. 29 m², cama king + cama sencilla, hasta 3 huéspedes. Hotel boutique Estar en La Estrella.",
+          "en": "Studio Origen in Manizales. City view, king bed and single bed for up to 3 guests, equipped kitchen in 29 sqm. Estar boutique hotel in La Estrella."
+        },
+        "ogImage": "https://estar.com.co/assets/photos/origen.webp"
+      },
+      "jsonLd": {
+        "price": "221000",
+        "maxOccupancy": 3,
+        "floorSize": 29
+      },
+      "screenLabel": "03.4 Habitación Origen",
+      "bodyExtraAttrs": "data-header=\"dark\"",
+      "hero": {
+        "color": "sand",
+        "pill": {
+          "es": "Tipología 04",
+          "en": "Type 04"
+        },
+        "name": {
+          "es": "Origen.",
+          "en": "Origen."
+        },
+        "lead": {
+          "es": "Apartaestudio de 29 m² con vista a la ciudad, cama king y cama sencilla para hasta 3 huéspedes. Cocina completa y baño privado con secador de pelo.",
+          "en_inline": "29 sqm studio with city view, king bed and single bed for up to 3 guests. Full kitchen and private bathroom with hair dryer.",
+          "en": "29 sqm studio with city view, king bed and single bed for up to 3 guests. Full kitchen and private bathroom with hair dryer."
+        }
+      },
+      "detail": {
+        "h2": {
+          "es": "Apartaestudio con vista a la ciudad y cama king en La Estrella",
+          "en_inline": "Studio apartment with city view and king bed in La Estrella",
+          "en": "Studio apartment with city view and king bed in La Estrella"
+        },
+        "body": {
+          "es": "Con 29 m² y vista a la ciudad, Origen ofrece cama king para dos más cama sencilla —la opción ideal para parejas que viajan con un acompañante—. Cocina equipada con estufa, microondas y cafetera, baño privado con ducha y secador de pelo.",
+          "en_inline": "At 29 sqm with city view, Origen offers a king bed for two plus a single bed — the ideal option for couples traveling with a companion. Equipped kitchen with stove, microwave and coffee maker, private bathroom with shower and hair dryer.",
+          "en": "At 29 sqm with city view, Origen offers a king bed for two plus a single bed — the ideal option for couples traveling with a companion. Equipped kitchen with stove, microwave and coffee maker, private bathroom with shower and hair dryer."
+        },
+        "specs": {
+          "capacity": {
+            "es": "3 personas",
+            "en_inline": "3 guests",
+            "en": "3 guests"
+          },
+          "bed": {
+            "es": "1 king + 1 sencilla",
+            "en_inline": "1 king + 1 single bed",
+            "en": "1 king + 1 single bed"
+          },
+          "area": {
+            "es": "29 m²",
+            "en_inline": "312 sq ft",
+            "en": "312 sq ft"
+          },
+          "view": {
+            "es": "Ciudad",
+            "en_inline": "City view",
+            "en": "City view"
+          }
+        },
+        "amenities": {
+          "es": [
+            {
+              "icon": "building-2",
+              "l_es": "Vista a la ciudad",
+              "l_en": "City view"
+            },
+            {
+              "icon": "wifi",
+              "l_es": "WiFi fibra",
+              "l_en": "WiFi (fiber)"
+            },
+            {
+              "icon": "tv",
+              "l_es": "TV Cable",
+              "l_en": "TV Cable"
+            },
+            {
+              "icon": "cooking-pot",
+              "l_es": "Cocina equipada",
+              "l_en": "Equipped kitchen"
+            },
+            {
+              "icon": "shower-head",
+              "l_es": "Baño privado",
+              "l_en": "Private bathroom"
+            },
+            {
+              "icon": "wind",
+              "l_es": "Secador de pelo",
+              "l_en": "Hair dryer"
+            }
+          ],
+          "en": [
+            {
+              "icon": "building-2",
+              "l": "City view"
+            },
+            {
+              "icon": "wifi",
+              "l": "WiFi (fiber)"
+            },
+            {
+              "icon": "tv",
+              "l": "TV Cable"
+            },
+            {
+              "icon": "cooking-pot",
+              "l": "Equipped kitchen"
+            },
+            {
+              "icon": "shower-head",
+              "l": "Private bathroom"
+            },
+            {
+              "icon": "wind",
+              "l": "Hair dryer"
+            }
+          ]
+        }
+      },
+      "pricing": {
+        "h2": {
+          "es": "Tarifas de alquiler mensual y estancias turísticas <span class=\"serif-italic\">en Manizales.</span>",
+          "en_inline": "Monthly rental and tourist stay rates <span class=\"serif-italic\">in Manizales.</span>",
+          "en": "Monthly rental and tourist stay rates <span class=\"serif-italic\">in Manizales.</span>"
+        },
+        "tiers": [
+          {
+            "featured": false,
+            "amount": "$ 3.200.000",
+            "save": {
+              "es": "Sin descuento",
+              "en": "No discount"
+            }
+          },
+          {
+            "featured": false,
+            "amount": "$ 2.300.000",
+            "save": {
+              "es": "Ahorras 28%",
+              "en": "Save 28%"
+            }
+          },
+          {
+            "featured": true,
+            "amount": "$ 2.100.000",
+            "save": {
+              "es": "Más pedido — 34%",
+              "en": "Best seller — 34%"
+            }
+          },
+          {
+            "featured": false,
+            "amount": "$ 1.950.000",
+            "save": {
+              "es": "Ahorras 39%",
+              "en": "Save 39%"
+            }
+          }
+        ]
+      },
+      "sliderImages": [
+        "assets/photos/tipo4/1.webp",
+        "assets/photos/tipo4/2.webp",
+        "assets/photos/tipo4/3.webp",
+        "assets/photos/tipo4/4.webp",
+        "assets/photos/tipo4/5.webp"
+      ]
+    }
   },
   "31352": {
     "id": "especial",
@@ -116,11 +883,203 @@
       "assets/photos/tipo5/4.webp"
     ],
     "amenities": [
-      {"icon": "building-2", "l": "Vista a la ciudad"},
-      {"icon": "wifi", "l": "WiFi fibra"},
-      {"icon": "tv", "l": "TV Cable"},
-      {"icon": "cooking-pot", "l": "Cocina equipada"},
-      {"icon": "wind", "l": "Secador de pelo"}
-    ]
+      {
+        "icon": "building-2",
+        "l": "Vista a la ciudad"
+      },
+      {
+        "icon": "wifi",
+        "l": "WiFi fibra"
+      },
+      {
+        "icon": "tv",
+        "l": "TV Cable"
+      },
+      {
+        "icon": "cooking-pot",
+        "l": "Cocina equipada"
+      },
+      {
+        "icon": "wind",
+        "l": "Secador de pelo"
+      }
+    ],
+    "page": {
+      "seo": {
+        "title": {
+          "es": "Apartaestudio Especial · estar · Alojamiento en Manizales",
+          "en": "Studio Especial · estar · Accommodation in Manizales"
+        },
+        "description": {
+          "es": "Apartaestudio Especial — alojamiento en Manizales con vista a la ciudad. 27 m², cama doble, cocina equipada y baño privado. Hotel boutique Estar en El Cable.",
+          "en": "Studio Especial in Manizales. City view, double bed and equipped kitchen in 27 sqm. Estar boutique hotel in El Cable."
+        },
+        "ogImage": "https://estar.com.co/assets/photos/especial.webp"
+      },
+      "jsonLd": {
+        "price": "165000",
+        "maxOccupancy": 2,
+        "floorSize": 27
+      },
+      "screenLabel": "03.5 Habitación Especial",
+      "bodyExtraAttrs": "",
+      "hero": {
+        "color": "ink",
+        "pill": {
+          "es": "Tipología 05",
+          "en": "Type 05"
+        },
+        "name": {
+          "es": "Especial.",
+          "en": "Especial."
+        },
+        "lead": {
+          "es": "Apartaestudio de 27 m² con vista a la ciudad, cama doble y todos los servicios incluidos.",
+          "en_inline": "27 sqm studio with city view, double bed and all services included.",
+          "en": "27 sqm studio with city view, double bed and all services included."
+        }
+      },
+      "detail": {
+        "h2": {
+          "es": "Apartaestudio con vista a la ciudad en El Cable",
+          "en_inline": "Studio apartment with city view in El Cable",
+          "en": "Studio apartment with city view in El Cable"
+        },
+        "body": {
+          "es": "27 m² con vista a la ciudad. Cama doble, cocina equipada con estufa, microondas y cafetera, baño privado con ducha, secador de pelo y plancha. Un apartaestudio completo y bien equipado para dos.",
+          "en_inline": "27 sqm with city view. Double bed, kitchen with stove, microwave and coffee maker, private bathroom with shower, hair dryer and iron. A complete and well-equipped studio for two.",
+          "en": "27 sqm with city view. Double bed, kitchen with stove, microwave and coffee maker, private bathroom with shower, hair dryer and iron. A complete and well-equipped studio for two."
+        },
+        "specs": {
+          "capacity": {
+            "es": "2 personas",
+            "en_inline": "2 guests",
+            "en": "2 guests"
+          },
+          "bed": {
+            "es": "1 cama doble",
+            "en_inline": "1 double bed",
+            "en": "1 double bed"
+          },
+          "area": {
+            "es": "27 m²",
+            "en_inline": "291 sq ft",
+            "en": "291 sq ft"
+          },
+          "view": {
+            "es": "Ciudad",
+            "en_inline": "City view",
+            "en": "City view"
+          }
+        },
+        "amenities": {
+          "es": [
+            {
+              "icon": "building-2",
+              "l_es": "Vista a la ciudad",
+              "l_en": "City view"
+            },
+            {
+              "icon": "wifi",
+              "l_es": "WiFi fibra",
+              "l_en": "WiFi (fiber)"
+            },
+            {
+              "icon": "tv",
+              "l_es": "TV Cable",
+              "l_en": "TV Cable"
+            },
+            {
+              "icon": "cooking-pot",
+              "l_es": "Cocina equipada",
+              "l_en": "Equipped kitchen"
+            },
+            {
+              "icon": "shower-head",
+              "l_es": "Baño privado",
+              "l_en": "Private bathroom"
+            },
+            {
+              "icon": "wind",
+              "l_es": "Secador de pelo",
+              "l_en": "Hair dryer"
+            }
+          ],
+          "en": [
+            {
+              "icon": "building-2",
+              "l": "City view"
+            },
+            {
+              "icon": "wifi",
+              "l": "WiFi (fiber)"
+            },
+            {
+              "icon": "tv",
+              "l": "TV Cable"
+            },
+            {
+              "icon": "cooking-pot",
+              "l": "Equipped kitchen"
+            },
+            {
+              "icon": "shower-head",
+              "l": "Private bathroom"
+            },
+            {
+              "icon": "wind",
+              "l": "Hair dryer"
+            }
+          ]
+        }
+      },
+      "pricing": {
+        "h2": {
+          "es": "Tarifas de estancias y apartaestudios <span class=\"serif-italic\">en Manizales.</span>",
+          "en_inline": "Rates for stays and studio apartments <span class=\"serif-italic\">in Manizales.</span>",
+          "en": "Rates for stays and studio apartments <span class=\"serif-italic\">in Manizales.</span>"
+        },
+        "tiers": [
+          {
+            "featured": false,
+            "amount": "$ 3.000.000",
+            "save": {
+              "es": "Sin descuento",
+              "en": "No discount"
+            }
+          },
+          {
+            "featured": false,
+            "amount": "$ 2.200.000",
+            "save": {
+              "es": "Ahorras 27%",
+              "en": "Save 27%"
+            }
+          },
+          {
+            "featured": true,
+            "amount": "$ 2.000.000",
+            "save": {
+              "es": "Más pedido — 33%",
+              "en": "Best seller — 33%"
+            }
+          },
+          {
+            "featured": false,
+            "amount": "$ 1.850.000",
+            "save": {
+              "es": "Ahorras 38%",
+              "en": "Save 38%"
+            }
+          }
+        ]
+      },
+      "sliderImages": [
+        "assets/photos/tipo5/1.webp",
+        "assets/photos/tipo5/2.webp",
+        "assets/photos/tipo5/3.webp",
+        "assets/photos/tipo5/4.webp"
+      ]
+    }
   }
 }
