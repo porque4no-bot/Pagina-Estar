@@ -29,8 +29,20 @@ npm run test:report
 - Cada página tiene `lang`, `title` y viewport.
 - La portada carga sin errores de JavaScript.
 - El formulario principal conserva fechas y huéspedes al abrir el motor de reservas.
+- El motor completa fechas, selección de habitación, extras y datos del huésped hasta mostrar el pago Wompi.
 - Las páginas de reservas, exploración, privacidad, inglés y Guest App responden.
 - La navegación móvil puede abrirse.
+
+### Cotizaciones y pagos
+
+- Cálculo de IVA 19 %, INC 8 % y descuentos porcentuales o fijos prorrateados.
+- Normalización y límites de cotizaciones, servicios, noches, unidades y comisión.
+- Detección de faltantes de disponibilidad y construcción de extras para OTASync.
+- Decodificación de referencias Wompi, sanitización de campos y heurística de IVA.
+- Verificación criptográfica de la firma Wompi respetando el orden de `signature.properties`.
+- Rechazo de montos incorrectos e idempotencia de cotizaciones ya aceptadas.
+- Registro de pago pendiente cuando no hay disponibilidad o falla OTASync.
+- Liberación de holds antes de crear la reserva confirmada.
 
 ### Guest App
 
