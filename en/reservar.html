@@ -525,8 +525,8 @@
     { id:'early', name:'Early check-in', desc:'Check in from 10:00 am (subject to availability)', price:50000, unit:'per booking', icon:'sunrise' }
   ];
   const BE_PAYMENTS = [
-    { id:'wompi', name:'Secure online payment (Wompi)', desc:'Credit card, PSE, Nequi', icon:'credit-card' }
-    // Rollback Mercado Pago: { id:'mercadopago', name:'Secure online payment (Mercado Pago)', desc:'Credit card, debit card, PSE, and other methods', icon:'credit-card' }
+    { id:'wompi', name:'Wompi', desc:'Colombian cards, PSE, Nequi, Bancolombia', icon:'credit-card' },
+    { id:'mercadopago', name:'Mercado Pago', desc:'International cards, Mercado Pago account', icon:'credit-card' }
   ];
   function dateDiff(a,b){const d1=new Date(a+'T00:00:00'),d2=new Date(b+'T00:00:00');return Math.max(1,Math.round((d2-d1)/86400000))}
   function formatCOP(n){return '$ '+Number(n).toLocaleString('es-CO').replace(/,/g,'.')}

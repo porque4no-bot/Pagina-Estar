@@ -442,10 +442,39 @@ async function processDirectPayment(transaction, corsHeaders) {
   }
   if (!response.ok) throw new Error(`insert/reservation returned status ${response.status}`);
   const data = await response.json();
+  const finalBookingCode = data.id_reservations || decoded.bookingCode;
+
+  /* Make the result visible to the cliente's /api/booking-status polling so
+     the motor knows the reservation landed. The Wompi-specific webhook does
+     the same for its own direct-booking path; keeping both paths writing to
+     'booking-results' lets the polling endpoint be provider-agnostic. */
+  try {
+    const { getStore } = require('@netlify/blobs');
+    const storeOpts = { name: 'booking-results', consistency: 'strong' };
+    if (process.env.BLOBS_TOKEN && process.env.NETLIFY_SITE_ID) {
+      storeOpts.token = process.env.BLOBS_TOKEN;
+      storeOpts.siteID = process.env.NETLIFY_SITE_ID;
+    }
+    const store = getStore(storeOpts);
+    await store.set(
+      `direct-${decoded.bookingCode}`,
+      JSON.stringify({
+        bookingCode: finalBookingCode,
+        otasyncId: data.id_reservations || null,
+        provider: transaction.provider,
+        transactionId: transaction.id,
+        createdAt: new Date().toISOString()
+      }),
+      { ttl: 86400 * 7 }  /* 7 days — covers any reasonable polling/manage window */
+    );
+  } catch (e) {
+    console.warn('[_payments] booking-results write failed (non-fatal):', e.message);
+  }
+
   return {
     statusCode: 200,
     headers: corsHeaders,
-    body: JSON.stringify({ success: true, bookingCode: data.id_reservations || decoded.bookingCode })
+    body: JSON.stringify({ success: true, bookingCode: finalBookingCode })
   };
 }
 
