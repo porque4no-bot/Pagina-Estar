@@ -528,6 +528,7 @@ function writeCspHeaders() {
     'https://apis.google.com',
     'https://www.mercadopago.com.co',
     'https://www.mercadopago.com',
+    'https://static.cloudflareinsights.com',
   ].filter(Boolean).join(' ');
 
   const csp = [
