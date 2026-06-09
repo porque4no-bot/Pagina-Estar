@@ -51,8 +51,10 @@
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-    # Mercado Pago rollback: keep mercadopago.com.co/com + api.mercadopago.com allowed while Wompi is active.
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://checkout.wompi.co https://www.googletagmanager.com https://www.gstatic.com https://apis.google.com https://www.mercadopago.com.co https://www.mercadopago.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self'; connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.mercadopago.com https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://estar-4d0da.firebaseapp.com; frame-src https://checkout.wompi.co https://www.mercadopago.com.co https://www.mercadopago.com https://estar-4d0da.firebaseapp.com https://accounts.google.com https://apis.google.com; object-src 'none'; base-uri 'self'; form-action 'self' https://checkout.wompi.co https://www.mercadopago.com.co https://www.mercadopago.com; frame-ancestors 'self'; upgrade-insecure-requests"
+    # NOTE: Content-Security-Policy is emitted by build.js into dist/_headers
+    # so that inline <script> blocks can be allow-listed by SHA-256 hash and
+    # `'unsafe-inline'` is no longer required on script-src.
+    # See `writeCspHeaders` in build.js for the full directive.
 
 [[headers]]
   for = "/cotizar-admin.html"

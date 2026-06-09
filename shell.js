@@ -844,6 +844,38 @@
     document.body.insertBefore(skip, document.body.firstChild);
   }
 
+  /* ---------- CSP-safe share + manage buttons ----------
+     Replaces former inline onclick handlers so the page can run under
+     a strict CSP without 'unsafe-inline' on script-src. */
+  function setupShareButtons() {
+    var pageLang = (document.documentElement.lang || 'es').toLowerCase().slice(0, 2);
+    var copiedMsg = pageLang === 'en' ? 'Link copied' : 'Enlace copiado';
+    document.querySelectorAll('.share-btn').forEach(function (btn) {
+      if (btn.dataset.shareBound === '1') return;
+      btn.dataset.shareBound = '1';
+      btn.addEventListener('click', function () {
+        if (navigator.share) {
+          navigator.share({ title: document.title, url: window.location.href }).catch(function () {});
+        } else if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(window.location.href).then(function () { alert(copiedMsg); });
+        }
+      });
+    });
+  }
+
+  function setupManageButton() {
+    document.querySelectorAll('a.book-btn[data-i18n="manage_btn"]').forEach(function (a) {
+      if (a.dataset.manageBound === '1') return;
+      a.dataset.manageBound = '1';
+      a.addEventListener('click', function (e) {
+        if (window.enterManageMode) {
+          e.preventDefault();
+          window.enterManageMode();
+        }
+      });
+    });
+  }
+
   // Accesibilidad: marcar contenido principal
   function markMainContent() {
     if (document.getElementById('main-content')) return;
@@ -870,6 +902,8 @@
       setupBookingBarScroll();
       fetchDynamicRating();
       setupNetlifyForms();
+      setupShareButtons();
+      setupManageButton();
     });
   } else {
     injectSkipLink();
@@ -884,5 +918,7 @@
     setupBookingBarScroll();
     fetchDynamicRating();
     setupNetlifyForms();
+    setupShareButtons();
+    setupManageButton();
   }
 })();
