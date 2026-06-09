@@ -56,6 +56,85 @@ test('Drive webhook rejects requests without the internal secret', async () => {
   assert.equal(response.statusCode, 401);
 });
 
+test('Drive webhook generates the contract PDF via service account without calling Apps Script', async () => {
+  const originalFetch = global.fetch;
+  process.env.GUEST_APP_DRIVE_WEBHOOK_SECRET = 'drive-internal-secret';
+  process.env.GOOGLE_DRIVE_APPS_SCRIPT_URL = 'https://script.example/exec';
+  process.env.GOOGLE_DRIVE_APPS_SCRIPT_SECRET = 'apps-script-secret';
+
+  const driveSA = require('../../netlify/functions/_google-drive');
+  const pdfRender = require('../../netlify/functions/_pdf-render');
+  const contractTemplate = require('../../netlify/functions/_contract-template');
+
+  const originals = {
+    isConfigured: driveSA.isConfigured,
+    findOrCreateFolder: driveSA.findOrCreateFolder,
+    uploadFile: driveSA.uploadFile,
+    htmlToPdfBuffer: pdfRender.htmlToPdfBuffer
+  };
+
+  const uploads = [];
+  let appsScriptCalled = false;
+
+  try {
+    driveSA.isConfigured = async () => true;
+    driveSA.rootFolderId = () => 'root-folder-id';
+    driveSA.findOrCreateFolder = async ({ name }) => `folder-${name}`;
+    driveSA.uploadFile = async args => {
+      uploads.push({ name: args.name, mimeType: args.mimeType, folderId: args.folderId });
+      return { id: `id-${uploads.length}`, name: args.name, webViewLink: `https://drive/${args.name}` };
+    };
+    pdfRender.htmlToPdfBuffer = async html => {
+      assert.ok(html.includes('Contrato de Hospedaje'));
+      assert.ok(html.includes('TEST-200'));
+      return Buffer.from('%PDF-fake-contents');
+    };
+
+    global.fetch = async () => {
+      appsScriptCalled = true;
+      return new Response('{}', { status: 200 });
+    };
+
+    const response = await guestDrive({
+      httpMethod: 'POST',
+      headers: { authorization: 'Bearer drive-internal-secret' },
+      body: JSON.stringify({
+        kind: 'guest-contract',
+        record: {
+          bookingCode: 'TEST-200',
+          signedName: 'Andrea <Test> Restrepo',
+          documentNumber: '123456',
+          acceptedTerms: true
+        }
+      })
+    });
+
+    assert.equal(response.statusCode, 201);
+    const payload = body(response);
+    assert.equal(payload.delivered, true);
+    assert.equal(payload.drive.via, 'service-account');
+    assert.equal(payload.drive.kind, 'guest-contract');
+    assert.equal(appsScriptCalled, false, 'Apps Script must not be called when SA succeeds');
+
+    const pdfUpload = uploads.find(u => u.mimeType === 'application/pdf');
+    assert.ok(pdfUpload, 'expected a PDF upload to be performed');
+    assert.match(pdfUpload.name, /^contrato-TEST-200-/);
+    assert.equal(pdfUpload.folderId, 'folder-02_contratos');
+
+    /* Confirm the template escapes HTML so guest names with `<` cannot inject markup. */
+    const sampleHtml = contractTemplate.renderContractHTML({
+      bookingCode: 'X<>&"', signedName: 'A <b> B'
+    });
+    assert.ok(!sampleHtml.includes('<b>'), 'template must escape angle brackets in inputs');
+  } finally {
+    driveSA.isConfigured = originals.isConfigured;
+    driveSA.findOrCreateFolder = originals.findOrCreateFolder;
+    driveSA.uploadFile = originals.uploadFile;
+    pdfRender.htmlToPdfBuffer = originals.htmlToPdfBuffer;
+    global.fetch = originalFetch;
+  }
+});
+
 test('Drive webhook accepts only a valid Apps Script JSON success response', async () => {
   const originalFetch = global.fetch;
   process.env.GUEST_APP_DRIVE_WEBHOOK_SECRET = 'drive-internal-secret';
