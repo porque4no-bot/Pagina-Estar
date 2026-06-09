@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { authenticateAdmin } = require('./_firebase-auth');
 const { getQuoteStore, loadQuote, saveQuote, sanitizeQuoteInput, effectiveStatus } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable, releaseHold, createHold } = require('./_otasync');
+const { appendAuditEntry } = require('./_quote-audit');
 
 function loadEnv() {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
@@ -71,20 +72,30 @@ exports.handler = async (event, context) => {
       for (const holdId of (existing.holdReservationIds || [])) {
         try { await releaseHold(holdId); } catch (e) { console.error('[update-quote] releaseHold failed for', quoteId, holdId, e.message); }
       }
+      const beforeCancel = { ...existing };
       existing.holdReservationIds = [];
       existing.status = 'cancelada';
       existing.cancelledAt = now;
       existing.cancelledBy = auth.email || 'admin';
       existing.updatedAt = now;
       await saveQuote(store, existing);
+      await appendAuditEntry({
+        quoteId, by: auth.email || 'admin', action: 'cancel',
+        before: beforeCancel, after: existing
+      });
       return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ quoteId, status: 'cancelada' }) };
     }
     if (body.action === 'reactivate') {
+      const beforeReact = { ...existing };
       existing.status = (existing.firstViewedAt) ? 'vista' : 'activa';
       delete existing.cancelledAt;
       delete existing.cancelledBy;
       existing.updatedAt = now;
       await saveQuote(store, existing);
+      await appendAuditEntry({
+        quoteId, by: auth.email || 'admin', action: 'reactivate',
+        before: beforeReact, after: existing
+      });
       return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ quoteId, status: effectiveStatus(existing) }) };
     }
 
@@ -150,6 +161,10 @@ exports.handler = async (event, context) => {
     delete updated.cancelledBy;
 
     await saveQuote(store, updated);
+    await appendAuditEntry({
+      quoteId, by: auth.email || 'admin', action: 'edit',
+      before: existing, after: updated
+    });
 
     /* Recreate the hold if requested */
     if (wantsHold && updated.checkin && updated.checkout) {
