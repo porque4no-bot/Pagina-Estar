@@ -11,7 +11,15 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:esbuild@~0.20.2"
+        "npm:@netlify/blobs@8",
+        "npm:@playwright/test@^1.60.0",
+        "npm:esbuild@0.28",
+        "npm:googleapis@144",
+        "npm:pdfkit@0.19",
+        "npm:react-dom@^18.3.1",
+        "npm:react@^18.3.1",
+        "npm:sharp@~0.34.5",
+        "npm:ttf2woff2@8.0.1"
       ]
     }
   }
