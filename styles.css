@@ -3214,7 +3214,7 @@ html[lang="en"] .lang-es { display: none !important; }
   transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
 .explora-map-wrapper:hover {
-  border-color: var(--terracotta-400);
+  border-color: var(--terracotta);
   box-shadow: var(--shadow-lg);
 }
 .explora-map-wrapper iframe {
@@ -4854,7 +4854,7 @@ textarea:focus-visible,
 .ct-name { font-size: 13px; font-weight: 700; font-family: var(--font-heading); color: var(--ink); }
 .ct-room-link.ct-featured .ct-name { color: var(--terracotta); }
 .comparador-table tbody tr {
-  border-bottom: 1px solid var(--paper-300);
+  border-bottom: 1px solid var(--border);
 }
 .comparador-table tbody tr:last-child { border-bottom: none; }
 .comparador-table tbody th {
