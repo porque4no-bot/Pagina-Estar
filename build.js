@@ -297,6 +297,8 @@ function inlineLucideIcons(html) {
 //   contents before minifying.
 // - motor-app.jsx: uses `import './i18n/motor.{es,en}.json'`; esbuild bundles
 //   the JSON directly so no extra request is made at runtime.
+// - guest-app.js: source has __GUEST_I18N_ES/EN_START__/END__ markers for
+//   guest portal copy that is not loaded through shell.js.
 // The /i18n/ folder is intentionally NOT copied to /dist/.
 const I18N_DIR = path.join(rootDir, 'i18n');
 
@@ -339,10 +341,14 @@ function validateI18nDicts() {
   const shellEn = loadI18nJson('shell.en.json');
   const motorEs = loadI18nJson('motor.es.json');
   const motorEn = loadI18nJson('motor.en.json');
+  const guestEs = loadI18nJson('guest.es.json');
+  const guestEn = loadI18nJson('guest.en.json');
   const shell = diffKeys('shell', shellEs, shellEn);
   const motor = diffKeys('motor', motorEs, motorEn);
+  const guest = diffKeys('guest', guestEs, guestEn);
   console.log(`  shell.* keys: ${shell.es} (es/en match)`);
   console.log(`  motor.* keys: ${motor.es} (es/en match)`);
+  console.log(`  guest.* keys: ${guest.es} (es/en match)`);
 }
 
 function inlineShellI18n(js) {
@@ -354,6 +360,19 @@ function inlineShellI18n(js) {
   const enRe = /\/\*__I18N_EN_START__\*\/[\s\S]*?\/\*__I18N_EN_END__\*\//;
   if (!esRe.test(js) || !enRe.test(js)) {
     throw new Error('shell.js: missing /*__I18N_ES/EN_START/END__*/ markers — cannot inline i18n');
+  }
+  return js.replace(esRe, esLiteral).replace(enRe, enLiteral);
+}
+
+function inlineGuestI18n(js) {
+  const guestEs = loadI18nJson('guest.es.json');
+  const guestEn = loadI18nJson('guest.en.json');
+  const esLiteral = JSON.stringify(guestEs);
+  const enLiteral = JSON.stringify(guestEn);
+  const esRe = /\/\*__GUEST_I18N_ES_START__\*\/[\s\S]*?\/\*__GUEST_I18N_ES_END__\*\//;
+  const enRe = /\/\*__GUEST_I18N_EN_START__\*\/[\s\S]*?\/\*__GUEST_I18N_EN_END__\*\//;
+  if (!esRe.test(js) || !enRe.test(js)) {
+    throw new Error('guest-app.js: missing /*__GUEST_I18N_ES/EN_START/END__*/ markers — cannot inline i18n');
   }
   return js.replace(esRe, esLiteral).replace(enRe, enLiteral);
 }
@@ -377,6 +396,8 @@ async function build() {
     let js = fs.readFileSync(path.join(rootDir, jsFile), 'utf8');
     if (jsFile === 'shell.js') {
       js = inlineShellI18n(js);
+    } else if (jsFile === 'guest-app.js') {
+      js = inlineGuestI18n(js);
     }
     const result = await esbuild.transform(js, { loader: 'js', minify: true });
     fs.writeFileSync(path.join(distDir, jsFile), result.code);
