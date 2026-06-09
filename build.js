@@ -281,6 +281,74 @@ function inlineLucideIcons(html) {
   });
 }
 
+// ── i18n: build-time inlining and validation ───────────────────────────────
+// Source of truth lives in /i18n/{shell,motor}.{es,en}.json.
+// - shell.js: source has __I18N_ES_START__/__I18N_ES_END__ comment markers
+//   wrapping the dictionary literals; we replace each block with the JSON
+//   contents before minifying.
+// - motor-app.jsx: uses `import './i18n/motor.{es,en}.json'`; esbuild bundles
+//   the JSON directly so no extra request is made at runtime.
+// The /i18n/ folder is intentionally NOT copied to /dist/.
+const I18N_DIR = path.join(rootDir, 'i18n');
+
+function loadI18nJson(name) {
+  const filePath = path.join(I18N_DIR, name);
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+function collectKeyPaths(obj, prefix = '') {
+  const out = [];
+  for (const k of Object.keys(obj)) {
+    const v = obj[k];
+    const p = prefix ? prefix + '.' + k : k;
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      out.push(...collectKeyPaths(v, p));
+    } else {
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+function diffKeys(label, es, en) {
+  const esKeys = new Set(collectKeyPaths(es));
+  const enKeys = new Set(collectKeyPaths(en));
+  const missingInEn = [...esKeys].filter((k) => !enKeys.has(k));
+  const missingInEs = [...enKeys].filter((k) => !esKeys.has(k));
+  if (missingInEn.length || missingInEs.length) {
+    const lines = [];
+    if (missingInEn.length) lines.push(`  Missing in ${label} EN: ${missingInEn.join(', ')}`);
+    if (missingInEs.length) lines.push(`  Missing in ${label} ES: ${missingInEs.join(', ')}`);
+    throw new Error(`i18n key mismatch (${label}):\n${lines.join('\n')}`);
+  }
+  return { es: esKeys.size, en: enKeys.size };
+}
+
+function validateI18nDicts() {
+  console.log('Validating i18n dictionaries...');
+  const shellEs = loadI18nJson('shell.es.json');
+  const shellEn = loadI18nJson('shell.en.json');
+  const motorEs = loadI18nJson('motor.es.json');
+  const motorEn = loadI18nJson('motor.en.json');
+  const shell = diffKeys('shell', shellEs, shellEn);
+  const motor = diffKeys('motor', motorEs, motorEn);
+  console.log(`  shell.* keys: ${shell.es} (es/en match)`);
+  console.log(`  motor.* keys: ${motor.es} (es/en match)`);
+}
+
+function inlineShellI18n(js) {
+  const shellEs = loadI18nJson('shell.es.json');
+  const shellEn = loadI18nJson('shell.en.json');
+  const esLiteral = JSON.stringify(shellEs);
+  const enLiteral = JSON.stringify(shellEn);
+  const esRe = /\/\*__I18N_ES_START__\*\/[\s\S]*?\/\*__I18N_ES_END__\*\//;
+  const enRe = /\/\*__I18N_EN_START__\*\/[\s\S]*?\/\*__I18N_EN_END__\*\//;
+  if (!esRe.test(js) || !enRe.test(js)) {
+    throw new Error('shell.js: missing /*__I18N_ES/EN_START/END__*/ markers — cannot inline i18n');
+  }
+  return js.replace(esRe, esLiteral).replace(enRe, enLiteral);
+}
+
 async function build() {
   // Minify CSS files with esbuild
   console.log('Minifying CSS files...');
@@ -291,10 +359,16 @@ async function build() {
     fs.writeFileSync(path.join(distDir, cssFile), result.code);
   }
 
+  // Validate i18n dictionaries (symmetric keys, including nested objects).
+  validateI18nDicts();
+
   console.log('Minifying shell.js, kunas.js and guest-app.js...');
   const jsFilesToMinify = ['shell.js', 'kunas.js', 'guest-app.js'];
   for (const jsFile of jsFilesToMinify) {
-    const js = fs.readFileSync(path.join(rootDir, jsFile), 'utf8');
+    let js = fs.readFileSync(path.join(rootDir, jsFile), 'utf8');
+    if (jsFile === 'shell.js') {
+      js = inlineShellI18n(js);
+    }
     const result = await esbuild.transform(js, { loader: 'js', minify: true });
     fs.writeFileSync(path.join(distDir, jsFile), result.code);
   }
