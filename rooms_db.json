@@ -50,7 +50,7 @@
         "ogImage": "https://estar.com.co/assets/photos/clasic.webp"
       },
       "jsonLd": {
-        "price": "220000",
+        "price": "140000",
         "maxOccupancy": 2,
         "floorSize": 29
       },
@@ -266,7 +266,7 @@
         "ogImage": "https://estar.com.co/assets/photos/fachada.webp"
       },
       "jsonLd": {
-        "price": "350000",
+        "price": "224000",
         "maxOccupancy": 5,
         "floorSize": 36
       },
@@ -482,7 +482,7 @@
         "ogImage": "https://estar.com.co/assets/photos/reserva.webp"
       },
       "jsonLd": {
-        "price": "320000",
+        "price": "172000",
         "maxOccupancy": 2,
         "floorSize": 24
       },
@@ -699,7 +699,7 @@
         "ogImage": "https://estar.com.co/assets/photos/origen.webp"
       },
       "jsonLd": {
-        "price": "385000",
+        "price": "221000",
         "maxOccupancy": 3,
         "floorSize": 29
       },
@@ -917,7 +917,7 @@
         "ogImage": "https://estar.com.co/assets/photos/especial.webp"
       },
       "jsonLd": {
-        "price": "450000",
+        "price": "165000",
         "maxOccupancy": 2,
         "floorSize": 27
       },
