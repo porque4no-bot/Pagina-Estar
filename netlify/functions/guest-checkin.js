@@ -276,7 +276,7 @@ exports.handler = async event => {
         name: file.name,
         contentType: file.contentType,
         size: file.size,
-        analysisSource: analysis.configured ? 'azure' : 'manual',
+        analysisSource,
         confidence: analysis.confidence
       },
       status: 'received',
