@@ -61,9 +61,16 @@ exports.handler = async (event) => {
       body: JSON.stringify({ available: shortfalls.length === 0, unavailable: shortfalls })
     };
   } catch (e) {
-    console.error('[quote-availability] check failed:', e.message);
-    // Fail open so a transient PMS hiccup doesn't block a legitimate payment;
-    // the webhook re-checks before creating the reservation.
-    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ available: true, degraded: true }) };
+    /* Fail CLOSED on PMS errors: without a hold and without a successful
+       re-check, we cannot guarantee the rooms. Letting the client open
+       Wompi would risk paying for unavailable rooms (and the webhook may
+       also fail to re-check). The client should surface the degraded state
+       so the guest can retry or contact us. */
+    console.error('[quote-availability] PMS check failed:', e.message);
+    return {
+      statusCode: 503,
+      headers: corsHeaders,
+      body: JSON.stringify({ available: false, degraded: true, reason: 'availability_check_failed' })
+    };
   }
 };
