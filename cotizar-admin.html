@@ -432,6 +432,100 @@
 .badge-cancelada { background: #F0DCDC; color: #8A2E2E; }
 .badge-vencida   { background: #EDE6D6; color: #8A6A2E; }
 .badge-unavailable { background: #F7D9C4; color: #9A3B12; margin-left: 4px; }
+
+/* ── Audit history modal ── */
+.audit-backdrop {
+  position: fixed; inset: 0; background: rgba(35, 30, 25, 0.55);
+  display: none; align-items: flex-start; justify-content: center;
+  padding: 40px 16px; overflow-y: auto; z-index: 400;
+}
+.audit-backdrop.is-open { display: flex; }
+.audit-modal {
+  background: var(--paper); border: 1px solid var(--paper-400); border-radius: 12px;
+  width: 100%; max-width: 760px; max-height: calc(100vh - 80px);
+  display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+}
+.audit-modal-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 24px; border-bottom: 1px solid var(--paper-300);
+  flex-shrink: 0; gap: 12px;
+}
+.audit-modal-head h3 {
+  margin: 0; font-family: var(--font-heading); font-size: 18px; color: var(--ink);
+}
+.audit-modal-head .audit-quote-id {
+  font-family: var(--font-label); font-size: 11px; color: var(--ink-500);
+  letter-spacing: 0.06em; margin-top: 4px;
+}
+.audit-close {
+  background: none; border: 1px solid var(--paper-400); border-radius: 6px;
+  width: 32px; height: 32px; cursor: pointer; color: var(--ink-700);
+  font-size: 18px; line-height: 1; flex-shrink: 0;
+}
+.audit-close:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.audit-modal-body {
+  padding: 16px 24px 24px; overflow-y: auto; flex: 1 1 auto;
+}
+.audit-empty, .audit-loading, .audit-error {
+  padding: 32px 8px; text-align: center;
+  font-family: var(--font-body); font-size: 14px; color: var(--ink-500);
+}
+.audit-error { color: var(--error-700); }
+.audit-entry {
+  border: 1px solid var(--paper-300); border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 14px; background: var(--white);
+}
+.audit-entry-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 10px;
+  padding-bottom: 10px; border-bottom: 1px dashed var(--paper-300);
+}
+.audit-entry-action {
+  font-family: var(--font-label); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--olive-700);
+}
+.audit-entry-ts {
+  font-family: var(--font-body); font-size: 12px; color: var(--ink-500);
+}
+.audit-entry-by {
+  font-family: var(--font-body); font-size: 12px; color: var(--ink-700);
+}
+.audit-entry-total {
+  font-family: var(--font-label); font-size: 11px;
+  color: var(--ink-700); letter-spacing: 0.04em;
+}
+.audit-entry-total .delta-up   { color: var(--terracotta); }
+.audit-entry-total .delta-down { color: var(--olive-700); }
+.audit-diff-row {
+  display: grid; grid-template-columns: 130px 1fr; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid var(--paper-200);
+}
+.audit-diff-row:last-child { border-bottom: none; }
+.audit-diff-key {
+  font-family: var(--font-label); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-700);
+  word-break: break-word;
+}
+.audit-diff-values { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.audit-diff-old, .audit-diff-new {
+  font-family: var(--font-body); font-size: 13px;
+  padding: 4px 8px; border-radius: 4px;
+  white-space: pre-wrap; word-break: break-word;
+}
+.audit-diff-old {
+  background: rgba(170, 70, 50, 0.10); color: var(--terracotta);
+  text-decoration: line-through;
+}
+.audit-diff-new {
+  background: rgba(110, 130, 90, 0.14); color: var(--olive-700);
+}
+.audit-diff-empty {
+  font-family: var(--font-body); font-size: 12px; color: var(--ink-500);
+  font-style: italic;
+}
+@media (max-width: 560px) {
+  .audit-diff-row { grid-template-columns: 1fr; gap: 4px; }
+}
 </style>
 </head>
 <body>
@@ -759,6 +853,20 @@
 </main>
 
 <div id="toast" class="toast"></div>
+
+<!-- ── Audit history modal ── -->
+<div id="auditBackdrop" class="audit-backdrop" role="dialog" aria-modal="true" aria-labelledby="auditTitle">
+  <div class="audit-modal">
+    <div class="audit-modal-head">
+      <div>
+        <h3 id="auditTitle">Historial de cambios</h3>
+        <div class="audit-quote-id" id="auditQuoteId"></div>
+      </div>
+      <button type="button" class="audit-close" id="auditCloseBtn" aria-label="Cerrar">×</button>
+    </div>
+    <div class="audit-modal-body" id="auditBody"></div>
+  </div>
+</div>
 
 <script>
 /* ── Helpers ── */
@@ -1439,6 +1547,7 @@ function renderQuotesList() {
           <div class="lista-actions">
             <button data-act="view">Ver</button>
             <button data-act="copy">Enlace</button>
+            <button data-act="history">Historial</button>
             ${!isPaid ? '<button data-act="edit">Editar</button>' : ''}
             ${q.reservationPending ? '<button data-act="retry">Reintentar reserva</button>' : ''}
             ${canReactivate ? '<button data-act="reactivate">Reactivar</button>' : ''}
@@ -1472,6 +1581,8 @@ document.getElementById('listBody').addEventListener('click', async function(e) 
     navigator.clipboard.writeText(quoteShareUrl(id))
       .then(() => showToast('Enlace copiado ✓'))
       .catch(() => showToast('No se pudo copiar.'));
+  } else if (act === 'history') {
+    openAuditHistory(id);
   } else if (act === 'edit') {
     loadQuoteIntoForm(quote);
   } else if (act === 'cancel') {
@@ -1481,6 +1592,246 @@ document.getElementById('listBody').addEventListener('click', async function(e) 
     await quoteStatusAction(id, 'reactivate');
   } else if (act === 'retry') {
     await retryBooking(id, btn);
+  }
+});
+
+/* ── Audit history modal ── */
+const AUDIT_FIELD_LABELS = {
+  empresa: 'Empresa',
+  contacto: 'Contacto',
+  email: 'Email',
+  telefono: 'Teléfono',
+  nit: 'NIT',
+  checkin: 'Check-in',
+  checkout: 'Check-out',
+  numPersonas: 'Personas',
+  items: 'Habitaciones',
+  servicios: 'Servicios',
+  descuento: 'Descuento',
+  comision: 'Comisión',
+  expiresAt: 'Expira',
+  bloquearHabitaciones: 'Bloqueo de habitaciones'
+};
+const AUDIT_ACTION_LABELS = {
+  create: 'Creación',
+  edit: 'Edición',
+  cancel: 'Cancelación',
+  reactivate: 'Reactivación',
+  status: 'Cambio de estado',
+  payment: 'Pago confirmado',
+  view: 'Vista por cliente'
+};
+
+function fmtAuditTimestamp(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return String(iso);
+  try {
+    return d.toLocaleString('es-CO', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    });
+  } catch (e) { return d.toISOString(); }
+}
+
+function auditFormatValue(v) {
+  if (v === undefined || v === null || v === '') return '—';
+  if (typeof v === 'boolean') return v ? 'Sí' : 'No';
+  if (typeof v === 'number') return String(v);
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) {
+    if (!v.length) return '— (vacío)';
+    return v.map((item, idx) => {
+      if (item && typeof item === 'object') {
+        const parts = [];
+        for (const k of Object.keys(item)) {
+          const val = item[k];
+          if (val === undefined || val === null || val === '') continue;
+          parts.push(k + ': ' + (typeof val === 'object' ? JSON.stringify(val) : String(val)));
+        }
+        return '#' + (idx + 1) + ' { ' + parts.join(', ') + ' }';
+      }
+      return String(item);
+    }).join('\n');
+  }
+  if (typeof v === 'object') {
+    const parts = [];
+    for (const k of Object.keys(v)) {
+      const val = v[k];
+      if (val === undefined || val === null || val === '') continue;
+      parts.push(k + ': ' + (typeof val === 'object' ? JSON.stringify(val) : String(val)));
+    }
+    return '{ ' + parts.join(', ') + ' }';
+  }
+  return String(v);
+}
+
+function auditDiffKeys(before, after) {
+  const b = before && typeof before === 'object' ? before : {};
+  const a = after && typeof after === 'object' ? after : {};
+  const keys = new Set([...Object.keys(b), ...Object.keys(a)]);
+  const changed = [];
+  for (const k of keys) {
+    const bs = JSON.stringify(b[k]);
+    const as = JSON.stringify(a[k]);
+    if (bs !== as) changed.push(k);
+  }
+  return changed;
+}
+
+function renderAuditEntry(entry) {
+  const wrap = document.createElement('div');
+  wrap.className = 'audit-entry';
+
+  const head = document.createElement('div');
+  head.className = 'audit-entry-head';
+
+  const left = document.createElement('div');
+  const action = document.createElement('div');
+  action.className = 'audit-entry-action';
+  action.textContent = AUDIT_ACTION_LABELS[entry.action] || entry.action || 'Cambio';
+  left.appendChild(action);
+  const by = document.createElement('div');
+  by.className = 'audit-entry-by';
+  by.textContent = entry.by || 'desconocido';
+  left.appendChild(by);
+  head.appendChild(left);
+
+  const right = document.createElement('div');
+  right.style.textAlign = 'right';
+  const ts = document.createElement('div');
+  ts.className = 'audit-entry-ts';
+  ts.textContent = fmtAuditTimestamp(entry.ts);
+  right.appendChild(ts);
+  if (entry.totalDeltaCents != null && entry.totalDeltaCents !== 0) {
+    const t = document.createElement('div');
+    t.className = 'audit-entry-total';
+    const sign = entry.totalDeltaCents > 0 ? '+' : '−';
+    const cls = entry.totalDeltaCents > 0 ? 'delta-up' : 'delta-down';
+    const cents = Math.abs(entry.totalDeltaCents);
+    const span = document.createElement('span');
+    span.className = cls;
+    span.textContent = sign + ' ' + formatCOP(cents / 100);
+    t.appendChild(document.createTextNode('Δ total: '));
+    t.appendChild(span);
+    right.appendChild(t);
+  }
+  head.appendChild(right);
+  wrap.appendChild(head);
+
+  const keys = Array.isArray(entry.fieldsChanged) && entry.fieldsChanged.length
+    ? entry.fieldsChanged
+    : auditDiffKeys(entry.before, entry.after);
+
+  if (!keys.length) {
+    const empty = document.createElement('div');
+    empty.className = 'audit-diff-empty';
+    empty.textContent = entry.note ? entry.note : 'Sin cambios en campos rastreados.';
+    wrap.appendChild(empty);
+    return wrap;
+  }
+
+  const before = entry.before || {};
+  const after = entry.after || {};
+  for (const key of keys) {
+    const row = document.createElement('div');
+    row.className = 'audit-diff-row';
+
+    const keyEl = document.createElement('div');
+    keyEl.className = 'audit-diff-key';
+    keyEl.textContent = AUDIT_FIELD_LABELS[key] || key;
+    row.appendChild(keyEl);
+
+    const vals = document.createElement('div');
+    vals.className = 'audit-diff-values';
+
+    const hadBefore = Object.prototype.hasOwnProperty.call(before, key) && before[key] !== undefined;
+    const hadAfter = Object.prototype.hasOwnProperty.call(after, key) && after[key] !== undefined;
+
+    if (hadBefore) {
+      const oldEl = document.createElement('div');
+      oldEl.className = 'audit-diff-old';
+      oldEl.textContent = auditFormatValue(before[key]);
+      vals.appendChild(oldEl);
+    }
+    if (hadAfter) {
+      const newEl = document.createElement('div');
+      newEl.className = 'audit-diff-new';
+      newEl.textContent = auditFormatValue(after[key]);
+      vals.appendChild(newEl);
+    }
+    if (!hadBefore && !hadAfter) {
+      const empty = document.createElement('div');
+      empty.className = 'audit-diff-empty';
+      empty.textContent = '(sin datos)';
+      vals.appendChild(empty);
+    }
+    row.appendChild(vals);
+    wrap.appendChild(row);
+  }
+
+  if (entry.note) {
+    const note = document.createElement('div');
+    note.className = 'audit-diff-empty';
+    note.style.marginTop = '8px';
+    note.textContent = 'Nota: ' + entry.note;
+    wrap.appendChild(note);
+  }
+
+  return wrap;
+}
+
+function closeAuditModal() {
+  document.getElementById('auditBackdrop').classList.remove('is-open');
+}
+
+function openAuditModal() {
+  document.getElementById('auditBackdrop').classList.add('is-open');
+}
+
+async function openAuditHistory(id) {
+  const body = document.getElementById('auditBody');
+  document.getElementById('auditQuoteId').textContent = id;
+  body.innerHTML = '';
+  const loading = document.createElement('div');
+  loading.className = 'audit-loading';
+  loading.textContent = 'Cargando historial…';
+  body.appendChild(loading);
+  openAuditModal();
+
+  try {
+    const token = await window.getAuthToken();
+    const res = await fetch('/api/read-quote-audit?id=' + encodeURIComponent(id), {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'No se pudo cargar el historial.');
+    body.innerHTML = '';
+    const entries = Array.isArray(json.entries) ? json.entries.slice().reverse() : [];
+    if (!entries.length) {
+      const empty = document.createElement('div');
+      empty.className = 'audit-empty';
+      empty.textContent = 'No hay cambios registrados para esta cotización.';
+      body.appendChild(empty);
+      return;
+    }
+    for (const entry of entries) body.appendChild(renderAuditEntry(entry));
+  } catch (err) {
+    body.innerHTML = '';
+    const errEl = document.createElement('div');
+    errEl.className = 'audit-error';
+    errEl.textContent = '✗ ' + (err && err.message ? err.message : err);
+    body.appendChild(errEl);
+  }
+}
+
+document.getElementById('auditCloseBtn').addEventListener('click', closeAuditModal);
+document.getElementById('auditBackdrop').addEventListener('click', function(e) {
+  if (e.target === this) closeAuditModal();
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('auditBackdrop').classList.contains('is-open')) {
+    closeAuditModal();
   }
 });
 
