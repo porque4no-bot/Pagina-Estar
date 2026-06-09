@@ -300,7 +300,7 @@ async function releaseHold(idReservations) {
    Shared by the Wompi webhook (on payment) and the admin retry endpoint. */
 async function createConfirmedReservation(quote, opts) {
   opts = opts || {};
-  const { token, propertyId } = otasyncCreds();
+  const { token, propertyId, channelId, channelName } = otasyncCreds();
   const pkey = await getSessionKey();
 
   const { rooms, nights } = buildRoomsFromQuote(quote);

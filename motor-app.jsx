@@ -1,3 +1,6 @@
+import React from 'react';
+import * as ReactDOM from 'react-dom/client';
+
 const { useState, useEffect, useRef } = React;
 
 /* ── Icon helper (Lucide UMD) ─────────────────────── */
