@@ -308,6 +308,43 @@ function buildQuoteRooms(quote, roomDetails) {
 // Handle a Wompi payment whose reference is a stored quote id (COT-...).
 // Loads the quote, verifies the amount, creates the OTASync reservation and
 // marks the quote as 'aceptada'. Returns a Netlify response object.
+/* Acquire a per-quote lock so two concurrent Wompi webhooks for the same
+   reference don't both end up creating reservations in OTASync. Uses Netlify
+   Blobs' onlyIfNew semantics for a compare-and-set primitive. Returns:
+     { acquired: true }                     — first writer, proceed
+     { acquired: true, alreadyOurs: true }  — same transaction retrying, proceed
+     { acquired: false, ownerTx, startedAt } — another transaction holds the lock */
+async function acquireQuoteLock(quoteId, transactionId) {
+  let lockStore;
+  try { lockStore = getStore({ name: 'quote-locks', consistency: 'strong' }); }
+  catch (e) {
+    console.error('[wompi-webhook] quote-locks store unavailable:', e.message);
+    /* Without Blobs we cannot prevent the race; let the caller proceed. The
+       transaction-level dedup in processed-transactions still protects
+       against duplicate webhook deliveries of the same txId. */
+    return { acquired: true, blobsUnavailable: true };
+  }
+
+  try {
+    await lockStore.setJSON(quoteId, { transactionId, startedAt: Date.now() }, { onlyIfNew: true });
+    return { acquired: true };
+  } catch (e) {
+    /* Lock already exists. If it's our own retry, proceed idempotently;
+       otherwise refuse so the second writer doesn't double-book. */
+    let existing;
+    try { existing = await lockStore.get(quoteId, { type: 'json' }); }
+    catch (readErr) { existing = null; }
+    if (existing && existing.transactionId === transactionId) {
+      return { acquired: true, alreadyOurs: true };
+    }
+    return {
+      acquired: false,
+      ownerTx: existing && existing.transactionId,
+      startedAt: existing && existing.startedAt
+    };
+  }
+}
+
 async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
   const deps = {
     getQuoteStore,
@@ -325,6 +362,7 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
     adminPendingHtml,
     getSessionKey,
     fetch,
+    acquireQuoteLock,
     ...overrides
   };
   const quoteId = transaction.reference;
@@ -352,6 +390,28 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
   if (status === 'cancelada' || status === 'vencida') {
     console.error(`[wompi-webhook] paid transaction ${transaction.id} for ${status} quote ${quoteId}. Manual follow-up required.`);
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: `Quote is ${status}; logged for manual follow-up` }) };
+  }
+
+  /* Single-writer lock per quoteId. If two Wompi webhooks for the same quote
+     arrive in parallel (e.g. two transactions with different ids both APPROVED
+     against the same reference), the second one is refused and logged for
+     manual handling — better than double-booking in OTASync. */
+  const lock = await deps.acquireQuoteLock(quoteId, transaction.id);
+  if (!lock.acquired) {
+    console.error(`[wompi-webhook] quote ${quoteId} is already being processed by tx ${lock.ownerTx} (started ${lock.startedAt}). Refusing tx ${transaction.id}.`);
+    try {
+      await deps.sendEmail({
+        to: deps.adminEmail(),
+        subject: `⚠ Doble pago detectado — ${quoteId}`,
+        html: `<p>La cotización <strong>${quoteId}</strong> recibió un segundo pago aprobado mientras procesábamos el primero.</p>
+               <ul>
+                 <li>Primera transacción (en curso): ${lock.ownerTx}</li>
+                 <li>Segunda transacción (rechazada): ${transaction.id}</li>
+               </ul>
+               <p>Verifica con Wompi y reembolsa la transacción duplicada.</p>`
+      });
+    } catch (e) { console.error('[wompi-webhook] double-pay alert email failed:', e.message); }
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Quote already being processed by another transaction', ownerTx: lock.ownerTx }) };
   }
 
   // Verify the paid amount matches the server-computed total (anti-tampering).
@@ -1042,5 +1102,6 @@ exports._test = {
   verifyWompiSignature,
   mustChargeDirectBookingIva,
   directBookingPricing,
-  handleQuotePayment
+  handleQuotePayment,
+  acquireQuoteLock
 };
