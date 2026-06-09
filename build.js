@@ -539,7 +539,7 @@ function writeCspHeaders() {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' https: data:",
     "font-src 'self'",
-    "connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.mercadopago.com https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://estar-4d0da.firebaseapp.com",
+    "connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.mercadopago.com https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://estar-4d0da.firebaseapp.com https://cloudflareinsights.com",
     "frame-src https://checkout.wompi.co https://www.mercadopago.com.co https://www.mercadopago.com https://estar-4d0da.firebaseapp.com https://accounts.google.com https://apis.google.com",
     "object-src 'none'",
     "base-uri 'self'",
