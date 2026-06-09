@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const esbuild = require('esbuild');
 
 /* ── Bilingual element stripper ──────────────────────────────────────────────
@@ -387,7 +388,90 @@ async function build() {
   }
 }
 
-build().catch(err => {
-  console.error('Build failed:', err);
-  process.exit(1);
-});
+/* ── CSP hash generation ────────────────────────────────────────────────────
+   Walks every HTML file under dist/, hashes the body of each inline
+   <script>…</script> block (i.e. blocks without a `src=` attribute), and
+   emits a `dist/_headers` file with the resulting Content-Security-Policy.
+   This lets us drop `'unsafe-inline'` from `script-src` while keeping every
+   existing inline script working.
+
+   Inline `style="…"` attributes and a handful of inline <style> blocks remain
+   throughout the site (hundreds of style="…" usages in the markup). Removing
+   `'unsafe-inline'` from style-src without refactoring all of those would
+   require listing per-value SHA-256 hashes with `'unsafe-hashes'`, which does
+   not scale here. style-src therefore keeps `'unsafe-inline'`; the high-value
+   XSS hardening — script-src — does not.
+─────────────────────────────────────────────────────────────────────────────*/
+function collectInlineScriptHashes(dir, hashes) {
+  fs.readdirSync(dir).forEach(entry => {
+    const fullPath = path.join(dir, entry);
+    const stat = fs.lstatSync(fullPath);
+    if (stat.isDirectory()) {
+      collectInlineScriptHashes(fullPath, hashes);
+      return;
+    }
+    if (!entry.endsWith('.html')) return;
+    const content = fs.readFileSync(fullPath, 'utf8');
+    // Match every <script …>…</script> and skip the ones with a src= attribute.
+    const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+    let m;
+    while ((m = re.exec(content)) !== null) {
+      const attrs = m[1] || '';
+      if (/\bsrc\s*=/i.test(attrs)) continue;
+      const body = m[2];
+      // Hash the *raw* body bytes exactly as they appear between the tags.
+      // Browsers compute the hash over the same range.
+      const digest = crypto.createHash('sha256').update(body, 'utf8').digest('base64');
+      hashes.add(`'sha256-${digest}'`);
+    }
+  });
+}
+
+function writeCspHeaders() {
+  console.log('Generating Content-Security-Policy with inline-script hashes...');
+  const hashes = new Set();
+  collectInlineScriptHashes(distDir, hashes);
+  console.log(`  Collected ${hashes.size} unique inline-script hash(es).`);
+
+  const hashList = Array.from(hashes).join(' ');
+  // Mercado Pago rollback hosts retained for parity with previous CSP.
+  const scriptSrc = [
+    "'self'",
+    hashList,
+    'https://unpkg.com',
+    'https://checkout.wompi.co',
+    'https://www.googletagmanager.com',
+    'https://www.gstatic.com',
+    'https://apis.google.com',
+    'https://www.mercadopago.com.co',
+    'https://www.mercadopago.com',
+  ].filter(Boolean).join(' ');
+
+  const csp = [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    // style-src keeps 'unsafe-inline' — the site uses hundreds of style="…"
+    // attributes that would each need an 'unsafe-hashes' entry to comply.
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' https: data:",
+    "font-src 'self'",
+    "connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.mercadopago.com https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://estar-4d0da.firebaseapp.com",
+    "frame-src https://checkout.wompi.co https://www.mercadopago.com.co https://www.mercadopago.com https://estar-4d0da.firebaseapp.com https://accounts.google.com https://apis.google.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self' https://checkout.wompi.co https://www.mercadopago.com.co https://www.mercadopago.com",
+    "frame-ancestors 'self'",
+    "upgrade-insecure-requests",
+  ].join('; ');
+
+  const headers = `/*\n  Content-Security-Policy: ${csp}\n`;
+  fs.writeFileSync(path.join(distDir, '_headers'), headers);
+  console.log('  Wrote dist/_headers with hardened CSP.');
+}
+
+build()
+  .then(() => writeCspHeaders())
+  .catch(err => {
+    console.error('Build failed:', err);
+    process.exit(1);
+  });
