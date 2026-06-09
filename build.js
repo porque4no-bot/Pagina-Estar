@@ -303,7 +303,11 @@ async function build() {
     await esbuild.build({
       entryPoints: [path.join(rootDir, 'motor-app.jsx')],
       outfile: path.join(distDir, 'motor-app.js'),
+      bundle: true,
+      format: 'iife',
       minify: true,
+      target: ['es2019'],
+      define: { 'process.env.NODE_ENV': '"production"' },
     });
     console.log('Build completed successfully.');
   } catch (error) {
