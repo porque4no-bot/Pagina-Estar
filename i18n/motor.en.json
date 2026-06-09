@@ -166,5 +166,7 @@
     "wompi": "Credit card, PSE, Nequi",
     "hotel": "Book now without prepay, pay upon check-in",
     "transfer": "We will email you our bank details"
-  }
+  },
+  "sandboxBannerTitle": "TEST MODE",
+  "sandboxBannerBody": "This build is using sandbox payment credentials. No transaction will charge real money. Use Wompi or Mercado Pago test cards."
 }

@@ -576,6 +576,65 @@ function GuestForm({ guest, setGuest, onContinue, lang }) {
   );
 }
 
+/* ── Sandbox credential detection ────────────────────
+ * Returns true when the currently configured public key uses a sandbox prefix:
+ *   - Wompi sandbox keys start with `pub_test_` (production keys are `pub_prod_`).
+ *   - Mercado Pago test keys start with `TEST-` (production keys are `APP_USR-`).
+ * Used to show a non-blocking visual signal on the payment step.
+ */
+function isSandboxPaymentEnv() {
+  if (typeof window === 'undefined') return false;
+  const wompiKey = window.WOMPI_PUBLIC_KEY;
+  const mpKey = window.MERCADOPAGO_PUBLIC_KEY;
+  const wompiSandbox = typeof wompiKey === 'string' && wompiKey.startsWith('pub_test_');
+  const mpSandbox = typeof mpKey === 'string' && mpKey.startsWith('TEST-');
+  return wompiSandbox || mpSandbox;
+}
+
+/* ── SandboxBanner ───────────────────────────────────
+ * Small yellow pill shown at the top of the payment step when sandbox
+ * credentials are detected. Hidden in production (returns null).
+ */
+function SandboxBanner({ lang }) {
+  if (!isSandboxPaymentEnv()) return null;
+  const t = i18nEngine[lang] || i18nEngine.es;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      data-testid="sandbox-banner"
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 10,
+        margin: '0 0 16px 0',
+        padding: '10px 14px',
+        borderRadius: 999,
+        background: '#fff7d6',
+        border: '1px solid #e6c84a',
+        color: '#6b5200',
+        fontSize: 12,
+        lineHeight: 1.4
+      }}>
+      <span
+        style={{
+          display: 'inline-block',
+          padding: '2px 8px',
+          borderRadius: 999,
+          background: '#e6c84a',
+          color: '#3a2d00',
+          fontWeight: 700,
+          letterSpacing: '0.04em',
+          fontSize: 11,
+          flexShrink: 0
+        }}>
+        {t.sandboxBannerTitle}
+      </span>
+      <span style={{ flex: 1 }}>{t.sandboxBannerBody}</span>
+    </div>
+  );
+}
+
 /* ── PaymentPanel ─────────────────────────────────── */
 function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, lang }) {
   const t = i18nEngine[lang];
@@ -777,6 +836,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
 
   return (
     <div>
+      <SandboxBanner lang={lang} />
       {calc && (
         <>
           <div className="be-inline-summary">
