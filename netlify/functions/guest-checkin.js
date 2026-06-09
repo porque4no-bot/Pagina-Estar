@@ -239,15 +239,18 @@ exports.handler = async event => {
       analysis = await analyzeWithAzure(file);
     } catch (azureErr) {
       console.warn('[guest-checkin] Azure analysis failed, falling back to manual:', azureErr.message);
-      analysis = { configured: false, fields: {}, confidence: 0 };
+      analysis = { configured: true, azureFailed: true, fields: {}, confidence: 0 };
     }
+
+    const analysisSource = !analysis.configured ? 'manual' : analysis.azureFailed ? 'azure-error' : 'azure';
+
     const guest = normalizeGuest(body, analysis.fields);
     const validation = validateGuest(guest);
 
     if (mode === 'analyze') {
       return json(200, {
         ok: true,
-        source: analysis.configured ? 'azure' : 'manual',
+        source: analysisSource,
         extracted: analysis.fields,
         confidence: analysis.confidence,
         validation
@@ -311,7 +314,7 @@ exports.handler = async event => {
       checkinId,
       status: 'received',
       validation,
-      documentAnalysis: analysis.configured ? 'azure' : 'manual',
+      documentAnalysis: analysisSource,
       archive,
       sync,
       stagedDocument
