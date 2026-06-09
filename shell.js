@@ -99,8 +99,13 @@
 
   const pageLang = window.location.pathname.startsWith('/en/') ? 'en' : 'es';
 
+  // The two language dictionaries below are the source of truth at dev time
+  // (when shell.js is served unbuilt via `node server.js`).
+  // At build time, build.js replaces each block between the START/END markers
+  // with the parsed contents of `i18n/shell.{es,en}.json` to keep dist/shell.js
+  // in sync with the canonical JSON files.
   const i18n = {
-    es: {
+    es: /*__I18N_ES_START__*/{
       nav_estadias: 'Estadías',
       nav_vivir: 'Estadía larga',
       nav_explorar: 'Explorar',
@@ -216,8 +221,8 @@
       cookie_accept: 'Aceptar',
       cookie_reject: 'Rechazar',
       cookie_policy: 'Política de Cookies'
-    },
-    en: {
+    }/*__I18N_ES_END__*/,
+    en: /*__I18N_EN_START__*/{
       nav_estadias: 'Stays',
       nav_vivir: 'Extended Stay',
       nav_explorar: 'Explore',
@@ -333,7 +338,7 @@
       cookie_accept: 'Accept',
       cookie_reject: 'Reject',
       cookie_policy: 'Cookies Policy'
-    }
+    }/*__I18N_EN_END__*/
   };
 
   function applyI18n() {
