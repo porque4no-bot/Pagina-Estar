@@ -234,14 +234,23 @@ exports.handler = async event => {
     const file = decodeFile(body.file);
     if (!file) return json(400, { error: 'Selecciona una foto o PDF del documento.' });
 
-    const analysis = await analyzeWithAzure(file);
+    let analysis;
+    try {
+      analysis = await analyzeWithAzure(file);
+    } catch (azureErr) {
+      console.warn('[guest-checkin] Azure analysis failed, falling back to manual:', azureErr.message);
+      analysis = { configured: true, azureFailed: true, fields: {}, confidence: 0 };
+    }
+
+    const analysisSource = !analysis.configured ? 'manual' : analysis.azureFailed ? 'azure-error' : 'azure';
+
     const guest = normalizeGuest(body, analysis.fields);
     const validation = validateGuest(guest);
 
     if (mode === 'analyze') {
       return json(200, {
         ok: true,
-        source: analysis.configured ? 'azure' : 'manual',
+        source: analysisSource,
         extracted: analysis.fields,
         confidence: analysis.confidence,
         validation
@@ -267,7 +276,7 @@ exports.handler = async event => {
         name: file.name,
         contentType: file.contentType,
         size: file.size,
-        analysisSource: analysis.configured ? 'azure' : 'manual',
+        analysisSource,
         confidence: analysis.confidence
       },
       status: 'received',
@@ -305,7 +314,7 @@ exports.handler = async event => {
       checkinId,
       status: 'received',
       validation,
-      documentAnalysis: analysis.configured ? 'azure' : 'manual',
+      documentAnalysis: analysisSource,
       archive,
       sync,
       stagedDocument
