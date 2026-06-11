@@ -24,7 +24,7 @@ const VALID_ROOM_IDS = new Set(Object.values(ROOM_NAME_TO_ID));
    (some deploy previews / older sites), fall back to explicit credentials
    from env: NETLIFY_SITE_ID + NETLIFY_API_TOKEN (a personal access token). */
 function getQuoteStore() {
-  const opts = { name: STORE_NAME, consistency: 'eventual' };
+  const opts = { name: STORE_NAME, consistency: 'strong' };
   /* Netlify reserves the NETLIFY_ prefix and won't expose those vars to
      functions, so prefer neutral names (BLOBS_*) and fall back to the rest. */
   const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;

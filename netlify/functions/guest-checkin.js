@@ -931,6 +931,7 @@ exports.handler = async event => {
         validation
       });
     }
+    return json(400, { error: 'Modo no soportado.' });
   } catch (error) {
     console.error('[guest-checkin]', error.message);
     return json(error.statusCode || 500, {

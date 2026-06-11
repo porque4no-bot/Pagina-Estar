@@ -1,23 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+require('./_env');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
-
-function loadEnv() {
-  if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
-  try {
-    const envPath = path.join(__dirname, '../../.env');
-    if (!fs.existsSync(envPath)) return;
-    fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
-      const m = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-      if (!m) return;
-      let v = m[2] || '';
-      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-      if (!process.env[m[1]]) process.env[m[1]] = v.trim();
-    });
-  } catch (e) {}
-}
-
-loadEnv();
 
 function esc(str) {
   return String(str || '')

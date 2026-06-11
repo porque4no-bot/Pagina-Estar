@@ -528,7 +528,8 @@ async function startQuotePayment() {
         body: JSON.stringify({
           reference: QUOTE_PAY.id,
           amountInCents: QUOTE_PAY.totalCents,
-          currency: 'COP'
+          currency: 'COP',
+          publicToken: QUOTE_PAY.token
         })
       });
       const sigData = await sigRes.json();
