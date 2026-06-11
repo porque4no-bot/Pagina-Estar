@@ -25,7 +25,7 @@
 | A-5 | Rate-limit no atómico | ✅ Mitigado | Compare-and-set (etag) con fallback |
 | A-6 | Sin telemetría de conversión | ✅ Resuelto | Funnel GA4 e-commerce + conversión server-side (Measurement Protocol) + píxeles opcionales |
 | A-7 | Sin consentimiento de cookies | ✅ Resuelto | Banner + Consent Mode v2 (opt-in, denegado por defecto) |
-| M-1 | CVE en dependencias | ✅ Resuelto | `googleapis` 144→173, `npm audit`: 0 vulnerabilidades |
+| M-1 | CVE en dependencias | ✅ Resuelto | `googleapis` reemplazado por `@googleapis/drive` standalone (204 MB → 2.4 MB; el monolito reventaba el límite de 250 MB por función en Netlify), `npm audit`: 0 vulnerabilidades |
 | M-2 | Precios duplicados | ✅ Resuelto | `_pricing.js` único + test anti-divergencia front/back |
 | M-5 | Huecos de tests | ✅ Mejorado | Tests de regresión para C-1, A-1/A-2, A-3, C-3, M-2 |
 | M-6 | Skip-link parcial | ✅ Resuelto | Inyección en build-time en todas las páginas |

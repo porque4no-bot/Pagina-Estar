@@ -6,9 +6,14 @@
 [functions]
   included_files = ["rooms_db.json"]
   node_bundler = "esbuild"
+  # Kept external (copied into the bundle instead of esbuild-bundled) because
+  # of dynamic requires. NOTE: externals and their dependency trees are copied
+  # into EVERY function zip — keep them small. The monolithic `googleapis`
+  # (~200 MB unpacked) lived here and blew the 250 MB per-function limit; it
+  # was replaced by the standalone @googleapis/drive (~2 MB).
   external_node_modules = [
     "@netlify/blobs",
-    "googleapis",
+    "@googleapis/drive",
     "pdfkit"
   ]
 
