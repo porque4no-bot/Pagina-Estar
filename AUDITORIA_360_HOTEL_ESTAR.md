@@ -10,6 +10,32 @@
 
 ---
 
+## 0. ✅ ESTADO DE REMEDIACIÓN (actualizado tras la implementación)
+
+> El diagnóstico abajo se conserva tal cual (snapshot). Tras la auditoría se implementaron las correcciones acordadas con el negocio. Estado actual:
+
+| ID | Hallazgo | Estado | Resolución |
+|---|---|---|---|
+| C-1 | `create-booking` crea reservas sin pago | ✅ Resuelto | Endpoint retirado (410); el webhook es el único creador de reservas |
+| C-2 | Precio manipulable en Mercado Pago | ✅ Resuelto | Recompute server-side + gate de disponibilidad, paridad con Wompi |
+| C-3 | Reconciliación ciega a reservas directas | ✅ Resuelto | `reconcile-payments` cubre reservas directas (alerta de pago-sin-reserva) |
+| A-1/A-2 | PII por código / acceso huésped | ✅ Resuelto (proporcionado) | `get-booking` exige segundo factor (email o apellido); se mantiene el apellido como llave de la guest app, sin PIN |
+| A-3 | Retención indefinida de PII | ✅ Resuelto | Cron `purge-guest-data`: retención **5 años** (decisión de negocio) |
+| A-4 | Doble reserva directa | ✅ Resuelto | Idempotencia por estadía en el webhook directo |
+| A-5 | Rate-limit no atómico | ✅ Mitigado | Compare-and-set (etag) con fallback |
+| A-6 | Sin telemetría de conversión | ✅ Resuelto | Funnel GA4 e-commerce + conversión server-side (Measurement Protocol) + píxeles opcionales |
+| A-7 | Sin consentimiento de cookies | ✅ Resuelto | Banner + Consent Mode v2 (opt-in, denegado por defecto) |
+| M-1 | CVE en dependencias | ✅ Resuelto | `googleapis` 144→173, `npm audit`: 0 vulnerabilidades |
+| M-2 | Precios duplicados | ✅ Resuelto | `_pricing.js` único + test anti-divergencia front/back |
+| M-5 | Huecos de tests | ✅ Mejorado | Tests de regresión para C-1, A-1/A-2, A-3, C-3, M-2 |
+| M-6 | Skip-link parcial | ✅ Resuelto | Inyección en build-time en todas las páginas |
+| M-7 | Escaping inconsistente | ✅ Resuelto | `renderCart` escapa el nombre del servicio |
+| M-3 | Errores enmascarados como 200 | ⏳ Pendiente | Requiere panel de operación (Fase 3) |
+
+**Pendiente de tu parte (sólo configuración en Netlify, sin código):** `GA4_API_SECRET` (conversiones server-side), y `META_PIXEL_ID` / `GOOGLE_ADS_ID` si quieres activar remarketing. Sin ellos, todo funciona; sólo no se envían esas señales.
+
+---
+
 ## 1. 🚨 HALLAZGOS CRÍTICOS
 
 ### 🔴 C-1 — `create-booking` crea reservas CONFIRMADAS sin verificar el pago (AppSec / Revenue)

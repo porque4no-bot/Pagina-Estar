@@ -149,10 +149,10 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | Function | Purpose |
 |---|---|
 | `check-availability` | Queries OTASync for available rooms and daily prices; merges with `rooms_db.json` metadata |
-| `create-booking` | Creates reservation in OTASync; **pricing is always computed server-side** — client-provided price is ignored |
+| `create-booking` | **RETIRED — returns 410.** Previously created the reservation from the client trusting client-supplied payment status (could create confirmed reservations without payment). The payment webhook is now the only reservation creator; kept as a 410 stub so any old integration fails loudly. |
 | `booking-status` | Polls webhook confirmation status after payment (used by motor-app polling loop) |
 | `send-confirmation` | Sends email confirmation to guest via Resend |
-| `get-booking` | Retrieves a booking by reference code for guest self-service |
+| `get-booking` | Retrieves a booking by reference code — **requires a second factor (email or surname)**; returns a uniform not-found on mismatch so an enumerated code alone discloses no PII |
 | `get-booking-rating` | Fetches Booking.com rating via `PROXY_URL`; returns hardcoded fallback if unconfigured |
 | `get-reviews` | Fetches property reviews |
 
@@ -229,7 +229,8 @@ See `docs/guest-app.md` for implementation details.
 | Function | Schedule | Purpose |
 |---|---|---|
 | `revalidate-quotes` | `0 */6 * * *` | Re-checks all active quote availability every 6 hours |
-| `reconcile-payments` | `*/30 * * * *` | Reconciles pending Wompi transactions every 30 minutes |
+| `reconcile-payments` | `*/30 * * * *` | Reconciles pending Wompi transactions every 30 minutes — covers **both** corporate quotes and direct bookings (missing `booking-results` entry ⇒ paid-but-no-reservation alert) |
+| `purge-guest-data` | `30 3 * * *` | Data-retention purge (Ley 1581): deletes guest PII (check-ins, documents, events) older than **5 years**, dated from the timestamp embedded in the blob key |
 
 ## CSS conventions
 
@@ -326,6 +327,18 @@ NETLIFY_SITE_ID=
 BLOBS_SITE_ID=
 BLOBS_TOKEN=
 ```
+
+**Analytics / Marketing (optional):**
+```
+GA4_MEASUREMENT_ID=    # enables server-side purchase tracking (Measurement Protocol)
+GA4_API_SECRET=        # GA4 Admin → Data Streams → Measurement Protocol API secrets
+META_PIXEL_ID=         # when set, build.js injects the consent-gated Meta Pixel
+GOOGLE_ADS_ID=         # when set, build.js injects the Google Ads tag (AW-...)
+```
+GA4 on-page tracking and Consent Mode v2 are injected by `build.js`. `consent.js`
+renders the cookie banner and flips Consent Mode to granted only on opt-in
+(analytics/ads default to **denied** for every visitor). Ad pixels are emitted
+into the build **only** when their IDs are configured.
 
 **Misc:**
 ```
