@@ -368,7 +368,7 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
         <div className="be-room-badge" style={{ zIndex: 1 }}>{lang === 'es' ? 'Tipología' : 'Typology'} {room.num}</div>
         {!isAvailable && (
           <div className="be-room-status-badge">
-            {lang === 'es' ? 'No disponible' : 'Not available'}
+            {t.soldOut}
           </div>
         )}
       </div>
@@ -380,45 +380,44 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
         <p className="be-room-specs-compact">
           {room.area} m² · {roomBed} · {room.capacity} {lang === 'es' ? 'pers.' : 'guests'} · {roomView}
         </p>
-        <div className="be-rate-options">
-          <button type="button" className={`be-rate-opt${rate === 'flexible' ? ' active' : ''}`}
-            onClick={() => onRateChange('flexible')}>
-            <div className="be-rate-tag">
-              <span className="be-label">{t.flexible}</span>
-              <span className="be-badge-policy">{t.refundable}</span>
-            </div>
-            <div className="be-rate-price">{formatCOP(priceFlex)}<span>/{t.noche}</span></div>
-            <div className="be-rate-sub">{t.freeCancel}</div>
-          </button>
-          <button type="button" className={`be-rate-opt best${rate === 'best' ? ' active' : ''}`}
-            onClick={() => onRateChange('best')}>
-            <div className="be-rate-tag">
-              <span className="be-label">{t.bestPrice}</span>
-              <span className="be-badge-save">{t.save10}</span>
-            </div>
-            <div className="be-rate-price">{formatCOP(priceBest)}<span>/{t.noche}</span></div>
-            <div className="be-rate-sub">{t.nonRefundable}</div>
-          </button>
-        </div>
-        <div className="be-room-total-row">
-          <span className="be-room-total-label">
-            {nights} {nights === 1 ? t.noche : t.noches} · {guests} {guests === 1 ? t.huesped : t.huespedes}
-          </span>
-          <span className="be-room-total">{formatCOP(activePrice * nights)} <span>{t.plusTax}</span></span>
-        </div>
-        <p style={{ fontSize: 11, color: 'var(--ink-300)', fontStyle: 'italic', margin: '4px 0 8px 0', lineHeight: 1.4 }}>
-          {lang === 'es' ? '* IVA (19%) segun nacionalidad y motivo del viaje' : '* VAT (19%) depends on nationality and travel purpose'}
-        </p>
         {isAvailable ? (
-          <button className="be-btn-primary be-room-select-btn" onClick={() => onSelect(room, rate)}>
-            {t.selectBtn}
-          </button>
+          <React.Fragment>
+            <div className="be-rate-options">
+              <button type="button" className={`be-rate-opt${rate === 'flexible' ? ' active' : ''}`}
+                onClick={() => onRateChange('flexible')}>
+                <div className="be-rate-tag">
+                  <span className="be-label">{t.flexible}</span>
+                  <span className="be-badge-policy">{t.refundable}</span>
+                </div>
+                <div className="be-rate-price">{formatCOP(priceFlex)}<span>/{t.noche}</span></div>
+                <div className="be-rate-sub">{t.freeCancel}</div>
+              </button>
+              <button type="button" className={`be-rate-opt best${rate === 'best' ? ' active' : ''}`}
+                onClick={() => onRateChange('best')}>
+                <div className="be-rate-tag">
+                  <span className="be-label">{t.bestPrice}</span>
+                  <span className="be-badge-save">{t.save10}</span>
+                </div>
+                <div className="be-rate-price">{formatCOP(priceBest)}<span>/{t.noche}</span></div>
+                <div className="be-rate-sub">{t.nonRefundable}</div>
+              </button>
+            </div>
+            <div className="be-room-total-row">
+              <span className="be-room-total-label">
+                {nights} {nights === 1 ? t.noche : t.noches} · {guests} {guests === 1 ? t.huesped : t.huespedes}
+              </span>
+              <span className="be-room-total">{formatCOP(activePrice * nights)} <span>{t.plusTax}</span></span>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--ink-300)', fontStyle: 'italic', margin: '4px 0 8px 0', lineHeight: 1.4 }}>
+              {lang === 'es' ? '* IVA (19%) segun nacionalidad y motivo del viaje' : '* VAT (19%) depends on nationality and travel purpose'}
+            </p>
+            <button className="be-btn-primary be-room-select-btn" onClick={() => onSelect(room, rate)}>
+              {t.selectBtn}
+            </button>
+          </React.Fragment>
         ) : (
           <div className="be-room-unavailable-msg">
-            <p>{lang === 'es' ? 'No hay disponibilidad en Kunas PMS para este apartaestudio en las fechas seleccionadas.' : 'No availability in Kunas PMS for this apartaestudio on the selected dates.'}</p>
-            <button className="be-btn-primary" disabled style={{ opacity: 0.6, width: '100%', justifyContent: 'center' }}>
-              {lang === 'es' ? 'No disponible' : 'Not available'}
-            </button>
+            <p>{t.soldOutMsg}</p>
           </div>
         )}
       </div>
@@ -1865,7 +1864,13 @@ function BookingEngine() {
                 </div>
               ) : (
                 <div className="be-rooms-list">
-                  {rooms.map(room => (
+                  {/* Available rooms first (preserve API order), sold-out at end */}
+                  {[...rooms].sort((a, b) => {
+                    const aOk = a.available !== false;
+                    const bOk = b.available !== false;
+                    if (aOk === bOk) return 0;
+                    return aOk ? -1 : 1;
+                  }).map(room => (
                     <RoomCard key={room.id} room={room}
                       nights={dateDiff(search.checkin, search.checkout)}
                       guests={search.guests}

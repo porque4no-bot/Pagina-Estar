@@ -2173,6 +2173,28 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
 }
 .tier.featured .save { color: var(--sand-300); }
 
+/* ---------- TIER TABLE: sold-out state ----------
+   Toggled by client-side script on room pages when /api/check-availability
+   reports no inventory for today. De-emphasizes the block and surfaces a badge. */
+.tier-table.sold-out { position: relative; opacity: 0.55; filter: grayscale(70%); }
+.tier-table.sold-out .tier { pointer-events: none; }
+.tier-table.sold-out::after {
+  content: attr(data-sold-out-label);
+  position: absolute;
+  top: 12px; right: 12px;
+  background: var(--terracotta-700);
+  color: var(--white);
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 2;
+}
+
 /* ---------- SECTION HEAD generic ---------- */
 .section-head {
   display: grid;

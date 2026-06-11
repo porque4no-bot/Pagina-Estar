@@ -25,6 +25,8 @@
   "save10": "Ahorra 10%",
   "nonRefundable": "No reembolsable",
   "selectBtn": "Seleccionar →",
+  "soldOut": "Agotado",
+  "soldOutMsg": "Sin disponibilidad para las fechas seleccionadas. Prueba con otras fechas o consúltanos por WhatsApp.",
   "extrasIntro": "Personaliza tu estadía. Todos los servicios se confirman al reservar.",
   "continueGuest": "Continuar con datos →",
   "guestIntro": "Tus datos se usan solo para la confirmación y para comunicarnos contigo.",
