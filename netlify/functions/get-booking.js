@@ -56,6 +56,8 @@ function normalizeReservation(raw) {
     bookingCode: String(raw.id_reservations || raw.reference || ''),
     status,
     guestName: `${guest.first_name || ''} ${guest.last_name || ''}`.trim(),
+    guestLastName: String(guest.last_name || ''),
+    guestEmail: String(guest.email || guest.mail || raw.guest_email || raw.email || ''),
     roomName: room.room_type || room.name || '',
     checkIn,
     checkOut,
@@ -63,6 +65,44 @@ function normalizeReservation(raw) {
     totalAmount,
     canCancel
   };
+}
+
+/* Normalize for last-name comparison: strip accents, lowercase, collapse to
+   single spaces. Used to require the booking code AND the full surname as a
+   second factor, so a guessed/enumerated code alone never reveals PII (A-1/A-2). */
+function normalizeName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/* Second-factor check. The reservation is disclosed only when the caller
+   proves knowledge of the booking email OR the guest surname — never the code
+   alone (A-1/A-2). Email match is exact (case-insensitive); surname match
+   mirrors guest-session (full last name or a token >= 3 chars) so two-surname
+   guests who type only one surname still pass. */
+function identityMatches(reservation, providedFactor) {
+  const candidate = normalizeName(providedFactor);
+  if (!candidate || candidate.length < 2) return false;
+
+  // Email match (the manage-booking form already collects the email).
+  const email = String(reservation.guestEmail || '').trim().toLowerCase();
+  if (email && email === String(providedFactor || '').trim().toLowerCase()) return true;
+
+  // Surname match.
+  const lastName = normalizeName(reservation.guestLastName);
+  const tokens = (lastName || normalizeName(reservation.guestName)).split(' ').filter(Boolean);
+  if (lastName && lastName === candidate) return true;
+  if (tokens.includes(candidate) && candidate.length >= 3) return true;
+  const candidateTokens = candidate.split(' ').filter(Boolean);
+  if (candidateTokens.length > 1 && lastName) {
+    const set = new Set(tokens);
+    return candidateTokens.every(tok => set.has(tok));
+  }
+  return false;
 }
 
 exports.handler = async (event, context) => {
@@ -119,15 +159,28 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Extract booking code from query string: ?code=EST-XXXXX
+  // Extract booking code + surname (second factor) from the query string:
+  // ?code=EST-XXXXX&apellido=<lastName>. The surname is mandatory so an
+  // enumerated code alone can never disclose guest PII (A-1/A-2).
   const params = event.queryStringParameters || {};
   const bookingCode = (params.code || '').trim();
+  /* Second factor: email (preferred, collected by the manage-booking form) or
+     surname. Either one is accepted. */
+  const providedFactor = (params.email || params.apellido || params.lastName || params.lastname || '').trim();
 
   if (!bookingCode) {
     return {
       statusCode: 400,
       headers: corsHeaders,
       body: JSON.stringify({ error: 'Missing required query param: code' })
+    };
+  }
+
+  if (!providedFactor) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Missing required query param: email or apellido' })
     };
   }
 
@@ -207,6 +260,21 @@ exports.handler = async (event, context) => {
     }
 
     const normalized = normalizeReservation(data);
+
+    /* Second-factor gate: the surname must match. On mismatch we return the
+       SAME "not found" shape as a missing reservation so an attacker cannot
+       distinguish "wrong surname" from "no such code" (no enumeration oracle). */
+    if (!identityMatches(normalized, providedFactor)) {
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({ found: false })
+      };
+    }
+
+    // Do not echo internal-only comparison fields back to the client.
+    delete normalized.guestLastName;
+    delete normalized.guestEmail;
     return {
       statusCode: 200,
       headers: corsHeaders,

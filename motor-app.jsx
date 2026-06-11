@@ -1260,7 +1260,7 @@ function ManageBooking({ onBack, lang }) {
     setSearchError(null);
 
     try {
-      const response = await fetch(`/api/get-booking?code=${encodeURIComponent(code.trim())}`);
+      const response = await fetch(`/api/get-booking?code=${encodeURIComponent(code.trim())}&email=${encodeURIComponent(email.trim())}`);
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
       }

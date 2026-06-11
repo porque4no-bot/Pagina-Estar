@@ -21,6 +21,11 @@
 [functions."reconcile-payments"]
   schedule = "*/30 * * * *"
 
+# Data-retention purge (Ley 1581): delete guest PII older than 5 years.
+# Runs daily at 03:30. See netlify/functions/purge-guest-data.js.
+[functions."purge-guest-data"]
+  schedule = "30 3 * * *"
+
 [build.environment]
   NODE_VERSION = "20"
   # The Firebase web apiKey is public by design (it ships in client-side HTML);

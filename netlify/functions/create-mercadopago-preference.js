@@ -9,6 +9,7 @@ const {
   effectiveStatus,
   computeQuoteTotal
 } = require('./_quotes-store');
+const { verifyDirectBookingAmount } = require('./_direct-pricing');
 
 function corsHeaders() {
   const headers = {
@@ -154,6 +155,33 @@ async function preferenceForDirectBooking(body, event) {
   if (!bookingCode || amountCents <= 0) return json(400, { error: 'Missing bookingCode or amountCents' });
   if (!body.checkin || !body.checkout || !body.roomTypeId || !body.firstName || !body.lastName || !body.email || !body.phone) {
     return json(400, { error: 'Missing reservation fields' });
+  }
+
+  /* SERVER-SIDE PRICE VERIFICATION (C-2). The client cannot be trusted to set
+     amountCents: recompute the authoritative subtotal from OTASync and refuse
+     to create a preference for a tampered amount. Mirrors the Wompi path in
+     create-wompi-signature.js so both providers have the same protection. */
+  const decodedLike = {
+    checkin: clean(body.checkin, 10),
+    checkout: clean(body.checkout, 10),
+    guestsCount: Math.max(1, parseInt(body.guestsCount, 10) || 1),
+    roomTypeId: clean(body.roomTypeId, 20),
+    extrasMask: clean(body.extrasMask, 20) || '000000'
+  };
+  let verdict;
+  try {
+    verdict = await verifyDirectBookingAmount(decodedLike, amountCents);
+  } catch (e) {
+    console.error('[create-mercadopago-preference] price recompute failed:', e.message);
+    return json(503, { error: 'price_check_unavailable' });
+  }
+  if (!verdict.ok) {
+    console.error(`[create-mercadopago-preference] price verification failed: bookingCode=${bookingCode}, roomType=${decodedLike.roomTypeId}, client=${amountCents}, reason=${verdict.reason}`);
+    return json(400, { error: verdict.reason || 'price_mismatch' });
+  }
+  if (verdict.isMock && (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true')) {
+    console.error('[create-mercadopago-preference] OTASync credentials missing in production. Refusing to create preference.');
+    return json(503, { error: 'OTASync credentials missing' });
   }
 
   const reference = createDirectReference({
