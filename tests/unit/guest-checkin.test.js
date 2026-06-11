@@ -258,6 +258,9 @@ test('guest check-in submit accepts minor when parent is present', async () => {
     const rcnArchives = archived.filter(p => p.kind === 'guest-minor-rcn');
     assert.equal(rcnArchives.length, 1);
     assert.equal(rcnArchives[0].guestIndex, 1);
+    /* RCN binary should be persisted in guest-minor-documents (no auth letter needed) */
+    assert.equal(minorBlobsSet.length, 1);
+    assert.ok(minorBlobsSet[0].key.includes('registro-civil'));
   } finally {
     _test.resetDeps();
   }

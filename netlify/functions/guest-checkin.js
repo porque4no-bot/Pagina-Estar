@@ -484,6 +484,8 @@ function calculateAge(birthDate) {
   if (!birthDate) return 0;
   const value = String(birthDate).trim();
   if (!/^\d{4}-\d{2}-\d{2}/.test(value)) return 0;
+  const [y, mo, d] = value.slice(0, 10).split('-').map(Number);
+  if (mo < 1 || mo > 12 || d < 1 || d > new Date(y, mo, 0).getDate()) return 0;
   const birth = new Date(`${value.slice(0, 10)}T00:00:00`);
   if (Number.isNaN(birth.getTime())) return 0;
   const now = new Date();
@@ -592,7 +594,7 @@ function matchProgenitor(progenitorName, adultEntries) {
     const guest = (entry && entry.guest) || {};
     const candidate = normalizeNameKey(`${guest.firstName || ''} ${guest.lastName || ''}`);
     if (!candidate) continue;
-    if (candidate.includes(target) || target.includes(candidate)) {
+    if (target.length >= 3 && (candidate.includes(target) || target.includes(candidate))) {
       return { matched: true, matchedIndex: entry.originalIndex !== undefined ? entry.originalIndex : i };
     }
     const candidateTokens = new Set(candidate.split(' ').filter(Boolean));

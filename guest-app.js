@@ -260,8 +260,11 @@
 
   function calculateAgeClient(birthDate) {
     if (!birthDate) return 0;
-    if (!/^\d{4}-\d{2}-\d{2}/.test(String(birthDate))) return 0;
-    const birth = new Date(`${String(birthDate).slice(0, 10)}T00:00:00`);
+    const value = String(birthDate).trim();
+    if (!/^\d{4}-\d{2}-\d{2}/.test(value)) return 0;
+    const [y, mo, d] = value.slice(0, 10).split('-').map(Number);
+    if (mo < 1 || mo > 12 || d < 1 || d > new Date(y, mo, 0).getDate()) return 0;
+    const birth = new Date(`${value.slice(0, 10)}T00:00:00`);
     if (Number.isNaN(birth.getTime())) return 0;
     const now = new Date();
     let age = now.getFullYear() - birth.getFullYear();
@@ -287,7 +290,7 @@
     return adultSlots.some(slot => {
       const candidate = normalizeNameClient(`${slot.guest.firstName || ''} ${slot.guest.lastName || ''}`);
       if (!candidate) return false;
-      if (candidate.includes(target) || target.includes(candidate)) return true;
+      if (target.length >= 3 && (candidate.includes(target) || target.includes(candidate))) return true;
       const candidateTokens = new Set(candidate.split(' ').filter(Boolean));
       const allPresent = targetTokens.every(token => candidateTokens.has(token));
       return allPresent && targetTokens.some(token => token.length >= 3);
@@ -404,7 +407,7 @@
     const rcnMeta = $('#minorRcnMeta');
     if (slot.registroCivilDocumentRef) {
       if (rcnTitle) rcnTitle.textContent = slot.registroCivilName || t('minorRcnLabel');
-      if (rcnMeta) rcnMeta.textContent = t('minorParentDetected');
+      if (rcnMeta) rcnMeta.textContent = (slot.fatherName || slot.motherName) ? t('minorParentDetected') : t('minorRcnHelp');
     } else {
       if (rcnTitle) rcnTitle.textContent = t('minorRcnLabel');
       if (rcnMeta) rcnMeta.textContent = 'JPG, PNG o PDF. Máximo 4.5 MB.';
