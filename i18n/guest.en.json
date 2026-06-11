@@ -8,5 +8,10 @@
   "photoTooDark": "Photo too dark or too bright, try again",
   "photoBlurry": "Photo is blurry, try again",
   "cameraUnavailable": "We could not open the camera. You can upload an image.",
-  "photoReady": "Photo ready to analyze."
+  "photoReady": "Photo ready to analyze.",
+  "occupantCountLabel": "How many people are staying?",
+  "guestSlotEmpty": "Empty",
+  "guestSlotOcrOk": "OCR ok",
+  "guestSlotPendingSignature": "Pending signature",
+  "primaryGuestLabel": "Primary"
 }

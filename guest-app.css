@@ -97,6 +97,11 @@
 .guest-camera-status{min-height:22px;margin:14px 0 0;font:700 12px/1.5 var(--font-label)}.guest-camera-status.is-error{display:inline-block;padding:9px 12px;color:var(--paper);border-radius:8px;background:var(--terracotta-700)}
 .guest-camera-actions{margin-top:18px;display:flex;justify-content:flex-end;gap:12px}
 @keyframes guestCameraScan{from{transform:translateY(-180px)}to{transform:translateY(180px)}}
+.guest-occupant-cards{margin-top:18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.guest-occupant-card{padding:14px;border:1px solid var(--paper-400);border-radius:12px;background:var(--white)}
+.guest-occupant-card.is-active{border-color:var(--olive);box-shadow:0 0 0 3px rgba(155,144,101,.14)}
+.guest-occupant-main{width:100%;display:grid;gap:5px;text-align:left}.guest-occupant-main strong{font:700 13px var(--font-label)}.guest-occupant-main small{color:var(--terracotta-700);font:700 10px var(--font-label);letter-spacing:.08em;text-transform:uppercase}
+.guest-primary-choice{margin-top:12px;display:flex;align-items:center;gap:8px;color:var(--ink-500);font:700 10px var(--font-label);letter-spacing:.08em;text-transform:uppercase}.guest-primary-choice input{accent-color:var(--olive)}
 .guest-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.guest-field-wide{grid-column:1/-1}
 .guest-consent{margin-top:20px;display:flex;align-items:flex-start;gap:10px;color:var(--ink-500);font:12px/1.55 var(--font-label)}
 .guest-consent input{width:17px;height:17px;margin-top:1px;accent-color:var(--olive)}.guest-consent a{color:var(--ink);border-bottom:1px solid currentColor}
@@ -149,7 +154,7 @@
   .guest-layout{padding:34px 20px 30px;display:block}.guest-sidebar{display:none}.guest-panel-head{align-items:flex-start}.guest-panel-head h2{font-size:clamp(30px,9vw,46px)}
   .guest-booking-card,.guest-booking-management{grid-template-columns:1fr}.guest-booking-image{height:220px}.guest-booking-summary{padding:28px 24px}
   .guest-quick-grid,.guest-service-grid,.guest-checkin-aside,.guest-recommendation-grid{grid-template-columns:1fr}.guest-place-card.featured{grid-column:auto}.guest-quick-card{min-height:0}.guest-arrival-card{align-items:flex-start;flex-direction:column}
-  .guest-form-grid{grid-template-columns:1fr}.guest-field-wide{grid-column:auto}.guest-inline-actions{align-items:flex-start;flex-direction:column}.guest-place-card{min-height:330px}
+  .guest-form-grid,.guest-occupant-cards{grid-template-columns:1fr}.guest-field-wide{grid-column:auto}.guest-inline-actions{align-items:flex-start;flex-direction:column}.guest-place-card{min-height:330px}
   .guest-mobile-nav{position:fixed;z-index:220;inset:auto 0 0;height:70px;padding:8px 8px max(8px,env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(5,1fr);gap:2px;border-top:1px solid var(--paper-400);background:rgba(250,246,239,.96);backdrop-filter:blur(18px)}
   .guest-mobile-nav button{display:grid;place-items:center;align-content:center;gap:4px;color:var(--ink-500);border-radius:7px;font:700 9px var(--font-label)}.guest-mobile-nav button.is-active{color:var(--terracotta-700);background:var(--terracotta-100)}.guest-mobile-nav svg{width:19px;height:19px}
 }

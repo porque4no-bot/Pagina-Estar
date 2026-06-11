@@ -36,6 +36,21 @@ function sanitizeItems(items) {
   }).filter(Boolean);
 }
 
+function sanitizeContractGuests(guests) {
+  return (Array.isArray(guests) ? guests : []).slice(0, 5).map((entry, index) => {
+    const guest = entry && entry.guest ? entry.guest : entry;
+    return {
+      firstName: cleanText(guest && guest.firstName, 100),
+      lastName: cleanText(guest && guest.lastName, 100),
+      documentType: cleanText(guest && guest.documentType, 60),
+      documentNumber: cleanText(guest && guest.documentNumber, 80),
+      nationality: cleanText(guest && guest.nationality, 80),
+      birthDate: cleanText(guest && guest.birthDate, 20),
+      isPrimary: Boolean((entry && entry.isPrimary) || index === 0)
+    };
+  }).filter(guest => guest.firstName || guest.lastName || guest.documentNumber);
+}
+
 function buildEvent(type, body, session) {
   const eventId = `GST-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
   const base = {
@@ -70,6 +85,7 @@ function buildEvent(type, body, session) {
     return {
       ...base,
       signedName,
+      guests: sanitizeContractGuests(body.guests),
       acceptedTerms: true,
       contractVersion: cleanText(body.contractVersion || 'ESTAR-HOSPEDAJE-2026-01', 80),
       signedAt: new Date().toISOString(),

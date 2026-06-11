@@ -21,6 +21,15 @@ const ALLOWED_TYPES = new Set([
   'image/bmp',
   'image/heif'
 ]);
+const MAX_GUESTS = 5;
+const defaultDeps = {
+  archiveGuestPayload,
+  guestStore,
+  protectRecord,
+  requireGuest,
+  syncGuestEvent
+};
+const deps = { ...defaultDeps };
 
 function decodeFile(file) {
   if (!file || !file.dataUrl) return null;
@@ -161,7 +170,13 @@ function parseAzureResult(result) {
 }
 
 exports._test = {
-  parseAzureResult
+  parseAzureResult,
+  setDeps(overrides = {}) {
+    Object.assign(deps, overrides);
+  },
+  resetDeps() {
+    Object.assign(deps, defaultDeps);
+  }
 };
 
 async function analyzeWithAzure(file) {
@@ -270,6 +285,65 @@ function validateGuest(guest) {
   return { valid: missing.length === 0 && warnings.length === 0, missing, warnings };
 }
 
+function normalizeGuestEntry(entry, index) {
+  const file = decodeFile(entry && entry.file);
+  if (!file) {
+    throw Object.assign(new Error(`Selecciona una foto o PDF del documento para el huésped ${index + 1}.`), { statusCode: 400 });
+  }
+  const guest = normalizeGuest({ guest: (entry && entry.guest) || {} }, {});
+  return {
+    guest,
+    file,
+    isPrimary: Boolean(entry && entry.isPrimary),
+    analysisSource: cleanText(
+      (entry && (entry.analysisSource || entry.documentAnalysis)) ||
+      (entry && entry.file && entry.file.analysisSource) ||
+      'manual',
+      40
+    ),
+    confidence: Number((entry && entry.confidence) || 0)
+  };
+}
+
+function guestArchiveName(guest) {
+  return cleanText(`${guest.firstName || ''} ${guest.lastName || ''}`.trim() || 'huesped', 120);
+}
+
+function normalizeSubmitGuests(body) {
+  const rawGuests = Array.isArray(body.guests) ? body.guests : [];
+  if (!rawGuests.length) {
+    throw Object.assign(new Error('Registra al menos un huésped para completar el check-in.'), { statusCode: 400 });
+  }
+  if (rawGuests.length > MAX_GUESTS) {
+    throw Object.assign(new Error('Puedes registrar máximo 5 huéspedes por reserva.'), { statusCode: 400 });
+  }
+  const entries = rawGuests.map((entry, index) => normalizeGuestEntry(entry, index));
+  if (!entries.some(entry => entry.isPrimary)) entries[0].isPrimary = true;
+  return entries.map((entry, index) => ({
+    ...entry,
+    isPrimary: index === entries.findIndex(item => item.isPrimary)
+  }));
+}
+
+function validateGuests(entries) {
+  const perGuest = entries.map((entry, index) => ({
+    index,
+    ...validateGuest(entry.guest)
+  }));
+  const missing = perGuest.flatMap(result =>
+    result.missing.map(field => `guests.${result.index}.${field}`)
+  );
+  const warnings = perGuest.flatMap(result =>
+    result.warnings.map(warning => `Huésped ${result.index + 1}: ${warning}`)
+  );
+  return {
+    valid: missing.length === 0 && warnings.length === 0,
+    missing,
+    warnings,
+    guests: perGuest
+  };
+}
+
 exports.handler = async event => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders(), body: '' };
@@ -284,9 +358,87 @@ exports.handler = async event => {
   if (!limited.ok) return rateLimitResponse(corsHeaders(), limited.retryAfter);
 
   try {
-    const session = requireGuest(event);
-    const body = parseJsonBody(event, 6.2 * 1024 * 1024);
+    const session = deps.requireGuest(event);
+    const body = parseJsonBody(event, 32 * 1024 * 1024);
     const mode = body.mode === 'submit' ? 'submit' : 'analyze';
+
+    if (mode === 'submit') {
+      const entries = normalizeSubmitGuests(body);
+      const validation = validateGuests(entries);
+
+      if (!validation.valid) {
+        return json(422, {
+          error: 'Revisa los campos requeridos antes de completar el check-in.',
+          validation
+        });
+      }
+
+      const checkinId = `CHK-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+      const createdAt = new Date().toISOString();
+      const record = {
+        type: 'guest_checkin',
+        checkinId,
+        bookingCode: session.sub,
+        guests: entries.map((entry, index) => ({
+          guest: entry.guest,
+          document: {
+            name: entry.file.name,
+            contentType: entry.file.contentType,
+            size: entry.file.size,
+            analysisSource: entry.analysisSource,
+            confidence: entry.confidence
+          },
+          isPrimary: entry.isPrimary,
+          guestIndex: index
+        })),
+        status: 'received',
+        createdAt
+      };
+
+      await deps.guestStore('guest-checkins').setJSON(checkinId, deps.protectRecord(record));
+
+      let stagedDocument = false;
+      if (process.env.GUEST_APP_STORE_DOCUMENTS === 'true') {
+        await Promise.all(entries.map((entry, index) => {
+          const safeName = entry.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+          return deps.guestStore('guest-documents').set(`${checkinId}/${index + 1}-${safeName}`, entry.file.buffer, {
+            metadata: {
+              bookingCode: session.sub,
+              contentType: entry.file.contentType,
+              uploadedAt: record.createdAt,
+              guestIndex: String(index)
+            }
+          });
+        }));
+        stagedDocument = true;
+      }
+
+      const archiveResults = await Promise.all(entries.map((entry, index) =>
+        deps.archiveGuestPayload({
+          kind: 'guest-checkin',
+          record,
+          guestIndex: index,
+          guestName: guestArchiveName(entry.guest),
+          file: {
+            name: entry.file.name,
+            contentType: entry.file.contentType,
+            dataBase64: entry.file.buffer.toString('base64')
+          }
+        })
+      ));
+      const sync = await deps.syncGuestEvent(record);
+
+      return json(201, {
+        ok: true,
+        checkinId,
+        status: 'received',
+        validation,
+        archive: archiveResults,
+        sync,
+        stagedDocument
+      });
+    }
+
     const file = decodeFile(body.file);
     if (!file) return json(400, { error: 'Selecciona una foto o PDF del documento.' });
 
@@ -307,74 +459,12 @@ exports.handler = async event => {
       return json(200, {
         ok: true,
         source: analysisSource,
+        slotIndex: Number.isInteger(body.slotIndex) ? body.slotIndex : null,
         extracted: analysis.fields,
         confidence: analysis.confidence,
         validation
       });
     }
-
-    if (!validation.valid) {
-      return json(422, {
-        error: 'Revisa los campos requeridos antes de completar el check-in.',
-        extracted: analysis.fields,
-        confidence: analysis.confidence,
-        validation
-      });
-    }
-
-    const checkinId = `CHK-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-    const record = {
-      type: 'guest_checkin',
-      checkinId,
-      bookingCode: session.sub,
-      guest,
-      document: {
-        name: file.name,
-        contentType: file.contentType,
-        size: file.size,
-        analysisSource,
-        confidence: analysis.confidence
-      },
-      status: 'received',
-      createdAt: new Date().toISOString()
-    };
-
-    await guestStore('guest-checkins').setJSON(checkinId, protectRecord(record));
-
-    let stagedDocument = false;
-    if (process.env.GUEST_APP_STORE_DOCUMENTS === 'true') {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      await guestStore('guest-documents').set(`${checkinId}/${safeName}`, file.buffer, {
-        metadata: {
-          bookingCode: session.sub,
-          contentType: file.contentType,
-          uploadedAt: record.createdAt
-        }
-      });
-      stagedDocument = true;
-    }
-
-    const archive = await archiveGuestPayload({
-      kind: 'guest-checkin',
-      record,
-      file: {
-        name: file.name,
-        contentType: file.contentType,
-        dataBase64: file.buffer.toString('base64')
-      }
-    });
-    const sync = await syncGuestEvent(record);
-
-    return json(201, {
-      ok: true,
-      checkinId,
-      status: 'received',
-      validation,
-      documentAnalysis: analysisSource,
-      archive,
-      sync,
-      stagedDocument
-    });
   } catch (error) {
     console.error('[guest-checkin]', error.message);
     return json(error.statusCode || 500, {

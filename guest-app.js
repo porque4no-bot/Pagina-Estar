@@ -17,7 +17,12 @@
       "photoTooDark": "Foto muy oscura o con demasiada luz, probá de nuevo",
       "photoBlurry": "Foto borrosa, probá de nuevo",
       "cameraUnavailable": "No fue posible abrir la cámara. Podés subir una imagen.",
-      "photoReady": "Foto lista para analizar."
+      "photoReady": "Foto lista para analizar.",
+      "occupantCountLabel": "¿Cuántas personas se hospedan?",
+      "guestSlotEmpty": "Vacía",
+      "guestSlotOcrOk": "OCR ok",
+      "guestSlotPendingSignature": "Pendiente firma",
+      "primaryGuestLabel": "Principal"
     }/*__GUEST_I18N_ES_END__*/,
     en: /*__GUEST_I18N_EN_START__*/{
       "expirationDateOptionalHint": "(optional, passports only)",
@@ -29,7 +34,12 @@
       "photoTooDark": "Photo too dark or too bright, try again",
       "photoBlurry": "Photo is blurry, try again",
       "cameraUnavailable": "We could not open the camera. You can upload an image.",
-      "photoReady": "Photo ready to analyze."
+      "photoReady": "Photo ready to analyze.",
+      "occupantCountLabel": "How many people are staying?",
+      "guestSlotEmpty": "Empty",
+      "guestSlotOcrOk": "OCR ok",
+      "guestSlotPendingSignature": "Pending signature",
+      "primaryGuestLabel": "Primary"
     }/*__GUEST_I18N_EN_END__*/
   };
   const CAMERA_WIDTH = 1600;
@@ -40,6 +50,8 @@
     token: '',
     booking: null,
     document: null,
+    guestSlots: [],
+    activeGuestIndex: 0,
     cart: {},
     cameraStream: null
   };
@@ -133,6 +145,8 @@
     state.token = '';
     state.booking = null;
     state.document = null;
+    state.guestSlots = [];
+    state.activeGuestIndex = 0;
     state.cart = {};
     sessionStorage.removeItem(SESSION_KEY);
   }
@@ -163,6 +177,7 @@
       guestName: 'Andrea Restrepo',
       roomName: 'Apartaestudio Selección',
       roomNumber: '402',
+      capacity: 2,
       checkIn: checkIn.toISOString().slice(0, 10),
       checkOut: checkOut.toISOString().slice(0, 10),
       nights: 4,
@@ -179,6 +194,168 @@
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return Math.ceil((target - today) / 86400000);
+  }
+
+  function emptyGuest() {
+    return {
+      firstName: '',
+      lastName: '',
+      documentType: '',
+      documentNumber: '',
+      birthDate: '',
+      expirationDate: '',
+      nationality: '',
+      arrivalTime: '',
+      email: '',
+      phone: '',
+      address: '',
+      notes: '',
+      privacyAccepted: false
+    };
+  }
+
+  function createGuestSlot(index) {
+    return {
+      guest: emptyGuest(),
+      document: null,
+      analysisSource: '',
+      confidence: 0,
+      isPrimary: index === 0,
+      status: 'empty'
+    };
+  }
+
+  function bookingCapacity() {
+    const capacity = Number(state.booking && state.booking.capacity);
+    return Math.min(5, Math.max(1, Number.isFinite(capacity) && capacity > 0 ? capacity : 1));
+  }
+
+  function splitBookingName() {
+    const parts = String((state.booking && state.booking.guestName) || '').trim().split(/\s+/).filter(Boolean);
+    return { firstName: parts.shift() || '', lastName: parts.join(' ') };
+  }
+
+  function activeSlot() {
+    return state.guestSlots[state.activeGuestIndex] || null;
+  }
+
+  function formFields() {
+    return [
+      'firstName', 'lastName', 'documentType', 'documentNumber', 'birthDate',
+      'expirationDate', 'nationality', 'arrivalTime', 'email', 'phone', 'address', 'notes'
+    ];
+  }
+
+  function saveActiveGuestFromForm() {
+    const slot = activeSlot();
+    if (!slot) return;
+    formFields().forEach(name => {
+      const field = $(`[name="${name}"]`);
+      if (field) slot.guest[name] = field.value || '';
+    });
+    const privacy = $('[name="privacyAccepted"]');
+    if (privacy) slot.guest.privacyAccepted = privacy.checked;
+    slot.status = slot.document
+      ? (slot.analysisSource === 'azure' ? 'ocr' : 'pending')
+      : 'empty';
+  }
+
+  function loadActiveGuestIntoForm() {
+    const slot = activeSlot();
+    if (!slot) return;
+    formFields().forEach(name => {
+      const field = $(`[name="${name}"]`);
+      if (field) field.value = slot.guest[name] || '';
+    });
+    const privacy = $('[name="privacyAccepted"]');
+    if (privacy) privacy.checked = Boolean(slot.guest.privacyAccepted);
+    state.document = slot.document;
+    if (slot.document) {
+      $('#uploadTitle').textContent = slot.document.name;
+      $('#uploadMeta').textContent = `${(slot.document.size / 1024 / 1024).toFixed(2)} MB · listo para analizar`;
+      $('#analyzeDocument').disabled = false;
+    } else {
+      $('#uploadTitle').textContent = 'Subir archivo';
+      $('#uploadMeta').textContent = 'JPG, PNG o PDF. Máximo 4.5 MB.';
+      $('#analyzeDocument').disabled = true;
+    }
+    setStatus($('#ocrStatus'), '', '');
+    updateExpirationRequirement();
+  }
+
+  function slotLabel(slot, index) {
+    const name = `${slot.guest.firstName || ''} ${slot.guest.lastName || ''}`.trim();
+    return name || `Huésped ${index + 1}`;
+  }
+
+  function slotStatusLabel(slot) {
+    if (slot.status === 'ocr') return t('guestSlotOcrOk');
+    if (slot.document) return t('guestSlotPendingSignature');
+    return t('guestSlotEmpty');
+  }
+
+  function renderGuestCards() {
+    const container = $('#guestCards');
+    if (!container) return;
+    container.innerHTML = state.guestSlots.map((slot, index) => `
+      <article class="guest-occupant-card${index === state.activeGuestIndex ? ' is-active' : ''}" data-guest-slot="${index}">
+        <button type="button" class="guest-occupant-main" data-select-guest="${index}">
+          <strong>${slotLabel(slot, index)}</strong>
+          <small>${slotStatusLabel(slot)}</small>
+        </button>
+        <label class="guest-primary-choice">
+          <input type="radio" name="primaryGuest" value="${index}" ${slot.isPrimary ? 'checked' : ''}>
+          <span>${t('primaryGuestLabel')}</span>
+        </label>
+      </article>
+    `).join('');
+    $$('[data-select-guest]').forEach(button => {
+      button.addEventListener('click', () => selectGuestSlot(Number(button.dataset.selectGuest)));
+    });
+    $$('[name="primaryGuest"]').forEach(input => {
+      input.addEventListener('change', event => setPrimaryGuest(Number(event.target.value)));
+    });
+  }
+
+  function selectGuestSlot(index) {
+    saveActiveGuestFromForm();
+    state.activeGuestIndex = Math.max(0, Math.min(index, state.guestSlots.length - 1));
+    loadActiveGuestIntoForm();
+    renderGuestCards();
+  }
+
+  function setPrimaryGuest(index) {
+    state.guestSlots.forEach((slot, slotIndex) => {
+      slot.isPrimary = slotIndex === index;
+    });
+    renderGuestCards();
+  }
+
+  function setGuestSlotCount(count) {
+    saveActiveGuestFromForm();
+    const nextCount = Math.min(5, Math.max(1, Number(count) || 1));
+    while (state.guestSlots.length < nextCount) {
+      state.guestSlots.push(createGuestSlot(state.guestSlots.length));
+    }
+    state.guestSlots = state.guestSlots.slice(0, nextCount);
+    if (!state.guestSlots.some(slot => slot.isPrimary)) state.guestSlots[0].isPrimary = true;
+    state.activeGuestIndex = Math.min(state.activeGuestIndex, state.guestSlots.length - 1);
+    $('#occupantCount').value = String(nextCount);
+    loadActiveGuestIntoForm();
+    renderGuestCards();
+  }
+
+  function initializeGuestSlots() {
+    if (state.guestSlots.length) return;
+    const count = bookingCapacity();
+    state.guestSlots = Array.from({ length: count }, (_, index) => createGuestSlot(index));
+    const bookingName = splitBookingName();
+    state.guestSlots[0].guest.firstName = bookingName.firstName;
+    state.guestSlots[0].guest.lastName = bookingName.lastName;
+    state.guestSlots[0].guest.email = (state.booking && state.booking.guestEmail) || '';
+    $('#occupantCount').value = String(count);
+    loadActiveGuestIntoForm();
+    renderGuestCards();
   }
 
   function renderBooking() {
@@ -235,6 +412,7 @@
     $('#guestLogout').hidden = false;
     document.body.classList.add('guest-is-authenticated');
     renderBooking();
+    initializeGuestSlots();
     if (window.lucide) window.lucide.createIcons();
   }
 
@@ -367,16 +545,29 @@
   }
 
   function setDocument(documentPayload, message) {
+    const slot = activeSlot();
     state.document = documentPayload;
+    if (slot) {
+      slot.document = documentPayload;
+      slot.status = 'pending';
+    }
     $('#uploadTitle').textContent = documentPayload.name;
     $('#uploadMeta').textContent = `${(documentPayload.size / 1024 / 1024).toFixed(2)} MB · listo para analizar`;
     $('#analyzeDocument').disabled = false;
     setStatus($('#ocrStatus'), message || 'Documento cargado.', 'success');
+    renderGuestCards();
   }
 
   async function handleDocumentSelection(event) {
     const file = event.target.files && event.target.files[0];
+    const slot = activeSlot();
     state.document = null;
+    if (slot) {
+      slot.document = null;
+      slot.status = 'empty';
+      slot.analysisSource = '';
+      slot.confidence = 0;
+    }
     $('#analyzeDocument').disabled = true;
     if (!file) return;
     if (file.size > 4.5 * 1024 * 1024) {
@@ -569,10 +760,23 @@
       } else {
         data = await request(API.checkin, {
           method: 'POST',
-          body: JSON.stringify({ mode: 'analyze', file: state.document, guest: {} })
+          body: JSON.stringify({
+            mode: 'analyze',
+            file: state.document,
+            guest: {},
+            slotIndex: state.activeGuestIndex
+          })
         });
       }
       fillExtractedFields(data.extracted);
+      saveActiveGuestFromForm();
+      const slot = activeSlot();
+      if (slot) {
+        slot.analysisSource = data.source || '';
+        slot.confidence = Number(data.confidence || 0);
+        slot.status = data.source === 'azure' ? 'ocr' : 'pending';
+      }
+      renderGuestCards();
       const azureFailed = data.source === 'azure-error';
       const text = data.source === 'azure'
         ? `Documento leído con ${data.confidence || 0}% de confianza. Confirma los datos.`
@@ -611,8 +815,12 @@
     event.preventDefault();
     const form = event.currentTarget;
     const button = form.querySelector('button[type="submit"]');
-    if (!state.document) {
-      setStatus($('#checkinStatus'), 'Primero sube el documento de identidad.', 'error');
+    saveActiveGuestFromForm();
+    const privacyAccepted = $('[name="privacyAccepted"]').checked;
+    const missingDocumentIndex = state.guestSlots.findIndex(slot => !slot.document);
+    if (missingDocumentIndex >= 0) {
+      selectGuestSlot(missingDocumentIndex);
+      setStatus($('#checkinStatus'), 'Primero sube el documento de identidad de cada huésped.', 'error');
       return;
     }
     updateExpirationRequirement();
@@ -630,8 +838,13 @@
           method: 'POST',
           body: JSON.stringify({
             mode: 'submit',
-            file: state.document,
-            guest: guestPayloadFromForm(form)
+            guests: state.guestSlots.map(slot => ({
+              guest: { ...slot.guest, privacyAccepted },
+              file: slot.document,
+              isPrimary: slot.isPrimary,
+              analysisSource: slot.analysisSource || 'manual',
+              confidence: slot.confidence || 0
+            }))
           })
         });
       }
@@ -675,10 +888,12 @@
     const button = $('#signContract');
     const signedName = $('#signedName').value.trim();
     const acceptedTerms = $('#contractAccepted').checked;
+    saveActiveGuestFromForm();
     const data = await submitAction({
       type: 'contract',
       signedName,
       acceptedTerms,
+      guests: state.guestSlots.map(slot => ({ guest: slot.guest, isPrimary: slot.isPrimary })),
       contractVersion: 'ESTAR-HOSPEDAJE-2026-01'
     }, $('#contractStatus'), button, 'Contrato firmado.');
     if (data) {
@@ -824,6 +1039,19 @@
     $('[name="documentType"]').addEventListener('change', updateExpirationRequirement);
     $('#analyzeDocument').addEventListener('click', analyzeDocument);
     $('#checkinForm').addEventListener('submit', submitCheckin);
+    formFields().forEach(name => {
+      const field = $(`[name="${name}"]`);
+      if (field) field.addEventListener('input', () => {
+        saveActiveGuestFromForm();
+        renderGuestCards();
+      });
+    });
+    $('[name="privacyAccepted"]').addEventListener('change', () => {
+      state.guestSlots.forEach(slot => {
+        slot.guest.privacyAccepted = $('[name="privacyAccepted"]').checked;
+      });
+    });
+    $('#occupantCount').addEventListener('change', event => setGuestSlotCount(event.target.value));
     $('#signContract').addEventListener('click', signContract);
     $$('.guest-add-service').forEach(button => {
       button.addEventListener('click', () => addService(button.closest('.guest-service-card')));
