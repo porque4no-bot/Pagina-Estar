@@ -175,7 +175,7 @@ function normalizeReservation(raw) {
     guestEmail: String(guest.email || guest.mail || raw.email || ''),
     roomName: room.room_type || room.name || 'Apartaestudio',
     roomNumber: room.room_number || room.name || '',
-    capacity: Number(raw.total_guests || raw.adults || room.occupancy || 1) || 1,
+    capacity: Number(raw.total_guests || raw.adults || 1) || 1,
     checkIn,
     checkOut,
     nights: calcNights(checkIn, checkOut),

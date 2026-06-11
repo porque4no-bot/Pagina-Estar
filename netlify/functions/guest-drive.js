@@ -52,6 +52,18 @@ function guestDocumentFolderName(payload) {
   return `${number}_${sanitizeName(payload.guestName || 'huesped')}`;
 }
 
+function withGuestFolderHints(payload) {
+  const guestFolder = guestDocumentFolderName(payload);
+  if (!guestFolder) return payload;
+  const copy = { ...(payload || {}) };
+  const subfolder = `${fileSubfolderForKind(copy.kind)}/${guestFolder}`;
+  copy.driveSubfolder = subfolder;
+  if (copy.file) {
+    copy.file = { ...copy.file, subfolder };
+  }
+  return copy;
+}
+
 /* Fetches the reservation from OTASync and merges its fields into the
    contract record. Guest-app-provided values (name, documentType, signedAt,
    etc.) are never overwritten — OTASync only fills in what is empty/missing.
@@ -202,7 +214,7 @@ async function forwardToAppsScript(payload) {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ secret, payload }),
+      body: JSON.stringify({ secret, payload: withGuestFolderHints(payload) }),
       signal: controller.signal
     });
     const text = await response.text();

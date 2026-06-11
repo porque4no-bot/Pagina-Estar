@@ -218,6 +218,7 @@
     return {
       guest: emptyGuest(),
       document: null,
+      documentRef: null,
       analysisSource: '',
       confidence: 0,
       isPrimary: index === 0,
@@ -559,6 +560,7 @@
     state.document = documentPayload;
     if (slot) {
       slot.document = documentPayload;
+      slot.documentRef = null;
       slot.status = 'pending';
     }
     $('#uploadTitle').textContent = documentPayload.name;
@@ -574,6 +576,7 @@
     state.document = null;
     if (slot) {
       slot.document = null;
+      slot.documentRef = null;
       slot.status = 'empty';
       slot.analysisSource = '';
       slot.confidence = 0;
@@ -786,6 +789,7 @@
         await new Promise(resolve => setTimeout(resolve, 700));
         data = {
           source: 'manual',
+          documentRef: { key: `local-demo/${analysisGuestIndex}`, name: analysisDocument.name },
           extracted: {},
           confidence: 0,
           validation: { missing: [] }
@@ -804,6 +808,7 @@
       const targetSlot = state.guestSlots[analysisGuestIndex];
       if (targetSlot) {
         applyExtractedToGuest(targetSlot.guest, data.extracted);
+        targetSlot.documentRef = data.documentRef || null;
         targetSlot.analysisSource = data.source || '';
         targetSlot.confidence = Number(data.confidence || 0);
         targetSlot.status = data.source === 'azure' ? 'ocr' : 'pending';
@@ -859,10 +864,11 @@
       'phone'
     ];
     const missingRequired = requiredFields.some(field => !String(guest[field] || '').trim());
+    const missingDocumentRef = slot && slot.document && !slot.documentRef;
     const missingPassportExpiry = guest.documentType === 'Pasaporte' && !guest.expirationDate;
     const expiredDocument = hasExpiredDocument(guest);
     const invalidEmail = guest.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email);
-    return missingRequired || missingPassportExpiry || expiredDocument || invalidEmail || !guest.privacyAccepted;
+    return missingRequired || missingDocumentRef || missingPassportExpiry || expiredDocument || invalidEmail || !guest.privacyAccepted;
   }
 
   function hasExpiredDocument(guest) {
@@ -911,7 +917,8 @@
             mode: 'submit',
             guests: state.guestSlots.map(slot => ({
               guest: { ...slot.guest },
-              file: slot.document,
+              file: slot.documentRef ? undefined : slot.document,
+              documentRef: slot.documentRef || undefined,
               isPrimary: slot.isPrimary,
               analysisSource: slot.analysisSource || 'manual',
               confidence: slot.confidence || 0

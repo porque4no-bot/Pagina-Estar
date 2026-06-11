@@ -33,7 +33,7 @@ test('guest check-in submit persists 3 guests and archives each document', async
   const persisted = [];
   const archived = [];
   _test.setDeps({
-    requireGuest: () => ({ sub: 'TEST-300', guest: 'Andrea Restrepo' }),
+    requireGuest: () => ({ sub: 'TEST-300', guest: 'Andrea Restrepo', capacity: 3 }),
     protectRecord: record => record,
     guestStore: () => ({
       setJSON: async (key, value) => persisted.push({ key, value }),

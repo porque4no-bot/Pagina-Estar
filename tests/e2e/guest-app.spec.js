@@ -46,6 +46,12 @@ async function mockGuestApis(page, captured = []) {
           ok: true,
           source: 'azure',
           slotIndex: payload.slotIndex ?? null,
+          documentRef: {
+            key: `EST-TEST-100/${payload.slotIndex ?? 0}-doc.json`,
+            name: payload.file && payload.file.name,
+            contentType: payload.file && payload.file.type,
+            size: payload.file && payload.file.size
+          },
           confidence: 97,
           extracted: {
             firstName: 'Andrea',
@@ -212,6 +218,7 @@ test('guest submits multiple occupants in the check-in payload', async ({ page }
     mimeType: 'image/png',
     buffer: Buffer.from('89504e470d0a1a0a', 'hex')
   });
+  await page.locator('#analyzeDocument').click();
   await page.locator('[name="firstName"]').fill('Andrea');
   await page.locator('[name="lastName"]').fill('Restrepo');
   await page.locator('[name="documentType"]').selectOption('CC');
@@ -228,6 +235,7 @@ test('guest submits multiple occupants in the check-in payload', async ({ page }
     mimeType: 'image/png',
     buffer: Buffer.from('89504e470d0a1a0a', 'hex')
   });
+  await page.locator('#analyzeDocument').click();
   await page.locator('[name="firstName"]').fill('Mateo');
   await page.locator('[name="lastName"]').fill('Restrepo');
   await page.locator('[name="documentType"]').selectOption('CC');
@@ -245,6 +253,8 @@ test('guest submits multiple occupants in the check-in payload', async ({ page }
   expect(submit.payload.guests).toHaveLength(2);
   expect(submit.payload.guests[0].guest.firstName).toBe('Andrea');
   expect(submit.payload.guests[1].guest.firstName).toBe('Mateo');
+  expect(submit.payload.guests[0].file).toBeUndefined();
+  expect(submit.payload.guests[0].documentRef.key).toContain('0-doc');
   expect(submit.payload.guests[0].isPrimary).toBe(true);
 });
 
