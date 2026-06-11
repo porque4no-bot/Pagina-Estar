@@ -151,8 +151,7 @@ async function withSessionRetry(makeRequest) {
    Returns { isMock, byRoomType: { '<id>': { avgPrice, totalPrice, dailyPrices,
    available, nights } }, nights }. avgPrice and totalPrice include the extra
    guest surcharge ($31,000/night per person beyond the first). */
-const EXTRA_GUEST_SURCHARGE = 31000;
-const PRICE_FALLBACK = 195000;
+const { EXTRA_GUEST_SURCHARGE, PRICE_FALLBACK } = require('./_pricing');
 
 async function getDynamicPricing(checkin, checkout, guests) {
   const nights = nightsBetween(checkin, checkout);

@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@netlify/blobs": "^8.0.0",
-    "googleapis": "^144.0.0",
+    "googleapis": "^173.0.0",
     "pdfkit": "^0.19.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

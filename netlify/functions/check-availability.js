@@ -7,6 +7,7 @@ const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 /* Session key (pkey) shared across functions via Netlify Blobs.
    See _otasync.getSessionKey for the implementation. */
 const { getSessionKey: sharedGetSessionKey } = require('./_otasync');
+const { EXTRA_GUEST_SURCHARGE, PRICE_FALLBACK } = require('./_pricing');
 
 async function getSessionKey(_token, _username, _password) {
   return sharedGetSessionKey();
@@ -114,10 +115,10 @@ exports.handler = async (event, context) => {
       };
     }
 
-    const extraGuestSurchargeMock = Math.max(0, guests - 1) * 31000;
+    const extraGuestSurchargeMock = Math.max(0, guests - 1) * EXTRA_GUEST_SURCHARGE;
     const mockRooms = Object.keys(roomDetails).map(id => {
       const details = roomDetails[id];
-      const mockPrice = 195000 + extraGuestSurchargeMock;
+      const mockPrice = PRICE_FALLBACK + extraGuestSurchargeMock;
       const totalPrice = mockPrice * nights;
 
       // Calculate daily price details
@@ -252,8 +253,8 @@ exports.handler = async (event, context) => {
       let avgPrice = 0;
       let totalPrice = 0;
 
-      // Additional guest surcharge: $31,000/night per person beyond the first
-      const extraGuestSurcharge = Math.max(0, guests - 1) * 31000;
+      // Additional guest surcharge: per-night per person beyond the first
+      const extraGuestSurcharge = Math.max(0, guests - 1) * EXTRA_GUEST_SURCHARGE;
 
       if (count > 0) {
         avgPrice = totalAmount / count + extraGuestSurcharge;
@@ -270,9 +271,9 @@ exports.handler = async (event, context) => {
           dailyPrices.push({ date: dateStr, price: avgPrice });
         }
       } else {
-        avgPrice = 195000 + extraGuestSurcharge;
+        avgPrice = PRICE_FALLBACK + extraGuestSurcharge;
         totalPrice = avgPrice * nights;
-        
+
         for (let i = 0; i < nights; i++) {
           const d = new Date(checkinDate);
           d.setDate(d.getDate() + i);

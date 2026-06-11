@@ -293,3 +293,5 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
+exports._test = { identityMatches, normalizeName };

@@ -176,6 +176,50 @@ function injectGA4(dir) {
 console.log('Injecting GA4 tracking...');
 injectGA4(distDir);
 
+// ── A11y: ensure every page has a "skip to main content" link ───────────────
+// Injected at build time so the ~15 ES pages, ~19 EN pages and the generated
+// room pages stay consistent without hand-editing each one. Inserts the link
+// right after <body> and guarantees a target id (#main-content) on the first
+// <main>/<section>. Text language is read from the page's <html lang> attr.
+function injectSkipLink(dir) {
+  fs.readdirSync(dir).forEach(entry => {
+    const fullPath = path.join(dir, entry);
+    if (fs.lstatSync(fullPath).isDirectory()) {
+      injectSkipLink(fullPath);
+      return;
+    }
+    if (!entry.endsWith('.html')) return;
+    let content = fs.readFileSync(fullPath, 'utf8');
+    if (/class="skip-link"/.test(content)) return; // already present
+
+    const bodyMatch = content.match(/<body[^>]*>/i);
+    if (!bodyMatch) return;
+
+    const isEn = /<html[^>]*\blang="en"/i.test(content);
+    const label = isEn ? 'Skip to main content' : 'Saltar al contenido principal';
+
+    // Resolve a valid in-page target. Prefer an existing #main-content, then
+    // tag the first <main>/<section>, then fall back to the React mount (#root)
+    // used by reservar.html so the link is never a dead anchor.
+    let targetHref = '#main-content';
+    if (!/id="main-content"/.test(content)) {
+      if (/<main\b[^>]*>/i.test(content)) {
+        content = content.replace(/<main\b/i, '<main id="main-content"');
+      } else if (/<section\b[^>]*>/i.test(content)) {
+        content = content.replace(/<section\b/i, '<section id="main-content"');
+      } else if (/id="root"/.test(content)) {
+        targetHref = '#root';
+      }
+    }
+
+    const link = `\n<a href="${targetHref}" class="skip-link">${label}</a>`;
+    content = content.replace(bodyMatch[0], `${bodyMatch[0]}${link}`);
+    fs.writeFileSync(fullPath, content);
+  });
+}
+console.log('Injecting accessibility skip-links...');
+injectSkipLink(distDir);
+
 // Strip bilingual mash: remove .lang-en from root ES pages, .lang-es from en/ pages
 console.log('Stripping bilingual inline elements...');
 fs.readdirSync(distDir).forEach(file => {

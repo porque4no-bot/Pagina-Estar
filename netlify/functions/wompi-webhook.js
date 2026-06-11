@@ -892,6 +892,39 @@ exports.handler = async (event, context) => {
     };
   }
 
+  /* Stay-level idempotency (A-4). The bookingCode is unique per payment attempt,
+     so if a guest pays twice for the SAME stay (two devices / retries) the
+     per-transaction and per-bookingCode dedups don't catch it and we would
+     create two OTASync reservations. Key on the stay itself and refuse the
+     second insert, alerting the admin to refund the duplicate charge. */
+  const stayIdemKey = `booking_${decoded.roomTypeId}_${decoded.checkin}_${decoded.checkout}_${String(decoded.email || '').toLowerCase().trim()}`;
+  let stayIdemStore = null;
+  try {
+    stayIdemStore = getStore({ name: 'booking-idempotency', consistency: 'strong' });
+    const existing = await stayIdemStore.get(stayIdemKey);
+    if (existing) {
+      const prev = JSON.parse(existing);
+      if (prev.transactionId && prev.transactionId !== transaction.id) {
+        console.error(`[wompi-webhook] DUPLICATE STAY paid: stay=${stayIdemKey} already booked by tx ${prev.transactionId}; second tx ${transaction.id}. Not creating a second reservation.`);
+        try {
+          await sendEmail({
+            to: adminEmail(),
+            subject: `⚠ Doble pago de reserva directa — ${decoded.bookingCode}`,
+            html: `<p>Se recibió un segundo pago aprobado para la MISMA estadía. No se creó una segunda reserva.</p>
+                   <ul><li>Estadía: ${escapeHtml(decoded.checkin)} → ${escapeHtml(decoded.checkout)}, hab. ${escapeHtml(String(decoded.roomTypeId))}</li>
+                   <li>Reserva existente (tx): ${escapeHtml(prev.transactionId)} → ${escapeHtml(String(prev.bookingCode || ''))}</li>
+                   <li>Segundo pago (tx): ${escapeHtml(transaction.id)}</li></ul>
+                   <p>Verifica con Wompi y reembolsa el cargo duplicado.</p>`
+          });
+        } catch (e) { console.error('[wompi-webhook] duplicate-stay alert failed:', e.message); }
+        return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, bookingCode: prev.bookingCode, duplicate: true }) };
+      }
+    }
+  } catch (e) {
+    if (process.env.DEBUG) console.warn('[wompi-webhook] stay idempotency check skipped:', e.message);
+    stayIdemStore = null;
+  }
+
   try {
     const pkey = await getSessionKey(token, username, password);
     const selectedRoomId = await findAvailableRoomId({
@@ -1109,10 +1142,18 @@ exports.handler = async (event, context) => {
     const finalBookingCode = data.id_reservations || decoded.bookingCode;
     console.log(`[wompi-webhook] OTASync insert response: ${JSON.stringify(data)}, finalBookingCode=${finalBookingCode}`);
 
-    // Store result so create-booking knows not to duplicate this reservation
+    // Store result so the booking-status poller (and any retry) sees the code.
     if (directBookingResultStore) {
       try {
         await directBookingResultStore.set(`direct-${decoded.bookingCode}`, JSON.stringify({ bookingCode: finalBookingCode }), { ttl: 86400 * 7 });
+      } catch (e) { /* non-fatal */ }
+    }
+
+    // Persist the stay-level idempotency record (A-4) so a second payment for
+    // the same stay is detected and refused above.
+    if (stayIdemStore) {
+      try {
+        await stayIdemStore.set(stayIdemKey, JSON.stringify({ bookingCode: finalBookingCode, transactionId: transaction.id }), { ttl: 86400 * 7 });
       } catch (e) { /* non-fatal */ }
     }
 
