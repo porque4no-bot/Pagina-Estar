@@ -13,5 +13,17 @@
   "guestSlotEmpty": "Vacía",
   "guestSlotOcrOk": "OCR ok",
   "guestSlotPendingSignature": "Pendiente firma",
-  "primaryGuestLabel": "Principal"
+  "primaryGuestLabel": "Principal",
+  "minorBadge": "Menor de edad",
+  "minorDocsTitle": "Documentación del menor",
+  "minorRcnLabel": "Registro civil de nacimiento",
+  "minorRcnHelp": "Lo necesitamos para validar la autorización de un progenitor.",
+  "minorFatherLabel": "Nombre del padre",
+  "minorMotherLabel": "Nombre de la madre",
+  "minorParentDetected": "Padre o madre detectado en el registro civil.",
+  "minorParentNotPresentWarn": "Ningún padre o madre figura entre los adultos del check-in. Debes subir una carta de autorización firmada por un progenitor.",
+  "minorAuthorizationLabel": "Carta de autorización",
+  "minorAuthorizationHelp": "Documento firmado por padre, madre o tutor legal autorizando la estadía del menor.",
+  "minorBlockingNotice": "Antes de confirmar el check-in, completa los documentos requeridos para los menores.",
+  "escnnaReminder": "En cumplimiento de la Ley 679 de 2001, advertimos que la explotación y el abuso sexual de menores de edad son sancionados penal y administrativamente."
 }

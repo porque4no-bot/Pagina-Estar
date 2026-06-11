@@ -206,6 +206,49 @@
                   </div>
                 </fieldset>
 
+                <fieldset class="guest-form-card guest-minor-card" id="minorDocsCard" hidden>
+                  <legend>
+                    <span class="guest-minor-flag" data-guest-i18n="minorBadge">Menor de edad</span>
+                    <span data-guest-i18n="minorDocsTitle">Documentación del menor</span>
+                  </legend>
+                  <p class="guest-muted" data-guest-i18n="escnnaReminder">En cumplimiento de la Ley 679 de 2001, advertimos que la explotación y el abuso sexual de menores de edad son sancionados penal y administrativamente.</p>
+
+                  <div class="guest-minor-block">
+                    <p class="eyebrow" data-guest-i18n="minorRcnLabel">Registro civil de nacimiento</p>
+                    <small class="guest-muted" data-guest-i18n="minorRcnHelp">Lo necesitamos para validar la autorización de un progenitor.</small>
+                    <label class="guest-upload" for="minorRcnFile">
+                      <input id="minorRcnFile" type="file" accept="image/jpeg,image/png,application/pdf">
+                      <span class="guest-upload-icon"><i data-lucide="file-text"></i></span>
+                      <strong id="minorRcnTitle" data-guest-i18n="minorRcnLabel">Registro civil de nacimiento</strong>
+                      <small id="minorRcnMeta">JPG, PNG o PDF. Máximo 4.5 MB.</small>
+                    </label>
+                    <input id="minorRcnCamera" type="file" accept="image/*" capture="environment" hidden>
+                    <div class="guest-inline-actions">
+                      <button class="btn btn-ghost-dark" id="openMinorRcnCamera" type="button">
+                        <span data-guest-i18n="cameraButton">Tomar foto</span>
+                      </button>
+                      <span class="guest-ocr-status" id="minorRcnStatus"></span>
+                    </div>
+                    <div class="guest-form-grid">
+                      <label class="guest-field"><span data-guest-i18n="minorFatherLabel">Nombre del padre</span><input id="minorFatherName" type="text" autocomplete="off"></label>
+                      <label class="guest-field"><span data-guest-i18n="minorMotherLabel">Nombre de la madre</span><input id="minorMotherName" type="text" autocomplete="off"></label>
+                    </div>
+                    <p class="guest-form-status" id="minorParentMessage" role="status"></p>
+                  </div>
+
+                  <div class="guest-minor-block" id="minorAuthBlock" hidden>
+                    <p class="eyebrow" data-guest-i18n="minorAuthorizationLabel">Carta de autorización</p>
+                    <small class="guest-muted" data-guest-i18n="minorAuthorizationHelp">Documento firmado por padre, madre o tutor legal autorizando la estadía del menor.</small>
+                    <label class="guest-upload" for="minorAuthFile">
+                      <input id="minorAuthFile" type="file" accept="image/jpeg,image/png,application/pdf">
+                      <span class="guest-upload-icon"><i data-lucide="file-signature"></i></span>
+                      <strong id="minorAuthTitle" data-guest-i18n="minorAuthorizationLabel">Carta de autorización</strong>
+                      <small id="minorAuthMeta">JPG, PNG o PDF. Máximo 4.5 MB.</small>
+                    </label>
+                    <span class="guest-ocr-status" id="minorAuthStatus"></span>
+                  </div>
+                </fieldset>
+
                 <fieldset class="guest-form-card">
                   <legend><span>3</span> Confirma tus datos</legend>
                   <div class="guest-form-grid">

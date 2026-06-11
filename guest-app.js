@@ -22,7 +22,19 @@
       "guestSlotEmpty": "Vacía",
       "guestSlotOcrOk": "OCR ok",
       "guestSlotPendingSignature": "Pendiente firma",
-      "primaryGuestLabel": "Principal"
+      "primaryGuestLabel": "Principal",
+      "minorBadge": "Menor de edad",
+      "minorDocsTitle": "Documentación del menor",
+      "minorRcnLabel": "Registro civil de nacimiento",
+      "minorRcnHelp": "Lo necesitamos para validar la autorización de un progenitor.",
+      "minorFatherLabel": "Nombre del padre",
+      "minorMotherLabel": "Nombre de la madre",
+      "minorParentDetected": "Padre o madre detectado en el registro civil.",
+      "minorParentNotPresentWarn": "Ningún padre o madre figura entre los adultos del check-in. Debes subir una carta de autorización firmada por un progenitor.",
+      "minorAuthorizationLabel": "Carta de autorización",
+      "minorAuthorizationHelp": "Documento firmado por padre, madre o tutor legal autorizando la estadía del menor.",
+      "minorBlockingNotice": "Antes de confirmar el check-in, completa los documentos requeridos para los menores.",
+      "escnnaReminder": "En cumplimiento de la Ley 679 de 2001, advertimos que la explotación y el abuso sexual de menores de edad son sancionados penal y administrativamente."
     }/*__GUEST_I18N_ES_END__*/,
     en: /*__GUEST_I18N_EN_START__*/{
       "expirationDateOptionalHint": "(optional, passports only)",
@@ -39,7 +51,19 @@
       "guestSlotEmpty": "Empty",
       "guestSlotOcrOk": "OCR ok",
       "guestSlotPendingSignature": "Pending signature",
-      "primaryGuestLabel": "Primary"
+      "primaryGuestLabel": "Primary",
+      "minorBadge": "Minor",
+      "minorDocsTitle": "Minor documentation",
+      "minorRcnLabel": "Birth certificate",
+      "minorRcnHelp": "We need it to validate parental authorization.",
+      "minorFatherLabel": "Father's name",
+      "minorMotherLabel": "Mother's name",
+      "minorParentDetected": "Parent detected from birth certificate.",
+      "minorParentNotPresentWarn": "No parent listed among adult guests in this check-in. You must upload a signed authorization letter from a parent.",
+      "minorAuthorizationLabel": "Authorization letter",
+      "minorAuthorizationHelp": "Document signed by a parent or legal guardian authorizing the minor's stay.",
+      "minorBlockingNotice": "Before confirming check-in, complete the required documents for minors.",
+      "escnnaReminder": "In compliance with Colombian Law 679 of 2001, we warn that child sexual exploitation and abuse are criminally and administratively punished."
     }/*__GUEST_I18N_EN_END__*/
   };
   const CAMERA_WIDTH = 1600;
@@ -222,8 +246,64 @@
       analysisSource: '',
       confidence: 0,
       isPrimary: index === 0,
-      status: 'empty'
+      status: 'empty',
+      isMinor: false,
+      fatherName: '',
+      motherName: '',
+      registroCivilDocumentRef: null,
+      registroCivilName: '',
+      authorizationDocumentRef: null,
+      authorizationName: '',
+      parentPresent: false
     };
+  }
+
+  function calculateAgeClient(birthDate) {
+    if (!birthDate) return 0;
+    if (!/^\d{4}-\d{2}-\d{2}/.test(String(birthDate))) return 0;
+    const birth = new Date(`${String(birthDate).slice(0, 10)}T00:00:00`);
+    if (Number.isNaN(birth.getTime())) return 0;
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age -= 1;
+    return Math.max(0, age);
+  }
+
+  function normalizeNameClient(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function progenitorMatchesAdult(progenitorName, adultSlots) {
+    const target = normalizeNameClient(progenitorName);
+    if (!target) return false;
+    const targetTokens = target.split(' ').filter(Boolean);
+    if (!targetTokens.length) return false;
+    return adultSlots.some(slot => {
+      const candidate = normalizeNameClient(`${slot.guest.firstName || ''} ${slot.guest.lastName || ''}`);
+      if (!candidate) return false;
+      if (candidate.includes(target) || target.includes(candidate)) return true;
+      const candidateTokens = new Set(candidate.split(' ').filter(Boolean));
+      const allPresent = targetTokens.every(token => candidateTokens.has(token));
+      return allPresent && targetTokens.some(token => token.length >= 3);
+    });
+  }
+
+  function recomputeMinorParentPresence() {
+    const adultSlots = state.guestSlots.filter(slot => !slot.isMinor);
+    state.guestSlots.forEach(slot => {
+      if (!slot.isMinor) {
+        slot.parentPresent = false;
+        return;
+      }
+      slot.parentPresent = progenitorMatchesAdult(slot.fatherName, adultSlots)
+        || progenitorMatchesAdult(slot.motherName, adultSlots);
+    });
   }
 
   function bookingCapacity() {
@@ -265,6 +345,19 @@
     });
     const privacy = $('[name="privacyAccepted"]');
     if (privacy) slot.guest.privacyAccepted = privacy.checked;
+    slot.isMinor = calculateAgeClient(slot.guest.birthDate) < 18 && Boolean(slot.guest.birthDate);
+    if (!slot.isMinor) {
+      /* Clear any minor-only state if the guest turns out to be an adult so
+         we don't accidentally send stale refs to the server. */
+      slot.fatherName = '';
+      slot.motherName = '';
+      slot.registroCivilDocumentRef = null;
+      slot.registroCivilName = '';
+      slot.authorizationDocumentRef = null;
+      slot.authorizationName = '';
+      slot.parentPresent = false;
+    }
+    recomputeMinorParentPresence();
     slot.status = slot.document
       ? (slot.analysisSource === 'azure' ? 'ocr' : 'pending')
       : 'empty';
@@ -291,6 +384,197 @@
     }
     setStatus($('#ocrStatus'), '', '');
     updateExpirationRequirement();
+    renderMinorSection();
+  }
+
+  function renderMinorSection() {
+    const slot = activeSlot();
+    const card = $('#minorDocsCard');
+    if (!card) return;
+    if (!slot || !slot.isMinor) {
+      card.hidden = true;
+      return;
+    }
+    card.hidden = false;
+    const fatherInput = $('#minorFatherName');
+    const motherInput = $('#minorMotherName');
+    if (fatherInput) fatherInput.value = slot.fatherName || '';
+    if (motherInput) motherInput.value = slot.motherName || '';
+    const rcnTitle = $('#minorRcnTitle');
+    const rcnMeta = $('#minorRcnMeta');
+    if (slot.registroCivilDocumentRef) {
+      if (rcnTitle) rcnTitle.textContent = slot.registroCivilName || t('minorRcnLabel');
+      if (rcnMeta) rcnMeta.textContent = t('minorParentDetected');
+    } else {
+      if (rcnTitle) rcnTitle.textContent = t('minorRcnLabel');
+      if (rcnMeta) rcnMeta.textContent = 'JPG, PNG o PDF. Máximo 4.5 MB.';
+    }
+    const authBlock = $('#minorAuthBlock');
+    const authTitle = $('#minorAuthTitle');
+    const authMeta = $('#minorAuthMeta');
+    const parentMessage = $('#minorParentMessage');
+    const hasParentInput = Boolean(slot.fatherName || slot.motherName);
+    if (hasParentInput && !slot.parentPresent) {
+      if (authBlock) authBlock.hidden = false;
+      if (parentMessage) setStatus(parentMessage, t('minorParentNotPresentWarn'), 'error');
+    } else {
+      if (authBlock) authBlock.hidden = !slot.authorizationDocumentRef ? true : false;
+      if (parentMessage) {
+        if (slot.parentPresent) setStatus(parentMessage, t('minorParentDetected'), 'success');
+        else setStatus(parentMessage, '', '');
+      }
+    }
+    if (slot.authorizationDocumentRef) {
+      if (authTitle) authTitle.textContent = slot.authorizationName || t('minorAuthorizationLabel');
+      if (authMeta) authMeta.textContent = t('minorAuthorizationHelp');
+    } else {
+      if (authTitle) authTitle.textContent = t('minorAuthorizationLabel');
+      if (authMeta) authMeta.textContent = 'JPG, PNG o PDF. Máximo 4.5 MB.';
+    }
+    setStatus($('#minorRcnStatus'), slot.registroCivilDocumentRef
+      ? `${slot.registroCivilName || ''} listo`.trim()
+      : '', slot.registroCivilDocumentRef ? 'success' : '');
+    setStatus($('#minorAuthStatus'), slot.authorizationDocumentRef
+      ? `${slot.authorizationName || ''} listo`.trim()
+      : '', slot.authorizationDocumentRef ? 'success' : '');
+  }
+
+  async function uploadMinorDocument(docKind, file) {
+    const slot = activeSlot();
+    if (!slot) return;
+    if (file.size > 4.5 * 1024 * 1024) {
+      setStatus($(`#${docKind === 'registro-civil' ? 'minorRcnStatus' : 'minorAuthStatus'}`), 'El archivo supera 4.5 MB.', 'error');
+      return;
+    }
+    const dataUrl = await fileToDataUrl(file);
+    const documentPayload = { name: file.name, type: file.type, size: file.size, dataUrl };
+    const slotIndex = state.activeGuestIndex;
+    const statusEl = docKind === 'registro-civil' ? $('#minorRcnStatus') : $('#minorAuthStatus');
+    setStatus(statusEl, 'Subiendo documento…', 'loading');
+    try {
+      let data;
+      if (state.token === 'local-demo-token') {
+        await new Promise(resolve => setTimeout(resolve, 400));
+        data = {
+          documentRef: { key: `local-demo/${docKind}/${slotIndex}`, name: file.name },
+          extracted: docKind === 'registro-civil' ? { fatherName: '', motherName: '' } : null
+        };
+      } else {
+        data = await request(API.checkin, {
+          method: 'POST',
+          body: JSON.stringify({
+            mode: 'analyze-minor-doc',
+            file: documentPayload,
+            slotIndex,
+            docKind
+          })
+        });
+      }
+      const targetSlot = state.guestSlots[slotIndex];
+      if (!targetSlot) return;
+      if (docKind === 'registro-civil') {
+        targetSlot.registroCivilDocumentRef = data.documentRef || null;
+        targetSlot.registroCivilName = file.name;
+        if (data.extracted) {
+          if (data.extracted.fatherName && !targetSlot.fatherName) targetSlot.fatherName = data.extracted.fatherName;
+          if (data.extracted.motherName && !targetSlot.motherName) targetSlot.motherName = data.extracted.motherName;
+        }
+      } else {
+        targetSlot.authorizationDocumentRef = data.documentRef || null;
+        targetSlot.authorizationName = file.name;
+      }
+      recomputeMinorParentPresence();
+      if (state.activeGuestIndex === slotIndex) renderMinorSection();
+      renderGuestCards();
+      setStatus(statusEl, t('photoReady'), 'success');
+    } catch (error) {
+      setStatus(statusEl, error.message, 'error');
+    }
+  }
+
+  async function handleMinorRcnSelection(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    await uploadMinorDocument('registro-civil', file);
+    event.target.value = '';
+  }
+
+  async function handleMinorAuthSelection(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    await uploadMinorDocument('autorizacion', file);
+    event.target.value = '';
+  }
+
+  async function handleMinorRcnCamera(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const documentPayload = await imageFileToCameraDocument(file);
+      await uploadMinorDocumentFromPayload('registro-civil', documentPayload);
+    } catch (error) {
+      setStatus($('#minorRcnStatus'), error.message, 'error');
+    }
+  }
+
+  async function uploadMinorDocumentFromPayload(docKind, documentPayload) {
+    /* uploadMinorDocument reads the File via fileToDataUrl. The camera path
+       already produced a dataUrl, so we hand it over directly to skip a
+       second decode pass. */
+    const slot = activeSlot();
+    if (!slot) return;
+    const slotIndex = state.activeGuestIndex;
+    const statusEl = docKind === 'registro-civil' ? $('#minorRcnStatus') : $('#minorAuthStatus');
+    setStatus(statusEl, 'Subiendo documento…', 'loading');
+    try {
+      let data;
+      if (state.token === 'local-demo-token') {
+        await new Promise(resolve => setTimeout(resolve, 400));
+        data = {
+          documentRef: { key: `local-demo/${docKind}/${slotIndex}`, name: documentPayload.name },
+          extracted: docKind === 'registro-civil' ? { fatherName: '', motherName: '' } : null
+        };
+      } else {
+        data = await request(API.checkin, {
+          method: 'POST',
+          body: JSON.stringify({
+            mode: 'analyze-minor-doc',
+            file: documentPayload,
+            slotIndex,
+            docKind
+          })
+        });
+      }
+      const targetSlot = state.guestSlots[slotIndex];
+      if (!targetSlot) return;
+      if (docKind === 'registro-civil') {
+        targetSlot.registroCivilDocumentRef = data.documentRef || null;
+        targetSlot.registroCivilName = documentPayload.name;
+        if (data.extracted) {
+          if (data.extracted.fatherName && !targetSlot.fatherName) targetSlot.fatherName = data.extracted.fatherName;
+          if (data.extracted.motherName && !targetSlot.motherName) targetSlot.motherName = data.extracted.motherName;
+        }
+      } else {
+        targetSlot.authorizationDocumentRef = data.documentRef || null;
+        targetSlot.authorizationName = documentPayload.name;
+      }
+      recomputeMinorParentPresence();
+      if (state.activeGuestIndex === slotIndex) renderMinorSection();
+      renderGuestCards();
+      setStatus(statusEl, t('photoReady'), 'success');
+    } catch (error) {
+      setStatus(statusEl, error.message, 'error');
+    }
+  }
+
+  function onMinorParentInput() {
+    const slot = activeSlot();
+    if (!slot || !slot.isMinor) return;
+    slot.fatherName = $('#minorFatherName').value || '';
+    slot.motherName = $('#minorMotherName').value || '';
+    recomputeMinorParentPresence();
+    renderMinorSection();
   }
 
   function slotLabel(slot, index) {
@@ -308,10 +592,11 @@
     const container = $('#guestCards');
     if (!container) return;
     container.innerHTML = state.guestSlots.map((slot, index) => `
-      <article class="guest-occupant-card${index === state.activeGuestIndex ? ' is-active' : ''}" data-guest-slot="${index}">
+      <article class="guest-occupant-card${index === state.activeGuestIndex ? ' is-active' : ''}${slot.isMinor ? ' is-minor' : ''}" data-guest-slot="${index}">
         <button type="button" class="guest-occupant-main" data-select-guest="${index}">
           <strong>${slotLabel(slot, index)}</strong>
           <small>${slotStatusLabel(slot)}</small>
+          ${slot.isMinor ? `<span class="guest-minor-flag">${t('minorBadge')}</span>` : ''}
         </button>
         <label class="guest-primary-choice">
           <input type="radio" name="primaryGuest" value="${index}" ${slot.isPrimary ? 'checked' : ''}>
@@ -901,6 +1186,18 @@
       return;
     }
     updateExpirationRequirement();
+    recomputeMinorParentPresence();
+    const minorBlockingIndex = state.guestSlots.findIndex(slot => {
+      if (!slot.isMinor) return false;
+      if (!slot.registroCivilDocumentRef) return true;
+      if (!slot.parentPresent && !slot.authorizationDocumentRef) return true;
+      return false;
+    });
+    if (minorBlockingIndex >= 0) {
+      selectGuestSlot(minorBlockingIndex);
+      setStatus($('#checkinStatus'), t('minorBlockingNotice'), 'error');
+      return;
+    }
     if (!form.reportValidity()) return;
 
     setButtonLoading(button, true, 'Completando check-in');
@@ -921,7 +1218,11 @@
               documentRef: slot.documentRef || undefined,
               isPrimary: slot.isPrimary,
               analysisSource: slot.analysisSource || 'manual',
-              confidence: slot.confidence || 0
+              confidence: slot.confidence || 0,
+              registroCivilDocumentRef: slot.isMinor ? slot.registroCivilDocumentRef : undefined,
+              authorizationDocumentRef: slot.isMinor ? slot.authorizationDocumentRef : undefined,
+              fatherName: slot.isMinor ? slot.fatherName : undefined,
+              motherName: slot.isMinor ? slot.motherName : undefined
             }))
           })
         });
@@ -1146,6 +1447,21 @@
     $('#requestKind').addEventListener('change', event => {
       $('#requestedDates').hidden = event.target.value !== 'dates';
     });
+    const minorRcnFile = $('#minorRcnFile');
+    if (minorRcnFile) minorRcnFile.addEventListener('change', handleMinorRcnSelection);
+    const minorAuthFile = $('#minorAuthFile');
+    if (minorAuthFile) minorAuthFile.addEventListener('change', handleMinorAuthSelection);
+    const minorRcnCamera = $('#minorRcnCamera');
+    if (minorRcnCamera) minorRcnCamera.addEventListener('change', handleMinorRcnCamera);
+    const openMinorRcnCameraBtn = $('#openMinorRcnCamera');
+    if (openMinorRcnCameraBtn) openMinorRcnCameraBtn.addEventListener('click', () => {
+      const camera = $('#minorRcnCamera');
+      if (camera) camera.click();
+    });
+    const minorFatherInput = $('#minorFatherName');
+    if (minorFatherInput) minorFatherInput.addEventListener('input', onMinorParentInput);
+    const minorMotherInput = $('#minorMotherName');
+    if (minorMotherInput) minorMotherInput.addEventListener('input', onMinorParentInput);
   }
 
   document.addEventListener('DOMContentLoaded', () => {

@@ -39,6 +39,8 @@ function stripLargePayloadForMetadata(payload) {
 function fileSubfolderForKind(kind) {
   switch (kind) {
     case 'guest-checkin': return '01_documentos';
+    case 'guest-minor-rcn': return '01_documentos/menores';
+    case 'guest-minor-authorization': return '01_documentos/menores';
     case 'guest-invoice': return '03_facturas';
     case 'guest-contract': return '02_contratos';
     default: return '04_otros';
@@ -149,10 +151,17 @@ async function uploadViaServiceAccount(payload) {
   let documentFile = null;
   const file = payload && payload.file;
   if (file && file.dataBase64) {
-    let subFolderId = await driveSA.findOrCreateFolder({
-      parentId: reservationFolderId,
-      name: fileSubfolderForKind(kind)
-    });
+    /* fileSubfolderForKind may return a path like "01_documentos/menores"
+       for minor docs; walk each segment so the Drive structure mirrors the
+       legacy layout. */
+    const segments = fileSubfolderForKind(kind).split('/').filter(Boolean);
+    let subFolderId = reservationFolderId;
+    for (const segment of segments) {
+      subFolderId = await driveSA.findOrCreateFolder({
+        parentId: subFolderId,
+        name: segment
+      });
+    }
     const guestFolder = guestDocumentFolderName(payload);
     if (guestFolder) {
       subFolderId = await driveSA.findOrCreateFolder({
