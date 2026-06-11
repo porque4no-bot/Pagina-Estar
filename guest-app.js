@@ -34,7 +34,19 @@
       "minorAuthorizationLabel": "Carta de autorización",
       "minorAuthorizationHelp": "Documento firmado por padre, madre o tutor legal autorizando la estadía del menor.",
       "minorBlockingNotice": "Antes de confirmar el check-in, completa los documentos requeridos para los menores.",
-      "escnnaReminder": "En cumplimiento de la Ley 679 de 2001, advertimos que la explotación y el abuso sexual de menores de edad son sancionados penal y administrativamente."
+      "escnnaReminder": "En cumplimiento de la Ley 679 de 2001, advertimos que la explotación y el abuso sexual de menores de edad son sancionados penal y administrativamente.",
+      "viewContractLink": "Ver contrato completo",
+      "contractModalTitle": "Contrato de Hospedaje",
+      "contractModalEyebrow": "Antes de firmar",
+      "contractModalIntro": "Lee el contrato completo. Para habilitar la firma, marca la casilla o desplázate hasta el final.",
+      "contractModalScrollHint": "Desplázate hasta el final para habilitar la firma.",
+      "contractModalReadyHint": "Has leído el contrato. Puedes cerrar y firmar.",
+      "contractDownloadBtn": "Descargar PDF",
+      "contractCloseBtn": "Cerrar",
+      "contractAcknowledgeLabel": "He leído el contrato completo.",
+      "contractAcknowledgeBlocked": "Lee el contrato antes de firmar.",
+      "contractReadConfirmation": "Confirmación de lectura registrada.",
+      "contractConsentText": "Declaro que he leído, entiendo y acepto íntegramente este contrato de hospedaje, sus cláusulas y políticas, y firmo electrónicamente con plenos efectos legales conforme a la Ley 527 de 1999 y el Decreto 2364 de 2012 de Colombia."
     }/*__GUEST_I18N_ES_END__*/,
     en: /*__GUEST_I18N_EN_START__*/{
       "expirationDateOptionalHint": "(optional, passports only)",
@@ -63,13 +75,57 @@
       "minorAuthorizationLabel": "Authorization letter",
       "minorAuthorizationHelp": "Document signed by a parent or legal guardian authorizing the minor's stay.",
       "minorBlockingNotice": "Before confirming check-in, complete the required documents for minors.",
-      "escnnaReminder": "In compliance with Colombian Law 679 of 2001, we warn that child sexual exploitation and abuse are criminally and administratively punished."
+      "escnnaReminder": "In compliance with Colombian Law 679 of 2001, we warn that child sexual exploitation and abuse are criminally and administratively punished.",
+      "viewContractLink": "View full contract",
+      "contractModalTitle": "Hospitality Agreement",
+      "contractModalEyebrow": "Before you sign",
+      "contractModalIntro": "Read the full contract. To enable signing, tick the box or scroll to the end.",
+      "contractModalScrollHint": "Scroll to the end to enable signing.",
+      "contractModalReadyHint": "You have read the contract. You can close and sign.",
+      "contractDownloadBtn": "Download PDF",
+      "contractCloseBtn": "Close",
+      "contractAcknowledgeLabel": "I have read the full contract.",
+      "contractAcknowledgeBlocked": "Read the contract before signing.",
+      "contractReadConfirmation": "Read confirmation recorded.",
+      "contractConsentText": "I declare that I have read, understand, and fully accept this hospitality agreement, its clauses, and policies, and I electronically sign it with full legal effect under Colombian Law 527 of 1999 and Decree 2364 of 2012."
     }/*__GUEST_I18N_EN_END__*/
   };
   const CAMERA_WIDTH = 1600;
   const CAMERA_HEIGHT = 1006;
   const CAMERA_QUALITY = 0.9;
   const SESSION_KEY = 'estar-guest-session';
+  /* Pinned contract version + clause body. The string is presented to the
+     user via the preview modal and hashed server-side (audit trail) so any
+     future edit yields a different hash. Keep clause text in lockstep with
+     netlify/functions/_contract-template.js and _pdf-render.js. */
+  const CONTRACT_VERSION = 'ESTAR-HOSPEDAJE-2026-01';
+  const CONTRACT_CLAUSES = [
+    {
+      num: 'PRIMERA', title: 'Objeto',
+      es: 'Hotel Estar, identificado con RNT 276306, otorga al huésped el uso temporal del apartaestudio identificado en este contrato, en calidad de hospedaje turístico, durante las fechas señaladas. El huésped declara conocer y aceptar las características del inmueble y las condiciones del servicio.',
+      en: 'Hotel Estar, holder of RNT 276306, grants the guest the temporary use of the studio identified in this agreement, as tourist accommodation, during the stated dates. The guest declares to know and accept the property characteristics and service conditions.'
+    },
+    {
+      num: 'SEGUNDA', title: 'Uso del inmueble',
+      es: 'El huésped utilizará el apartaestudio exclusivamente para fines de alojamiento personal y no podrá destinarlo a actividades comerciales, industriales, ilícitas o distintas a la naturaleza del servicio contratado. Queda prohibido subarrendar o ceder, total o parcialmente, el derecho de uso a terceros.',
+      en: 'The guest shall use the studio exclusively for personal lodging and may not allocate it to commercial, industrial, unlawful or any other activity outside the contracted service. Subletting or assigning the right of use to third parties, in whole or in part, is prohibited.'
+    },
+    {
+      num: 'TERCERA', title: 'Convivencia y silencio',
+      es: 'Por tratarse de un edificio residencial, el huésped se obliga a respetar el reglamento de propiedad horizontal, mantener un comportamiento respetuoso con los demás residentes y guardar silencio entre las 10:00 p. m. y las 7:00 a. m. No se permiten fiestas, reuniones que excedan la capacidad declarada ni el ingreso de personas no registradas.',
+      en: 'As this is a residential building, the guest must respect the condominium rules, behave respectfully toward other residents, and observe quiet hours between 10:00 p.m. and 7:00 a.m. Parties, gatherings exceeding the declared capacity, and unregistered visitors are not permitted.'
+    },
+    {
+      num: 'CUARTA', title: 'Cuidado y daños',
+      es: 'El huésped es responsable del cuidado del apartaestudio, su mobiliario, enseres y dotación. Cualquier daño, pérdida o deterioro distinto al desgaste normal por uso será reportado al huésped y su valor podrá ser cobrado al momento del check-out o a través del medio de pago registrado.',
+      en: 'The guest is responsible for the care of the studio, its furniture, fixtures, and supplies. Any damage, loss, or deterioration beyond normal wear will be reported to the guest and may be charged at check-out or via the registered payment method.'
+    },
+    {
+      num: 'QUINTA', title: 'Horarios y entrega',
+      es: 'El check-in se realiza a partir de las 3:00 p. m. y el check-out hasta las 12:00 m. del día de salida. Toda permanencia posterior sin acuerdo previo causará un cargo adicional. Hotel Estar podrá retener objetos olvidados hasta por 30 días, transcurridos los cuales se dispondrá de ellos según política interna.',
+      en: 'Check-in is from 3:00 p.m. and check-out by 12:00 noon on the departure day. Any extended stay without prior agreement will incur an additional charge. Hotel Estar may retain forgotten items for up to 30 days; afterwards they will be disposed of per internal policy.'
+    }
+  ];
   const state = {
     token: '',
     booking: null,
@@ -77,7 +133,13 @@
     guestSlots: [],
     activeGuestIndex: 0,
     cart: {},
-    cameraStream: null
+    cameraStream: null,
+    /* Audit-trail evidence for the e-signature flow (Ley 527 / Decreto 2364):
+       contractRead is set true when the user scrolls to the end of the modal
+       OR explicitly ticks "I have read", and acknowledgedAt records the ISO
+       timestamp. The server independently re-validates and adds IP + UA. */
+    contractRead: false,
+    contractAcknowledgedAt: ''
   };
 
   const $ = selector => document.querySelector(selector);
@@ -1267,10 +1329,258 @@
     }
   }
 
+  function primaryContractGuest() {
+    return (state.guestSlots.find(slot => slot.isPrimary) || state.guestSlots[0] || { guest: emptyGuest() }).guest;
+  }
+
+  function contractMoney(amount) {
+    if (!Number.isFinite(Number(amount))) return '—';
+    try {
+      return new Intl.NumberFormat('es-CO', {
+        style: 'currency', currency: 'COP', maximumFractionDigits: 0
+      }).format(Number(amount));
+    } catch (_) {
+      return `COP ${Number(amount).toLocaleString('es-CO')}`;
+    }
+  }
+
+  function contractDateOnly(value) {
+    if (!value) return '—';
+    const date = new Date(`${value}T12:00:00`);
+    if (Number.isNaN(date.getTime())) return String(value);
+    try {
+      return new Intl.DateTimeFormat(currentLang() === 'en' ? 'en-US' : 'es-CO', {
+        year: 'numeric', month: 'long', day: '2-digit'
+      }).format(date);
+    } catch (_) {
+      return date.toISOString().slice(0, 10);
+    }
+  }
+
+  function renderContractHTML() {
+    /* Client-side preview renderer. The exact wording must mirror
+       netlify/functions/_contract-template.js so the user reads what the
+       server later hashes for the audit trail. */
+    const lang = currentLang();
+    const booking = state.booking || {};
+    const guest = primaryContractGuest();
+    const fullName = `${guest.firstName || ''} ${guest.lastName || ''}`.trim() || booking.guestName || '—';
+    const occupants = state.guestSlots.map((slot, index) => {
+      const g = slot.guest || {};
+      return `<li>${escHtml(`${g.firstName || ''} ${g.lastName || ''}`.trim() || `Huésped ${index + 1}`)}` +
+        ` — ${escHtml(g.documentType || '—')} ${escHtml(g.documentNumber || '—')}` +
+        (slot.isPrimary ? ` (${escHtml(lang === 'en' ? 'Primary' : 'Principal')})` : '') +
+        '</li>';
+    }).join('');
+    const clauses = CONTRACT_CLAUSES.map(c => `
+      <p class="guest-contract-clause">
+        <strong>${escHtml(c.num)} — ${escHtml(c.title)}.</strong>
+        ${escHtml(c[lang] || c.es)}
+      </p>
+    `).join('');
+
+    const labels = lang === 'en' ? {
+      title: 'Hospitality Agreement',
+      booking: 'Booking details',
+      bookingCode: 'Reservation code',
+      checkIn: 'Check-in date',
+      checkOut: 'Check-out date',
+      room: 'Studio',
+      capacity: 'Guest capacity',
+      occupants: 'Registered guests',
+      guest: 'Primary guest data',
+      name: 'Full name',
+      documentType: 'Document type',
+      documentNumber: 'Document number',
+      phone: 'Phone',
+      email: 'Email',
+      payment: 'Payment information',
+      total: 'Total stay value',
+      consent: 'Consent and electronic signature',
+      version: 'Version'
+    } : {
+      title: 'Contrato de Hospedaje',
+      booking: 'Datos de la reserva',
+      bookingCode: 'Código de reserva',
+      checkIn: 'Fecha de ingreso (check-in)',
+      checkOut: 'Fecha de salida (check-out)',
+      room: 'Apartaestudio',
+      capacity: 'Capacidad de huéspedes',
+      occupants: 'Huéspedes registrados',
+      guest: 'Datos del huésped principal',
+      name: 'Nombre completo',
+      documentType: 'Tipo de documento',
+      documentNumber: 'Número de documento',
+      phone: 'Teléfono',
+      email: 'Correo electrónico',
+      payment: 'Información de pago',
+      total: 'Valor total del hospedaje',
+      consent: 'Consentimiento y firma electrónica',
+      version: 'Versión'
+    };
+    const consentBody = t('contractConsentText');
+
+    return `
+      <article class="guest-contract-print">
+        <header class="guest-contract-print-head">
+          <h2>${escHtml(labels.title)}</h2>
+          <p><strong>${escHtml(labels.bookingCode)}:</strong> ${escHtml(booking.bookingCode || '—')}
+             · ${escHtml(labels.version)}: ${escHtml(CONTRACT_VERSION)}</p>
+        </header>
+        <section>
+          <h3>${escHtml(labels.booking)}</h3>
+          <ul class="guest-contract-list">
+            <li><strong>${escHtml(labels.checkIn)}:</strong> ${escHtml(contractDateOnly(booking.checkIn))}</li>
+            <li><strong>${escHtml(labels.checkOut)}:</strong> ${escHtml(contractDateOnly(booking.checkOut))}</li>
+            <li><strong>${escHtml(labels.room)}:</strong> ${escHtml(booking.roomName || '—')}</li>
+            <li><strong>${escHtml(labels.capacity)}:</strong> ${escHtml(String(booking.capacity || state.guestSlots.length || '—'))}</li>
+          </ul>
+        </section>
+        <section>
+          <h3>${escHtml(labels.occupants)}</h3>
+          <ul class="guest-contract-list">${occupants || '<li>—</li>'}</ul>
+        </section>
+        <section>
+          <h3>${escHtml(labels.guest)}</h3>
+          <ul class="guest-contract-list">
+            <li><strong>${escHtml(labels.name)}:</strong> ${escHtml(fullName)}</li>
+            <li><strong>${escHtml(labels.documentType)}:</strong> ${escHtml(guest.documentType || '—')}</li>
+            <li><strong>${escHtml(labels.documentNumber)}:</strong> ${escHtml(guest.documentNumber || '—')}</li>
+            <li><strong>${escHtml(labels.phone)}:</strong> ${escHtml(guest.phone || '—')}</li>
+            <li><strong>${escHtml(labels.email)}:</strong> ${escHtml(guest.email || '—')}</li>
+          </ul>
+        </section>
+        <section>
+          <h3>${escHtml(labels.payment)}</h3>
+          <ul class="guest-contract-list">
+            <li><strong>${escHtml(labels.total)}:</strong> ${escHtml(contractMoney(booking.totalAmount))}</li>
+          </ul>
+        </section>
+        <section>
+          <h3>${escHtml(lang === 'en' ? 'Contract clauses' : 'Cláusulas del contrato')}</h3>
+          ${clauses}
+        </section>
+        <section>
+          <h3>${escHtml(labels.consent)}</h3>
+          <p class="guest-contract-clause">${escHtml(consentBody)}</p>
+        </section>
+        <p class="guest-contract-end" id="contractEnd">— ${escHtml(lang === 'en' ? 'End of contract' : 'Fin del contrato')} —</p>
+      </article>
+    `;
+  }
+
+  function setContractGate(read) {
+    state.contractRead = Boolean(read);
+    if (read && !state.contractAcknowledgedAt) {
+      state.contractAcknowledgedAt = new Date().toISOString();
+    }
+    const ackInput = $('#contractAcknowledge');
+    const acceptedInput = $('#contractAccepted');
+    const signBtn = $('#signContract');
+    const gateMsg = $('#contractGate');
+    const hint = $('#contractHint');
+    if (read) {
+      if (ackInput) { ackInput.disabled = false; ackInput.checked = true; }
+      if (acceptedInput) acceptedInput.disabled = false;
+      if (signBtn) signBtn.disabled = false;
+      if (gateMsg) {
+        gateMsg.textContent = t('contractReadConfirmation');
+        gateMsg.classList.remove('is-error');
+        gateMsg.classList.add('is-success');
+      }
+      if (hint) hint.textContent = t('contractModalReadyHint');
+    } else {
+      if (ackInput) ackInput.disabled = true;
+      if (acceptedInput) { acceptedInput.disabled = true; acceptedInput.checked = false; }
+      if (signBtn) signBtn.disabled = true;
+      if (gateMsg) {
+        gateMsg.textContent = t('contractAcknowledgeBlocked');
+        gateMsg.classList.add('is-error');
+        gateMsg.classList.remove('is-success');
+      }
+      if (hint) hint.textContent = t('contractModalScrollHint');
+    }
+  }
+
+  function openContractModal() {
+    saveActiveGuestFromForm();
+    const body = $('#contractBody');
+    const modal = $('#contractModal');
+    if (!body || !modal) return;
+    body.innerHTML = renderContractHTML();
+    modal.hidden = false;
+    document.body.classList.add('guest-modal-open');
+    /* If they already acknowledged once during this session, keep the
+       acknowledgement; otherwise reset visual hint. */
+    if (state.contractRead) {
+      setContractGate(true);
+    } else {
+      const hint = $('#contractHint');
+      if (hint) hint.textContent = t('contractModalScrollHint');
+    }
+    /* Defer scroll-end detection wiring until next tick so layout settles. */
+    requestAnimationFrame(() => {
+      body.scrollTop = 0;
+      attachContractScrollWatcher(body);
+    });
+  }
+
+  function closeContractModal() {
+    const modal = $('#contractModal');
+    if (modal) modal.hidden = true;
+    document.body.classList.remove('guest-modal-open');
+  }
+
+  function attachContractScrollWatcher(body) {
+    if (!body) return;
+    /* Use an IntersectionObserver on the trailing sentinel so we don't have
+       to chase scrollHeight rounding errors across mobile zoom states. */
+    const sentinel = body.querySelector('#contractEnd');
+    if (!sentinel) return;
+    if (body._contractObserver) body._contractObserver.disconnect();
+    body._contractObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) setContractGate(true);
+      });
+    }, { root: body, threshold: 0.9 });
+    body._contractObserver.observe(sentinel);
+  }
+
+  function downloadContractPDF() {
+    /* Browser-driven PDF: open the rendered HTML in a new window, trigger
+       the native print dialog (user picks "Save as PDF"). Avoids shipping
+       a PDF library in the bundle and reuses the same content the user
+       just read. */
+    const html = renderContractHTML();
+    const w = window.open('', '_blank', 'noopener,noreferrer');
+    if (!w) return;
+    w.document.open();
+    w.document.write(`<!doctype html><html lang="${currentLang()}"><head><meta charset="utf-8">
+      <title>${escHtml(t('contractModalTitle'))} — ${escHtml((state.booking && state.booking.bookingCode) || '')}</title>
+      <style>
+        body{margin:0;padding:32px 40px;color:#1f1f1f;font:13px/1.55 Arial,Helvetica,sans-serif}
+        h2{font:600 18pt Georgia,serif;color:#9b9065;margin:0 0 12px}
+        h3{font:600 12pt Georgia,serif;color:#9b9065;margin:18px 0 6px;border-bottom:1px solid #e1ddca;padding-bottom:3px}
+        ul{margin:4px 0 0;padding-left:18px}
+        li{margin:2px 0}
+        p{margin:6px 0;text-align:justify}
+        .guest-contract-clause strong{color:#9b9065}
+      </style>
+      </head><body>${html}</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { try { w.print(); } catch (_) { /* user cancelled */ } }, 250);
+  }
+
   async function signContract() {
     const button = $('#signContract');
     const signedName = $('#signedName').value.trim();
     const acceptedTerms = $('#contractAccepted').checked;
+    if (!state.contractRead) {
+      setStatus($('#contractStatus'), t('contractAcknowledgeBlocked'), 'error');
+      openContractModal();
+      return;
+    }
     if (!signedName) {
       setStatus($('#contractStatus'), 'Escribe tu nombre completo para firmar.', 'error');
       $('#signedName').focus();
@@ -1287,7 +1597,11 @@
       signedName,
       acceptedTerms,
       guests: state.guestSlots.map(slot => ({ guest: slot.guest, isPrimary: slot.isPrimary })),
-      contractVersion: 'ESTAR-HOSPEDAJE-2026-01'
+      contractVersion: CONTRACT_VERSION,
+      /* Audit-trail evidence collected client-side; server re-stamps a
+         server-side timestamp and adds IP + user-agent. */
+      acknowledgedAt: state.contractAcknowledgedAt || new Date().toISOString(),
+      consentText: t('contractConsentText')
     }, $('#contractStatus'), button, 'Contrato firmado.');
     if (data) {
       $('#checkinProgress').textContent = 'Proceso completo';
@@ -1445,6 +1759,20 @@
     });
     $('#occupantCount').addEventListener('change', event => setGuestSlotCount(event.target.value));
     $('#signContract').addEventListener('click', signContract);
+    const openContractBtn = $('#openContract');
+    if (openContractBtn) openContractBtn.addEventListener('click', openContractModal);
+    const closeContractBtn = $('#closeContract');
+    if (closeContractBtn) closeContractBtn.addEventListener('click', closeContractModal);
+    const confirmReadBtn = $('#confirmContractRead');
+    if (confirmReadBtn) confirmReadBtn.addEventListener('click', closeContractModal);
+    const ackInput = $('#contractAcknowledge');
+    if (ackInput) ackInput.addEventListener('change', event => setContractGate(event.target.checked));
+    const downloadBtn = $('#downloadContract');
+    if (downloadBtn) downloadBtn.addEventListener('click', downloadContractPDF);
+    const contractModal = $('#contractModal');
+    if (contractModal) contractModal.addEventListener('click', event => {
+      if (event.target.id === 'contractModal') closeContractModal();
+    });
     $$('.guest-add-service').forEach(button => {
       button.addEventListener('click', () => addService(button.closest('.guest-service-card')));
     });

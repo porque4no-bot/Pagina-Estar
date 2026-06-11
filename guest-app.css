@@ -1,5 +1,36 @@
 /* Estar Guest App */
-.guest-access[hidden],.guest-shell[hidden],.guest-cart[hidden],.guest-camera-modal[hidden]{display:none!important}
+.guest-access[hidden],.guest-shell[hidden],.guest-cart[hidden],.guest-camera-modal[hidden],.guest-contract-modal[hidden]{display:none!important}
+body.guest-modal-open{overflow:hidden}
+.guest-contract-modal{position:fixed;z-index:430;inset:0;padding:28px;display:grid;place-items:center;background:color-mix(in srgb,var(--ink) 72%,transparent);backdrop-filter:blur(16px)}
+.guest-contract-dialog{width:min(920px,100%);max-height:calc(100vh - 56px);display:flex;flex-direction:column;border:1px solid var(--paper-400);border-radius:18px;background:var(--paper);box-shadow:var(--shadow-lg);overflow:hidden}
+.guest-contract-modal-head{padding:24px 24px 12px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border-bottom:1px solid var(--paper-400)}
+.guest-contract-modal-head h3{margin:4px 0 6px;font:600 22px var(--font-heading,Georgia,serif);color:var(--ink)}
+.guest-contract-modal-head .guest-muted{margin:0;font-size:13px;line-height:1.55}
+.guest-contract-close{width:40px;height:40px;display:grid;place-items:center;border-radius:50%;color:var(--paper);background:var(--ink);font:700 24px/1 var(--font-label);flex-shrink:0}
+.guest-contract-body{padding:22px 28px;overflow-y:auto;flex:1;background:var(--white);font-family:var(--font-body);color:var(--ink);line-height:1.55}
+.guest-contract-body:focus{outline:2px solid var(--olive);outline-offset:-4px}
+.guest-contract-print-head h2{margin:0 0 6px;font:600 20px var(--font-heading,Georgia,serif);color:var(--olive-700)}
+.guest-contract-print-head p{margin:0 0 12px;color:var(--ink-500);font-size:12px}
+.guest-contract-body section{margin-bottom:16px}
+.guest-contract-body section h3{margin:14px 0 6px;font:600 13px var(--font-heading,Georgia,serif);color:var(--olive-700);border-bottom:1px solid var(--paper-400);padding-bottom:4px;text-transform:none}
+.guest-contract-list{margin:6px 0 0;padding-left:18px;font-size:13px}
+.guest-contract-list li{margin:2px 0}
+.guest-contract-clause{margin:6px 0 8px;text-align:justify;font-size:13px}
+.guest-contract-clause strong{color:var(--olive-700)}
+.guest-contract-end{margin:22px 0 4px;text-align:center;color:var(--ink-500);font:700 11px var(--font-label);letter-spacing:.12em;text-transform:uppercase}
+.guest-contract-hint{margin:0;padding:10px 24px;background:var(--paper-200);color:var(--ink-500);font:600 12px var(--font-label);text-align:center}
+.guest-contract-actions{padding:16px 24px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;border-top:1px solid var(--paper-400)}
+.guest-contract-actions-buttons{display:flex;gap:10px;flex-wrap:wrap}
+.guest-contract-actions .guest-consent{margin:0;flex:1 1 240px}
+.guest-contract-view{margin:6px 0 14px;padding:10px 14px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--olive);border-radius:8px;color:var(--olive-700);background:transparent;font:700 12px var(--font-label);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:background var(--dur-fast),color var(--dur-fast)}
+.guest-contract-view:hover,.guest-contract-view:focus-visible{background:var(--olive);color:var(--paper)}
+#contractGate.is-success{color:var(--success,#2c8a4e)}
+@media(max-width:520px){
+  .guest-contract-modal{padding:0}
+  .guest-contract-dialog{max-height:100vh;border-radius:0}
+  .guest-contract-body{padding:18px}
+  .guest-contract-actions{padding:14px 18px 18px}
+}
 .guest-app-page{min-height:100vh;background:#f3efe7}
 .guest-app-page h1,.guest-app-page h2,.guest-app-page h3,.guest-app-page h4{letter-spacing:-.02em}
 .guest-header{position:fixed;inset:0 0 auto;z-index:200;height:76px;padding:0 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;background:rgba(250,246,239,.94);border-bottom:1px solid rgba(40,41,43,.1);backdrop-filter:blur(18px)}

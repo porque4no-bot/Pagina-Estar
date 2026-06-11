@@ -25,5 +25,18 @@
   "minorAuthorizationLabel": "Carta de autorización",
   "minorAuthorizationHelp": "Documento firmado por padre, madre o tutor legal autorizando la estadía del menor.",
   "minorBlockingNotice": "Antes de confirmar el check-in, completa los documentos requeridos para los menores.",
-  "escnnaReminder": "En cumplimiento de la Ley 679 de 2001, advertimos que la explotación y el abuso sexual de menores de edad son sancionados penal y administrativamente."
+  "escnnaReminder": "En cumplimiento de la Ley 679 de 2001, advertimos que la explotación y el abuso sexual de menores de edad son sancionados penal y administrativamente.",
+  "viewContractLink": "Ver contrato completo",
+  "contractModalTitle": "Contrato de Hospedaje",
+  "contractModalEyebrow": "Antes de firmar",
+  "contractModalIntro": "Lee el contrato completo. Para habilitar la firma, marca la casilla o desplázate hasta el final.",
+  "contractModalScrollHint": "Desplázate hasta el final para habilitar la firma.",
+  "contractModalReadyHint": "Has leído el contrato. Puedes cerrar y firmar.",
+  "contractDownloadBtn": "Descargar PDF",
+  "contractCloseBtn": "Cerrar",
+  "contractAcknowledgeLabel": "He leído el contrato completo.",
+  "contractAcknowledgeBlocked": "Lee el contrato antes de firmar.",
+  "contractReadConfirmation": "Confirmación de lectura registrada.",
+  "contractConsentText": "Declaro que he leído, entiendo y acepto íntegramente este contrato de hospedaje, sus cláusulas y políticas, y firmo electrónicamente con plenos efectos legales conforme a la Ley 527 de 1999 y el Decreto 2364 de 2012 de Colombia."
 }
+

@@ -168,6 +168,12 @@ test('guest completes document analysis, check-in and contract signature', async
   await expect(page.locator('#checkinStatus')).toContainText('CHK-TEST-100');
   await expect(page.locator('#checkinProgress')).toHaveText('Check-in completado');
 
+  /* Contract preview gate: user must open the contract modal and either
+     scroll to the end OR explicitly tick "I have read" before signing. */
+  await page.locator('#openContract').click();
+  await expect(page.locator('#contractModal')).toBeVisible();
+  await page.locator('#contractAcknowledge').check();
+  await page.locator('#closeContract').click();
   await page.locator('#contractAccepted').check();
   await page.locator('#signContract').click();
   await expect(page.locator('#contractStatus')).toContainText('Contrato firmado');
@@ -181,6 +187,8 @@ test('guest completes document analysis, check-in and contract signature', async
   const contract = captured.find(item => item.endpoint === 'action' && item.payload.type === 'contract');
   expect(contract.payload.acceptedTerms).toBe(true);
   expect(contract.payload.guests).toHaveLength(1);
+  expect(contract.payload.contractVersion).toBe('ESTAR-HOSPEDAJE-2026-01');
+  expect(contract.payload.acknowledgedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 });
 
 test('guest opens the camera modal with the document guide frame', async ({ page, context }) => {

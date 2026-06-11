@@ -25,5 +25,18 @@
   "minorAuthorizationLabel": "Authorization letter",
   "minorAuthorizationHelp": "Document signed by a parent or legal guardian authorizing the minor's stay.",
   "minorBlockingNotice": "Before confirming check-in, complete the required documents for minors.",
-  "escnnaReminder": "In compliance with Colombian Law 679 of 2001, we warn that child sexual exploitation and abuse are criminally and administratively punished."
+  "escnnaReminder": "In compliance with Colombian Law 679 of 2001, we warn that child sexual exploitation and abuse are criminally and administratively punished.",
+  "viewContractLink": "View full contract",
+  "contractModalTitle": "Hospitality Agreement",
+  "contractModalEyebrow": "Before you sign",
+  "contractModalIntro": "Read the full contract. To enable signing, tick the box or scroll to the end.",
+  "contractModalScrollHint": "Scroll to the end to enable signing.",
+  "contractModalReadyHint": "You have read the contract. You can close and sign.",
+  "contractDownloadBtn": "Download PDF",
+  "contractCloseBtn": "Close",
+  "contractAcknowledgeLabel": "I have read the full contract.",
+  "contractAcknowledgeBlocked": "Read the contract before signing.",
+  "contractReadConfirmation": "Read confirmation recorded.",
+  "contractConsentText": "I declare that I have read, understand, and fully accept this hospitality agreement, its clauses, and policies, and I electronically sign it with full legal effect under Colombian Law 527 of 1999 and Decree 2364 of 2012."
 }
+

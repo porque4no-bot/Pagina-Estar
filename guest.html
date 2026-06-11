@@ -329,12 +329,14 @@
                   <p class="eyebrow">Firma digital</p>
                   <h3>Contrato de hospedaje</h3>
                   <p>Firma después de confirmar tus datos. Guardaremos la evidencia de aceptación junto con el expediente de la reserva.</p>
+                  <button class="guest-contract-view" id="openContract" type="button" data-guest-i18n="viewContractLink">Ver contrato completo</button>
                   <label class="guest-field"><span>Nombre completo del firmante</span><input id="signedName" type="text"></label>
                   <label class="guest-consent">
-                    <input id="contractAccepted" type="checkbox">
+                    <input id="contractAccepted" type="checkbox" disabled>
                     <span>Leí y acepto el contrato, las políticas de convivencia y cancelación.</span>
                   </label>
-                  <button class="btn btn-primary" id="signContract" type="button">Firmar contrato</button>
+                  <p class="guest-form-status" id="contractGate" role="status" data-guest-i18n="contractAcknowledgeBlocked">Lee el contrato antes de firmar.</p>
+                  <button class="btn btn-primary" id="signContract" type="button" disabled>Firmar contrato</button>
                   <p class="guest-form-status" id="contractStatus" role="status"></p>
                 </div>
               </aside>
@@ -550,6 +552,31 @@
       <footer class="guest-camera-actions">
         <button class="btn btn-primary" id="capturePhoto" type="button" data-guest-i18n="captureBtn">Capturar</button>
         <button class="btn btn-ghost-dark" id="retakePhoto" type="button" data-guest-i18n="retakeBtn" hidden>Reintentar</button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="guest-contract-modal" id="contractModal" role="dialog" aria-modal="true" aria-labelledby="contractModalTitle" hidden>
+    <div class="guest-contract-dialog">
+      <header class="guest-contract-modal-head">
+        <div>
+          <p class="eyebrow terracotta" data-guest-i18n="contractModalEyebrow">Antes de firmar</p>
+          <h3 id="contractModalTitle" data-guest-i18n="contractModalTitle">Contrato de Hospedaje</h3>
+          <p class="guest-muted" data-guest-i18n="contractModalIntro">Lee el contrato completo. Para habilitar la firma, marca la casilla o desplázate hasta el final.</p>
+        </div>
+        <button class="guest-contract-close" id="closeContract" type="button" aria-label="Cerrar contrato">×</button>
+      </header>
+      <div class="guest-contract-body" id="contractBody" tabindex="0"></div>
+      <p class="guest-contract-hint" id="contractHint" data-guest-i18n="contractModalScrollHint">Desplázate hasta el final para habilitar la firma.</p>
+      <footer class="guest-contract-actions">
+        <label class="guest-consent">
+          <input type="checkbox" id="contractAcknowledge" disabled>
+          <span data-guest-i18n="contractAcknowledgeLabel">He leído el contrato completo.</span>
+        </label>
+        <div class="guest-contract-actions-buttons">
+          <button class="btn btn-ghost-dark" id="downloadContract" type="button" data-guest-i18n="contractDownloadBtn">Descargar PDF</button>
+          <button class="btn btn-primary" id="confirmContractRead" type="button" data-guest-i18n="contractCloseBtn">Cerrar</button>
+        </div>
       </footer>
     </div>
   </div>
