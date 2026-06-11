@@ -27,7 +27,12 @@ function makeEvent({ method = 'POST', body = {} } = {}) {
   return { httpMethod: method, body: JSON.stringify(body), headers: {} };
 }
 
-test('signs the cliente amount for non-quote references (direct booking)', async () => {
+function encodeDirectRef(parts) {
+  return Buffer.from(parts.join('|'), 'utf8').toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+test('rejects a non-encoded direct reference as invalid', async () => {
   process.env.WOMPI_INTEGRITY_SECRET = 'test_integrity_xxxx';
   process.env.WOMPI_PUBLIC_KEY = 'pub_test_xxxx';
   delete process.env.ALLOWED_ORIGIN;
@@ -39,14 +44,63 @@ test('signs the cliente amount for non-quote references (direct booking)', async
     computeQuoteTotal: () => { throw new Error('should not be called'); }
   };
   const fn = load(stub);
+  /* The literal 'EST-DIRECT-123' is not a quote id nor a base64 reservation
+     payload, so the signer refuses it. Production references are always
+     produced by motor-app.jsx and are URL-safe base64. */
   const res = await fn.handler(makeEvent({ body: {
     reference: 'EST-DIRECT-123', amountInCents: 119000, currency: 'COP'
   } }));
-  assert.equal(res.statusCode, 200);
+  assert.equal(res.statusCode, 400);
   const json = JSON.parse(res.body);
-  assert.equal(json.reference, 'EST-DIRECT-123');
-  assert.equal(json.amountInCents, 119000);
-  assert.ok(json.signature.integrity);
+  assert.equal(json.error, 'invalid_reference');
+});
+
+test('signs an encoded direct reference when OTASync mock fallback is active', async () => {
+  /* Without OTASync credentials the recompute returns isMock and the signer
+     accepts the cliente amount as a dev-only fallback. */
+  const originalCreds = {
+    OTASYNC_TOKEN: process.env.OTASYNC_TOKEN,
+    OTASYNC_USERNAME: process.env.OTASYNC_USERNAME,
+    OTASYNC_PASSWORD: process.env.OTASYNC_PASSWORD
+  };
+  delete process.env.OTASYNC_TOKEN;
+  delete process.env.OTASYNC_USERNAME;
+  delete process.env.OTASYNC_PASSWORD;
+  process.env.WOMPI_INTEGRITY_SECRET = 'test_integrity_xxxx';
+  process.env.WOMPI_PUBLIC_KEY = 'pub_test_xxxx';
+  delete process.env.ALLOWED_ORIGIN;
+
+  /* Drop cached modules so the absent credentials are observed. */
+  const otaPath = require.resolve('../../netlify/functions/_otasync');
+  const dpPath = require.resolve('../../netlify/functions/_direct-pricing');
+  delete require.cache[otaPath];
+  delete require.cache[dpPath];
+
+  const stub = {
+    getQuoteStore: () => { throw new Error('should not be called'); },
+    loadQuote: async () => { throw new Error('should not be called'); },
+    effectiveStatus: () => { throw new Error('should not be called'); },
+    computeQuoteTotal: () => { throw new Error('should not be called'); }
+  };
+
+  try {
+    const fn = load(stub);
+    const ref = encodeDirectRef(['1', '260701', '260703', '2', '31348', 'Ana', 'Lopez', 'a@b.co', '+57 300 000 0000', '000000', 'EST-ABCDE', '1', '0']);
+    const res = await fn.handler(makeEvent({ body: {
+      reference: ref, amountInCents: 50200000, currency: 'COP'
+    } }));
+    assert.equal(res.statusCode, 200);
+    const json = JSON.parse(res.body);
+    assert.equal(json.reference, ref);
+    assert.equal(json.amountInCents, 50200000);
+    assert.ok(json.signature.integrity);
+  } finally {
+    for (const [k, v] of Object.entries(originalCreds)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+    delete require.cache[otaPath];
+    delete require.cache[dpPath];
+  }
 });
 
 test('signs the server-computed total for a quote payment, ignoring cliente amount', async () => {

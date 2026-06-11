@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { getQuoteStore, loadQuote, effectiveStatus, computeQuoteTotal } = require('./_quotes-store');
+const { decodeDirectReference, verifyDirectBookingAmount } = require('./_direct-pricing');
 
 function timingSafeEqual(a, b) {
   const ba = Buffer.from(String(a || ''));
@@ -102,6 +103,32 @@ exports.handler = async (event) => {
 
     const totals = computeQuoteTotal(quote);
     amountInCents = totals.totalCents;
+  } else {
+    /* Direct booking: the reference is a base64-encoded payload that pins
+       the room type, dates, extras and IVA flags. Recompute the authoritative
+       subtotal from OTASync availability so a tampered client amount cannot
+       be signed. Quote payments are already protected above via the store. */
+    const decoded = decodeDirectReference(reference);
+    if (!decoded) {
+      console.warn('[create-wompi-signature] reference is neither a quote id nor a decodable direct payload; refusing to sign');
+      return json(400, { error: 'invalid_reference' });
+    }
+
+    let verdict;
+    try {
+      verdict = await verifyDirectBookingAmount(decoded, clientAmountInCents);
+    } catch (e) {
+      console.error('[create-wompi-signature] price recompute failed:', e.message);
+      return json(503, { error: 'price_check_unavailable' });
+    }
+
+    if (!verdict.ok) {
+      console.error(`[create-wompi-signature] price_mismatch refusing to sign: bookingCode=${decoded.bookingCode}, roomType=${decoded.roomTypeId}, client=${clientAmountInCents}, expected=${verdict.expectedCentsAll ? verdict.expectedCentsAll.join('|') : verdict.expectedCents}, reason=${verdict.reason}`);
+      return json(400, { error: 'price_mismatch' });
+    }
+    if (verdict.isMock) {
+      console.warn(`[create-wompi-signature] OTASync mock fallback active — accepting client amount without recompute. bookingCode=${decoded.bookingCode}, client=${clientAmountInCents}`);
+    }
   }
 
   const integrity = crypto
