@@ -261,6 +261,7 @@ function signGuestToken(booking, ttlSeconds = 24 * 60 * 60) {
   const payload = {
     sub: booking.bookingCode,
     guest: booking.guestName,
+    capacity: booking.capacity,
     exp: Math.floor(Date.now() / 1000) + ttlSeconds
   };
   const encoded = base64url(JSON.stringify(payload));

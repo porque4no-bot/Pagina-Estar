@@ -230,6 +230,15 @@
     return Math.min(5, Math.max(1, Number.isFinite(capacity) && capacity > 0 ? capacity : 1));
   }
 
+  function updateOccupantCountOptions() {
+    const select = $('#occupantCount');
+    if (!select) return;
+    const max = bookingCapacity();
+    Array.from(select.options).forEach(option => {
+      option.disabled = Number(option.value) > max;
+    });
+  }
+
   function splitBookingName() {
     const parts = String((state.booking && state.booking.guestName) || '').trim().split(/\s+/).filter(Boolean);
     return { firstName: parts.shift() || '', lastName: parts.join(' ') };
@@ -333,7 +342,7 @@
 
   function setGuestSlotCount(count) {
     saveActiveGuestFromForm();
-    const nextCount = Math.min(5, Math.max(1, Number(count) || 1));
+    const nextCount = Math.min(bookingCapacity(), Math.max(1, Number(count) || 1));
     while (state.guestSlots.length < nextCount) {
       state.guestSlots.push(createGuestSlot(state.guestSlots.length));
     }
@@ -348,6 +357,7 @@
   function initializeGuestSlots() {
     if (state.guestSlots.length) return;
     const count = bookingCapacity();
+    updateOccupantCountOptions();
     state.guestSlots = Array.from({ length: count }, (_, index) => createGuestSlot(index));
     const bookingName = splitBookingName();
     state.guestSlots[0].guest.firstName = bookingName.firstName;
@@ -681,53 +691,72 @@
     }
   }
 
+  function normalizeDocumentTypeOption(value) {
+    const normalizeOption = input => String(input || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+    const documentAliases = {
+      cc: 'cc',
+      'cedula': 'cc',
+      'cedula ciudadania': 'cc',
+      'cedula de ciudadania': 'cc',
+      'cedula colombiana': 'cc',
+      'documento nacional': 'cc',
+      'id': 'cc',
+      'id card': 'cc',
+      'identity card': 'cc',
+      'national id': 'cc',
+      'national identity card': 'cc',
+      'iddocument nationalidentitycard': 'cc',
+      ce: 'ce',
+      'cedula extranjeria': 'ce',
+      'cedula de extranjeria': 'ce',
+      'residence permit': 'ce',
+      'iddocument residencepermit': 'ce',
+      passport: 'pasaporte',
+      'iddocument passport': 'pasaporte',
+      'driver license': 'licencia',
+      'drivers license': 'licencia',
+      'licencia de conduccion': 'licencia',
+      'iddocument driverlicense': 'licencia'
+    };
+    const normalized = normalizeOption(value);
+    const comparable = documentAliases[normalized] || normalized;
+    const field = $('[name="documentType"]');
+    const options = field ? Array.from(field.options) : [];
+    const option = options.find(item => {
+      const candidate = normalizeOption(item.value);
+      if (!candidate) return false;
+      return candidate === comparable ||
+        comparable.includes(candidate) ||
+        candidate.includes(comparable);
+    });
+    return option ? option.value : '';
+  }
+
+  function applyExtractedToGuest(guest, extracted) {
+    Object.entries(extracted || {}).forEach(([name, value]) => {
+      if (!value) return;
+      if (name === 'documentType') {
+        const normalized = normalizeDocumentTypeOption(value);
+        if (normalized) guest.documentType = normalized;
+      } else if (!guest[name]) {
+        guest[name] = value;
+      }
+    });
+  }
+
   function fillExtractedFields(extracted) {
     Object.entries(extracted || {}).forEach(([name, value]) => {
       if (!value) return;
       const field = $(`[name="${name}"]`);
       if (!field) return;
       if (field.tagName === 'SELECT') {
-        const normalizeOption = input => String(input || '')
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, ' ')
-          .trim();
-        const documentAliases = {
-          cc: 'cc',
-          'cedula': 'cc',
-          'cedula ciudadania': 'cc',
-          'cedula de ciudadania': 'cc',
-          'cedula colombiana': 'cc',
-          'documento nacional': 'cc',
-          'id': 'cc',
-          'id card': 'cc',
-          'identity card': 'cc',
-          'national id': 'cc',
-          'national identity card': 'cc',
-          'iddocument nationalidentitycard': 'cc',
-          ce: 'ce',
-          'cedula extranjeria': 'ce',
-          'cedula de extranjeria': 'ce',
-          'residence permit': 'ce',
-          'iddocument residencepermit': 'ce',
-          passport: 'pasaporte',
-          'iddocument passport': 'pasaporte',
-          'driver license': 'licencia',
-          'drivers license': 'licencia',
-          'licencia de conduccion': 'licencia',
-          'iddocument driverlicense': 'licencia'
-        };
-        const normalized = normalizeOption(value);
-        const comparable = documentAliases[normalized] || normalized;
-        const option = Array.from(field.options).find(item => {
-          const candidate = normalizeOption(item.value);
-          if (!candidate) return false;
-          return candidate === comparable ||
-            comparable.includes(candidate) ||
-            candidate.includes(comparable);
-        });
-        if (option) field.value = option.value;
+        const normalized = normalizeDocumentTypeOption(value);
+        if (normalized) field.value = normalized;
       } else if (!field.value) {
         field.value = value;
       }
@@ -745,6 +774,10 @@
   async function analyzeDocument() {
     if (!state.document) return;
     const button = $('#analyzeDocument');
+    const analysisGuestIndex = state.activeGuestIndex;
+    const analysisSlot = state.guestSlots[analysisGuestIndex];
+    const analysisDocument = analysisSlot && analysisSlot.document;
+    if (!analysisSlot || !analysisDocument) return;
     setButtonLoading(button, true, 'Leyendo');
     setStatus($('#ocrStatus'), 'Validando con reconocimiento de documento…', 'loading');
     try {
@@ -762,19 +795,21 @@
           method: 'POST',
           body: JSON.stringify({
             mode: 'analyze',
-            file: state.document,
+            file: analysisDocument,
             guest: {},
-            slotIndex: state.activeGuestIndex
+            slotIndex: analysisGuestIndex
           })
         });
       }
-      fillExtractedFields(data.extracted);
-      saveActiveGuestFromForm();
-      const slot = activeSlot();
-      if (slot) {
-        slot.analysisSource = data.source || '';
-        slot.confidence = Number(data.confidence || 0);
-        slot.status = data.source === 'azure' ? 'ocr' : 'pending';
+      const targetSlot = state.guestSlots[analysisGuestIndex];
+      if (targetSlot) {
+        applyExtractedToGuest(targetSlot.guest, data.extracted);
+        targetSlot.analysisSource = data.source || '';
+        targetSlot.confidence = Number(data.confidence || 0);
+        targetSlot.status = data.source === 'azure' ? 'ocr' : 'pending';
+      }
+      if (state.activeGuestIndex === analysisGuestIndex) {
+        loadActiveGuestIntoForm();
       }
       renderGuestCards();
       const azureFailed = data.source === 'azure-error';
@@ -1072,9 +1107,8 @@
       });
     });
     $('[name="privacyAccepted"]').addEventListener('change', () => {
-      state.guestSlots.forEach(slot => {
-        slot.guest.privacyAccepted = $('[name="privacyAccepted"]').checked;
-      });
+      saveActiveGuestFromForm();
+      renderGuestCards();
     });
     $('#occupantCount').addEventListener('change', event => setGuestSlotCount(event.target.value));
     $('#signContract').addEventListener('click', signContract);

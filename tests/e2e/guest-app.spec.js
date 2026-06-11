@@ -4,8 +4,10 @@ const booking = {
   bookingCode: 'EST-TEST-100',
   status: 'confirmed',
   guestName: 'Andrea Restrepo',
+  guestEmail: 'andrea@example.com',
   roomName: 'Apartaestudio Seleccion',
   roomNumber: '402',
+  capacity: 2,
   checkIn: '2026-08-10',
   checkOut: '2026-08-13',
   nights: 3,
@@ -136,6 +138,7 @@ test('guest completes document analysis, check-in and contract signature', async
   await mockGuestApis(page, captured);
   await login(page);
   await page.locator('[data-guest-tab="checkin"]:visible').first().click();
+  await page.locator('#occupantCount').selectOption('1');
 
   await page.locator('#identityDocument').setInputFiles({
     name: 'pasaporte.png',
@@ -201,6 +204,7 @@ test('guest submits multiple occupants in the check-in payload', async ({ page }
   await mockGuestApis(page, captured);
   await login(page);
   await page.locator('[data-guest-tab="checkin"]:visible').first().click();
+  await expect(page.locator('#occupantCount option[value="3"]')).toHaveJSProperty('disabled', true);
   await page.locator('#occupantCount').selectOption('2');
 
   await page.locator('#identityDocument').setInputFiles({
@@ -216,6 +220,7 @@ test('guest submits multiple occupants in the check-in payload', async ({ page }
   await page.locator('[name="nationality"]').fill('Colombia');
   await page.locator('[name="email"]').fill('andrea@example.com');
   await page.locator('[name="phone"]').fill('+57 300 111 1111');
+  await page.locator('[name="privacyAccepted"]').check();
 
   await page.locator('[data-select-guest="1"]').click();
   await page.locator('#identityDocument').setInputFiles({

@@ -90,3 +90,53 @@ test('guest check-in submit persists 3 guests and archives each document', async
     _test.resetDeps();
   }
 });
+
+test('guest check-in submit rejects guests beyond reservation capacity', async () => {
+  _test.setDeps({
+    requireGuest: () => ({ sub: 'TEST-301', guest: 'Andrea Restrepo', capacity: 2 }),
+    protectRecord: record => record,
+    guestStore: () => ({
+      setJSON: async () => {},
+      set: async () => {}
+    }),
+    archiveGuestPayload: async () => ({ delivered: true }),
+    syncGuestEvent: async () => ({ delivered: true })
+  });
+
+  const file = index => ({
+    name: `doc-${index}.png`,
+    type: 'image/png',
+    dataUrl: `data:image/png;base64,${Buffer.from(`file-${index}`).toString('base64')}`
+  });
+  const guest = index => ({
+    firstName: `Nombre${index}`,
+    lastName: `Apellido${index}`,
+    documentType: 'CC',
+    documentNumber: `100${index}`,
+    birthDate: '1990-01-01',
+    nationality: 'Colombia',
+    email: `guest${index}@example.com`,
+    phone: `300000000${index}`,
+    privacyAccepted: true
+  });
+
+  try {
+    const response = await guestCheckin.handler({
+      httpMethod: 'POST',
+      headers: {},
+      body: JSON.stringify({
+        mode: 'submit',
+        guests: [0, 1, 2].map(index => ({
+          guest: guest(index),
+          file: file(index),
+          isPrimary: index === 0
+        }))
+      })
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.match(JSON.parse(response.body).error, /máximo 2 huéspedes/);
+  } finally {
+    _test.resetDeps();
+  }
+});

@@ -309,13 +309,18 @@ function guestArchiveName(guest) {
   return cleanText(`${guest.firstName || ''} ${guest.lastName || ''}`.trim() || 'huesped', 120);
 }
 
-function normalizeSubmitGuests(body) {
+function normalizeSubmitGuests(body, capacity) {
   const rawGuests = Array.isArray(body.guests) ? body.guests : [];
   if (!rawGuests.length) {
     throw Object.assign(new Error('Registra al menos un huésped para completar el check-in.'), { statusCode: 400 });
   }
-  if (rawGuests.length > MAX_GUESTS) {
-    throw Object.assign(new Error('Puedes registrar máximo 5 huéspedes por reserva.'), { statusCode: 400 });
+  const capacityLimit = Number(capacity);
+  const maxGuests = Math.min(
+    MAX_GUESTS,
+    Number.isFinite(capacityLimit) && capacityLimit > 0 ? capacityLimit : MAX_GUESTS
+  );
+  if (rawGuests.length > maxGuests) {
+    throw Object.assign(new Error(`Puedes registrar máximo ${maxGuests} huéspedes para esta reserva.`), { statusCode: 400 });
   }
   const entries = rawGuests.map((entry, index) => normalizeGuestEntry(entry, index));
   if (!entries.some(entry => entry.isPrimary)) entries[0].isPrimary = true;
@@ -363,7 +368,7 @@ exports.handler = async event => {
     const mode = body.mode === 'submit' ? 'submit' : 'analyze';
 
     if (mode === 'submit') {
-      const entries = normalizeSubmitGuests(body);
+      const entries = normalizeSubmitGuests(body, session.capacity);
       const validation = validateGuests(entries);
 
       if (!validation.valid) {
