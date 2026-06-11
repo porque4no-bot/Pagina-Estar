@@ -496,27 +496,29 @@
   // window.PAYMENT_PROVIDER = 'mercadopago';
   // window.MERCADOPAGO_PUBLIC_KEY = '';
 
+  // Booking-engine fallback room list used when the OTASync API is unreachable.
+  // KEEP IN SYNC WITH rooms_db.json — area/capacity/bed must match the canonical room data.
   const BE_ROOMS = [
-    { id:'clasica', roomTypeId:'31348', num:'01', name:'Clásica', area:28, capacity:2, bed:'1 Queen size', view:'City view',
-      desc:'Efficient and warm design. Everything essential in a well-used 28 m².', priceFlexible:220000,
+    { id:'clasica', roomTypeId:'31348', num:'01', name:'Clásica', area:29, capacity:2, bed:'1 double', view:'Interior',
+      desc:'Efficient and warm design. Everything essential in a well-used 29 m².', priceFlexible:220000,
       images: ['../assets/photos/tipo1/1.webp', '../assets/photos/tipo1/2.webp', '../assets/photos/tipo1/3.webp'],
-      amenities:[{icon:'wifi',l:'Fiber WiFi'},{icon:'tv',l:'Smart TV 43"'},{icon:'cooking-pot',l:'Equipped kitchen'},{icon:'shower-head',l:'Private bathroom'},{icon:'sparkles',l:'Weekly housekeeping'}]},
-    { id:'seleccion', roomTypeId:'31349', num:'02', name:'Selección', area:32, capacity:2, bed:'1 Queen size', view:'Mountain range + balcony',
-      desc:'Private balcony with mountain views. Perfect for morning coffee.', priceFlexible:265000,
+      amenities:[{icon:'wifi',l:'Fiber WiFi'},{icon:'tv',l:'TV Cable'},{icon:'cooking-pot',l:'Equipped kitchen'},{icon:'shower-head',l:'Private bathroom'},{icon:'sparkles',l:'Weekly housekeeping'}]},
+    { id:'seleccion', roomTypeId:'31349', num:'02', name:'Selección', area:36, capacity:5, bed:'1 king + 1 double + 1 single', view:'City view',
+      desc:'36 sqm with city view. Three beds — king, double and single — for up to 5 guests.', priceFlexible:265000,
       images: ['../assets/photos/tipo2/1.webp', '../assets/photos/tipo2/2.webp', '../assets/photos/tipo2/3.webp', '../assets/photos/tipo2/4.webp'],
-      amenities:[{icon:'wind',l:'Private balcony'},{icon:'wifi',l:'Fiber WiFi'},{icon:'tv',l:'Smart TV 43"'},{icon:'cooking-pot',l:'Equipped kitchen'},{icon:'shower-head',l:'Private bathroom'}]},
-    { id:'reserva', roomTypeId:'31350', num:'03', name:'Reserva', area:42, capacity:2, bed:'1 King size', view:'City view',
-      desc:'Separate private bedroom from the living area. Ergonomic desk. 42 m².', priceFlexible:320000,
+      amenities:[{icon:'building-2',l:'City view'},{icon:'wifi',l:'Fiber WiFi'},{icon:'tv',l:'TV Cable'},{icon:'cooking-pot',l:'Equipped kitchen'},{icon:'users',l:'Up to 5 guests'}]},
+    { id:'reserva', roomTypeId:'31350', num:'03', name:'Reserva', area:24, capacity:2, bed:'1 double', view:'City view',
+      desc:'Cozy studio with city view. Compact, well designed and with all the essentials in 24 m².', priceFlexible:320000,
       images: ['../assets/photos/tipo3/1.webp', '../assets/photos/tipo3/2.webp', '../assets/photos/tipo3/3.webp'],
-      amenities:[{icon:'layout',l:'Separate spaces'},{icon:'wifi',l:'Fiber WiFi'},{icon:'tv',l:'Smart TV 55"'},{icon:'cooking-pot',l:'Equipped kitchen'},{icon:'briefcase',l:'Desk'}]},
-    { id:'origen', roomTypeId:'31351', num:'04', name:'Origen', area:52, capacity:2, bed:'1 King size', view:'Panoramic',
-      desc:'The most spacious. Coffee-region inspired design. Panoramic view of Manizales.', priceFlexible:385000,
+      amenities:[{icon:'building-2',l:'City view'},{icon:'wifi',l:'Fiber WiFi'},{icon:'tv',l:'TV Cable'},{icon:'cooking-pot',l:'Equipped kitchen'},{icon:'shower-head',l:'Private bathroom'}]},
+    { id:'origen', roomTypeId:'31351', num:'04', name:'Origen', area:29, capacity:3, bed:'1 double + 1 single', view:'City view',
+      desc:'29 sqm with city view. Double bed plus a single bed — up to 3 guests.', priceFlexible:385000,
       images: ['../assets/photos/tipo4/1.webp', '../assets/photos/tipo4/2.webp', '../assets/photos/tipo4/3.webp', '../assets/photos/tipo4/4.webp', '../assets/photos/tipo4/5.webp'],
-      amenities:[{icon:'mountain',l:'Panoramic view'},{icon:'wifi',l:'Fiber WiFi'},{icon:'tv',l:'Smart TV 65"'},{icon:'cooking-pot',l:'Equipped kitchen'},{icon:'bath',l:'Bathtub'}]},
-    { id:'especial', roomTypeId:'31352', num:'05', name:'Especial', area:60, capacity:4, bed:'King + sofa bed', view:'Premium panoramic',
-      desc:'Our most complete typology. Private terrace. Ideal for a truly special stay.', priceFlexible:450000,
+      amenities:[{icon:'building-2',l:'City view'},{icon:'wifi',l:'Fiber WiFi'},{icon:'tv',l:'TV Cable'},{icon:'cooking-pot',l:'Equipped kitchen'},{icon:'users',l:'Up to 3 guests'}]},
+    { id:'especial', roomTypeId:'31352', num:'05', name:'Especial', area:27, capacity:2, bed:'1 double', view:'City view',
+      desc:'27 sqm with city view. Double bed, equipped kitchen and private bathroom with hair dryer and iron.', priceFlexible:450000,
       images: ['../assets/photos/tipo5/1.webp', '../assets/photos/tipo5/2.webp', '../assets/photos/tipo5/3.webp', '../assets/photos/tipo5/4.webp'],
-      amenities:[{icon:'sun',l:'Private terrace'},{icon:'wifi',l:'Fiber WiFi'},{icon:'tv',l:'Smart TV 65"'},{icon:'cooking-pot',l:'Premium kitchen'},{icon:'users',l:'Up to 4 people'}]}
+      amenities:[{icon:'building-2',l:'City view'},{icon:'wifi',l:'Fiber WiFi'},{icon:'tv',l:'TV Cable'},{icon:'cooking-pot',l:'Equipped kitchen'},{icon:'shower-head',l:'Private bathroom'}]}
   ];
   const BE_EXTRAS = [
     { id:'desayuno', name:'Breakfast', desc:'Coffee, fruit and eggs every morning', price:20000, unit:'/person/night', icon:'coffee' },

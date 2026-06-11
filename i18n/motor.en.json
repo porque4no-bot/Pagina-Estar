@@ -91,11 +91,12 @@
     "clasica": "Double bed, equipped kitchen and private bathroom in 29 sqm. Cozy and functional.",
     "seleccion": "36 sqm with city view. Three beds for up to 5 guests — king, double and single.",
     "reserva": "24 sqm with city view. Double bed, equipped kitchen and private bathroom.",
-    "origen": "29 sqm with city view. King bed for two plus a single bed — up to 3 guests.",
+    "origen": "29 sqm with city view. Double bed plus a single bed — up to 3 guests.",
     "especial": "27 sqm with city view. Double bed, full kitchen and all amenities."
   },
   "roomBeds": {
     "1 cama doble": "1 double bed",
+    "1 cama doble + 1 sencilla": "1 double + 1 single",
     "1 king + 1 doble + 1 sencilla": "1 king + 1 double + 1 single",
     "1 king + 1 sencilla": "1 king + 1 single bed",
     "1 Queen size": "1 Queen size bed",

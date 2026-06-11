@@ -650,10 +650,10 @@
     "id": "origen",
     "num": "04",
     "name": "Origen",
-    "sub": "Cama king más espacio para un tercero.",
-    "description": "29 m² con vista a la ciudad. Cama king para dos más cama sencilla — hasta 3 huéspedes. Cocina completa, baño privado y secador de pelo.",
+    "sub": "Cama doble más espacio para un tercero.",
+    "description": "29 m² con vista a la ciudad. Cama doble más cama sencilla — hasta 3 huéspedes. Cocina completa, baño privado y secador de pelo.",
     "capacity": 3,
-    "beds": "1 king + 1 sencilla",
+    "beds": "1 cama doble + 1 sencilla",
     "area": 29,
     "view": "Vista a la ciudad",
     "image": "assets/photos/tipo4/1.webp",
@@ -693,8 +693,8 @@
           "en": "Studio Origen · estar · Accommodation in Manizales"
         },
         "description": {
-          "es": "Apartaestudio Origen — alojamiento en Manizales con vista a la ciudad. 29 m², cama king + cama sencilla, hasta 3 huéspedes. Hotel boutique Estar en La Estrella.",
-          "en": "Studio Origen in Manizales. City view, king bed and single bed for up to 3 guests, equipped kitchen in 29 sqm. Estar boutique hotel in La Estrella."
+          "es": "Apartaestudio Origen — alojamiento en Manizales con vista a la ciudad. 29 m², cama doble + cama sencilla, hasta 3 huéspedes. Hotel boutique Estar en La Estrella.",
+          "en": "Studio Origen in Manizales. City view, double bed and single bed for up to 3 guests, equipped kitchen in 29 sqm. Estar boutique hotel in La Estrella."
         },
         "ogImage": "https://estar.com.co/assets/photos/origen.webp"
       },
@@ -716,21 +716,21 @@
           "en": "Origen."
         },
         "lead": {
-          "es": "Apartaestudio de 29 m² con vista a la ciudad, cama king y cama sencilla para hasta 3 huéspedes. Cocina completa y baño privado con secador de pelo.",
-          "en_inline": "29 sqm studio with city view, king bed and single bed for up to 3 guests. Full kitchen and private bathroom with hair dryer.",
-          "en": "29 sqm studio with city view, king bed and single bed for up to 3 guests. Full kitchen and private bathroom with hair dryer."
+          "es": "Apartaestudio de 29 m² con vista a la ciudad, cama doble y cama sencilla para hasta 3 huéspedes. Cocina completa y baño privado con secador de pelo.",
+          "en_inline": "29 sqm studio with city view, double bed and single bed for up to 3 guests. Full kitchen and private bathroom with hair dryer.",
+          "en": "29 sqm studio with city view, double bed and single bed for up to 3 guests. Full kitchen and private bathroom with hair dryer."
         }
       },
       "detail": {
         "h2": {
-          "es": "Apartaestudio con vista a la ciudad y cama king en La Estrella",
-          "en_inline": "Studio apartment with city view and king bed in La Estrella",
-          "en": "Studio apartment with city view and king bed in La Estrella"
+          "es": "Apartaestudio con vista a la ciudad para hasta 3 huéspedes en La Estrella",
+          "en_inline": "Studio apartment with city view for up to 3 guests in La Estrella",
+          "en": "Studio apartment with city view for up to 3 guests in La Estrella"
         },
         "body": {
-          "es": "Con 29 m² y vista a la ciudad, Origen ofrece cama king para dos más cama sencilla —la opción ideal para parejas que viajan con un acompañante—. Cocina equipada con estufa, microondas y cafetera, baño privado con ducha y secador de pelo.",
-          "en_inline": "At 29 sqm with city view, Origen offers a king bed for two plus a single bed — the ideal option for couples traveling with a companion. Equipped kitchen with stove, microwave and coffee maker, private bathroom with shower and hair dryer.",
-          "en": "At 29 sqm with city view, Origen offers a king bed for two plus a single bed — the ideal option for couples traveling with a companion. Equipped kitchen with stove, microwave and coffee maker, private bathroom with shower and hair dryer."
+          "es": "Con 29 m² y vista a la ciudad, Origen ofrece cama doble más cama sencilla —la opción ideal para parejas que viajan con un acompañante—. Cocina equipada con estufa, microondas y cafetera, baño privado con ducha y secador de pelo.",
+          "en_inline": "At 29 sqm with city view, Origen offers a double bed plus a single bed — the ideal option for couples traveling with a companion. Equipped kitchen with stove, microwave and coffee maker, private bathroom with shower and hair dryer.",
+          "en": "At 29 sqm with city view, Origen offers a double bed plus a single bed — the ideal option for couples traveling with a companion. Equipped kitchen with stove, microwave and coffee maker, private bathroom with shower and hair dryer."
         },
         "specs": {
           "capacity": {
@@ -739,9 +739,9 @@
             "en": "3 guests"
           },
           "bed": {
-            "es": "1 king + 1 sencilla",
-            "en_inline": "1 king + 1 single bed",
-            "en": "1 king + 1 single bed"
+            "es": "1 doble + 1 sencilla",
+            "en_inline": "1 double + 1 single",
+            "en": "1 double + 1 single"
           },
           "area": {
             "es": "29 m²",
