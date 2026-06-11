@@ -15,7 +15,7 @@ const FUNCTIONS_DIR = path.join(__dirname, '../../netlify/functions');
 const MODULES = [
   /* shared helpers */
   '_env', '_guest-app', '_quotes-store', '_otasync', '_email', '_rate-limit',
-  '_google-drive', '_pdf-render', '_contract-template',
+  '_google-drive', '_pdf-render', '_contract-template', '_direct-pricing',
   /* handlers */
   'booking-status', 'check-availability', 'create-booking',
   'create-mercadopago-preference', 'create-quote', 'create-wompi-signature',
