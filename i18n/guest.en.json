@@ -13,5 +13,17 @@
   "guestSlotEmpty": "Empty",
   "guestSlotOcrOk": "OCR ok",
   "guestSlotPendingSignature": "Pending signature",
-  "primaryGuestLabel": "Primary"
+  "primaryGuestLabel": "Primary",
+  "minorBadge": "Minor",
+  "minorDocsTitle": "Minor documentation",
+  "minorRcnLabel": "Birth certificate",
+  "minorRcnHelp": "We need it to validate parental authorization.",
+  "minorFatherLabel": "Father's name",
+  "minorMotherLabel": "Mother's name",
+  "minorParentDetected": "Parent detected from birth certificate.",
+  "minorParentNotPresentWarn": "No parent listed among adult guests in this check-in. You must upload a signed authorization letter from a parent.",
+  "minorAuthorizationLabel": "Authorization letter",
+  "minorAuthorizationHelp": "Document signed by a parent or legal guardian authorizing the minor's stay.",
+  "minorBlockingNotice": "Before confirming check-in, complete the required documents for minors.",
+  "escnnaReminder": "In compliance with Colombian Law 679 of 2001, we warn that child sexual exploitation and abuse are criminally and administratively punished."
 }
