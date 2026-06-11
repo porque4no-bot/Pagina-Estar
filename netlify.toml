@@ -6,9 +6,14 @@
 [functions]
   included_files = ["rooms_db.json"]
   node_bundler = "esbuild"
+  # Kept external (copied into the bundle instead of esbuild-bundled) because
+  # of dynamic requires. NOTE: externals and their dependency trees are copied
+  # into EVERY function zip — keep them small. The monolithic `googleapis`
+  # (~200 MB unpacked) lived here and blew the 250 MB per-function limit; it
+  # was replaced by the standalone @googleapis/drive (~2 MB).
   external_node_modules = [
     "@netlify/blobs",
-    "googleapis",
+    "@googleapis/drive",
     "pdfkit"
   ]
 
@@ -21,8 +26,13 @@
 [functions."reconcile-payments"]
   schedule = "*/30 * * * *"
 
+# Data-retention purge (Ley 1581): delete guest PII older than 5 years.
+# Runs daily at 03:30. See netlify/functions/purge-guest-data.js.
+[functions."purge-guest-data"]
+  schedule = "30 3 * * *"
+
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
   # The Firebase web apiKey is public by design (it ships in client-side HTML);
   # security is enforced by Firebase authorized domains + the server-side
   # ADMIN_EMAILS allowlist. Exclude it from secret scanning.

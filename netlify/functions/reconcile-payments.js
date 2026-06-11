@@ -13,6 +13,31 @@
 const { getStore } = require('@netlify/blobs');
 const { getQuoteStore, loadQuote, effectiveStatus } = require('./_quotes-store');
 const { sendEmail, adminEmail } = require('./_email');
+const { decodeDirectReference } = require('./_direct-pricing');
+
+function getBookingResultsStore() {
+  try {
+    return getStore({ name: 'booking-results', consistency: 'strong' });
+  } catch (e) {
+    return null;
+  }
+}
+
+/* A direct booking is reconciled when the webhook wrote its booking-results
+   entry (`direct-<bookingCode>`). Missing entry => the webhook never created
+   the reservation for a paid transaction. */
+async function directBookingReconciled(resultsStore, bookingCode) {
+  if (!resultsStore || !bookingCode) return false;
+  try {
+    const raw = await resultsStore.get(`direct-${bookingCode}`);
+    if (!raw) return false;
+    /* A pending entry (sold_out / failed insert) is NOT reconciled — it still
+       needs manual handling, so we want it reported. */
+    try { return !JSON.parse(raw).reservationPending; } catch (e) { return true; }
+  } catch (e) {
+    return false;
+  }
+}
 
 const WOMPI_API = process.env.WOMPI_SANDBOX === 'true'
   ? 'https://sandbox.wompi.co/v1'
@@ -125,38 +150,59 @@ exports.handler = async () => {
   const orphans = [];
   let quoteStore;
   try { quoteStore = getQuoteStore(); } catch (e) { quoteStore = null; }
+  const resultsStore = getBookingResultsStore();
 
   for (const tx of transactions) {
     const ref = String(tx.reference || '');
-    /* Only care about transactions we should have created reservations for.
-       Direct booking refs are base64url-encoded; quote refs follow COT-YYYY-XXXXX. */
-    const isQuote = /^COT-\d{4}-[A-Z0-9]{5}$/.test(ref);
-    if (!isQuote) continue;
-
     const processed = await isProcessed(txStore, tx.id);
     if (processed) continue;
 
-    let quoteState = null;
-    if (quoteStore) {
-      try {
-        const q = await loadQuote(quoteStore, ref);
-        if (q) {
-          /* If the quote already records this tx id and is aceptada, the webhook
-             succeeded but the processed-transactions blob lost the entry — treat
-             as already reconciled. */
-          if (q.transactionId === tx.id && effectiveStatus(q) === 'aceptada') continue;
-          quoteState = effectiveStatus(q);
-        }
-      } catch (e) { /* fall through to alert with limited info */ }
+    const isQuote = /^COT-\d{4}-[A-Z0-9]{5}$/.test(ref);
+
+    if (isQuote) {
+      /* ── Corporate quote path ── */
+      let quoteState = null;
+      if (quoteStore) {
+        try {
+          const q = await loadQuote(quoteStore, ref);
+          if (q) {
+            /* If the quote already records this tx id and is aceptada, the webhook
+               succeeded but the processed-transactions blob lost the entry — treat
+               as already reconciled. */
+            if (q.transactionId === tx.id && effectiveStatus(q) === 'aceptada') continue;
+            quoteState = effectiveStatus(q);
+          }
+        } catch (e) { /* fall through to alert with limited info */ }
+      }
+
+      orphans.push({
+        quoteId: ref,
+        transactionId: tx.id,
+        reference: ref,
+        amountCents: tx.amount_in_cents,
+        createdAt: tx.created_at,
+        reason: quoteState ? `quote status: ${quoteState}` : 'quote not found / store unavailable'
+      });
+      continue;
     }
 
+    /* ── Direct booking path (C-3) ── the main consumer flow. The Wompi
+       reference is base64url-encoded (1|...). If we can decode it and the
+       webhook never wrote its booking-results entry, the guest paid but has
+       no reservation: report it for manual recovery. */
+    const decoded = decodeDirectReference(ref);
+    if (!decoded || !decoded.bookingCode) continue; /* not a recognizable direct ref */
+
+    const reconciled = await directBookingReconciled(resultsStore, decoded.bookingCode);
+    if (reconciled) continue;
+
     orphans.push({
-      quoteId: ref,
+      quoteId: null,
       transactionId: tx.id,
-      reference: ref,
+      reference: decoded.bookingCode,
       amountCents: tx.amount_in_cents,
       createdAt: tx.created_at,
-      reason: quoteState ? `quote status: ${quoteState}` : 'quote not found / store unavailable'
+      reason: 'direct booking paid but no reservation in booking-results'
     });
   }
 

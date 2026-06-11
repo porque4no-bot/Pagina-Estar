@@ -16,13 +16,13 @@ const MODULES = [
   /* shared helpers */
   '_env', '_guest-app', '_quotes-store', '_otasync', '_email', '_rate-limit',
   '_google-drive', '_pdf-render', '_contract-template', '_quote-lock', '_direct-pricing',
-  '_payments', '_firebase-auth', '_quote-audit',
+  '_payments', '_firebase-auth', '_quote-audit', '_pricing', '_analytics',
   /* handlers */
   'booking-status', 'check-availability', 'create-booking',
   'create-mercadopago-preference', 'create-quote', 'create-wompi-signature',
   'drive-probe', 'get-booking', 'get-booking-rating', 'get-quote', 'get-reviews',
   'guest-action', 'guest-checkin', 'guest-drive', 'guest-session', 'guest-sync',
-  'list-quotes', 'mercadopago-webhook', 'otasync-webhook',
+  'list-quotes', 'mercadopago-webhook', 'otasync-webhook', 'purge-guest-data',
   'quote-availability', 'read-quote-audit', 'reconcile-payments',
   'request-quote', 'retry-quote-booking', 'revalidate-quotes',
   'send-confirmation', 'send-quote-email', 'update-quote',

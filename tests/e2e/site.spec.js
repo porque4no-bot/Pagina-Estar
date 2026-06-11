@@ -23,6 +23,44 @@ async function mockSharedDependencies(page) {
 
 test.beforeEach(async ({ page }) => {
   await mockSharedDependencies(page);
+  /* Seed a consent choice so the cookie banner doesn't overlay the UI in
+     unrelated tests. The dedicated banner test below removes this seed. */
+  await page.addInitScript(() => {
+    /* try/catch: init scripts also run inside third-party iframes where
+       localStorage access can be denied and would surface as a pageerror.
+       The dedicated banner test opts out via the sessionStorage flag. */
+    try {
+      if (sessionStorage.getItem('e2e-no-consent-seed')) return;
+      localStorage.setItem('estar-cookie-consent-v1', JSON.stringify({ choice: 'denied', at: Date.now() }));
+    } catch (e) {}
+  });
+});
+
+test('cookie consent banner appears on first visit and accept persists', async ({ page }) => {
+  /* Init scripts run in registration order: this one runs after the shared
+     seed. On the first navigation it wipes the seed (first-visit state) and
+     sets the opt-out flag (sessionStorage survives reload), so the reload
+     below keeps whatever choice the banner stored. */
+  await page.addInitScript(() => {
+    try {
+      if (!sessionStorage.getItem('e2e-no-consent-seed')) {
+        localStorage.removeItem('estar-cookie-consent-v1');
+        sessionStorage.setItem('e2e-no-consent-seed', '1');
+      }
+    } catch (e) {}
+  });
+  await page.goto('/index.html');
+
+  const banner = page.locator('.cookie-consent');
+  await expect(banner).toBeVisible();
+  await banner.getByRole('button', { name: /aceptar|accept/i }).click();
+  await expect(banner).toHaveCount(0);
+
+  /* The choice is persisted: on reload the banner must not come back. */
+  await page.reload();
+  await expect(page.locator('.cookie-consent')).toHaveCount(0);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('estar-cookie-consent-v1') || 'null'));
+  expect(stored && stored.choice).toBe('granted');
 });
 
 test('home page exposes the main booking and guest journeys', async ({ page }) => {

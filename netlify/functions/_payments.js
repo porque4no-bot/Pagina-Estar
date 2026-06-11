@@ -9,6 +9,7 @@ const {
 } = require('./_otasync');
 const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
 const { acquireQuoteLock, releaseQuoteLock } = require('./_quote-lock');
+const { trackPurchase } = require('./_analytics');
 
 const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
 const DIRECT_REF_RE = /^MPDIR-[A-Za-z0-9_-]+$/;
@@ -326,6 +327,11 @@ async function processQuotePayment(transaction, corsHeaders) {
     }
   } catch (e) { console.error('[payments] confirmation email failed:', e.message); }
 
+  /* A-6: server-side conversion for corporate quote payments. */
+  try {
+    await trackPurchase({ transactionId: String(bookingCode), value: paidAmount });
+  } catch (e) { /* analytics never blocks */ }
+
   return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, bookingCode }) };
 
   } finally {
@@ -352,6 +358,41 @@ async function processDirectPayment(transaction, corsHeaders) {
       headers: corsHeaders,
       body: JSON.stringify({ success: true, mock: true, bookingCode: decoded.bookingCode })
     };
+  }
+
+  /* Availability gate (C-2). Payment already captured, so if the room type is
+     sold out we must NOT overbook: persist a pending result, alert the admin
+     and let the reconciler/portal handle it manually. Mirrors the Wompi direct
+     path (wompi-webhook.js findAvailableRoomId === 0). */
+  if (decoded.checkin && decoded.checkout) {
+    try {
+      const { availByType, isMock } = await getAvailabilityByType(decoded.checkin, decoded.checkout);
+      if (!isMock && (availByType[String(decoded.roomTypeId)] || 0) <= 0) {
+        console.error(`[payments] direct booking PAID but SOLD OUT: roomType=${decoded.roomTypeId}, bookingCode=${decoded.bookingCode}, tx=${transaction.id}. Reservation NOT created.`);
+        try {
+          const { getStore } = require('@netlify/blobs');
+          const store = getStore({ name: 'booking-results', consistency: 'strong' });
+          await store.set(`direct-${decoded.bookingCode}`, JSON.stringify({
+            bookingCode: decoded.bookingCode, reservationPending: true, reason: 'sold_out',
+            provider: transaction.provider, transactionId: transaction.id, createdAt: new Date().toISOString()
+          }), { ttl: 86400 * 7 });
+        } catch (e) { /* non-fatal */ }
+        try {
+          await sendEmail({
+            to: adminEmail(),
+            subject: `Pago sin reserva directa (Agotada) - ${decoded.bookingCode}`,
+            html: `<p>Pago ${transaction.provider} aprobado para una reserva directa, pero la habitación ya no tiene disponibilidad. La reserva NO se creó.</p>
+                   <ul><li>Código: ${escapeHtml(decoded.bookingCode)}</li><li>Habitación: ${escapeHtml(String(decoded.roomTypeId))}</li>
+                   <li>Fechas: ${escapeHtml(decoded.checkin)} → ${escapeHtml(decoded.checkout)}</li>
+                   <li>Transacción: ${escapeHtml(transaction.id)}</li></ul>
+                   <p>Crear manualmente en OTASync o gestionar reembolso.</p>`
+          });
+        } catch (e) { console.error('[payments] sold-out alert failed:', e.message); }
+        return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, bookingCode: decoded.bookingCode, reservationPending: true }) };
+      }
+    } catch (e) {
+      console.error('[payments] direct availability check failed (continuing to book):', e.message);
+    }
   }
 
   const fs = require('fs');
@@ -502,6 +543,15 @@ async function processDirectPayment(transaction, corsHeaders) {
   } catch (e) {
     console.warn('[_payments] booking-results write failed (non-fatal):', e.message);
   }
+
+  /* A-6: server-side conversion (Measurement Protocol). */
+  try {
+    await trackPurchase({
+      transactionId: String(finalBookingCode),
+      value: paidAmount,
+      items: [{ item_id: String(decoded.roomTypeId), item_name: roomName, price: avgPrice, quantity: nights }]
+    });
+  } catch (e) { /* analytics never blocks */ }
 
   return {
     statusCode: 200,

@@ -1,5 +1,18 @@
 const { test, expect } = require('@playwright/test');
 
+/* The cookie consent banner (consent.js) overlays the bottom of the mobile
+   viewport and intercepts taps on the guest-app tabs. Seed a stored choice so
+   it never renders here; the banner has its own dedicated test in site.spec. */
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    /* try/catch: init scripts also run inside third-party iframes where
+       localStorage access can be denied and would surface as a pageerror. */
+    try {
+      localStorage.setItem('estar-cookie-consent-v1', JSON.stringify({ choice: 'denied', at: Date.now() }));
+    } catch (e) {}
+  });
+});
+
 const booking = {
   bookingCode: 'EST-TEST-100',
   status: 'confirmed',

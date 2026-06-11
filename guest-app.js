@@ -1533,7 +1533,7 @@
     }
     container.innerHTML = items.map(item => `
       <div class="guest-cart-item">
-        <div><strong>${item.name}</strong><small>${money(item.price)} c/u</small></div>
+        <div><strong>${escHtml(item.name)}</strong><small>${money(item.price)} c/u</small></div>
         <div class="guest-quantity">
           <button type="button" data-cart-change="${item.id}" data-delta="-1" aria-label="Quitar uno">−</button>
           <span>${item.quantity}</span>

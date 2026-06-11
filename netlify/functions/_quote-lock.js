@@ -6,9 +6,12 @@
  * sure only one of them runs the create-reservation path. Without it
  * both writers can race and we double-book in OTASync.
  *
- * Backed by Netlify Blobs `onlyIfNew` as a compare-and-set primitive,
- * with a TTL + staleness check so a crashed holder doesn't wedge the
- * quote forever.
+ * Backed by Netlify Blobs conditional writes (@netlify/blobs >= 10):
+ * `set(..., { onlyIfNew: true })` resolves with `{ modified: false }` when the
+ * key already exists — it does NOT throw. Netlify Blobs has no TTL, so expiry
+ * is age-based: a lock older than LOCK_STALE_MS is treated as abandoned and
+ * stolen with an etag-conditional write (onlyIfMatch) so two stealers can't
+ * both win.
  *
  * Exports:
  *   acquireQuoteLock(quoteId, transactionId, deps?)
@@ -23,10 +26,16 @@
 const { getStore } = require('@netlify/blobs');
 
 const LOCK_STALE_MS = 5 * 60 * 1000; // 5 minutes: a lock older than this is treated as abandoned
-const LOCK_TTL_S   = 360;            // 6 min blob TTL — auto-expiry safety net
 
 function defaultGetLockStore() {
   return getStore({ name: 'quote-locks', consistency: 'strong' });
+}
+
+/* Treat both contracts defensively: current @netlify/blobs returns
+   { modified: boolean }; if a future/polyfilled store throws on a failed
+   precondition instead, the caller maps the throw to "not acquired". */
+function wasWritten(writeResult) {
+  return !writeResult || writeResult.modified !== false;
 }
 
 async function acquireQuoteLock(quoteId, transactionId, deps = {}) {
@@ -43,32 +52,45 @@ async function acquireQuoteLock(quoteId, transactionId, deps = {}) {
     return { acquired: true, blobsUnavailable: true };
   }
 
-  try {
-    await lockStore.setJSON(quoteId, { transactionId, startedAt: Date.now() }, { onlyIfNew: true, ttl: LOCK_TTL_S });
-    return { acquired: true };
-  } catch (e) {
-    /* Lock already exists. Check staleness first; if stale, overwrite. */
-    let existing;
-    try { existing = await lockStore.get(quoteId, { type: 'json' }); }
-    catch (readErr) { existing = null; }
+  const lockValue = JSON.stringify({ transactionId, startedAt: Date.now() });
 
-    const isStale = !existing || (Date.now() - (existing.startedAt || 0)) > LOCK_STALE_MS;
-    if (isStale) {
-      try {
-        await lockStore.setJSON(quoteId, { transactionId, startedAt: Date.now() }, { ttl: LOCK_TTL_S });
+  let created;
+  try {
+    created = wasWritten(await lockStore.set(quoteId, lockValue, { onlyIfNew: true }));
+  } catch (e) {
+    created = false; /* precondition-throwing store: key already exists */
+  }
+  if (created) return { acquired: true };
+
+  /* Lock already exists. Read it (with etag) and check staleness; a stale
+     lock is stolen with an etag-conditional write so concurrent stealers
+     can't both succeed. */
+  let existing = null;
+  let etag = null;
+  try {
+    const current = await lockStore.getWithMetadata(quoteId, { type: 'json' });
+    if (current) { existing = current.data; etag = current.etag; }
+  } catch (readErr) { existing = null; }
+
+  const isStale = !existing || (Date.now() - (existing.startedAt || 0)) > LOCK_STALE_MS;
+  if (isStale) {
+    try {
+      const stealOpts = etag ? { onlyIfMatch: etag } : { onlyIfNew: true };
+      const stolen = wasWritten(await lockStore.set(quoteId, lockValue, stealOpts));
+      if (stolen) {
         logger.warn(`[quote-lock] overwrote stale lock for ${quoteId} (owner was ${existing && existing.transactionId})`);
         return { acquired: true };
-      } catch (overwriteErr) {
-        logger.error('[quote-lock] stale lock overwrite failed:', overwriteErr.message);
       }
+    } catch (overwriteErr) {
+      logger.error('[quote-lock] stale lock overwrite failed:', overwriteErr.message);
     }
-
-    return {
-      acquired: false,
-      ownerTx: existing && existing.transactionId,
-      startedAt: existing && existing.startedAt
-    };
   }
+
+  return {
+    acquired: false,
+    ownerTx: existing && existing.transactionId,
+    startedAt: existing && existing.startedAt
+  };
 }
 
 async function releaseQuoteLock(quoteId, deps = {}) {
@@ -85,6 +107,5 @@ async function releaseQuoteLock(quoteId, deps = {}) {
 module.exports = {
   acquireQuoteLock,
   releaseQuoteLock,
-  LOCK_STALE_MS,
-  LOCK_TTL_S
+  LOCK_STALE_MS
 };

@@ -5,6 +5,7 @@
    different path via _quotes-store.computeQuoteTotal. */
 
 const { getDynamicPricing } = require('./_otasync');
+const { EXTRAS_PRICES, EXTRAS_KEYS } = require('./_pricing');
 
 /* URL-safe base64 decode of the Wompi reservation reference. Mirrors the
    encoding in motor-app.jsx (PaymentPanel.handlePayment) and matches the
@@ -42,20 +43,8 @@ function decodeDirectReference(ref) {
   }
 }
 
-/* Front-end calcTotal (reservar.html) extras and rate math, mirrored here.
-   Keep these in sync with the values in reservar.html / motor-app.jsx. */
-const EXTRAS_PRICES = {
-  desayuno:    { price: 20000, multiplier: 'perGuestPerNight' },
-  parqueadero: { price: 25000, multiplier: 'perNight' },
-  late:        { price: 60000, multiplier: 'flat' },
-  early:       { price: 50000, multiplier: 'flat' },
-  /* Positions 4, 5 in the extras mask (traslado, tour) are reserved but
-     currently not surfaced in the UI; treated as flat per-booking if ever
-     re-enabled so the recompute does not break. */
-  traslado:    { price: 0,     multiplier: 'flat' },
-  tour:        { price: 0,     multiplier: 'flat' }
-};
-const EXTRAS_KEYS = ['desayuno', 'parqueadero', 'late', 'early', 'traslado', 'tour'];
+/* Extras prices and the mask order live in ./_pricing (single source of truth,
+   mirrored by reservar.html). */
 
 /* Accept up to 0.5% drift to absorb int rounding when the front-end derives
    the flexible rate via `Math.round(best / 0.9)`. */

@@ -97,9 +97,13 @@ async function getDriveClient() {
   if (cachedClient) return cachedClient;
   const credentials = await loadCredentials();
   if (!credentials) throw new Error('Google service account credentials are not configured');
-  const { google } = require('googleapis');
-  const auth = new google.auth.GoogleAuth({ credentials, scopes: SCOPES });
-  const drive = google.drive({ version: 'v3', auth });
+  /* @googleapis/drive is the standalone Drive client (~2 MB). The monolithic
+     `googleapis` package weighs ~200 MB unpacked and, being listed in
+     external_node_modules, was copied whole into EVERY function bundle —
+     which blew Netlify's 250 MB per-function limit. Same API surface. */
+  const driveLib = require('@googleapis/drive');
+  const auth = new driveLib.auth.GoogleAuth({ credentials, scopes: SCOPES });
+  const drive = driveLib.drive({ version: 'v3', auth });
   cachedClient = drive;
   return drive;
 }
