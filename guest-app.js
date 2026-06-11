@@ -1479,8 +1479,12 @@
     const signBtn = $('#signContract');
     const gateMsg = $('#contractGate');
     const hint = $('#contractHint');
+    /* The acknowledge checkbox is the manual "I have read" control, so it
+       must stay enabled at all times — it is one of the two ways to satisfy
+       the gate (the other being scrolling to the end). Only the downstream
+       sign controls are toggled by the gate state. */
     if (read) {
-      if (ackInput) { ackInput.disabled = false; ackInput.checked = true; }
+      if (ackInput) ackInput.checked = true;
       if (acceptedInput) acceptedInput.disabled = false;
       if (signBtn) signBtn.disabled = false;
       if (gateMsg) {
@@ -1490,7 +1494,7 @@
       }
       if (hint) hint.textContent = t('contractModalReadyHint');
     } else {
-      if (ackInput) ackInput.disabled = true;
+      if (ackInput) ackInput.checked = false;
       if (acceptedInput) { acceptedInput.disabled = true; acceptedInput.checked = false; }
       if (signBtn) signBtn.disabled = true;
       if (gateMsg) {
