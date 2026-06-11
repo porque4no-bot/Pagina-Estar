@@ -27,7 +27,7 @@
   schedule = "30 3 * * *"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
   # The Firebase web apiKey is public by design (it ships in client-side HTML);
   # security is enforced by Firebase authorized domains + the server-side
   # ADMIN_EMAILS allowlist. Exclude it from secret scanning.
