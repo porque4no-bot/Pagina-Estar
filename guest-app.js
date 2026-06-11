@@ -9,19 +9,39 @@
   const guestI18n = {
     es: /*__GUEST_I18N_ES_START__*/{
       "expirationDateOptionalHint": "(opcional, solo pasaportes)",
-      "nationalityPlaceholder": "Ej. Colombia"
+      "nationalityPlaceholder": "Ej. Colombia",
+      "cameraButton": "Tomar foto",
+      "cameraInstruction": "Encuadrá el documento dentro del marco",
+      "captureBtn": "Capturar",
+      "retakeBtn": "Reintentar",
+      "photoTooDark": "Foto muy oscura o con demasiada luz, probá de nuevo",
+      "photoBlurry": "Foto borrosa, probá de nuevo",
+      "cameraUnavailable": "No fue posible abrir la cámara. Podés subir una imagen.",
+      "photoReady": "Foto lista para analizar."
     }/*__GUEST_I18N_ES_END__*/,
     en: /*__GUEST_I18N_EN_START__*/{
       "expirationDateOptionalHint": "(optional, passports only)",
-      "nationalityPlaceholder": "E.g. Colombia"
+      "nationalityPlaceholder": "E.g. Colombia",
+      "cameraButton": "Take photo",
+      "cameraInstruction": "Frame the document inside the guide",
+      "captureBtn": "Capture",
+      "retakeBtn": "Retake",
+      "photoTooDark": "Photo too dark or too bright, try again",
+      "photoBlurry": "Photo is blurry, try again",
+      "cameraUnavailable": "We could not open the camera. You can upload an image.",
+      "photoReady": "Photo ready to analyze."
     }/*__GUEST_I18N_EN_END__*/
   };
+  const CAMERA_WIDTH = 1600;
+  const CAMERA_HEIGHT = 1006;
+  const CAMERA_QUALITY = 0.9;
   const SESSION_KEY = 'estar-guest-session';
   const state = {
     token: '',
     booking: null,
     document: null,
-    cart: {}
+    cart: {},
+    cameraStream: null
   };
 
   const $ = selector => document.querySelector(selector);
@@ -47,15 +67,19 @@
       : 'es';
   }
 
-  function applyGuestI18n() {
+  function t(key) {
     const dict = guestI18n[currentLang()] || guestI18n.es;
+    return dict[key] || guestI18n.es[key] || key;
+  }
+
+  function applyGuestI18n() {
     $$('[data-guest-i18n]').forEach(element => {
       const key = element.dataset.guestI18n;
-      if (dict[key]) element.textContent = dict[key];
+      element.textContent = t(key);
     });
     $$('[data-guest-i18n-placeholder]').forEach(element => {
       const key = element.dataset.guestI18nPlaceholder;
-      if (dict[key]) element.setAttribute('placeholder', dict[key]);
+      element.setAttribute('placeholder', t(key));
     });
   }
 
@@ -240,6 +264,116 @@
     });
   }
 
+  function dataUrlToImage(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error('No fue posible leer la imagen.'));
+      image.src = dataUrl;
+    });
+  }
+
+  function canvasToBlob(canvas) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => {
+        if (blob) resolve(blob);
+        else reject(new Error('No fue posible preparar la foto.'));
+      }, 'image/jpeg', CAMERA_QUALITY);
+    });
+  }
+
+  function drawCover(source, canvas) {
+    const context = canvas.getContext('2d');
+    const sourceWidth = source.videoWidth || source.naturalWidth || source.width;
+    const sourceHeight = source.videoHeight || source.naturalHeight || source.height;
+    const targetRatio = CAMERA_WIDTH / CAMERA_HEIGHT;
+    const sourceRatio = sourceWidth / sourceHeight;
+    let sx = 0;
+    let sy = 0;
+    let sw = sourceWidth;
+    let sh = sourceHeight;
+    if (sourceRatio > targetRatio) {
+      sw = sourceHeight * targetRatio;
+      sx = (sourceWidth - sw) / 2;
+    } else {
+      sh = sourceWidth / targetRatio;
+      sy = (sourceHeight - sh) / 2;
+    }
+    context.drawImage(source, sx, sy, sw, sh, 0, 0, CAMERA_WIDTH, CAMERA_HEIGHT);
+  }
+
+  function photoMetrics(canvas) {
+    const sample = document.createElement('canvas');
+    sample.width = 320;
+    sample.height = 201;
+    const sampleContext = sample.getContext('2d', { willReadFrequently: true });
+    sampleContext.drawImage(canvas, 0, 0, sample.width, sample.height);
+    const { data } = sampleContext.getImageData(0, 0, sample.width, sample.height);
+    const gray = new Float32Array(sample.width * sample.height);
+    let brightness = 0;
+    for (let i = 0, p = 0; i < data.length; i += 4, p += 1) {
+      const value = (data[i] * 0.299) + (data[i + 1] * 0.587) + (data[i + 2] * 0.114);
+      gray[p] = value;
+      brightness += value;
+    }
+    brightness /= gray.length;
+
+    let count = 0;
+    let mean = 0;
+    let m2 = 0;
+    for (let y = 1; y < sample.height - 1; y += 1) {
+      for (let x = 1; x < sample.width - 1; x += 1) {
+        const idx = (y * sample.width) + x;
+        const laplacian = (-4 * gray[idx]) + gray[idx - 1] + gray[idx + 1] + gray[idx - sample.width] + gray[idx + sample.width];
+        count += 1;
+        const delta = laplacian - mean;
+        mean += delta / count;
+        m2 += delta * (laplacian - mean);
+      }
+    }
+    return { brightness, laplacianVariance: count > 1 ? m2 / (count - 1) : 0 };
+  }
+
+  function validateCameraCanvas(canvas) {
+    const metrics = photoMetrics(canvas);
+    if (metrics.brightness < 30 || metrics.brightness > 220) {
+      throw Object.assign(new Error(t('photoTooDark')), { code: 'photo-too-dark' });
+    }
+    if (metrics.laplacianVariance < 100) {
+      throw Object.assign(new Error(t('photoBlurry')), { code: 'photo-blurry' });
+    }
+  }
+
+  async function documentFromCanvas(canvas) {
+    validateCameraCanvas(canvas);
+    const blob = await canvasToBlob(canvas);
+    const dataUrl = canvas.toDataURL('image/jpeg', CAMERA_QUALITY);
+    return {
+      name: `documento-${Date.now()}.jpg`,
+      type: 'image/jpeg',
+      size: blob.size,
+      dataUrl
+    };
+  }
+
+  async function imageFileToCameraDocument(file) {
+    const dataUrl = await fileToDataUrl(file);
+    const image = await dataUrlToImage(dataUrl);
+    const canvas = $('#cameraCanvas');
+    canvas.width = CAMERA_WIDTH;
+    canvas.height = CAMERA_HEIGHT;
+    drawCover(image, canvas);
+    return documentFromCanvas(canvas);
+  }
+
+  function setDocument(documentPayload, message) {
+    state.document = documentPayload;
+    $('#uploadTitle').textContent = documentPayload.name;
+    $('#uploadMeta').textContent = `${(documentPayload.size / 1024 / 1024).toFixed(2)} MB · listo para analizar`;
+    $('#analyzeDocument').disabled = false;
+    setStatus($('#ocrStatus'), message || 'Documento cargado.', 'success');
+  }
+
   async function handleDocumentSelection(event) {
     const file = event.target.files && event.target.files[0];
     state.document = null;
@@ -252,13 +386,107 @@
     }
     try {
       const dataUrl = await fileToDataUrl(file);
-      state.document = { name: file.name, type: file.type, size: file.size, dataUrl };
-      $('#uploadTitle').textContent = file.name;
-      $('#uploadMeta').textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB · listo para analizar`;
-      $('#analyzeDocument').disabled = false;
-      setStatus($('#ocrStatus'), 'Documento cargado.', 'success');
+      setDocument({ name: file.name, type: file.type, size: file.size, dataUrl });
     } catch (error) {
       setStatus($('#ocrStatus'), error.message, 'error');
+    }
+  }
+
+  async function handleNativeCameraSelection(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const documentPayload = await imageFileToCameraDocument(file);
+      setDocument(documentPayload, t('photoReady'));
+    } catch (error) {
+      setStatus($('#ocrStatus'), error.message, 'error');
+    }
+  }
+
+  function isCoarsePointer() {
+    return window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  }
+
+  function setCameraStatus(message, type) {
+    setStatus($('#cameraStatus'), message, type);
+    $('#retakePhoto').hidden = type !== 'error';
+  }
+
+  function stopCamera() {
+    if (state.cameraStream) {
+      state.cameraStream.getTracks().forEach(track => track.stop());
+      state.cameraStream = null;
+    }
+    const preview = $('#cameraPreview');
+    if (preview) preview.srcObject = null;
+  }
+
+  function closeCamera() {
+    stopCamera();
+    $('#cameraModal').hidden = true;
+    document.body.classList.remove('guest-camera-open');
+    setCameraStatus('', '');
+  }
+
+  async function requestCamera(facingMode) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error(t('cameraUnavailable'));
+    }
+    return navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: { ideal: facingMode },
+        width: { ideal: CAMERA_WIDTH },
+        height: { ideal: CAMERA_HEIGHT }
+      }
+    });
+  }
+
+  async function startCamera() {
+    let stream;
+    try {
+      stream = await requestCamera('environment');
+    } catch (error) {
+      stream = await requestCamera('user');
+    }
+    state.cameraStream = stream;
+    const preview = $('#cameraPreview');
+    preview.srcObject = stream;
+    await preview.play();
+  }
+
+  async function openCamera() {
+    setStatus($('#ocrStatus'), '', '');
+    $('#retakePhoto').hidden = true;
+    $('#cameraModal').hidden = false;
+    document.body.classList.add('guest-camera-open');
+    setCameraStatus('', '');
+    try {
+      await startCamera();
+    } catch (error) {
+      closeCamera();
+      if (isCoarsePointer()) {
+        $('#cameraFileCapture').click();
+      } else {
+        setStatus($('#ocrStatus'), t('cameraUnavailable'), 'error');
+      }
+    }
+  }
+
+  async function capturePhoto() {
+    const preview = $('#cameraPreview');
+    const canvas = $('#cameraCanvas');
+    if (!preview.videoWidth || !preview.videoHeight) return;
+    try {
+      canvas.width = CAMERA_WIDTH;
+      canvas.height = CAMERA_HEIGHT;
+      drawCover(preview, canvas);
+      const documentPayload = await documentFromCanvas(canvas);
+      setDocument(documentPayload, t('photoReady'));
+      closeCamera();
+    } catch (error) {
+      setCameraStatus(error.message, 'error');
     }
   }
 
@@ -585,6 +813,14 @@
       button.addEventListener('click', () => openTab(button.dataset.openTab));
     });
     $('#identityDocument').addEventListener('change', handleDocumentSelection);
+    $('#cameraFileCapture').addEventListener('change', handleNativeCameraSelection);
+    $('#openCamera').addEventListener('click', openCamera);
+    $('#closeCamera').addEventListener('click', closeCamera);
+    $('#capturePhoto').addEventListener('click', capturePhoto);
+    $('#retakePhoto').addEventListener('click', () => setCameraStatus('', ''));
+    $('#cameraModal').addEventListener('click', event => {
+      if (event.target.id === 'cameraModal') closeCamera();
+    });
     $('[name="documentType"]').addEventListener('change', updateExpirationRequirement);
     $('#analyzeDocument').addEventListener('click', analyzeDocument);
     $('#checkinForm').addEventListener('submit', submitCheckin);

@@ -1,4 +1,12 @@
 {
   "expirationDateOptionalHint": "(optional, passports only)",
-  "nationalityPlaceholder": "E.g. Colombia"
+  "nationalityPlaceholder": "E.g. Colombia",
+  "cameraButton": "Take photo",
+  "cameraInstruction": "Frame the document inside the guide",
+  "captureBtn": "Capture",
+  "retakeBtn": "Retake",
+  "photoTooDark": "Photo too dark or too bright, try again",
+  "photoBlurry": "Photo is blurry, try again",
+  "cameraUnavailable": "We could not open the camera. You can upload an image.",
+  "photoReady": "Photo ready to analyze."
 }

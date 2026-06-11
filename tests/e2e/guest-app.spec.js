@@ -169,6 +169,28 @@ test('guest completes document analysis, check-in and contract signature', async
   expect(contract.payload.acceptedTerms).toBe(true);
 });
 
+test('guest opens the camera modal with the document guide frame', async ({ page, context }) => {
+  await context.grantPermissions(['camera'], { origin: 'http://127.0.0.1:3401' });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: async () => new MediaStream()
+      }
+    });
+    HTMLMediaElement.prototype.play = () => Promise.resolve();
+  });
+  await mockGuestApis(page);
+  await login(page);
+  await page.locator('[data-guest-tab="checkin"]:visible').first().click();
+
+  await page.locator('#openCamera').click();
+  await expect(page.locator('#cameraModal')).toBeVisible();
+  await expect(page.locator('#cameraPreview')).toBeVisible();
+  await expect(page.locator('.guest-camera-frame rect')).toBeVisible();
+  await expect(page.locator('.guest-camera-instruction')).toContainText('Encuadrá');
+});
+
 test('guest orders an additional service and contacts concierge', async ({ page }) => {
   const captured = [];
   await mockGuestApis(page, captured);
