@@ -46,6 +46,8 @@ function sanitizeContractGuests(guests) {
       documentNumber: cleanText(guest && guest.documentNumber, 80),
       nationality: cleanText(guest && guest.nationality, 80),
       birthDate: cleanText(guest && guest.birthDate, 20),
+      email: cleanText(guest && guest.email, 254),
+      phone: cleanText(guest && guest.phone, 50),
       isPrimary: Boolean(entry && entry.isPrimary)
     };
   }).filter(guest => guest.firstName || guest.lastName || guest.documentNumber);
@@ -87,10 +89,14 @@ function buildEvent(type, body, session) {
     if (!signedName || body.acceptedTerms !== true) {
       throw Object.assign(new Error('Escribe tu nombre y acepta el contrato para firmar.'), { statusCode: 400 });
     }
+    const guests = sanitizeContractGuests(body.guests);
+    const primaryGuest = guests.find(guest => guest.isPrimary) || guests[0] || {};
     return {
       ...base,
       signedName,
-      guests: sanitizeContractGuests(body.guests),
+      phone: primaryGuest.phone || '',
+      email: primaryGuest.email || '',
+      guests,
       acceptedTerms: true,
       contractVersion: cleanText(body.contractVersion || 'ESTAR-HOSPEDAJE-2026-01', 80),
       signedAt: new Date().toISOString(),

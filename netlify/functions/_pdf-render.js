@@ -84,6 +84,20 @@ function contractGuests(record, fallback) {
   return normalized.length ? normalized : [fallback];
 }
 
+function primaryContractGuest(record) {
+  const guests = Array.isArray(record && record.guests) ? record.guests : [];
+  const entry = guests.find(item => item && item.isPrimary) || guests[0];
+  return entry && entry.guest ? entry.guest : (entry || {});
+}
+
+function contractCapacity(record) {
+  const capacity = pick(record, 'capacity');
+  if (capacity !== '') return capacity;
+  const guests = pick(record, 'guests');
+  if (Array.isArray(guests)) return guests.length || '';
+  return guests;
+}
+
 /* ── layout helpers ──────────────────────────────────────────────────────── */
 
 const MARGIN = 50;
@@ -170,14 +184,15 @@ function renderContractPDF(record = {}) {
   return new Promise((resolve, reject) => {
     const bookingCode     = pick(record, 'bookingCode') || 'SIN-RESERVA';
     const guestName       = pick(record, 'signedName', 'guestName') || 'Huésped';
+    const primaryGuest    = primaryContractGuest(record);
     const documentType    = pick(record, 'documentType') || 'Documento de identidad';
     const documentNumber  = pick(record, 'documentNumber', 'documentId');
-    const phone           = pick(record, 'phone');
-    const email           = pick(record, 'email');
+    const phone           = pick(record, 'phone') || pick(primaryGuest, 'phone');
+    const email           = pick(record, 'email') || pick(primaryGuest, 'email');
     const checkIn         = pick(record, 'checkIn', 'requestedCheckIn');
     const checkOut        = pick(record, 'checkOut', 'requestedCheckOut');
     const roomName        = pick(record, 'roomName', 'room');
-    const capacity        = pick(record, 'capacity', 'guests');
+    const capacity        = contractCapacity(record);
     const totalAmount     = pick(record, 'total', 'totalAmount', 'amount');
     const paymentProvider = pick(record, 'paymentProvider', 'paymentMethod');
     const transactionId   = pick(record, 'transactionId', 'paymentReference');

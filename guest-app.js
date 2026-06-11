@@ -860,8 +860,15 @@
     ];
     const missingRequired = requiredFields.some(field => !String(guest[field] || '').trim());
     const missingPassportExpiry = guest.documentType === 'Pasaporte' && !guest.expirationDate;
+    const expiredDocument = hasExpiredDocument(guest);
     const invalidEmail = guest.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email);
-    return missingRequired || missingPassportExpiry || invalidEmail || !guest.privacyAccepted;
+    return missingRequired || missingPassportExpiry || expiredDocument || invalidEmail || !guest.privacyAccepted;
+  }
+
+  function hasExpiredDocument(guest) {
+    if (!guest || !guest.expirationDate) return false;
+    const expiry = new Date(`${guest.expirationDate}T23:59:59`);
+    return !Number.isNaN(expiry.getTime()) && expiry < new Date();
   }
 
   async function submitCheckin(event) {
@@ -880,7 +887,11 @@
       selectGuestSlot(incompleteGuestIndex);
       updateExpirationRequirement();
       form.reportValidity();
-      setStatus($('#checkinStatus'), 'Completa los datos requeridos de cada huésped.', 'error');
+      const activeGuest = state.guestSlots[incompleteGuestIndex].guest;
+      const message = hasExpiredDocument(activeGuest)
+        ? 'El documento aparece vencido. Verifica la fecha de vencimiento.'
+        : 'Completa los datos requeridos de cada huésped.';
+      setStatus($('#checkinStatus'), message, 'error');
       return;
     }
     updateExpirationRequirement();
