@@ -16,6 +16,7 @@ const MODULES = [
   /* shared helpers */
   '_env', '_guest-app', '_quotes-store', '_otasync', '_email', '_rate-limit',
   '_google-drive', '_pdf-render', '_contract-template', '_direct-pricing',
+  '_payments', '_firebase-auth', '_quote-audit',
   /* handlers */
   'booking-status', 'check-availability', 'create-booking',
   'create-mercadopago-preference', 'create-quote', 'create-wompi-signature',

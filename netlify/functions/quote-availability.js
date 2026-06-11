@@ -1,6 +1,13 @@
+const crypto = require('crypto');
 const { getQuoteStore, loadQuote, effectiveStatus } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable } = require('./_otasync');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
+
+function timingSafeEqual(a, b) {
+  const ba = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  return ba.length === bb.length && ba.length > 0 && crypto.timingSafeEqual(ba, bb);
+}
 
 /* Public re-check of a stored quote's room availability, called right before
    the client opens the Wompi widget so we don't charge for unavailable rooms. */
@@ -33,7 +40,7 @@ exports.handler = async (event) => {
   }
   if (!quote) return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización no encontrada' }) };
 
-  if (quote.publicToken && token !== quote.publicToken) {
+  if (quote.publicToken && !timingSafeEqual(token, quote.publicToken)) {
     return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotizacion no encontrada' }) };
   }
 
