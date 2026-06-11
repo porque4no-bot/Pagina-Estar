@@ -14,11 +14,6 @@ const guestAction = guestActionModule.handler;
 
 const persisted = [];
 guestActionModule._test.setDeps({
-  requireGuest: event => {
-    const auth = (event.headers && event.headers.authorization) || '';
-    const match = auth.match(/^Bearer\s+(.+)$/i);
-    return guestHelpers.requireGuest({ headers: { authorization: auth } });
-  },
   protectRecord: record => record,
   guestStore: () => ({
     setJSON: async (key, value) => { persisted.push({ key, value }); }
