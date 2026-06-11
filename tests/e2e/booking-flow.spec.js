@@ -1,6 +1,15 @@
 const { test, expect } = require('@playwright/test');
 
 test.beforeEach(async ({ page }) => {
+  /* Seed a consent choice so the cookie banner doesn't overlay the booking UI
+     (it intercepts taps on mobile). The banner itself is tested in site.spec. */
+  await page.addInitScript(() => {
+    /* try/catch: init scripts also run inside third-party iframes where
+       localStorage access can be denied and would surface as a pageerror. */
+    try {
+      localStorage.setItem('estar-cookie-consent-v1', JSON.stringify({ choice: 'denied', at: Date.now() }));
+    } catch (e) {}
+  });
   await page.route('https://unpkg.com/lucide@*/**', route => route.fulfill({
     contentType: 'application/javascript',
     body: 'window.lucide={createIcons:function(){}};'

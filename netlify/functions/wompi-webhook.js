@@ -904,13 +904,18 @@ exports.handler = async (event, context) => {
      create two OTASync reservations. Key on the stay itself and refuse the
      second insert, alerting the admin to refund the duplicate charge. */
   const stayIdemKey = `booking_${decoded.roomTypeId}_${decoded.checkin}_${decoded.checkout}_${String(decoded.email || '').toLowerCase().trim()}`;
+  /* Netlify Blobs has no TTL: expiry is age-based. 7 days covers genuine
+     double-payment races without permanently blocking a guest who cancels
+     (with refund) and later legitimately re-books the same stay. */
+  const STAY_IDEM_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
   let stayIdemStore = null;
   try {
     stayIdemStore = getStore({ name: 'booking-idempotency', consistency: 'strong' });
     const existing = await stayIdemStore.get(stayIdemKey);
     if (existing) {
       const prev = JSON.parse(existing);
-      if (prev.transactionId && prev.transactionId !== transaction.id) {
+      const expired = !prev.createdAt || (Date.now() - prev.createdAt) > STAY_IDEM_MAX_AGE_MS;
+      if (!expired && prev.transactionId && prev.transactionId !== transaction.id) {
         console.error(`[wompi-webhook] DUPLICATE STAY paid: stay=${stayIdemKey} already booked by tx ${prev.transactionId}; second tx ${transaction.id}. Not creating a second reservation.`);
         try {
           await sendEmail({
@@ -1159,7 +1164,7 @@ exports.handler = async (event, context) => {
     // the same stay is detected and refused above.
     if (stayIdemStore) {
       try {
-        await stayIdemStore.set(stayIdemKey, JSON.stringify({ bookingCode: finalBookingCode, transactionId: transaction.id }), { ttl: 86400 * 7 });
+        await stayIdemStore.set(stayIdemKey, JSON.stringify({ bookingCode: finalBookingCode, transactionId: transaction.id, createdAt: Date.now() }));
       } catch (e) { /* non-fatal */ }
     }
 

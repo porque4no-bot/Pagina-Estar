@@ -16,7 +16,12 @@ module.exports = defineConfig({
     baseURL: 'http://127.0.0.1:3401',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure'
+    video: 'retain-on-failure',
+    /* Sandboxed environments that can't download Playwright's browsers can
+       point CHROMIUM_PATH at any Chromium binary (e.g. @sparticuz/chromium). */
+    ...(process.env.CHROMIUM_PATH
+      ? { launchOptions: { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox', '--disable-gpu'] } }
+      : {})
   },
   webServer: {
     command: 'node tests/helpers/static-server.js dist 3401',
