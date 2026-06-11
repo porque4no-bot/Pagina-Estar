@@ -1,8 +1,15 @@
 const crypto = require('crypto');
 const { corsHeaders, json, parseJsonBody } = require('./_guest-app');
 const driveSA = require('./_google-drive');
-const { renderContractPDF } = require('./_pdf-render');
+const _pdfRender = require('./_pdf-render');
 const { getSessionKey, otasyncCreds, hasOtasyncCreds } = require('./_otasync');
+
+const defaultDeps = { renderContractPDF: _pdfRender.renderContractPDF };
+const deps = { ...defaultDeps };
+exports._test = {
+  setDeps(overrides = {}) { Object.assign(deps, overrides); },
+  resetDeps() { Object.assign(deps, defaultDeps); }
+};
 
 function bearerToken(event) {
   const headers = event.headers || {};
@@ -73,6 +80,7 @@ function withGuestFolderHints(payload) {
 async function enrichContractRecord(record) {
   const bookingCode = String(record.bookingCode || '').trim();
   if (!bookingCode || !hasOtasyncCreds()) return record;
+  record = { ...record };
 
   try {
     const creds = otasyncCreds();
@@ -188,7 +196,7 @@ async function uploadViaServiceAccount(payload) {
       name: fileSubfolderForKind(kind)
     });
     const enrichedRecord = await enrichContractRecord(record);
-    const pdfBuffer = await renderContractPDF(enrichedRecord);
+    const pdfBuffer = await deps.renderContractPDF(enrichedRecord);
     const docName = sanitizeName(`contrato-${bookingCode}-${new Date().toISOString()}.pdf`);
     documentFile = await driveSA.uploadFile({
       folderId: subFolderId,

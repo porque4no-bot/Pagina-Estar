@@ -46,8 +46,15 @@ loadEnv();
    See _otasync.getSessionKey for the implementation. */
 const { getSessionKey: sharedGetSessionKey } = require('./_otasync');
 
-// In-memory simple processed transaction ID deduplicator (warm instances)
+// In-memory simple processed transaction ID deduplicator (warm instances).
+// Capped at 500 entries to prevent unbounded growth on long-lived containers.
 const processedTransactionIds = new Set();
+function addProcessedTransaction(id) {
+  if (processedTransactionIds.size >= 500) {
+    processedTransactionIds.delete(processedTransactionIds.values().next().value);
+  }
+  processedTransactionIds.add(id);
+}
 
 // Persistent deduplication store (survives cold starts)
 let txStore;
@@ -807,7 +814,7 @@ exports.handler = async (event, context) => {
   // Corporate quote payment: reference is a stored quote id (COT-...).
   if (QUOTE_ID_RE.test(transaction.reference || '')) {
     // Mark processed before doing work to avoid duplicate reservations on retries
-    processedTransactionIds.add(transaction.id);
+    addProcessedTransaction(transaction.id);
     if (txStore) {
       try { await txStore.set(String(transaction.id), '1', { ttl: 86400 }); } catch (e) { /* non-fatal */ }
     }
@@ -826,7 +833,7 @@ exports.handler = async (event, context) => {
   }
 
   // Mark as processed in both in-memory and persistent store
-  processedTransactionIds.add(transaction.id);
+  addProcessedTransaction(transaction.id);
   if (txStore) {
     try {
       await txStore.set(String(transaction.id), '1', { ttl: 86400 }); // 24h TTL

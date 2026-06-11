@@ -227,8 +227,27 @@ exports.handler = async (event, context) => {
     };
   }
 
+  // Guest count validation (mirrors check-availability)
+  const guestsCountInt = parseInt(guestsCount) || 1;
+  if (guestsCountInt < 1 || guestsCountInt > 10) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Guests must be between 1 and 10' })
+    };
+  }
+
   // Date order validation: checkin must be before checkout
-  if (new Date(checkin) >= new Date(checkout)) {
+  const checkinDate = new Date(checkin);
+  const checkoutDate = new Date(checkout);
+  if (Number.isNaN(checkinDate.getTime()) || Number.isNaN(checkoutDate.getTime())) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Invalid date format' })
+    };
+  }
+  if (checkinDate >= checkoutDate) {
     return {
       statusCode: 400,
       headers: corsHeaders,
