@@ -36,6 +36,28 @@ function sanitizeItems(items) {
   }).filter(Boolean);
 }
 
+function sanitizeContractGuests(guests) {
+  const sanitizedGuests = (Array.isArray(guests) ? guests : []).slice(0, 5).map(entry => {
+    const guest = entry && entry.guest ? entry.guest : entry;
+    return {
+      firstName: cleanText(guest && guest.firstName, 100),
+      lastName: cleanText(guest && guest.lastName, 100),
+      documentType: cleanText(guest && guest.documentType, 60),
+      documentNumber: cleanText(guest && guest.documentNumber, 80),
+      nationality: cleanText(guest && guest.nationality, 80),
+      birthDate: cleanText(guest && guest.birthDate, 20),
+      email: cleanText(guest && guest.email, 254),
+      phone: cleanText(guest && guest.phone, 50),
+      isPrimary: Boolean(entry && entry.isPrimary)
+    };
+  }).filter(guest => guest.firstName || guest.lastName || guest.documentNumber);
+  const primaryIndex = sanitizedGuests.findIndex(guest => guest.isPrimary);
+  return sanitizedGuests.map((guest, index) => ({
+    ...guest,
+    isPrimary: index === (primaryIndex >= 0 ? primaryIndex : 0)
+  }));
+}
+
 function buildEvent(type, body, session) {
   const eventId = `GST-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
   const base = {
@@ -67,9 +89,14 @@ function buildEvent(type, body, session) {
     if (!signedName || body.acceptedTerms !== true) {
       throw Object.assign(new Error('Escribe tu nombre y acepta el contrato para firmar.'), { statusCode: 400 });
     }
+    const guests = sanitizeContractGuests(body.guests);
+    const primaryGuest = guests.find(guest => guest.isPrimary) || guests[0] || {};
     return {
       ...base,
       signedName,
+      phone: primaryGuest.phone || '',
+      email: primaryGuest.email || '',
+      guests,
       acceptedTerms: true,
       contractVersion: cleanText(body.contractVersion || 'ESTAR-HOSPEDAJE-2026-01', 80),
       signedAt: new Date().toISOString(),

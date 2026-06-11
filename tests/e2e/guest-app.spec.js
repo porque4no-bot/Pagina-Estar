@@ -4,8 +4,10 @@ const booking = {
   bookingCode: 'EST-TEST-100',
   status: 'confirmed',
   guestName: 'Andrea Restrepo',
+  guestEmail: 'andrea@example.com',
   roomName: 'Apartaestudio Seleccion',
   roomNumber: '402',
+  capacity: 2,
   checkIn: '2026-08-10',
   checkOut: '2026-08-13',
   nights: 3,
@@ -43,6 +45,13 @@ async function mockGuestApis(page, captured = []) {
       ? {
           ok: true,
           source: 'azure',
+          slotIndex: payload.slotIndex ?? null,
+          documentRef: {
+            key: `EST-TEST-100/${payload.slotIndex ?? 0}-doc.json`,
+            name: payload.file && payload.file.name,
+            contentType: payload.file && payload.file.type,
+            size: payload.file && payload.file.size
+          },
           confidence: 97,
           extracted: {
             firstName: 'Andrea',
@@ -135,6 +144,7 @@ test('guest completes document analysis, check-in and contract signature', async
   await mockGuestApis(page, captured);
   await login(page);
   await page.locator('[data-guest-tab="checkin"]:visible').first().click();
+  await page.locator('#occupantCount').selectOption('1');
 
   await page.locator('#identityDocument').setInputFiles({
     name: 'pasaporte.png',
@@ -165,8 +175,12 @@ test('guest completes document analysis, check-in and contract signature', async
   const checkinRequests = captured.filter(item => item.endpoint === 'checkin');
   expect(checkinRequests).toHaveLength(2);
   expect(checkinRequests[1].authorization).toBe('Bearer test-guest-token');
+  expect(checkinRequests[1].payload.guests).toHaveLength(1);
+  expect(checkinRequests[1].payload.guests[0].guest.firstName).toBe('Andrea');
+  expect(checkinRequests[1].payload.guests[0].isPrimary).toBe(true);
   const contract = captured.find(item => item.endpoint === 'action' && item.payload.type === 'contract');
   expect(contract.payload.acceptedTerms).toBe(true);
+  expect(contract.payload.guests).toHaveLength(1);
 });
 
 test('guest opens the camera modal with the document guide frame', async ({ page, context }) => {
@@ -189,6 +203,59 @@ test('guest opens the camera modal with the document guide frame', async ({ page
   await expect(page.locator('#cameraPreview')).toBeVisible();
   await expect(page.locator('.guest-camera-frame rect')).toBeVisible();
   await expect(page.locator('.guest-camera-instruction')).toContainText('Encuadrá');
+});
+
+test('guest submits multiple occupants in the check-in payload', async ({ page }) => {
+  const captured = [];
+  await mockGuestApis(page, captured);
+  await login(page);
+  await page.locator('[data-guest-tab="checkin"]:visible').first().click();
+  await expect(page.locator('#occupantCount option[value="3"]')).toHaveJSProperty('disabled', true);
+  await page.locator('#occupantCount').selectOption('2');
+
+  await page.locator('#identityDocument').setInputFiles({
+    name: 'guest-1.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('89504e470d0a1a0a', 'hex')
+  });
+  await page.locator('#analyzeDocument').click();
+  await page.locator('[name="firstName"]').fill('Andrea');
+  await page.locator('[name="lastName"]').fill('Restrepo');
+  await page.locator('[name="documentType"]').selectOption('CC');
+  await page.locator('[name="documentNumber"]').fill('1001');
+  await page.locator('[name="birthDate"]').fill('1990-01-01');
+  await page.locator('[name="nationality"]').fill('Colombia');
+  await page.locator('[name="email"]').fill('andrea@example.com');
+  await page.locator('[name="phone"]').fill('+57 300 111 1111');
+  await page.locator('[name="privacyAccepted"]').check();
+
+  await page.locator('[data-select-guest="1"]').click();
+  await page.locator('#identityDocument').setInputFiles({
+    name: 'guest-2.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('89504e470d0a1a0a', 'hex')
+  });
+  await page.locator('#analyzeDocument').click();
+  await page.locator('[name="firstName"]').fill('Mateo');
+  await page.locator('[name="lastName"]').fill('Restrepo');
+  await page.locator('[name="documentType"]').selectOption('CC');
+  await page.locator('[name="documentNumber"]').fill('1002');
+  await page.locator('[name="birthDate"]').fill('1991-01-01');
+  await page.locator('[name="nationality"]').fill('Colombia');
+  await page.locator('[name="email"]').fill('mateo@example.com');
+  await page.locator('[name="phone"]').fill('+57 300 222 2222');
+  await page.locator('[name="privacyAccepted"]').check();
+
+  await page.locator('#checkinForm button[type="submit"]').click();
+  await expect(page.locator('#checkinStatus')).toContainText('CHK-TEST-100');
+
+  const submit = captured.find(item => item.endpoint === 'checkin' && item.payload.mode === 'submit');
+  expect(submit.payload.guests).toHaveLength(2);
+  expect(submit.payload.guests[0].guest.firstName).toBe('Andrea');
+  expect(submit.payload.guests[1].guest.firstName).toBe('Mateo');
+  expect(submit.payload.guests[0].file).toBeUndefined();
+  expect(submit.payload.guests[0].documentRef.key).toContain('0-doc');
+  expect(submit.payload.guests[0].isPrimary).toBe(true);
 });
 
 test('guest orders an additional service and contacts concierge', async ({ page }) => {

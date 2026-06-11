@@ -64,6 +64,40 @@ function pick(record, ...keys) {
   return '';
 }
 
+function normalizeGuestName(guest) {
+  return `${pick(guest, 'firstName')} ${pick(guest, 'lastName')}`.trim();
+}
+
+function contractGuests(record, fallback) {
+  const guests = Array.isArray(record.guests) ? record.guests : [];
+  const normalized = guests.map(entry => {
+    const guest = entry && entry.guest ? entry.guest : entry;
+    return {
+      name: normalizeGuestName(guest) || pick(guest, 'guestName', 'signedName') || '—',
+      documentType: pick(guest, 'documentType') || '—',
+      documentNumber: pick(guest, 'documentNumber', 'documentId') || '—',
+      nationality: pick(guest, 'nationality') || '—',
+      birthDate: pick(guest, 'birthDate') || '—',
+      isPrimary: Boolean(entry && entry.isPrimary)
+    };
+  }).filter(guest => guest.name !== '—' || guest.documentNumber !== '—');
+  return normalized.length ? normalized : [fallback];
+}
+
+function primaryContractGuest(record) {
+  const guests = Array.isArray(record && record.guests) ? record.guests : [];
+  const entry = guests.find(item => item && item.isPrimary) || guests[0];
+  return entry && entry.guest ? entry.guest : (entry || {});
+}
+
+function contractCapacity(record) {
+  const capacity = pick(record, 'capacity');
+  if (capacity !== '') return capacity;
+  const guests = pick(record, 'guests');
+  if (Array.isArray(guests)) return guests.length || '';
+  return guests;
+}
+
 /* ── layout helpers ──────────────────────────────────────────────────────── */
 
 const MARGIN = 50;
@@ -102,20 +136,63 @@ function clause(doc, num, title, body) {
   doc.y += 2;
 }
 
+function guestTable(doc, guests) {
+  const headers = ['#', 'Nombre', 'Documento', 'Nacionalidad', 'Nacimiento', 'Rol'];
+  const widths = [22, 124, 108, 78, 78, 68];
+  const rowH = 24;
+  const drawRow = (cells, y, header = false) => {
+    let x = MARGIN;
+    cells.forEach((cell, index) => {
+      doc.rect(x, y, widths[index], rowH)
+        .strokeColor(BORDER)
+        .lineWidth(0.5)
+        .stroke();
+      doc.font(header ? 'Helvetica-Bold' : 'Helvetica')
+        .fontSize(header ? 8 : 7.8)
+        .fillColor(header ? OLIVE : INK)
+        .text(str(cell), x + 4, y + 7, { width: widths[index] - 8, height: rowH - 8 });
+      x += widths[index];
+    });
+  };
+
+  let y = doc.y + 2;
+  drawRow(headers, y, true);
+  y += rowH;
+  guests.forEach((guest, index) => {
+    if (y + rowH > doc.page.height - MARGIN) {
+      doc.addPage();
+      y = MARGIN;
+      drawRow(headers, y, true);
+      y += rowH;
+    }
+    drawRow([
+      index + 1,
+      guest.name,
+      `${guest.documentType} ${guest.documentNumber}`.trim(),
+      guest.nationality,
+      formatDateOnly(guest.birthDate),
+      guest.isPrimary ? 'Principal' : 'Acompañante'
+    ], y);
+    y += rowH;
+  });
+  doc.y = y + 4;
+}
+
 /* ── main renderer ───────────────────────────────────────────────────────── */
 
 function renderContractPDF(record = {}) {
   return new Promise((resolve, reject) => {
     const bookingCode     = pick(record, 'bookingCode') || 'SIN-RESERVA';
     const guestName       = pick(record, 'signedName', 'guestName') || 'Huésped';
+    const primaryGuest    = primaryContractGuest(record);
     const documentType    = pick(record, 'documentType') || 'Documento de identidad';
     const documentNumber  = pick(record, 'documentNumber', 'documentId');
-    const phone           = pick(record, 'phone');
-    const email           = pick(record, 'email');
+    const phone           = pick(record, 'phone') || pick(primaryGuest, 'phone');
+    const email           = pick(record, 'email') || pick(primaryGuest, 'email');
     const checkIn         = pick(record, 'checkIn', 'requestedCheckIn');
     const checkOut        = pick(record, 'checkOut', 'requestedCheckOut');
     const roomName        = pick(record, 'roomName', 'room');
-    const capacity        = pick(record, 'capacity', 'guests');
+    const capacity        = contractCapacity(record);
     const totalAmount     = pick(record, 'total', 'totalAmount', 'amount');
     const paymentProvider = pick(record, 'paymentProvider', 'paymentMethod');
     const transactionId   = pick(record, 'transactionId', 'paymentReference');
@@ -124,6 +201,14 @@ function renderContractPDF(record = {}) {
     const consentText     = pick(record, 'consentText') ||
       'Firma electrónica simple aceptada desde la guest app de Hotel Estar.';
     const eventId         = pick(record, 'eventId');
+    const guests          = contractGuests(record, {
+      name: guestName,
+      documentType,
+      documentNumber: documentNumber || '—',
+      nationality: pick(record, 'nationality') || '—',
+      birthDate: pick(record, 'birthDate') || '—',
+      isPrimary: true
+    });
 
     const doc = new PDFDocument({
       size: 'A4',
@@ -176,12 +261,10 @@ function renderContractPDF(record = {}) {
     kvRow(doc, 'Apartaestudio', roomName);
     kvRow(doc, 'Capacidad de huéspedes', capacity);
 
-    /* ── DATOS DEL HUÉSPED ───────────────────────────────────────────────── */
-    sectionHeading(doc, 'Datos del huésped');
-    kvRow(doc, 'Nombre completo', guestName);
-    kvRow(doc, 'Tipo de documento', documentType);
-    kvRow(doc, 'Número de documento', documentNumber);
-    kvRow(doc, 'Teléfono', phone);
+    /* ── HUÉSPEDES ───────────────────────────────────────────────────────── */
+    sectionHeading(doc, 'Huéspedes registrados');
+    guestTable(doc, guests);
+    kvRow(doc, 'Teléfono de contacto', phone);
     kvRow(doc, 'Correo electrónico', email);
 
     /* ── INFORMACIÓN DE PAGO ─────────────────────────────────────────────── */

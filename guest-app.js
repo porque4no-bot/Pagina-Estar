@@ -17,7 +17,12 @@
       "photoTooDark": "Foto muy oscura o con demasiada luz, probá de nuevo",
       "photoBlurry": "Foto borrosa, probá de nuevo",
       "cameraUnavailable": "No fue posible abrir la cámara. Podés subir una imagen.",
-      "photoReady": "Foto lista para analizar."
+      "photoReady": "Foto lista para analizar.",
+      "occupantCountLabel": "¿Cuántas personas se hospedan?",
+      "guestSlotEmpty": "Vacía",
+      "guestSlotOcrOk": "OCR ok",
+      "guestSlotPendingSignature": "Pendiente firma",
+      "primaryGuestLabel": "Principal"
     }/*__GUEST_I18N_ES_END__*/,
     en: /*__GUEST_I18N_EN_START__*/{
       "expirationDateOptionalHint": "(optional, passports only)",
@@ -29,7 +34,12 @@
       "photoTooDark": "Photo too dark or too bright, try again",
       "photoBlurry": "Photo is blurry, try again",
       "cameraUnavailable": "We could not open the camera. You can upload an image.",
-      "photoReady": "Photo ready to analyze."
+      "photoReady": "Photo ready to analyze.",
+      "occupantCountLabel": "How many people are staying?",
+      "guestSlotEmpty": "Empty",
+      "guestSlotOcrOk": "OCR ok",
+      "guestSlotPendingSignature": "Pending signature",
+      "primaryGuestLabel": "Primary"
     }/*__GUEST_I18N_EN_END__*/
   };
   const CAMERA_WIDTH = 1600;
@@ -40,6 +50,8 @@
     token: '',
     booking: null,
     document: null,
+    guestSlots: [],
+    activeGuestIndex: 0,
     cart: {},
     cameraStream: null
   };
@@ -133,6 +145,8 @@
     state.token = '';
     state.booking = null;
     state.document = null;
+    state.guestSlots = [];
+    state.activeGuestIndex = 0;
     state.cart = {};
     sessionStorage.removeItem(SESSION_KEY);
   }
@@ -163,6 +177,7 @@
       guestName: 'Andrea Restrepo',
       roomName: 'Apartaestudio Selección',
       roomNumber: '402',
+      capacity: 2,
       checkIn: checkIn.toISOString().slice(0, 10),
       checkOut: checkOut.toISOString().slice(0, 10),
       nights: 4,
@@ -179,6 +194,179 @@
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return Math.ceil((target - today) / 86400000);
+  }
+
+  function emptyGuest() {
+    return {
+      firstName: '',
+      lastName: '',
+      documentType: '',
+      documentNumber: '',
+      birthDate: '',
+      expirationDate: '',
+      nationality: '',
+      arrivalTime: '',
+      email: '',
+      phone: '',
+      address: '',
+      notes: '',
+      privacyAccepted: false
+    };
+  }
+
+  function createGuestSlot(index) {
+    return {
+      guest: emptyGuest(),
+      document: null,
+      documentRef: null,
+      analysisSource: '',
+      confidence: 0,
+      isPrimary: index === 0,
+      status: 'empty'
+    };
+  }
+
+  function bookingCapacity() {
+    const capacity = Number(state.booking && state.booking.capacity);
+    return Math.min(5, Math.max(1, Number.isFinite(capacity) && capacity > 0 ? capacity : 1));
+  }
+
+  function updateOccupantCountOptions() {
+    const select = $('#occupantCount');
+    if (!select) return;
+    const max = bookingCapacity();
+    Array.from(select.options).forEach(option => {
+      option.disabled = Number(option.value) > max;
+    });
+  }
+
+  function splitBookingName() {
+    const parts = String((state.booking && state.booking.guestName) || '').trim().split(/\s+/).filter(Boolean);
+    return { firstName: parts.shift() || '', lastName: parts.join(' ') };
+  }
+
+  function activeSlot() {
+    return state.guestSlots[state.activeGuestIndex] || null;
+  }
+
+  function formFields() {
+    return [
+      'firstName', 'lastName', 'documentType', 'documentNumber', 'birthDate',
+      'expirationDate', 'nationality', 'arrivalTime', 'email', 'phone', 'address', 'notes'
+    ];
+  }
+
+  function saveActiveGuestFromForm() {
+    const slot = activeSlot();
+    if (!slot) return;
+    formFields().forEach(name => {
+      const field = $(`[name="${name}"]`);
+      if (field) slot.guest[name] = field.value || '';
+    });
+    const privacy = $('[name="privacyAccepted"]');
+    if (privacy) slot.guest.privacyAccepted = privacy.checked;
+    slot.status = slot.document
+      ? (slot.analysisSource === 'azure' ? 'ocr' : 'pending')
+      : 'empty';
+  }
+
+  function loadActiveGuestIntoForm() {
+    const slot = activeSlot();
+    if (!slot) return;
+    formFields().forEach(name => {
+      const field = $(`[name="${name}"]`);
+      if (field) field.value = slot.guest[name] || '';
+    });
+    const privacy = $('[name="privacyAccepted"]');
+    if (privacy) privacy.checked = Boolean(slot.guest.privacyAccepted);
+    state.document = slot.document;
+    if (slot.document) {
+      $('#uploadTitle').textContent = slot.document.name;
+      $('#uploadMeta').textContent = `${(slot.document.size / 1024 / 1024).toFixed(2)} MB · listo para analizar`;
+      $('#analyzeDocument').disabled = false;
+    } else {
+      $('#uploadTitle').textContent = 'Subir archivo';
+      $('#uploadMeta').textContent = 'JPG, PNG o PDF. Máximo 4.5 MB.';
+      $('#analyzeDocument').disabled = true;
+    }
+    setStatus($('#ocrStatus'), '', '');
+    updateExpirationRequirement();
+  }
+
+  function slotLabel(slot, index) {
+    const name = `${slot.guest.firstName || ''} ${slot.guest.lastName || ''}`.trim();
+    return name || `Huésped ${index + 1}`;
+  }
+
+  function slotStatusLabel(slot) {
+    if (slot.status === 'ocr') return t('guestSlotOcrOk');
+    if (slot.document) return t('guestSlotPendingSignature');
+    return t('guestSlotEmpty');
+  }
+
+  function renderGuestCards() {
+    const container = $('#guestCards');
+    if (!container) return;
+    container.innerHTML = state.guestSlots.map((slot, index) => `
+      <article class="guest-occupant-card${index === state.activeGuestIndex ? ' is-active' : ''}" data-guest-slot="${index}">
+        <button type="button" class="guest-occupant-main" data-select-guest="${index}">
+          <strong>${slotLabel(slot, index)}</strong>
+          <small>${slotStatusLabel(slot)}</small>
+        </button>
+        <label class="guest-primary-choice">
+          <input type="radio" name="primaryGuest" value="${index}" ${slot.isPrimary ? 'checked' : ''}>
+          <span>${t('primaryGuestLabel')}</span>
+        </label>
+      </article>
+    `).join('');
+    $$('[data-select-guest]').forEach(button => {
+      button.addEventListener('click', () => selectGuestSlot(Number(button.dataset.selectGuest)));
+    });
+    $$('[name="primaryGuest"]').forEach(input => {
+      input.addEventListener('change', event => setPrimaryGuest(Number(event.target.value)));
+    });
+  }
+
+  function selectGuestSlot(index) {
+    saveActiveGuestFromForm();
+    state.activeGuestIndex = Math.max(0, Math.min(index, state.guestSlots.length - 1));
+    loadActiveGuestIntoForm();
+    renderGuestCards();
+  }
+
+  function setPrimaryGuest(index) {
+    state.guestSlots.forEach((slot, slotIndex) => {
+      slot.isPrimary = slotIndex === index;
+    });
+    renderGuestCards();
+  }
+
+  function setGuestSlotCount(count) {
+    saveActiveGuestFromForm();
+    const nextCount = Math.min(bookingCapacity(), Math.max(1, Number(count) || 1));
+    while (state.guestSlots.length < nextCount) {
+      state.guestSlots.push(createGuestSlot(state.guestSlots.length));
+    }
+    state.guestSlots = state.guestSlots.slice(0, nextCount);
+    if (!state.guestSlots.some(slot => slot.isPrimary)) state.guestSlots[0].isPrimary = true;
+    state.activeGuestIndex = Math.min(state.activeGuestIndex, state.guestSlots.length - 1);
+    $('#occupantCount').value = String(nextCount);
+    loadActiveGuestIntoForm();
+    renderGuestCards();
+  }
+
+  function initializeGuestSlots() {
+    if (state.guestSlots.length) return;
+    const count = bookingCapacity();
+    updateOccupantCountOptions();
+    state.guestSlots = Array.from({ length: count }, (_, index) => createGuestSlot(index));
+    const bookingName = splitBookingName();
+    state.guestSlots[0].guest.firstName = bookingName.firstName;
+    state.guestSlots[0].guest.lastName = bookingName.lastName;
+    state.guestSlots[0].guest.email = (state.booking && state.booking.guestEmail) || '';
+    $('#occupantCount').value = String(count);
+    loadActiveGuestIntoForm();
+    renderGuestCards();
   }
 
   function renderBooking() {
@@ -235,6 +423,7 @@
     $('#guestLogout').hidden = false;
     document.body.classList.add('guest-is-authenticated');
     renderBooking();
+    initializeGuestSlots();
     if (window.lucide) window.lucide.createIcons();
   }
 
@@ -367,16 +556,31 @@
   }
 
   function setDocument(documentPayload, message) {
+    const slot = activeSlot();
     state.document = documentPayload;
+    if (slot) {
+      slot.document = documentPayload;
+      slot.documentRef = null;
+      slot.status = 'pending';
+    }
     $('#uploadTitle').textContent = documentPayload.name;
     $('#uploadMeta').textContent = `${(documentPayload.size / 1024 / 1024).toFixed(2)} MB · listo para analizar`;
     $('#analyzeDocument').disabled = false;
     setStatus($('#ocrStatus'), message || 'Documento cargado.', 'success');
+    renderGuestCards();
   }
 
   async function handleDocumentSelection(event) {
     const file = event.target.files && event.target.files[0];
+    const slot = activeSlot();
     state.document = null;
+    if (slot) {
+      slot.document = null;
+      slot.documentRef = null;
+      slot.status = 'empty';
+      slot.analysisSource = '';
+      slot.confidence = 0;
+    }
     $('#analyzeDocument').disabled = true;
     if (!file) return;
     if (file.size > 4.5 * 1024 * 1024) {
@@ -490,53 +694,72 @@
     }
   }
 
+  function normalizeDocumentTypeOption(value) {
+    const normalizeOption = input => String(input || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+    const documentAliases = {
+      cc: 'cc',
+      'cedula': 'cc',
+      'cedula ciudadania': 'cc',
+      'cedula de ciudadania': 'cc',
+      'cedula colombiana': 'cc',
+      'documento nacional': 'cc',
+      'id': 'cc',
+      'id card': 'cc',
+      'identity card': 'cc',
+      'national id': 'cc',
+      'national identity card': 'cc',
+      'iddocument nationalidentitycard': 'cc',
+      ce: 'ce',
+      'cedula extranjeria': 'ce',
+      'cedula de extranjeria': 'ce',
+      'residence permit': 'ce',
+      'iddocument residencepermit': 'ce',
+      passport: 'pasaporte',
+      'iddocument passport': 'pasaporte',
+      'driver license': 'licencia',
+      'drivers license': 'licencia',
+      'licencia de conduccion': 'licencia',
+      'iddocument driverlicense': 'licencia'
+    };
+    const normalized = normalizeOption(value);
+    const comparable = documentAliases[normalized] || normalized;
+    const field = $('[name="documentType"]');
+    const options = field ? Array.from(field.options) : [];
+    const option = options.find(item => {
+      const candidate = normalizeOption(item.value);
+      if (!candidate) return false;
+      return candidate === comparable ||
+        comparable.includes(candidate) ||
+        candidate.includes(comparable);
+    });
+    return option ? option.value : '';
+  }
+
+  function applyExtractedToGuest(guest, extracted) {
+    Object.entries(extracted || {}).forEach(([name, value]) => {
+      if (!value) return;
+      if (name === 'documentType') {
+        const normalized = normalizeDocumentTypeOption(value);
+        if (normalized) guest.documentType = normalized;
+      } else if (!guest[name]) {
+        guest[name] = value;
+      }
+    });
+  }
+
   function fillExtractedFields(extracted) {
     Object.entries(extracted || {}).forEach(([name, value]) => {
       if (!value) return;
       const field = $(`[name="${name}"]`);
       if (!field) return;
       if (field.tagName === 'SELECT') {
-        const normalizeOption = input => String(input || '')
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, ' ')
-          .trim();
-        const documentAliases = {
-          cc: 'cc',
-          'cedula': 'cc',
-          'cedula ciudadania': 'cc',
-          'cedula de ciudadania': 'cc',
-          'cedula colombiana': 'cc',
-          'documento nacional': 'cc',
-          'id': 'cc',
-          'id card': 'cc',
-          'identity card': 'cc',
-          'national id': 'cc',
-          'national identity card': 'cc',
-          'iddocument nationalidentitycard': 'cc',
-          ce: 'ce',
-          'cedula extranjeria': 'ce',
-          'cedula de extranjeria': 'ce',
-          'residence permit': 'ce',
-          'iddocument residencepermit': 'ce',
-          passport: 'pasaporte',
-          'iddocument passport': 'pasaporte',
-          'driver license': 'licencia',
-          'drivers license': 'licencia',
-          'licencia de conduccion': 'licencia',
-          'iddocument driverlicense': 'licencia'
-        };
-        const normalized = normalizeOption(value);
-        const comparable = documentAliases[normalized] || normalized;
-        const option = Array.from(field.options).find(item => {
-          const candidate = normalizeOption(item.value);
-          if (!candidate) return false;
-          return candidate === comparable ||
-            comparable.includes(candidate) ||
-            candidate.includes(comparable);
-        });
-        if (option) field.value = option.value;
+        const normalized = normalizeDocumentTypeOption(value);
+        if (normalized) field.value = normalized;
       } else if (!field.value) {
         field.value = value;
       }
@@ -554,6 +777,10 @@
   async function analyzeDocument() {
     if (!state.document) return;
     const button = $('#analyzeDocument');
+    const analysisGuestIndex = state.activeGuestIndex;
+    const analysisSlot = state.guestSlots[analysisGuestIndex];
+    const analysisDocument = analysisSlot && analysisSlot.document;
+    if (!analysisSlot || !analysisDocument) return;
     setButtonLoading(button, true, 'Leyendo');
     setStatus($('#ocrStatus'), 'Validando con reconocimiento de documento…', 'loading');
     try {
@@ -562,6 +789,7 @@
         await new Promise(resolve => setTimeout(resolve, 700));
         data = {
           source: 'manual',
+          documentRef: { key: `local-demo/${analysisGuestIndex}`, name: analysisDocument.name },
           extracted: {},
           confidence: 0,
           validation: { missing: [] }
@@ -569,10 +797,26 @@
       } else {
         data = await request(API.checkin, {
           method: 'POST',
-          body: JSON.stringify({ mode: 'analyze', file: state.document, guest: {} })
+          body: JSON.stringify({
+            mode: 'analyze',
+            file: analysisDocument,
+            guest: {},
+            slotIndex: analysisGuestIndex
+          })
         });
       }
-      fillExtractedFields(data.extracted);
+      const targetSlot = state.guestSlots[analysisGuestIndex];
+      if (targetSlot) {
+        applyExtractedToGuest(targetSlot.guest, data.extracted);
+        targetSlot.documentRef = data.documentRef || null;
+        targetSlot.analysisSource = data.source || '';
+        targetSlot.confidence = Number(data.confidence || 0);
+        targetSlot.status = data.source === 'azure' ? 'ocr' : 'pending';
+      }
+      if (state.activeGuestIndex === analysisGuestIndex) {
+        loadActiveGuestIntoForm();
+      }
+      renderGuestCards();
       const azureFailed = data.source === 'azure-error';
       const text = data.source === 'azure'
         ? `Documento leído con ${data.confidence || 0}% de confianza. Confirma los datos.`
@@ -607,12 +851,53 @@
     };
   }
 
+  function guestNeedsReview(slot) {
+    const guest = slot && slot.guest ? slot.guest : {};
+    const requiredFields = [
+      'firstName',
+      'lastName',
+      'documentType',
+      'documentNumber',
+      'birthDate',
+      'nationality',
+      'email',
+      'phone'
+    ];
+    const missingRequired = requiredFields.some(field => !String(guest[field] || '').trim());
+    const missingDocumentRef = slot && slot.document && !slot.documentRef;
+    const missingPassportExpiry = guest.documentType === 'Pasaporte' && !guest.expirationDate;
+    const expiredDocument = hasExpiredDocument(guest);
+    const invalidEmail = guest.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email);
+    return missingRequired || missingDocumentRef || missingPassportExpiry || expiredDocument || invalidEmail || !guest.privacyAccepted;
+  }
+
+  function hasExpiredDocument(guest) {
+    if (!guest || !guest.expirationDate) return false;
+    const expiry = new Date(`${guest.expirationDate}T23:59:59`);
+    return !Number.isNaN(expiry.getTime()) && expiry < new Date();
+  }
+
   async function submitCheckin(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const button = form.querySelector('button[type="submit"]');
-    if (!state.document) {
-      setStatus($('#checkinStatus'), 'Primero sube el documento de identidad.', 'error');
+    saveActiveGuestFromForm();
+    const missingDocumentIndex = state.guestSlots.findIndex(slot => !slot.document);
+    if (missingDocumentIndex >= 0) {
+      selectGuestSlot(missingDocumentIndex);
+      setStatus($('#checkinStatus'), 'Primero sube el documento de identidad de cada huésped.', 'error');
+      return;
+    }
+    const incompleteGuestIndex = state.guestSlots.findIndex(guestNeedsReview);
+    if (incompleteGuestIndex >= 0) {
+      selectGuestSlot(incompleteGuestIndex);
+      updateExpirationRequirement();
+      form.reportValidity();
+      const activeGuest = state.guestSlots[incompleteGuestIndex].guest;
+      const message = hasExpiredDocument(activeGuest)
+        ? 'El documento aparece vencido. Verifica la fecha de vencimiento.'
+        : 'Completa los datos requeridos de cada huésped.';
+      setStatus($('#checkinStatus'), message, 'error');
       return;
     }
     updateExpirationRequirement();
@@ -630,8 +915,14 @@
           method: 'POST',
           body: JSON.stringify({
             mode: 'submit',
-            file: state.document,
-            guest: guestPayloadFromForm(form)
+            guests: state.guestSlots.map(slot => ({
+              guest: { ...slot.guest },
+              file: slot.documentRef ? undefined : slot.document,
+              documentRef: slot.documentRef || undefined,
+              isPrimary: slot.isPrimary,
+              analysisSource: slot.analysisSource || 'manual',
+              confidence: slot.confidence || 0
+            }))
           })
         });
       }
@@ -675,10 +966,12 @@
     const button = $('#signContract');
     const signedName = $('#signedName').value.trim();
     const acceptedTerms = $('#contractAccepted').checked;
+    saveActiveGuestFromForm();
     const data = await submitAction({
       type: 'contract',
       signedName,
       acceptedTerms,
+      guests: state.guestSlots.map(slot => ({ guest: slot.guest, isPrimary: slot.isPrimary })),
       contractVersion: 'ESTAR-HOSPEDAJE-2026-01'
     }, $('#contractStatus'), button, 'Contrato firmado.');
     if (data) {
@@ -824,6 +1117,18 @@
     $('[name="documentType"]').addEventListener('change', updateExpirationRequirement);
     $('#analyzeDocument').addEventListener('click', analyzeDocument);
     $('#checkinForm').addEventListener('submit', submitCheckin);
+    formFields().forEach(name => {
+      const field = $(`[name="${name}"]`);
+      if (field) field.addEventListener('input', () => {
+        saveActiveGuestFromForm();
+        renderGuestCards();
+      });
+    });
+    $('[name="privacyAccepted"]').addEventListener('change', () => {
+      saveActiveGuestFromForm();
+      renderGuestCards();
+    });
+    $('#occupantCount').addEventListener('change', event => setGuestSlotCount(event.target.value));
     $('#signContract').addEventListener('click', signContract);
     $$('.guest-add-service').forEach(button => {
       button.addEventListener('click', () => addService(button.closest('.guest-service-card')));

@@ -175,6 +175,7 @@ function normalizeReservation(raw) {
     guestEmail: String(guest.email || guest.mail || raw.email || ''),
     roomName: room.room_type || room.name || 'Apartaestudio',
     roomNumber: room.room_number || room.name || '',
+    capacity: Number(raw.total_guests || raw.adults || 1) || 1,
     checkIn,
     checkOut,
     nights: calcNights(checkIn, checkOut),
@@ -198,6 +199,7 @@ function demoReservation(bookingCode, accessKey) {
     guestEmail: 'huesped@example.com',
     roomName: 'Apartaestudio Selección',
     roomNumber: '402',
+    capacity: 2,
     checkIn: iso(checkInDate),
     checkOut: iso(checkOutDate),
     nights: 4,
@@ -259,6 +261,7 @@ function signGuestToken(booking, ttlSeconds = 24 * 60 * 60) {
   const payload = {
     sub: booking.bookingCode,
     guest: booking.guestName,
+    capacity: booking.capacity,
     exp: Math.floor(Date.now() / 1000) + ttlSeconds
   };
   const encoded = base64url(JSON.stringify(payload));

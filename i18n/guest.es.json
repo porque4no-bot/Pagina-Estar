@@ -8,5 +8,10 @@
   "photoTooDark": "Foto muy oscura o con demasiada luz, probá de nuevo",
   "photoBlurry": "Foto borrosa, probá de nuevo",
   "cameraUnavailable": "No fue posible abrir la cámara. Podés subir una imagen.",
-  "photoReady": "Foto lista para analizar."
+  "photoReady": "Foto lista para analizar.",
+  "occupantCountLabel": "¿Cuántas personas se hospedan?",
+  "guestSlotEmpty": "Vacía",
+  "guestSlotOcrOk": "OCR ok",
+  "guestSlotPendingSignature": "Pendiente firma",
+  "primaryGuestLabel": "Principal"
 }
