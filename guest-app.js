@@ -6,6 +6,16 @@
     checkin: '/api/guest-checkin',
     action: '/api/guest-action'
   };
+  const guestI18n = {
+    es: /*__GUEST_I18N_ES_START__*/{
+      "expirationDateOptionalHint": "(opcional, solo pasaportes)",
+      "nationalityPlaceholder": "Ej. Colombia"
+    }/*__GUEST_I18N_ES_END__*/,
+    en: /*__GUEST_I18N_EN_START__*/{
+      "expirationDateOptionalHint": "(optional, passports only)",
+      "nationalityPlaceholder": "E.g. Colombia"
+    }/*__GUEST_I18N_EN_END__*/
+  };
   const SESSION_KEY = 'estar-guest-session';
   const state = {
     token: '',
@@ -30,6 +40,24 @@
       year: 'numeric'
     }).format(date);
   };
+
+  function currentLang() {
+    return document.documentElement.lang === 'en' || window.location.pathname.startsWith('/en/')
+      ? 'en'
+      : 'es';
+  }
+
+  function applyGuestI18n() {
+    const dict = guestI18n[currentLang()] || guestI18n.es;
+    $$('[data-guest-i18n]').forEach(element => {
+      const key = element.dataset.guestI18n;
+      if (dict[key]) element.textContent = dict[key];
+    });
+    $$('[data-guest-i18n-placeholder]').forEach(element => {
+      const key = element.dataset.guestI18nPlaceholder;
+      if (dict[key]) element.setAttribute('placeholder', dict[key]);
+    });
+  }
 
   function setStatus(element, message, type) {
     if (!element) return;
@@ -247,11 +275,29 @@
           .replace(/[^a-z0-9]+/g, ' ')
           .trim();
         const documentAliases = {
+          cc: 'cc',
+          'cedula': 'cc',
+          'cedula ciudadania': 'cc',
+          'cedula de ciudadania': 'cc',
+          'cedula colombiana': 'cc',
+          'documento nacional': 'cc',
+          'id': 'cc',
+          'id card': 'cc',
+          'identity card': 'cc',
+          'national id': 'cc',
+          'national identity card': 'cc',
+          'iddocument nationalidentitycard': 'cc',
+          ce: 'ce',
+          'cedula extranjeria': 'ce',
+          'cedula de extranjeria': 'ce',
+          'residence permit': 'ce',
+          'iddocument residencepermit': 'ce',
           passport: 'pasaporte',
-          id: 'documento nacional',
-          'id card': 'documento nacional',
-          'identity card': 'documento nacional',
-          'national id': 'documento nacional'
+          'iddocument passport': 'pasaporte',
+          'driver license': 'licencia',
+          'drivers license': 'licencia',
+          'licencia de conduccion': 'licencia',
+          'iddocument driverlicense': 'licencia'
         };
         const normalized = normalizeOption(value);
         const comparable = documentAliases[normalized] || normalized;
@@ -267,6 +313,14 @@
         field.value = value;
       }
     });
+    updateExpirationRequirement();
+  }
+
+  function updateExpirationRequirement() {
+    const documentType = $('[name="documentType"]');
+    const expirationDate = $('[name="expirationDate"]');
+    if (!documentType || !expirationDate) return;
+    expirationDate.required = documentType.value === 'Pasaporte';
   }
 
   async function analyzeDocument() {
@@ -333,6 +387,7 @@
       setStatus($('#checkinStatus'), 'Primero sube el documento de identidad.', 'error');
       return;
     }
+    updateExpirationRequirement();
     if (!form.reportValidity()) return;
 
     setButtonLoading(button, true, 'Completando check-in');
@@ -530,6 +585,7 @@
       button.addEventListener('click', () => openTab(button.dataset.openTab));
     });
     $('#identityDocument').addEventListener('change', handleDocumentSelection);
+    $('[name="documentType"]').addEventListener('change', updateExpirationRequirement);
     $('#analyzeDocument').addEventListener('click', analyzeDocument);
     $('#checkinForm').addEventListener('submit', submitCheckin);
     $('#signContract').addEventListener('click', signContract);
@@ -553,7 +609,9 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     bindEvents();
+    applyGuestI18n();
     renderCart();
+    updateExpirationRequirement();
     if (restoreSession()) {
       showApp();
     } else if (

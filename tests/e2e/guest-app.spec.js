@@ -145,6 +145,10 @@ test('guest completes document analysis, check-in and contract signature', async
   await page.locator('#analyzeDocument').click();
   await expect(page.locator('[name="documentNumber"]')).toHaveValue('PA123456');
   await expect(page.locator('[name="documentType"]')).toHaveValue('Pasaporte');
+  await expect(page.locator('[name="expirationDate"]')).toHaveJSProperty('required', true);
+  await page.locator('[name="documentType"]').selectOption('CC');
+  await expect(page.locator('[name="expirationDate"]')).toHaveJSProperty('required', false);
+  await page.locator('[name="documentType"]').selectOption('Pasaporte');
   await expect(page.locator('#ocrStatus')).toContainText('97%');
 
   await page.locator('[name="email"]').fill('andrea@example.com');

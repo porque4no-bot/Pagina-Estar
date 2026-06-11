@@ -195,16 +195,49 @@
                     <label class="guest-field"><span>Tipo de documento *</span>
                       <select name="documentType" required>
                         <option value="">Selecciona</option>
-                        <option value="Cédula de ciudadanía">Cédula de ciudadanía</option>
-                        <option value="Cédula de extranjería">Cédula de extranjería</option>
+                        <option value="CC">CC</option>
+                        <option value="CE">CE</option>
                         <option value="Pasaporte">Pasaporte</option>
-                        <option value="Documento nacional">Documento nacional</option>
+                        <option value="Licencia">Licencia</option>
+                        <option value="Otro">Otro</option>
                       </select>
                     </label>
                     <label class="guest-field"><span>Número de documento *</span><input name="documentNumber" autocomplete="off" required></label>
                     <label class="guest-field"><span>Fecha de nacimiento *</span><input name="birthDate" type="date" required></label>
-                    <label class="guest-field"><span>Vencimiento</span><input name="expirationDate" type="date"></label>
-                    <label class="guest-field"><span>Nacionalidad *</span><input name="nationality" autocomplete="country-name" required></label>
+                    <label class="guest-field"><span>Vencimiento <small data-guest-i18n="expirationDateOptionalHint">(opcional, solo pasaportes)</small></span><input name="expirationDate" type="date"></label>
+                    <label class="guest-field"><span>Nacionalidad *</span><input name="nationality" list="nationalityOptions" autocomplete="country-name" placeholder="Ej. Colombia" data-guest-i18n-placeholder="nationalityPlaceholder" required></label>
+                    <datalist id="nationalityOptions">
+                      <option value="Colombia"></option>
+                      <option value="Venezuela"></option>
+                      <option value="Ecuador"></option>
+                      <option value="Perú"></option>
+                      <option value="Chile"></option>
+                      <option value="Argentina"></option>
+                      <option value="Brasil"></option>
+                      <option value="México"></option>
+                      <option value="Estados Unidos"></option>
+                      <option value="Canadá"></option>
+                      <option value="España"></option>
+                      <option value="Francia"></option>
+                      <option value="Alemania"></option>
+                      <option value="Italia"></option>
+                      <option value="Reino Unido"></option>
+                      <option value="Países Bajos"></option>
+                      <option value="Suiza"></option>
+                      <option value="Portugal"></option>
+                      <option value="Uruguay"></option>
+                      <option value="Paraguay"></option>
+                      <option value="Bolivia"></option>
+                      <option value="Panamá"></option>
+                      <option value="Costa Rica"></option>
+                      <option value="República Dominicana"></option>
+                      <option value="Guatemala"></option>
+                      <option value="Honduras"></option>
+                      <option value="El Salvador"></option>
+                      <option value="Nicaragua"></option>
+                      <option value="Cuba"></option>
+                      <option value="China"></option>
+                    </datalist>
                     <label class="guest-field"><span>Hora aproximada de llegada</span><input name="arrivalTime" type="time"></label>
                     <label class="guest-field"><span>Correo *</span><input name="email" type="email" autocomplete="email" required></label>
                     <label class="guest-field"><span>WhatsApp *</span><input name="phone" type="tel" autocomplete="tel" required></label>

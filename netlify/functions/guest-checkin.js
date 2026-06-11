@@ -65,6 +65,53 @@ function pickField(fields, names) {
   return { value: '', confidence: 0 };
 }
 
+function documentTypeFromDocType(docType) {
+  const normalized = String(docType || '').trim();
+  const map = {
+    'idDocument.nationalIdentityCard': 'CC',
+    'idDocument.passport': 'Pasaporte',
+    'idDocument.driverLicense': 'Licencia',
+    'idDocument.residencePermit': 'CE'
+  };
+  return map[normalized] || '';
+}
+
+function machineReadableZoneText(field) {
+  if (!field) return '';
+  if (typeof field === 'string') return field;
+  const direct = field.valueString || field.content;
+  if (direct) return String(direct);
+  if (field.valueObject && typeof field.valueObject === 'object') {
+    return Object.values(field.valueObject)
+      .map(value => fieldValue(value))
+      .filter(Boolean)
+      .join('\n');
+  }
+  if (Array.isArray(field.valueArray)) {
+    return field.valueArray
+      .map(value => fieldValue(value))
+      .filter(Boolean)
+      .join('\n');
+  }
+  return '';
+}
+
+function firstNameFromMrz(mrzValue) {
+  const lines = String(mrzValue || '')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+  const passportLine = lines.find(line => /^P[A-Z<][A-Z0-9<]{3}/i.test(line) && line.includes('<<'));
+  if (!passportLine) return '';
+  const [, names = ''] = passportLine.match(/^P[A-Z<][A-Z0-9<]{3}([A-Z<]+)$/i) || [];
+  const [, givenNames = ''] = names.split('<<');
+  return givenNames
+    .split('<')
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+}
+
 function parseAzureResult(result) {
   const document = result &&
     result.analyzeResult &&
@@ -81,24 +128,29 @@ function parseAzureResult(result) {
   const nationality = pickField(fields, ['CountryRegion', 'Nationality']);
   const sex = pickField(fields, ['Sex', 'Gender']);
   const address = pickField(fields, ['Address']);
+  const inferredDocumentType = documentType.value || documentTypeFromDocType(document && document.docType);
+  const inferredNationality = nationality.value ||
+    (inferredDocumentType === 'CC' ? 'Colombia' : '');
+  const inferredFirstName = firstName.value ||
+    firstNameFromMrz(machineReadableZoneText(fields.MachineReadableZone));
   const values = [
-    firstName,
+    inferredFirstName ? { value: inferredFirstName, confidence: firstName.confidence } : firstName,
     lastName,
     documentNumber,
     birthDate,
     expirationDate,
-    nationality
+    inferredNationality ? { value: inferredNationality, confidence: nationality.confidence } : nationality
   ].filter(item => item.value);
 
   return {
     fields: {
-      firstName: firstName.value,
+      firstName: inferredFirstName,
       lastName: lastName.value,
       documentNumber: documentNumber.value,
-      documentType: documentType.value || (document ? document.docType : ''),
+      documentType: inferredDocumentType,
       birthDate: birthDate.value,
       expirationDate: expirationDate.value,
-      nationality: nationality.value,
+      nationality: inferredNationality,
       sex: sex.value,
       address: address.value
     },
@@ -107,6 +159,10 @@ function parseAzureResult(result) {
       : 0
   };
 }
+
+exports._test = {
+  parseAzureResult
+};
 
 async function analyzeWithAzure(file) {
   const endpoint = String(process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT || '').replace(/\/+$/, '');
