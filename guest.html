@@ -174,12 +174,16 @@
                 <fieldset class="guest-form-card">
                   <legend><span>1</span> Documento de identidad</legend>
                   <label class="guest-upload" for="identityDocument">
-                    <input id="identityDocument" type="file" accept="image/jpeg,image/png,application/pdf" capture="environment">
+                    <input id="identityDocument" type="file" accept="image/jpeg,image/png,application/pdf">
                     <span class="guest-upload-icon"><i data-lucide="scan-line"></i></span>
-                    <strong id="uploadTitle">Toma una foto o sube el documento</strong>
+                    <strong id="uploadTitle">Subir archivo</strong>
                     <small id="uploadMeta">JPG, PNG o PDF. Máximo 4.5 MB.</small>
                   </label>
+                  <input id="cameraFileCapture" type="file" accept="image/*" capture="environment" hidden>
                   <div class="guest-inline-actions">
+                    <button class="btn btn-ghost-dark" id="openCamera" type="button">
+                      <span data-guest-i18n="cameraButton">Tomar foto</span>
+                    </button>
                     <button class="btn btn-ghost-dark" id="analyzeDocument" type="button" disabled>
                       <i data-lucide="sparkles"></i> Leer documento
                     </button>
@@ -465,5 +469,31 @@
       </nav>
     </section>
   </main>
+
+  <div class="guest-camera-modal" id="cameraModal" role="dialog" aria-modal="true" aria-labelledby="cameraTitle" hidden>
+    <div class="guest-camera-dialog">
+      <header class="guest-camera-head">
+        <div>
+          <p class="eyebrow terracotta">OCR</p>
+          <h3 id="cameraTitle" data-guest-i18n="cameraButton">Tomar foto</h3>
+        </div>
+        <button class="guest-camera-close" id="closeCamera" type="button" aria-label="Cerrar cámara">×</button>
+      </header>
+      <div class="guest-camera-stage">
+        <video id="cameraPreview" autoplay muted playsinline></video>
+        <svg class="guest-camera-frame" viewBox="0 0 860 540" aria-hidden="true" focusable="false">
+          <rect x="43" y="30" width="774" height="486" rx="38"></rect>
+          <line class="guest-camera-scan" x1="82" x2="778" y1="270" y2="270"></line>
+        </svg>
+        <p class="guest-camera-instruction" data-guest-i18n="cameraInstruction">Encuadrá el documento dentro del marco</p>
+      </div>
+      <p class="guest-camera-status" id="cameraStatus" role="status"></p>
+      <canvas id="cameraCanvas" width="1600" height="1006" hidden></canvas>
+      <footer class="guest-camera-actions">
+        <button class="btn btn-primary" id="capturePhoto" type="button" data-guest-i18n="captureBtn">Capturar</button>
+        <button class="btn btn-ghost-dark" id="retakePhoto" type="button" data-guest-i18n="retakeBtn" hidden>Reintentar</button>
+      </footer>
+    </div>
+  </div>
 </body>
 </html>

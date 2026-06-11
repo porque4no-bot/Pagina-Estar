@@ -1,4 +1,12 @@
 {
   "expirationDateOptionalHint": "(opcional, solo pasaportes)",
-  "nationalityPlaceholder": "Ej. Colombia"
+  "nationalityPlaceholder": "Ej. Colombia",
+  "cameraButton": "Tomar foto",
+  "cameraInstruction": "Encuadrá el documento dentro del marco",
+  "captureBtn": "Capturar",
+  "retakeBtn": "Reintentar",
+  "photoTooDark": "Foto muy oscura o con demasiada luz, probá de nuevo",
+  "photoBlurry": "Foto borrosa, probá de nuevo",
+  "cameraUnavailable": "No fue posible abrir la cámara. Podés subir una imagen.",
+  "photoReady": "Foto lista para analizar."
 }
