@@ -75,50 +75,54 @@
       {
         "@type": "HotelRoom",
         "name": "Clásica",
-        "description": "Cama queen, escritorio frente a la ventana, cocina equipada con menaje completo y baño privado con ducha. La esencia de estar, en 28 m².",
+        "description": "Cama doble, cocina equipada con menaje completo y baño privado con ducha. La esencia de estar, en 29 m².",
         "url": "https://estar.com.co/clasica",
         "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
-        "bed": [{"@type": "BedDetails", "typeOfBed": "Queen size", "numberOfBeds": 1}],
-        "floorSize": {"@type": "QuantitativeValue", "value": 28, "unitCode": "MTK"}
+        "bed": [{"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 29, "unitCode": "MTK"}
       },
       {
         "@type": "HotelRoom",
         "name": "Selección",
-        "description": "Balcón privado con vistas a la cordillera. Ideal para el café de las mañanas. La luz natural cambia toda la sensación del espacio.",
+        "description": "Apartaestudio con vista a la ciudad y tres camas — king, doble y sencilla — para hasta 5 huéspedes.",
         "url": "https://estar.com.co/seleccion",
-        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
-        "bed": [{"@type": "BedDetails", "typeOfBed": "Queen size", "numberOfBeds": 1}],
-        "floorSize": {"@type": "QuantitativeValue", "value": 32, "unitCode": "MTK"}
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 5},
+        "bed": [
+          {"@type": "BedDetails", "typeOfBed": "King size", "numberOfBeds": 1},
+          {"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1},
+          {"@type": "BedDetails", "typeOfBed": "Single", "numberOfBeds": 1}
+        ],
+        "floorSize": {"@type": "QuantitativeValue", "value": 36, "unitCode": "MTK"}
       },
       {
         "@type": "HotelRoom",
         "name": "Reserva",
-        "description": "Dormitorio privado separado de la zona social. Escritorio ergonómico. 42 m². Cuenta con ambientes definidos, cocina y Smart TV.",
+        "description": "Apartaestudio íntimo con vista a la ciudad. Cama doble, cocina equipada y baño privado en 24 m² bien resueltos.",
         "url": "https://estar.com.co/reserva",
         "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
-        "bed": [{"@type": "BedDetails", "typeOfBed": "King size", "numberOfBeds": 1}],
-        "floorSize": {"@type": "QuantitativeValue", "value": 42, "unitCode": "MTK"}
+        "bed": [{"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 24, "unitCode": "MTK"}
       },
       {
         "@type": "HotelRoom",
         "name": "Origen",
-        "description": "El más espacioso. Diseño con referencia cafetera. Vista panorámica de Manizales para relajarse tras un día de trabajo.",
+        "description": "Apartaestudio con vista a la ciudad. Cama doble más cama sencilla para hasta 3 huéspedes, cocina completa y baño privado.",
         "url": "https://estar.com.co/origen",
-        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
-        "bed": [{"@type": "BedDetails", "typeOfBed": "King size", "numberOfBeds": 1}],
-        "floorSize": {"@type": "QuantitativeValue", "value": 52, "unitCode": "MTK"}
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 3},
+        "bed": [
+          {"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1},
+          {"@type": "BedDetails", "typeOfBed": "Single", "numberOfBeds": 1}
+        ],
+        "floorSize": {"@type": "QuantitativeValue", "value": 29, "unitCode": "MTK"}
       },
       {
         "@type": "HotelRoom",
         "name": "Especial",
-        "description": "Nuestra tipología más completa. Terraza privada, cama king + sofá cama. Ideal para viajes familiares o de negocios.",
+        "description": "Apartaestudio con vista a la ciudad. Cama doble, cocina equipada y baño privado en 27 m².",
         "url": "https://estar.com.co/especial",
-        "occupancy": {"@type": "QuantitativeValue", "maxValue": 4},
-        "bed": [
-          {"@type": "BedDetails", "typeOfBed": "King size", "numberOfBeds": 1},
-          {"@type": "BedDetails", "typeOfBed": "Sofa bed", "numberOfBeds": 1}
-        ],
-        "floorSize": {"@type": "QuantitativeValue", "value": 60, "unitCode": "MTK"}
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
+        "bed": [{"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 27, "unitCode": "MTK"}
       }
     ],
     "aggregateRating": {
@@ -450,6 +454,7 @@
       <div class="room-list" id="room-list">
 
       <!-- Room 1: Clásica -->
+      <!-- KEEP IN SYNC WITH rooms_db.json (room id 31348) -->
       <article class="room has-star-cursor" data-reveal>
         <div class="room-media slider-active">
           <div class="badge">01 / Clásica</div>
@@ -476,12 +481,12 @@
           <p class="eyebrow"><span class="lang-es" lang="es">Para una o dos personas</span><span class="lang-en" lang="en">For one or two people</span></p>
           <h3>Clásica</h3>
           <p class="sub"><span class="lang-es" lang="es">Compacto, cálido, todo a la mano.</span><span class="lang-en" lang="en">Compact, warm, everything within reach.</span></p>
-          <p class="body"><span class="lang-es" lang="es">Cama queen, escritorio frente a la ventana, cocina equipada con menaje completo y baño privado con ducha. La esencia de estar, en 28 m².</span><span class="lang-en" lang="en">Queen bed, desk facing the window, fully equipped kitchen and private shower bathroom. The essence of estar, in 28 m².</span></p>
+          <p class="body"><span class="lang-es" lang="es">Cama doble, escritorio frente a la ventana, cocina equipada con menaje completo y baño privado con ducha. La esencia de estar, en 29 m².</span><span class="lang-en" lang="en">Double bed, desk facing the window, fully equipped kitchen and private shower bathroom. The essence of estar, in 29 sqm.</span></p>
           <div class="room-specs">
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Capacidad</span><span class="lang-en" lang="en">Capacity</span></span><span class="v"><span class="lang-es" lang="es">2 personas</span><span class="lang-en" lang="en">2 guests</span></span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Cama</span><span class="lang-en" lang="en">Bed</span></span><span class="v">1 queen</span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">28 m²</span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Ciudad</span><span class="lang-en" lang="en">City</span></span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Cama</span><span class="lang-en" lang="en">Bed</span></span><span class="v"><span class="lang-es" lang="es">1 doble</span><span class="lang-en" lang="en">1 double</span></span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">29 m²</span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Interior</span><span class="lang-en" lang="en">Interior</span></span></div>
           </div>
           <div class="room-price">
             <span class="from"><span class="lang-es" lang="es">Precio hoy</span><span class="lang-en" lang="en">Tonight</span></span>
@@ -495,6 +500,7 @@
       </article>
 
       <!-- Room 2: Selección -->
+      <!-- KEEP IN SYNC WITH rooms_db.json (room id 31349) -->
       <article class="room has-star-cursor" data-reveal>
         <div class="room-media slider-active" style="background: var(--terracotta-300);">
           <div class="badge">02 / Selección</div>
@@ -520,15 +526,15 @@
           </div>
         </div>
         <div class="room-info">
-          <p class="eyebrow"><span class="lang-es" lang="es">Para dos personas</span><span class="lang-en" lang="en">For two people</span></p>
+          <p class="eyebrow"><span class="lang-es" lang="es">Para grupos pequeños o familias</span><span class="lang-en" lang="en">For small groups or families</span></p>
           <h3>Selección</h3>
-          <p class="sub"><span class="lang-es" lang="es">Un poco de afuera, adentro.</span><span class="lang-en" lang="en">A little outdoors, indoors.</span></p>
-          <p class="body"><span class="lang-es" lang="es">Mismo plano del Clásica, ahora con balcón privado para tu café de la mañana. La luz natural cambia toda la sensación del espacio.</span><span class="lang-en" lang="en">Same floor plan as the Clásica, now with a private balcony for your morning coffee. Natural light transforms the whole feel of the space.</span></p>
+          <p class="sub"><span class="lang-es" lang="es">El más versátil, hasta 5 huéspedes.</span><span class="lang-en" lang="en">The most versatile, up to 5 guests.</span></p>
+          <p class="body"><span class="lang-es" lang="es">36 m² con vista a la ciudad. Tres camas — king, doble y sencilla — para alojar hasta 5 huéspedes con comodidad.</span><span class="lang-en" lang="en">36 sqm with city view. Three beds — king, double and single — to comfortably accommodate up to 5 guests.</span></p>
           <div class="room-specs">
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Capacidad</span><span class="lang-en" lang="en">Capacity</span></span><span class="v"><span class="lang-es" lang="es">2 personas</span><span class="lang-en" lang="en">2 guests</span></span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Cama</span><span class="lang-en" lang="en">Bed</span></span><span class="v">1 queen</span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">32 m²</span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Cordillera</span><span class="lang-en" lang="en">Mountain</span></span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Capacidad</span><span class="lang-en" lang="en">Capacity</span></span><span class="v"><span class="lang-es" lang="es">5 personas</span><span class="lang-en" lang="en">5 guests</span></span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Cama</span><span class="lang-en" lang="en">Bed</span></span><span class="v"><span class="lang-es" lang="es">1 king + 1 doble + 1 sencilla</span><span class="lang-en" lang="en">1 king + 1 double + 1 single</span></span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">36 m²</span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Ciudad</span><span class="lang-en" lang="en">City</span></span></div>
           </div>
           <div class="room-price">
             <span class="from"><span class="lang-es" lang="es">Precio hoy</span><span class="lang-en" lang="en">Tonight</span></span>
@@ -542,6 +548,7 @@
       </article>
 
       <!-- Room 3: Reserva -->
+      <!-- KEEP IN SYNC WITH rooms_db.json (room id 31350) -->
       <article class="room has-star-cursor" data-reveal>
         <div class="room-media slider-active" style="background: var(--olive);">
           <div class="badge">03 / Reserva</div>
@@ -571,8 +578,8 @@
           <p class="body"><span class="lang-es" lang="es">Espacios definidos: dormitorio, sala con sofá y zona de trabajo. Smart TV de 55", cocina abierta y un baño más amplio con ventana al exterior.</span><span class="lang-en" lang="en">Defined spaces: bedroom, living room with sofa and work area. 55" Smart TV, open kitchen and a larger bathroom with exterior window.</span></p>
           <div class="room-specs">
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Capacidad</span><span class="lang-en" lang="en">Capacity</span></span><span class="v"><span class="lang-es" lang="es">2 personas</span><span class="lang-en" lang="en">2 guests</span></span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Cama</span><span class="lang-en" lang="en">Bed</span></span><span class="v">1 king</span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">42 m²</span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Cama</span><span class="lang-en" lang="en">Bed</span></span><span class="v"><span class="lang-es" lang="es">1 doble</span><span class="lang-en" lang="en">1 double</span></span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">24 m²</span></div>
             <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Ciudad</span><span class="lang-en" lang="en">City</span></span></div>
           </div>
           <div class="room-price">
@@ -587,6 +594,7 @@
       </article>
 
       <!-- Room 4: Origen -->
+      <!-- KEEP IN SYNC WITH rooms_db.json (room id 31351) -->
       <article class="room has-star-cursor" data-reveal>
         <div class="room-media slider-active" style="background: var(--sand);">
           <div class="badge">04 / Origen</div>
@@ -614,15 +622,15 @@
           </div>
         </div>
         <div class="room-info">
-          <p class="eyebrow"><span class="lang-es" lang="es">Para parejas</span><span class="lang-en" lang="en">For couples</span></p>
+          <p class="eyebrow"><span class="lang-es" lang="es">Para parejas o tres huéspedes</span><span class="lang-en" lang="en">For couples or up to three guests</span></p>
           <h3>Origen</h3>
-          <p class="sub"><span class="lang-es" lang="es">Nuestra habitación más pedida.</span><span class="lang-en" lang="en">Our most-requested room.</span></p>
-          <p class="body"><span class="lang-es" lang="es">El apartaestudio Origen con balcón al frente — el lugar donde la mayoría de huéspedes pasa la tarde leyendo o trabajando con el rumor de la ciudad de fondo.</span><span class="lang-en" lang="en">The Origen studio with a front balcony — where most guests spend their afternoons reading or working with the hum of the city in the background.</span></p>
+          <p class="sub"><span class="lang-es" lang="es">Espacio para un acompañante extra.</span><span class="lang-en" lang="en">Room for an extra companion.</span></p>
+          <p class="body"><span class="lang-es" lang="es">Cama doble más cama sencilla, con vista a la ciudad. La opción ideal para parejas que viajan con un acompañante o pequeños grupos.</span><span class="lang-en" lang="en">Double bed plus a single bed, with city view. The ideal option for couples traveling with a companion or small groups.</span></p>
           <div class="room-specs">
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Capacidad</span><span class="lang-en" lang="en">Capacity</span></span><span class="v"><span class="lang-es" lang="es">2 personas</span><span class="lang-en" lang="en">2 guests</span></span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Cama</span><span class="lang-en" lang="en">Bed</span></span><span class="v">1 king</span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">52 m²</span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Cordillera</span><span class="lang-en" lang="en">Mountain</span></span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Capacidad</span><span class="lang-en" lang="en">Capacity</span></span><span class="v"><span class="lang-es" lang="es">3 personas</span><span class="lang-en" lang="en">3 guests</span></span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Cama</span><span class="lang-en" lang="en">Bed</span></span><span class="v"><span class="lang-es" lang="es">1 doble + 1 sencilla</span><span class="lang-en" lang="en">1 double + 1 single</span></span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">29 m²</span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Ciudad</span><span class="lang-en" lang="en">City</span></span></div>
           </div>
           <div class="room-price">
             <span class="from"><span class="lang-es" lang="es">Precio hoy</span><span class="lang-en" lang="en">Tonight</span></span>
@@ -636,6 +644,7 @@
       </article>
 
       <!-- Room 5: Especial -->
+      <!-- KEEP IN SYNC WITH rooms_db.json (room id 31352) -->
       <article class="room has-star-cursor" data-reveal>
         <div class="room-media slider-active" style="background: var(--ink);">
           <div class="badge">05 / Especial</div>
@@ -661,15 +670,15 @@
           </div>
         </div>
         <div class="room-info">
-          <p class="eyebrow"><span class="lang-es" lang="es">Para grupos pequeños o familias</span><span class="lang-en" lang="en">For small groups or families</span></p>
+          <p class="eyebrow"><span class="lang-es" lang="es">Para parejas</span><span class="lang-en" lang="en">For couples</span></p>
           <h3>Especial</h3>
-          <p class="sub"><span class="lang-es" lang="es">Dos ambientes, una sola tarifa.</span><span class="lang-en" lang="en">Two spaces, one price.</span></p>
-          <p class="body"><span class="lang-es" lang="es">Cama king + sofá cama doble en zona de estar separada. Cocina completa con nevera grande. Ideal para familias o cuatro personas viajando juntas.</span><span class="lang-en" lang="en">King bed + double sofa bed in a separate living area. Full kitchen with large fridge. Ideal for families or four friends traveling together.</span></p>
+          <p class="sub"><span class="lang-es" lang="es">Apartaestudio con vista a la ciudad.</span><span class="lang-en" lang="en">Studio with city view.</span></p>
+          <p class="body"><span class="lang-es" lang="es">27 m² con vista a la ciudad. Cama doble, cocina equipada con estufa, microondas y cafetera, baño privado con ducha, secador de pelo y plancha.</span><span class="lang-en" lang="en">27 sqm with city view. Double bed, kitchen with stove, microwave and coffee maker, private bathroom with shower, hair dryer and iron.</span></p>
           <div class="room-specs">
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Capacidad</span><span class="lang-en" lang="en">Capacity</span></span><span class="v"><span class="lang-es" lang="es">4 personas</span><span class="lang-en" lang="en">4 guests</span></span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Cama</span><span class="lang-en" lang="en">Bed</span></span><span class="v"><span class="lang-es" lang="es">1 king + sofá cama</span><span class="lang-en" lang="en">1 king + sofa bed</span></span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">60 m²</span></div>
-            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Cordillera</span><span class="lang-en" lang="en">Mountain</span></span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Capacidad</span><span class="lang-en" lang="en">Capacity</span></span><span class="v"><span class="lang-es" lang="es">2 personas</span><span class="lang-en" lang="en">2 guests</span></span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Cama</span><span class="lang-en" lang="en">Bed</span></span><span class="v"><span class="lang-es" lang="es">1 doble</span><span class="lang-en" lang="en">1 double</span></span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Área</span><span class="lang-en" lang="en">Area</span></span><span class="v">27 m²</span></div>
+            <div class="room-spec"><span class="k"><span class="lang-es" lang="es">Vista</span><span class="lang-en" lang="en">View</span></span><span class="v"><span class="lang-es" lang="es">Ciudad</span><span class="lang-en" lang="en">City</span></span></div>
           </div>
           <div class="room-price">
             <span class="from"><span class="lang-es" lang="es">Precio hoy</span><span class="lang-en" lang="en">Tonight</span></span>
@@ -759,7 +768,7 @@
             <td><span class="lang-es" lang="es">Doble</span><span class="lang-en" lang="en">Double</span></td>
             <td><span class="lang-es" lang="es">King + doble + sencilla</span><span class="lang-en" lang="en">King + double + single</span></td>
             <td><span class="lang-es" lang="es">Doble</span><span class="lang-en" lang="en">Double</span></td>
-            <td><span class="lang-es" lang="es">King + sencilla</span><span class="lang-en" lang="en">King + single</span></td>
+            <td><span class="lang-es" lang="es">Doble + sencilla</span><span class="lang-en" lang="en">Double + single</span></td>
             <td><span class="lang-es" lang="es">Doble</span><span class="lang-en" lang="en">Double</span></td>
           </tr>
           <tr>

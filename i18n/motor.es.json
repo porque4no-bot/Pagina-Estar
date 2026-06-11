@@ -89,11 +89,12 @@
     "clasica": "Cama doble, cocina equipada y baño privado en 29 m². Acogedor y funcional.",
     "seleccion": "36 m² con vista a la ciudad. Tres camas para hasta 5 huéspedes — king, doble y sencilla.",
     "reserva": "24 m² con vista a la ciudad. Cama doble, cocina equipada y baño privado.",
-    "origen": "29 m² con vista a la ciudad. Cama king para dos más cama sencilla — hasta 3 huéspedes.",
+    "origen": "29 m² con vista a la ciudad. Cama doble más cama sencilla — hasta 3 huéspedes.",
     "especial": "27 m² con vista a la ciudad. Cama doble, cocina completa y todos los servicios."
   },
   "roomBeds": {
     "1 cama doble": "1 cama doble",
+    "1 cama doble + 1 sencilla": "1 cama doble + 1 sencilla",
     "1 king + 1 doble + 1 sencilla": "1 king + 1 doble + 1 sencilla",
     "1 king + 1 sencilla": "1 king + 1 sencilla",
     "1 Queen size": "1 Queen size",
