@@ -168,6 +168,7 @@ function renderRoomPage(template, room, lang) {
   const data = {
     ...page,
     slug: room.id,
+    roomTypeId: room.roomTypeId || '',
     num: room.num,
     name: room.name,
     nameUrlEncoded: whatsappRoomToken(room.name),
@@ -206,8 +207,11 @@ function generateRoomPages({ rootDir, targetDir }) {
     if (!room.page) continue;
     const slug = room.id;
     slugs.push(slug);
-    const htmlEs = renderRoomPage(tplEs, room, 'es');
-    const htmlEn = renderRoomPage(tplEn, room, 'en');
+    // Pass roomTypeId so the template can reference {{roomTypeId}} (used by
+    // the sold-out check script to match the OTASync id_room_types field).
+    const roomWithTypeId = { ...room, roomTypeId: id };
+    const htmlEs = renderRoomPage(tplEs, roomWithTypeId, 'es');
+    const htmlEn = renderRoomPage(tplEn, roomWithTypeId, 'en');
     fs.writeFileSync(path.join(targetDir, `${slug}.html`), htmlEs);
     fs.writeFileSync(path.join(enDir, `${slug}.html`), htmlEn);
   }

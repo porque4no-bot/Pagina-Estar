@@ -189,11 +189,42 @@
       </p>
     </div>
 
-    <div class="tier-table">
+    <div class="tier-table" data-room="{{slug}}" data-room-type-id="{{roomTypeId}}" data-sold-out-label="Agotado">
 {{tiersEs}}
     </div>
   </div>
 </section>
+
+<!-- Sold-out badge: client-side check against /api/check-availability for today.
+     Only toggles a class — never mutates prices. Silent on failure. -->
+<script>
+(function() {
+  var table = document.querySelector('.tier-table[data-room]');
+  if (!table) return;
+  var typeId = table.getAttribute('data-room-type-id');
+  if (!typeId) return;
+  var today = new Date();
+  var tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  function fmt(d) {
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+  var url = '/api/check-availability?checkin=' + fmt(today) + '&checkout=' + fmt(tomorrow) + '&guests=1';
+  fetch(url, { headers: { 'Accept': 'application/json' } })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !Array.isArray(data.rooms)) return;
+      var match = data.rooms.find(function(r) {
+        return r && String(r.id_room_types) === String(typeId);
+      });
+      if (match && match.available === false) {
+        table.classList.add('sold-out');
+      }
+    })
+    .catch(function() { /* silent: do not disrupt static page on API failure */ });
+})();
+</script>
 
 <!-- ============================== FOOTER ============================== -->
 <footer class="site-footer">

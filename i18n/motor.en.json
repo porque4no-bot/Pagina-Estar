@@ -25,6 +25,8 @@
   "save10": "Save 10%",
   "nonRefundable": "Non-refundable",
   "selectBtn": "Select →",
+  "soldOut": "Sold out",
+  "soldOutMsg": "No availability for the selected dates. Try other dates or reach us on WhatsApp.",
   "extrasIntro": "Personalize your stay. All additional services are confirmed upon booking.",
   "continueGuest": "Continue to details →",
   "guestIntro": "Your information is only used for confirmation and communication purposes.",
