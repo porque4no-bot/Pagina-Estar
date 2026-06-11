@@ -811,16 +811,41 @@
     };
   }
 
+  function guestNeedsReview(slot) {
+    const guest = slot && slot.guest ? slot.guest : {};
+    const requiredFields = [
+      'firstName',
+      'lastName',
+      'documentType',
+      'documentNumber',
+      'birthDate',
+      'nationality',
+      'email',
+      'phone'
+    ];
+    const missingRequired = requiredFields.some(field => !String(guest[field] || '').trim());
+    const missingPassportExpiry = guest.documentType === 'Pasaporte' && !guest.expirationDate;
+    const invalidEmail = guest.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email);
+    return missingRequired || missingPassportExpiry || invalidEmail || !guest.privacyAccepted;
+  }
+
   async function submitCheckin(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const button = form.querySelector('button[type="submit"]');
     saveActiveGuestFromForm();
-    const privacyAccepted = $('[name="privacyAccepted"]').checked;
     const missingDocumentIndex = state.guestSlots.findIndex(slot => !slot.document);
     if (missingDocumentIndex >= 0) {
       selectGuestSlot(missingDocumentIndex);
       setStatus($('#checkinStatus'), 'Primero sube el documento de identidad de cada huésped.', 'error');
+      return;
+    }
+    const incompleteGuestIndex = state.guestSlots.findIndex(guestNeedsReview);
+    if (incompleteGuestIndex >= 0) {
+      selectGuestSlot(incompleteGuestIndex);
+      updateExpirationRequirement();
+      form.reportValidity();
+      setStatus($('#checkinStatus'), 'Completa los datos requeridos de cada huésped.', 'error');
       return;
     }
     updateExpirationRequirement();
@@ -839,7 +864,7 @@
           body: JSON.stringify({
             mode: 'submit',
             guests: state.guestSlots.map(slot => ({
-              guest: { ...slot.guest, privacyAccepted },
+              guest: { ...slot.guest },
               file: slot.document,
               isPrimary: slot.isPrimary,
               analysisSource: slot.analysisSource || 'manual',

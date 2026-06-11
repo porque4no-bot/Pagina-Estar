@@ -37,7 +37,7 @@ function sanitizeItems(items) {
 }
 
 function sanitizeContractGuests(guests) {
-  return (Array.isArray(guests) ? guests : []).slice(0, 5).map((entry, index) => {
+  const sanitizedGuests = (Array.isArray(guests) ? guests : []).slice(0, 5).map(entry => {
     const guest = entry && entry.guest ? entry.guest : entry;
     return {
       firstName: cleanText(guest && guest.firstName, 100),
@@ -46,9 +46,14 @@ function sanitizeContractGuests(guests) {
       documentNumber: cleanText(guest && guest.documentNumber, 80),
       nationality: cleanText(guest && guest.nationality, 80),
       birthDate: cleanText(guest && guest.birthDate, 20),
-      isPrimary: Boolean((entry && entry.isPrimary) || index === 0)
+      isPrimary: Boolean(entry && entry.isPrimary)
     };
   }).filter(guest => guest.firstName || guest.lastName || guest.documentNumber);
+  const primaryIndex = sanitizedGuests.findIndex(guest => guest.isPrimary);
+  return sanitizedGuests.map((guest, index) => ({
+    ...guest,
+    isPrimary: index === (primaryIndex >= 0 ? primaryIndex : 0)
+  }));
 }
 
 function buildEvent(type, body, session) {

@@ -375,10 +375,13 @@ exports.handler = async event => {
 
       const checkinId = `CHK-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
       const createdAt = new Date().toISOString();
+      const primaryEntry = entries.find(entry => entry.isPrimary) || entries[0];
       const record = {
         type: 'guest_checkin',
         checkinId,
         bookingCode: session.sub,
+        guestName: guestArchiveName(primaryEntry.guest),
+        guest: primaryEntry.guest,
         guests: entries.map((entry, index) => ({
           guest: entry.guest,
           document: {
