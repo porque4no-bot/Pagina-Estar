@@ -76,10 +76,15 @@ exports.handler = async () => {
     if (!Array.isArray(q.holdReservationIds) || !q.holdReservationIds.length) continue;
     const st = effectiveStatus(q);
     if (st === 'vencida' || st === 'cancelada') {
+      const remaining = [];
       for (const holdId of q.holdReservationIds) {
-        try { await releaseHold(holdId); released++; } catch (e) { console.error(`[revalidate-quotes] releaseHold failed for ${q.quoteId}:`, e.message); }
+        try { await releaseHold(holdId); released++; }
+        catch (e) {
+          console.error(`[revalidate-quotes] releaseHold failed for ${q.quoteId}/${holdId}:`, e.message);
+          remaining.push(holdId);
+        }
       }
-      q.holdReservationIds = [];
+      q.holdReservationIds = remaining;
       try { await saveQuote(store, q); } catch (e) { /* non-fatal */ }
     }
   }

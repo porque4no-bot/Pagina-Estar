@@ -45,6 +45,10 @@ function obfuscateEmail(email) {
  * Builds the HTML email template for a booking confirmation.
  * All CSS is inline for maximum email client compatibility (Gmail, Apple Mail, Outlook).
  */
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function buildEmailHtml({
   guestName,
   bookingCode,
@@ -56,9 +60,12 @@ function buildEmailHtml({
   paidAmount,
   phone
 }) {
+  guestName  = esc(guestName);
+  bookingCode = esc(bookingCode);
+  roomName   = esc(roomName);
   const nightsLabel = nights === 1 ? 'noche' : 'noches';
-  const checkInFormatted = formatDateES(checkIn);
-  const checkOutFormatted = formatDateES(checkOut);
+  const checkInFormatted = esc(formatDateES(checkIn));
+  const checkOutFormatted = esc(formatDateES(checkOut));
   const totalFormatted = formatCOP(totalAmount);
   const paidFormatted = formatCOP(paidAmount);
 
