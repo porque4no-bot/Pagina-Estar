@@ -183,3 +183,49 @@ test('returns 404 for an unknown quote reference', async () => {
   } }));
   assert.equal(res.statusCode, 404);
 });
+
+test('fails closed in production if OTASync mock fallback is active', async () => {
+  const originalEnv = {
+    OTASYNC_TOKEN: process.env.OTASYNC_TOKEN,
+    OTASYNC_USERNAME: process.env.OTASYNC_USERNAME,
+    OTASYNC_PASSWORD: process.env.OTASYNC_PASSWORD,
+    NODE_ENV: process.env.NODE_ENV,
+    NETLIFY: process.env.NETLIFY
+  };
+  delete process.env.OTASYNC_TOKEN;
+  delete process.env.OTASYNC_USERNAME;
+  delete process.env.OTASYNC_PASSWORD;
+  process.env.NODE_ENV = 'production';
+  process.env.NETLIFY = 'true';
+  process.env.WOMPI_INTEGRITY_SECRET = 'test_integrity_xxxx';
+  process.env.WOMPI_PUBLIC_KEY = 'pub_test_xxxx';
+
+  const otaPath = require.resolve('../../netlify/functions/_otasync');
+  const dpPath = require.resolve('../../netlify/functions/_direct-pricing');
+  delete require.cache[otaPath];
+  delete require.cache[dpPath];
+
+  const stub = {
+    getQuoteStore: () => { throw new Error('should not be called'); },
+    loadQuote: async () => { throw new Error('should not be called'); },
+    effectiveStatus: () => { throw new Error('should not be called'); },
+    computeQuoteTotal: () => { throw new Error('should not be called'); }
+  };
+
+  try {
+    const fn = load(stub);
+    const ref = encodeDirectRef(['1', '260701', '260703', '2', '31348', 'Ana', 'Lopez', 'a@b.co', '+57 300 000 0000', '000000', 'EST-ABCDE', '1', '0']);
+    const res = await fn.handler(makeEvent({ body: {
+      reference: ref, amountInCents: 50200000, currency: 'COP'
+    } }));
+    assert.equal(res.statusCode, 503);
+    const json = JSON.parse(res.body);
+    assert.equal(json.error, 'OTASync credentials missing');
+  } finally {
+    for (const [k, v] of Object.entries(originalEnv)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+    delete require.cache[otaPath];
+    delete require.cache[dpPath];
+  }
+});

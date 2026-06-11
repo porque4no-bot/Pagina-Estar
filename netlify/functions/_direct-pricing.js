@@ -23,7 +23,7 @@ function decodeDirectReference(ref) {
     if (parts.length < 11) return null;
     const [, checkinYYMMDD, checkoutYYMMDD, guestsCount, roomTypeId, , , , , extrasMask, bookingCode] = parts;
     if (!/^\d{6}$/.test(checkinYYMMDD) || !/^\d{6}$/.test(checkoutYYMMDD)) return null;
-    return {
+    const result = {
       bookingCode,
       checkin: `20${checkinYYMMDD.substring(0, 2)}-${checkinYYMMDD.substring(2, 4)}-${checkinYYMMDD.substring(4, 6)}`,
       checkout: `20${checkoutYYMMDD.substring(0, 2)}-${checkoutYYMMDD.substring(2, 4)}-${checkoutYYMMDD.substring(4, 6)}`,
@@ -33,6 +33,10 @@ function decodeDirectReference(ref) {
       isColombian: parts[11] === '1' ? true : parts[11] === '0' ? false : undefined,
       isBusiness:  parts[12] === '1' ? true : parts[12] === '0' ? false : undefined
     };
+    if (parts[13]) {
+      result.amountCents = parseInt(parts[13], 10) || 0;
+    }
+    return result;
   } catch (e) {
     return null;
   }
@@ -131,6 +135,9 @@ async function verifyDirectBookingAmount(decoded, clientAmountInCents) {
   }
   if (totals.missing) {
     return { ok: false, isMock: false, reason: 'room_not_found', expectedCents: null, actualCents: clientAmountInCents };
+  }
+  if (totals.available !== undefined && totals.available <= 0) {
+    return { ok: false, isMock: false, reason: 'sold_out', expectedCents: null, actualCents: clientAmountInCents };
   }
 
   const expectedCentsList = totals.expectedSubtotals.map(s => Math.round(s * 100));

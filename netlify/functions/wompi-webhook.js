@@ -147,7 +147,7 @@ function decodeReference(ref) {
       extrasMask,
       bookingCode
     ] = parts;
-    return {
+    const result = {
       bookingCode,
       checkin: `20${checkinYYMMDD.substring(0, 2)}-${checkinYYMMDD.substring(2, 4)}-${checkinYYMMDD.substring(4, 6)}`,
       checkout: `20${checkoutYYMMDD.substring(0, 2)}-${checkoutYYMMDD.substring(2, 4)}-${checkoutYYMMDD.substring(4, 6)}`,
@@ -162,6 +162,10 @@ function decodeReference(ref) {
       isColombian: parts[11] === '1' ? true : parts[11] === '0' ? false : undefined,
       isBusiness:  parts[12] === '1' ? true : parts[12] === '0' ? false : undefined
     };
+    if (parts[13]) {
+      result.amountCents = parseInt(parts[13], 10) || 0;
+    }
+    return result;
   } catch (err) {
     console.error("Error decoding reference:", err.message);
     return null;
@@ -828,47 +832,64 @@ exports.handler = async (event, context) => {
     };
   }
 
-  /* Server-side price verification: recompute the authoritative subtotal from
-     OTASync availability and compare to the Wompi-paid amount before touching
-     OTASync. If a malicious client bypassed the signature gate somehow, the
-     paid amount will not match the real total and we refuse to create the
-     reservation — instead alerting an admin to refund or follow up. */
-  try {
-    const verdict = await verifyDirectBookingAmount(decoded, transaction.amount_in_cents);
-    if (!verdict.ok) {
-      console.error(`[wompi-webhook] price_mismatch — refusing to create direct booking. bookingCode=${decoded.bookingCode}, tx=${transaction.id}, roomType=${decoded.roomTypeId}, paid_cents=${transaction.amount_in_cents}, expected_cents=${verdict.expectedCentsAll ? verdict.expectedCentsAll.join('|') : verdict.expectedCents}, reason=${verdict.reason}`);
-      try {
-        await sendEmail({
-          to: adminEmail(),
-          subject: `⚠ Pago Wompi con monto incorrecto — ${decoded.bookingCode}`,
-          html: `<p>Un pago Wompi fue aprobado por un monto distinto al precio recalculado en el servidor. La reserva NO se creó en OTASync.</p>
-                 <ul>
-                   <li><strong>Código:</strong> ${decoded.bookingCode}</li>
-                   <li><strong>Transacción Wompi:</strong> ${transaction.id}</li>
-                   <li><strong>Habitación:</strong> ${decoded.roomTypeId}</li>
-                   <li><strong>Fechas:</strong> ${decoded.checkin} → ${decoded.checkout}</li>
-                   <li><strong>Monto pagado (centavos):</strong> ${transaction.amount_in_cents}</li>
-                   <li><strong>Monto esperado (centavos):</strong> ${verdict.expectedCentsAll ? verdict.expectedCentsAll.join(' o ') : verdict.expectedCents}</li>
-                   <li><strong>Motivo:</strong> ${verdict.reason}</li>
-                 </ul>
-                 <p>Revisar manualmente: o bien devolver el pago, o crear la reserva en OTASync si el motivo fue una desviación legítima (ej. tarifa especial).</p>`
-        });
-      } catch (mailErr) {
-        console.error('[wompi-webhook] price_mismatch admin alert failed:', mailErr.message);
+  /* Server-side price verification: if the reference encodes the price,
+     compare the paid amount directly. Otherwise, fall back to recomputing
+     from OTASync availability. This prevents post-payment rate changes
+     from blocking approved transactions. */
+  let priceVerifyOk = true;
+  let priceReason = '';
+  let expectedCentsForAlert = 0;
+
+  if (decoded.amountCents !== undefined) {
+    if (Math.abs(transaction.amount_in_cents - decoded.amountCents) > 100) {
+      priceVerifyOk = false;
+      priceReason = 'amount_mismatch_reference';
+      expectedCentsForAlert = decoded.amountCents;
+    }
+  } else {
+    try {
+      const verdict = await verifyDirectBookingAmount(decoded, transaction.amount_in_cents);
+      if (!verdict.ok) {
+        priceVerifyOk = false;
+        priceReason = verdict.reason;
+        expectedCentsForAlert = verdict.expectedCentsAll ? verdict.expectedCentsAll[0] : verdict.expectedCents;
       }
-      return {
-        statusCode: 200,
-        headers: corsHeaders,
-        body: JSON.stringify({ error: 'price_mismatch', message: 'Paid amount does not match server-recomputed price; admin alerted.' })
-      };
+      if (verdict.isMock) {
+        console.warn(`[wompi-webhook] OTASync mock fallback active — skipping price verification. bookingCode=${decoded.bookingCode}, tx=${transaction.id}`);
+      }
+    } catch (priceErr) {
+      /* Don't fail the booking creation on a recompute error — log and let
+         the downstream flow proceed. Wompi has already approved the payment. */
+      console.error('[wompi-webhook] price verification threw, proceeding with booking:', priceErr.message);
     }
-    if (verdict.isMock) {
-      console.warn(`[wompi-webhook] OTASync mock fallback active — skipping price verification. bookingCode=${decoded.bookingCode}, tx=${transaction.id}`);
+  }
+
+  if (!priceVerifyOk) {
+    console.error(`[wompi-webhook] price_mismatch — refusing to create direct booking. bookingCode=${decoded.bookingCode}, tx=${transaction.id}, roomType=${decoded.roomTypeId}, paid_cents=${transaction.amount_in_cents}, expected_cents=${expectedCentsForAlert}, reason=${priceReason}`);
+    try {
+      await sendEmail({
+        to: adminEmail(),
+        subject: `⚠ Pago Wompi con monto incorrecto — ${decoded.bookingCode}`,
+        html: `<p>Un pago Wompi fue aprobado por un monto distinto al precio esperado. La reserva NO se creó en OTASync.</p>
+               <ul>
+                 <li><strong>Código:</strong> ${decoded.bookingCode}</li>
+                 <li><strong>Transacción Wompi:</strong> ${transaction.id}</li>
+                 <li><strong>Habitación:</strong> ${decoded.roomTypeId}</li>
+                 <li><strong>Fechas:</strong> ${decoded.checkin} → ${decoded.checkout}</li>
+                 <li><strong>Monto pagado (centavos):</strong> ${transaction.amount_in_cents}</li>
+                 <li><strong>Monto esperado (centavos):</strong> ${expectedCentsForAlert}</li>
+                 <li><strong>Motivo:</strong> ${priceReason}</li>
+               </ul>
+               <p>Revisar manualmente: o bien devolver el pago, o crear la reserva en OTASync si el motivo fue una desviación legítima.</p>`
+      });
+    } catch (mailErr) {
+      console.error('[wompi-webhook] price_mismatch admin alert failed:', mailErr.message);
     }
-  } catch (priceErr) {
-    /* Don't fail the booking creation on a recompute error — log and let
-       the downstream flow proceed. Wompi has already approved the payment. */
-    console.error('[wompi-webhook] price verification threw, proceeding with booking:', priceErr.message);
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'price_mismatch', message: 'Paid amount does not match expected price; admin alerted.' })
+    };
   }
 
   try {
@@ -881,6 +902,49 @@ exports.handler = async (event, context) => {
       checkout: decoded.checkout,
       roomTypeId: decoded.roomTypeId
     });
+
+    if (selectedRoomId === 0) {
+      console.error(`[wompi-webhook] Direct booking PAID but SOLD OUT. No rooms available for roomTypeId=${decoded.roomTypeId}, bookingCode=${decoded.bookingCode}, tx=${transaction.id}. Marking reservationPending.`);
+      try {
+        await sendEmail({
+          to: adminEmail(),
+          subject: `⚠ Pago sin reserva directa (Habitación Agotada) — ${decoded.bookingCode}`,
+          html: `<p>Se recibió un pago aprobado por Wompi para una reserva directa, pero la habitación seleccionada ya no tiene disponibilidad en OTASync. La reserva NO se creó.</p>
+                 <ul>
+                   <li><strong>Código:</strong> ${decoded.bookingCode}</li>
+                   <li><strong>Huésped:</strong> ${decoded.firstName} ${decoded.lastName} — ${decoded.email}</li>
+                   <li><strong>Check-in / Check-out:</strong> ${decoded.checkin} → ${decoded.checkout}</li>
+                   <li><strong>Habitación (Room Type ID):</strong> ${decoded.roomTypeId}</li>
+                   <li><strong>ID Transacción Wompi:</strong> ${transaction.id}</li>
+                 </ul>
+                 <p>La transacción está marcada como procesada. Crear manualmente en OTASync o gestionar reembolso.</p>`
+        });
+      } catch (mailErr) {
+        console.error('[wompi-webhook] sold out admin alert failed:', mailErr.message);
+      }
+
+      if (directBookingResultStore) {
+        try {
+          await directBookingResultStore.set(`direct-${decoded.bookingCode}`, JSON.stringify({
+            bookingCode: decoded.bookingCode,
+            reservationPending: true,
+            reason: 'sold_out',
+            transactionId: transaction.id,
+            createdAt: new Date().toISOString()
+          }), { ttl: 86400 * 7 });
+        } catch (e) { /* non-fatal */ }
+      }
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: true,
+          bookingCode: decoded.bookingCode,
+          reservationPending: true
+        })
+      };
+    }
 
     // Calculate dates & nights
     const checkinDate = new Date(decoded.checkin);

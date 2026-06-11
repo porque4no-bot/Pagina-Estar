@@ -741,7 +741,8 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
         extrasMask,
         code,
         isColombian ? '1' : '0',
-        isBusinessTrip ? '1' : '0'
+        isBusinessTrip ? '1' : '0',
+        Math.round(calc.subtotal * 100) // 14th field: price in cents
       ].join('|');
 
       const encodedRef = btoa(unescape(encodeURIComponent(serialized)))
@@ -760,6 +761,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       }
 
       let wompiSignature;
+      let sigData;
       try {
         const sigRes = await fetch('/api/create-wompi-signature', {
           method: 'POST',
@@ -770,26 +772,36 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
             currency: 'COP'
           })
         });
-        const sigData = await sigRes.json();
+        sigData = await sigRes.json();
         if (!sigRes.ok || !sigData.signature || !sigData.signature.integrity) {
           throw new Error(sigData.error || 'Wompi signature failed');
         }
-        wompiSignature = sigData.signature;
+        wompiSignature = sigData.signature.integrity;
       } catch (e) {
         console.error('[PaymentPanel] Wompi signature error:', e.message);
         setLoading(false);
-        setPaymentError(
-          lang === 'es'
+        let errorMsg;
+        if (e.message === 'sold_out') {
+          errorMsg = lang === 'es'
+            ? 'Lo sentimos, la habitación seleccionada ya no tiene disponibilidad para las fechas elegidas.'
+            : 'Sorry, the selected room is no longer available for the chosen dates.';
+        } else if (e.message === 'price_mismatch') {
+          errorMsg = lang === 'es'
+            ? 'Hubo un cambio en la tarifa de la habitación. Por favor, recarga la página para ver los precios actualizados.'
+            : 'There was a change in the room rate. Please refresh the page to view the updated pricing.';
+        } else {
+          errorMsg = lang === 'es'
             ? 'No se pudo preparar la firma de seguridad de Wompi. Por favor intenta de nuevo o contáctanos.'
-            : 'Could not prepare the Wompi security signature. Please try again or contact us.'
-        );
+            : 'Could not prepare the Wompi security signature. Please try again or contact us.';
+        }
+        setPaymentError(errorMsg);
         return;
       }
 
       const checkout = new window.WidgetCheckout({
         currency: 'COP',
-        amountInCents: Math.round(calc.subtotal * 100),
-        reference: encodedRef,
+        amountInCents: sigData.amountInCents,
+        reference: sigData.reference,
         publicKey: wompiKey,
         signature: wompiSignature,
         customerData: {

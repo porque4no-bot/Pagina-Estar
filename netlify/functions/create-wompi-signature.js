@@ -123,10 +123,14 @@ exports.handler = async (event) => {
     }
 
     if (!verdict.ok) {
-      console.error(`[create-wompi-signature] price_mismatch refusing to sign: bookingCode=${decoded.bookingCode}, roomType=${decoded.roomTypeId}, client=${clientAmountInCents}, expected=${verdict.expectedCentsAll ? verdict.expectedCentsAll.join('|') : verdict.expectedCents}, reason=${verdict.reason}`);
-      return json(400, { error: 'price_mismatch' });
+      console.error(`[create-wompi-signature] pricing verification failed refusing to sign: bookingCode=${decoded.bookingCode}, roomType=${decoded.roomTypeId}, client=${clientAmountInCents}, expected=${verdict.expectedCentsAll ? verdict.expectedCentsAll.join('|') : verdict.expectedCents}, reason=${verdict.reason}`);
+      return json(400, { error: verdict.reason || 'price_mismatch' });
     }
     if (verdict.isMock) {
+      if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') {
+        console.error('[create-wompi-signature] OTASync credentials missing in production. Refusing to sign client amount.');
+        return json(503, { error: 'OTASync credentials missing' });
+      }
       console.warn(`[create-wompi-signature] OTASync mock fallback active — accepting client amount without recompute. bookingCode=${decoded.bookingCode}, client=${clientAmountInCents}`);
     }
   }

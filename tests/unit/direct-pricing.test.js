@@ -236,3 +236,34 @@ test('verifyDirectBookingAmount returns room_not_found when roomTypeId is absent
     assert.equal(verdict.reason, 'room_not_found');
   });
 });
+
+test('decodeDirectReference round-trips a reference with amountCents', () => {
+  const { decodeDirectReference } = require('../../netlify/functions/_direct-pricing');
+  const ref = encodeRef(['1', '260701', '260703', '2', '31348', 'Ana', 'Lopez', 'a@b.co', '+57 300 000 0000', '100000', 'EST-ABCDE', '1', '0', '50200000']);
+  const decoded = decodeDirectReference(ref);
+  assert.equal(decoded.checkin, '2026-07-01');
+  assert.equal(decoded.checkout, '2026-07-03');
+  assert.equal(decoded.amountCents, 50200000);
+});
+
+test('verifyDirectBookingAmount returns sold_out when availability is 0', async () => {
+  const otaResponse = {
+    rooms: [{
+      id_room_types: 31348,
+      avail: 0,
+      price: 0,
+      pricing_plans: [{ prices: [{ prices: { '2026-07-01': 220000, '2026-07-02': 220000 } }] }]
+    }]
+  };
+
+  await withMockedFetch(otaResponse, async () => {
+    const { verifyDirectBookingAmount } = require('../../netlify/functions/_direct-pricing');
+    const decoded = {
+      checkin: '2026-07-01', checkout: '2026-07-03', guestsCount: 2,
+      roomTypeId: '31348', extrasMask: '000000'
+    };
+    const verdict = await verifyDirectBookingAmount(decoded, 50200000);
+    assert.equal(verdict.ok, false);
+    assert.equal(verdict.reason, 'sold_out');
+  });
+});
