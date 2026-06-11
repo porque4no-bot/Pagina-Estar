@@ -1529,6 +1529,13 @@
     const modal = $('#contractModal');
     if (modal) modal.hidden = true;
     document.body.classList.remove('guest-modal-open');
+    /* Tear down the scroll-end observer so a hidden modal doesn't keep a
+       live observer (and its sentinel reference) around between openings. */
+    const body = $('#contractBody');
+    if (body && body._contractObserver) {
+      body._contractObserver.disconnect();
+      body._contractObserver = null;
+    }
   }
 
   function attachContractScrollWatcher(body) {
