@@ -8,6 +8,7 @@ const {
 } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable, releaseHold, buildExtrasFromQuote } = require('./_otasync');
 const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
+const { acquireQuoteLock, releaseQuoteLock } = require('./_quote-lock');
 
 const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
 
@@ -284,67 +285,8 @@ function buildQuoteRooms(quote, roomDetails) {
 // Handle a Wompi payment whose reference is a stored quote id (COT-...).
 // Loads the quote, verifies the amount, creates the OTASync reservation and
 // marks the quote as 'aceptada'. Returns a Netlify response object.
-/* Acquire a per-quote lock so two concurrent Wompi webhooks for the same
-   reference don't both end up creating reservations in OTASync. Uses Netlify
-   Blobs' onlyIfNew semantics for a compare-and-set primitive. Returns:
-     { acquired: true }                     — first writer, proceed
-     { acquired: true, alreadyOurs: true }  — same transaction retrying, proceed
-     { acquired: false, ownerTx, startedAt } — another transaction holds the lock */
-const LOCK_STALE_MS = 5 * 60 * 1000; // 5 minutes: a lock older than this is treated as abandoned
-const LOCK_TTL_S   = 360;            // 6 min blob TTL — auto-expiry safety net
-
-async function acquireQuoteLock(quoteId, transactionId) {
-  let lockStore;
-  try { lockStore = getStore({ name: 'quote-locks', consistency: 'strong' }); }
-  catch (e) {
-    console.error('[wompi-webhook] quote-locks store unavailable:', e.message);
-    /* Without Blobs we cannot prevent the race; let the caller proceed. The
-       transaction-level dedup in processed-transactions still protects
-       against duplicate webhook deliveries of the same txId. */
-    return { acquired: true, blobsUnavailable: true };
-  }
-
-  try {
-    await lockStore.setJSON(quoteId, { transactionId, startedAt: Date.now() }, { onlyIfNew: true, ttl: LOCK_TTL_S });
-    return { acquired: true };
-  } catch (e) {
-    /* Lock already exists. Check staleness first; if stale, overwrite. */
-    let existing;
-    try { existing = await lockStore.get(quoteId, { type: 'json' }); }
-    catch (readErr) { existing = null; }
-
-    if (existing && existing.transactionId === transactionId) {
-      return { acquired: true, alreadyOurs: true };
-    }
-
-    const isStale = !existing || (Date.now() - (existing.startedAt || 0)) > LOCK_STALE_MS;
-    if (isStale) {
-      try {
-        await lockStore.setJSON(quoteId, { transactionId, startedAt: Date.now() }, { ttl: LOCK_TTL_S });
-        console.warn(`[wompi-webhook] overwrote stale lock for ${quoteId} (owner was ${existing && existing.transactionId})`);
-        return { acquired: true };
-      } catch (overwriteErr) {
-        console.error('[wompi-webhook] stale lock overwrite failed:', overwriteErr.message);
-      }
-    }
-
-    return {
-      acquired: false,
-      ownerTx: existing && existing.transactionId,
-      startedAt: existing && existing.startedAt
-    };
-  }
-}
-
-async function releaseQuoteLock(quoteId) {
-  try {
-    const lockStore = getStore({ name: 'quote-locks', consistency: 'strong' });
-    await lockStore.delete(quoteId);
-  } catch (e) {
-    console.warn('[wompi-webhook] releaseQuoteLock failed (non-fatal):', e.message);
-  }
-}
-
+// The per-quote lock that prevents concurrent webhooks from double-booking
+// lives in ./_quote-lock so the MercadoPago webhook can share it.
 async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
   const deps = {
     getQuoteStore,

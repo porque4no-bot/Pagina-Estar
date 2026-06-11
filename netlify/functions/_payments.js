@@ -8,6 +8,7 @@ const {
   releaseHold, createConfirmedReservation
 } = require('./_otasync');
 const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
+const { acquireQuoteLock, releaseQuoteLock } = require('./_quote-lock');
 
 const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
 const DIRECT_REF_RE = /^MPDIR-[A-Za-z0-9_-]+$/;
@@ -195,6 +196,31 @@ async function processQuotePayment(transaction, corsHeaders) {
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Amount mismatch; logged for manual follow-up' }) };
   }
 
+  /* Single-writer lock per quoteId. Two webhook deliveries for the same quote
+     (different transactions both APPROVED against the same reference, or
+     duplicates that slip past per-tx dedup) would otherwise both reach
+     createConfirmedReservation and double-book in OTASync. The Wompi handler
+     uses the same lock. */
+  const lock = await acquireQuoteLock(quoteId, transaction.id);
+  if (!lock.acquired) {
+    console.error(`[payments] quote ${quoteId} is already being processed by tx ${lock.ownerTx} (started ${lock.startedAt}). Refusing tx ${transaction.id}.`);
+    try {
+      await sendEmail({
+        to: adminEmail(),
+        subject: `Doble pago detectado - ${quoteId}`,
+        html: `<p>La cotizacion <strong>${quoteId}</strong> recibio un segundo pago aprobado mientras procesabamos el primero.</p>
+               <ul>
+                 <li>Primera transaccion (en curso): ${lock.ownerTx}</li>
+                 <li>Segunda transaccion (rechazada): ${transaction.id} (${transaction.provider})</li>
+               </ul>
+               <p>Verifica con el proveedor de pago y reembolsa la transaccion duplicada.</p>`
+      });
+    } catch (e) { console.error('[payments] double-pay alert email failed:', e.message); }
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Quote already being processed by another transaction', ownerTx: lock.ownerTx }) };
+  }
+
+  try {
+
   const now = new Date().toISOString();
   const paidAmount = transaction.amountCents / 100;
 
@@ -301,6 +327,12 @@ async function processQuotePayment(transaction, corsHeaders) {
   } catch (e) { console.error('[payments] confirmation email failed:', e.message); }
 
   return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, bookingCode }) };
+
+  } finally {
+    /* Quote saved as 'aceptada' before release, so a concurrent webhook
+       retrying after release falls through the duplicate check. */
+    if (!lock.blobsUnavailable) await releaseQuoteLock(quoteId);
+  }
 }
 
 async function processDirectPayment(transaction, corsHeaders) {
