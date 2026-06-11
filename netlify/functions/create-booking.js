@@ -286,8 +286,6 @@ exports.handler = async (event, context) => {
   const roomRecord = roomsDb[roomTypeId];
 
   // Calculate nights
-  const checkinDate = new Date(checkin);
-  const checkoutDate = new Date(checkout);
   const diffTime = checkoutDate - checkinDate;
   const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
