@@ -448,7 +448,9 @@ function normalizeGuest(body, extracted) {
   };
 }
 
-function validateGuest(guest) {
+function validateGuest(guest, { isMinor = false } = {}) {
+  /* For minors (age < 18), email, phone and the privacy acceptance are
+     collected from the responsible adult, not from the minor themselves. */
   const required = [
     'firstName',
     'lastName',
@@ -456,8 +458,7 @@ function validateGuest(guest) {
     'documentNumber',
     'birthDate',
     'nationality',
-    'email',
-    'phone'
+    ...(isMinor ? [] : ['email', 'phone'])
   ];
   const missing = required.filter(key => !guest[key]);
   const warnings = [];
@@ -473,7 +474,7 @@ function validateGuest(guest) {
   if (guest.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email)) {
     warnings.push('El correo electrónico no tiene un formato válido.');
   }
-  if (!guest.privacyAccepted) missing.push('privacyAccepted');
+  if (!isMinor && !guest.privacyAccepted) missing.push('privacyAccepted');
   return { valid: missing.length === 0 && warnings.length === 0, missing, warnings };
 }
 
@@ -501,7 +502,7 @@ async function normalizeGuestEntry(entry, index, session) {
   return {
     guest,
     file,
-    isMinor: calculateAge(guest.birthDate) < 18,
+    isMinor: guest.birthDate ? calculateAge(guest.birthDate) < 18 : false,
     isPrimary: Boolean(entry && entry.isPrimary),
     analysisSource: cleanText(
       (entry && (entry.analysisSource || entry.documentAnalysis)) ||
@@ -544,7 +545,7 @@ async function normalizeSubmitGuests(body, session) {
 function validateGuests(entries) {
   const perGuest = entries.map((entry, index) => ({
     index,
-    ...validateGuest(entry.guest)
+    ...validateGuest(entry.guest, { isMinor: entry.isMinor })
   }));
   const missing = perGuest.flatMap(result =>
     result.missing.map(field => `guests.${result.index}.${field}`)
