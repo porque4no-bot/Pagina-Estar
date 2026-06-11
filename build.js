@@ -155,9 +155,49 @@ console.log('Generating room pages from template + rooms_db.json...');
 const { generateRoomPages } = require('./build-rooms');
 generateRoomPages({ rootDir, targetDir: distDir });
 
-// Inject GA4 into all HTML files in dist (including en/ subdir)
+// Inject GA4 (+ Consent Mode v2 + optional ad pixels) into all HTML files.
+// Ad pixels are emitted ONLY when their IDs are configured at build time, so
+// the markup is inert until META_PIXEL_ID / GOOGLE_ADS_ID are set in Netlify.
 const GA4_ID = 'G-9PB0Z2KQJK';
-const ga4Snippet = `<!-- Google tag (gtag.js) -->\n<script async src="https://www.googletagmanager.com/gtag/js?id=${GA4_ID}"></script>\n<script>\n  window.dataLayer = window.dataLayer || [];\n  function gtag(){dataLayer.push(arguments);}\n  gtag('js', new Date());\n  gtag('config', '${GA4_ID}');\n</script>`;
+const META_PIXEL_ID = (process.env.META_PIXEL_ID || '').trim();
+const GOOGLE_ADS_ID = (process.env.GOOGLE_ADS_ID || '').trim();
+
+/* Consent Mode v2: deny analytics + ads by default for EVERY visitor until
+   consent.js records an opt-in (strictest model). */
+const consentDefault =
+  "gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied'," +
+  "ad_personalization:'denied',analytics_storage:'denied'," +
+  "functionality_storage:'granted',security_storage:'granted',wait_for_update:500});";
+
+let ga4Snippet =
+  `<!-- Google tag (gtag.js) + Consent Mode v2 -->\n` +
+  `<script async src="https://www.googletagmanager.com/gtag/js?id=${GA4_ID}"></script>\n` +
+  `<script>\n` +
+  `  window.dataLayer = window.dataLayer || [];\n` +
+  `  function gtag(){dataLayer.push(arguments);}\n` +
+  `  ${consentDefault}\n` +
+  `  gtag('js', new Date());\n` +
+  `  gtag('config', '${GA4_ID}', { anonymize_ip: true });\n` +
+  (GOOGLE_ADS_ID ? `  gtag('config', '${GOOGLE_ADS_ID}');\n` : '') +
+  `</script>`;
+
+if (META_PIXEL_ID) {
+  ga4Snippet +=
+    `\n<!-- Meta Pixel (consent-gated; fires only after opt-in) -->\n` +
+    `<script>\n` +
+    `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?` +
+    `n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;` +
+    `n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;` +
+    `t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}` +
+    `(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');\n` +
+    `fbq('consent','revoke');\n` +
+    `fbq('init','${META_PIXEL_ID}');\n` +
+    `fbq('track','PageView');\n` +
+    `</script>`;
+}
+
+// External consent manager (banner + Consent Mode update on opt-in).
+ga4Snippet += `\n<script src="/consent.js" defer></script>`;
 
 function injectGA4(dir) {
   fs.readdirSync(dir).forEach(entry => {
@@ -173,7 +213,7 @@ function injectGA4(dir) {
     }
   });
 }
-console.log('Injecting GA4 tracking...');
+console.log('Injecting GA4 tracking + Consent Mode...');
 injectGA4(distDir);
 
 // ── A11y: ensure every page has a "skip to main content" link ───────────────
@@ -434,8 +474,8 @@ async function build() {
   // Validate i18n dictionaries (symmetric keys, including nested objects).
   validateI18nDicts();
 
-  console.log('Minifying shell.js, kunas.js and guest-app.js...');
-  const jsFilesToMinify = ['shell.js', 'kunas.js', 'guest-app.js'];
+  console.log('Minifying shell.js, kunas.js, guest-app.js and consent.js...');
+  const jsFilesToMinify = ['shell.js', 'kunas.js', 'guest-app.js', 'consent.js'];
   for (const jsFile of jsFilesToMinify) {
     let js = fs.readFileSync(path.join(rootDir, jsFile), 'utf8');
     if (jsFile === 'shell.js') {
@@ -604,6 +644,10 @@ function writeCspHeaders() {
     'https://www.mercadopago.com.co',
     'https://www.mercadopago.com',
     'https://static.cloudflareinsights.com',
+    // Ad pixels (inert until META_PIXEL_ID / GOOGLE_ADS_ID are configured).
+    'https://connect.facebook.net',
+    'https://www.googleadservices.com',
+    'https://googleads.g.doubleclick.net',
   ].filter(Boolean).join(' ');
 
   const csp = [
@@ -614,7 +658,7 @@ function writeCspHeaders() {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' https: data:",
     "font-src 'self'",
-    "connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.mercadopago.com https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://estar-4d0da.firebaseapp.com",
+    "connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.mercadopago.com https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://estar-4d0da.firebaseapp.com https://connect.facebook.net https://www.facebook.com https://googleads.g.doubleclick.net https://www.google.com",
     "frame-src https://checkout.wompi.co https://www.mercadopago.com.co https://www.mercadopago.com https://estar-4d0da.firebaseapp.com https://accounts.google.com https://apis.google.com",
     "object-src 'none'",
     "base-uri 'self'",

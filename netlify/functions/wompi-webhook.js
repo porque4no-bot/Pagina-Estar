@@ -10,6 +10,7 @@ const { getAvailabilityByType, findUnavailable, releaseHold, buildExtrasFromQuot
 const { verifyDirectBookingAmount } = require('./_direct-pricing');
 const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
 const { acquireQuoteLock, releaseQuoteLock } = require('./_quote-lock');
+const { trackPurchase } = require('./_analytics');
 
 const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
 
@@ -608,6 +609,11 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
     }
   } catch (e) { console.error('[wompi-webhook] confirmation email failed:', e.message); }
 
+    /* A-6: server-side conversion for corporate quote payments. */
+    try {
+      await trackPurchase({ transactionId: String(bookingCode), value: paidAmount });
+    } catch (e) { /* analytics never blocks */ }
+
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, bookingCode }) };
   } finally {
     if (!lock.blobsUnavailable) await deps.releaseQuoteLock(quoteId);
@@ -1156,6 +1162,16 @@ exports.handler = async (event, context) => {
         await stayIdemStore.set(stayIdemKey, JSON.stringify({ bookingCode: finalBookingCode, transactionId: transaction.id }), { ttl: 86400 * 7 });
       } catch (e) { /* non-fatal */ }
     }
+
+    /* A-6: server-side conversion (Measurement Protocol). Same transaction_id
+       as the client purchase so GA4 dedupes. value = online subtotal charged. */
+    try {
+      await trackPurchase({
+        transactionId: String(finalBookingCode),
+        value: transaction.amount_in_cents / 100,
+        items: [{ item_id: String(decoded.roomTypeId), item_name: roomName, price: avgPrice, quantity: nights }]
+      });
+    } catch (e) { /* analytics never blocks */ }
 
     return {
       statusCode: 200,

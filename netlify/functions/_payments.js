@@ -9,6 +9,7 @@ const {
 } = require('./_otasync');
 const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
 const { acquireQuoteLock, releaseQuoteLock } = require('./_quote-lock');
+const { trackPurchase } = require('./_analytics');
 
 const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
 const DIRECT_REF_RE = /^MPDIR-[A-Za-z0-9_-]+$/;
@@ -326,6 +327,11 @@ async function processQuotePayment(transaction, corsHeaders) {
     }
   } catch (e) { console.error('[payments] confirmation email failed:', e.message); }
 
+  /* A-6: server-side conversion for corporate quote payments. */
+  try {
+    await trackPurchase({ transactionId: String(bookingCode), value: paidAmount });
+  } catch (e) { /* analytics never blocks */ }
+
   return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, bookingCode }) };
 
   } finally {
@@ -537,6 +543,15 @@ async function processDirectPayment(transaction, corsHeaders) {
   } catch (e) {
     console.warn('[_payments] booking-results write failed (non-fatal):', e.message);
   }
+
+  /* A-6: server-side conversion (Measurement Protocol). */
+  try {
+    await trackPurchase({
+      transactionId: String(finalBookingCode),
+      value: paidAmount,
+      items: [{ item_id: String(decoded.roomTypeId), item_name: roomName, price: avgPrice, quantity: nights }]
+    });
+  } catch (e) { /* analytics never blocks */ }
 
   return {
     statusCode: 200,

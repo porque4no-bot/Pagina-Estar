@@ -26,6 +26,34 @@ function Icon({ name, size = 20, style, className }) {
 /* ── Translation Dictionary (sourced from i18n/motor.{es,en}.json) ─ */
 const i18nEngine = { es: i18nEngineEs, en: i18nEngineEn };
 
+/* ── Analytics (A-6) ──────────────────────────────────
+   GA4 e-commerce events for the booking funnel. gtag is loaded site-wide and
+   gated by Consent Mode v2 (consent.js), so these calls are safe no-ops until
+   the visitor opts in — we never branch on consent here. Every call is wrapped
+   so a missing gtag (ad blocker / dev) never breaks the flow. */
+function beTrack(eventName, params) {
+  try {
+    if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+      window.gtag('event', eventName, params || {});
+    }
+  } catch (e) { /* analytics must never break the booking flow */ }
+}
+
+/* Map a selected room + rate into a GA4 items[] entry. */
+function gaItem(room, rate, search) {
+  if (!room) return null;
+  const nights = dateDiff(search.checkin, search.checkout);
+  const nightly = rate === 'best' ? room.priceFlexible : Math.round(room.priceFlexible / 0.9);
+  return {
+    item_id: room.roomTypeId || room.id,
+    item_name: room.name,
+    item_category: 'habitacion',
+    item_variant: rate === 'best' ? 'best_price' : 'flexible',
+    price: nightly,
+    quantity: Math.max(1, nights)
+  };
+}
+
 /* ── Helper: get query parameters on load ────────── */
 function parseQueryParams() {
   const params = new URLSearchParams(window.location.search);
@@ -649,6 +677,15 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
 
   const handlePayment = async () => {
     setPaymentError(null);
+    /* A-6: payment initiated. value is what we charge online (subtotal, no IVA,
+       matching the Wompi amount). */
+    const gi = gaItem(booking.room, booking.rate, search);
+    beTrack('add_payment_info', {
+      currency: 'COP',
+      value: calc ? calc.subtotal : 0,
+      payment_type: paymentMethod,
+      items: gi ? [gi] : []
+    });
 
     if (paymentMethod === 'mercadopago') {
       setLoading(true);
@@ -1615,6 +1652,12 @@ function BookingEngine() {
     setSelectedRoom(room);
     setSelectedRate(rate);
     setCurrentStep('extras');
+    /* A-6: room chosen → select_item + begin_checkout (start of the funnel). */
+    const gi = gaItem(room, rate, search);
+    if (gi) {
+      beTrack('select_item', { item_list_id: 'rooms', items: [gi] });
+      beTrack('begin_checkout', { currency: 'COP', value: gi.price * gi.quantity, items: [gi] });
+    }
   }
 
   function handleSearch(s) {
@@ -1654,6 +1697,17 @@ function BookingEngine() {
       if (cancelled) return;
       setCreatingReservation(false);
       if (success) {
+        /* A-6: client-side purchase. The webhook also reports the conversion
+           server-side (Measurement Protocol) so ad-blocked sessions still
+           count; GA4 dedupes on transaction_id. value = amount charged online
+           (subtotal, no IVA). */
+        const gi = gaItem(booking.room, booking.rate, search);
+        beTrack('purchase', {
+          transaction_id: finalCode,
+          currency: 'COP',
+          value: calc ? calc.subtotal : 0,
+          items: gi ? [gi] : []
+        });
         setBookingCode(finalCode);
         /* Reservation locked in — clear the draft so a future visitor on this
            browser does not see this guest's data pre-filled. */
