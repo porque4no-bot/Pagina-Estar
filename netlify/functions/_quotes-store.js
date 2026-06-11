@@ -38,7 +38,12 @@ function getQuoteStore() {
 
 async function loadQuote(store, id) {
   const raw = await store.get(id);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    throw Object.assign(new Error(`Quote ${id} is corrupt: ${e.message}`), { statusCode: 500 });
+  }
 }
 
 async function saveQuote(store, quote) {

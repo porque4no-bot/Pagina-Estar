@@ -82,6 +82,7 @@
 
   const $ = selector => document.querySelector(selector);
   const $$ = selector => Array.from(document.querySelectorAll(selector));
+  const escHtml = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const money = value => new Intl.NumberFormat('es-CO', {
     style: 'currency',
     currency: 'COP',
@@ -597,9 +598,9 @@
     container.innerHTML = state.guestSlots.map((slot, index) => `
       <article class="guest-occupant-card${index === state.activeGuestIndex ? ' is-active' : ''}${slot.isMinor ? ' is-minor' : ''}" data-guest-slot="${index}">
         <button type="button" class="guest-occupant-main" data-select-guest="${index}">
-          <strong>${slotLabel(slot, index)}</strong>
-          <small>${slotStatusLabel(slot)}</small>
-          ${slot.isMinor ? `<span class="guest-minor-flag">${t('minorBadge')}</span>` : ''}
+          <strong>${escHtml(slotLabel(slot, index))}</strong>
+          <small>${escHtml(slotStatusLabel(slot))}</small>
+          ${slot.isMinor ? `<span class="guest-minor-flag">${escHtml(t('minorBadge'))}</span>` : ''}
         </button>
         <label class="guest-primary-choice">
           <input type="radio" name="primaryGuest" value="${index}" ${slot.isPrimary ? 'checked' : ''}>

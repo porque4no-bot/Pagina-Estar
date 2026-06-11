@@ -83,9 +83,10 @@ exports.handler = async (event, context) => {
   }
 
   if (!checkin || !checkout) {
-    checkin = event.queryStringParameters.checkin;
-    checkout = event.queryStringParameters.checkout;
-    guests = parseInt(event.queryStringParameters.guests) || 1;
+    const qs = event.queryStringParameters || {};
+    checkin = qs.checkin;
+    checkout = qs.checkout;
+    guests = parseInt(qs.guests) || 1;
   }
 
   if (!checkin || !checkout) {
@@ -96,17 +97,21 @@ exports.handler = async (event, context) => {
     };
   }
 
-  if (new Date(checkin) >= new Date(checkout)) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Check-in must be before check-out' }) };
+  const checkinDate = new Date(checkin);
+  const checkoutDate = new Date(checkout);
+  if (Number.isNaN(checkinDate.getTime()) || Number.isNaN(checkoutDate.getTime())) {
+    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Invalid date format' }) };
+  }
+
+  if (checkinDate >= checkoutDate) {
+    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Check-in must be before check-out' }) };
   }
 
   if (guests < 1 || guests > 10) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Guests must be between 1 and 10' }) };
+    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Guests must be between 1 and 10' }) };
   }
 
   // Calculate number of nights
-  const checkinDate = new Date(checkin);
-  const checkoutDate = new Date(checkout);
   const diffTime = checkoutDate - checkinDate;
   const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 

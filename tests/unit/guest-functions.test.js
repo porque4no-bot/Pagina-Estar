@@ -7,7 +7,8 @@ process.env.GUEST_APP_DEMO_MODE = 'true';
 
 const guestHelpers = require('../../netlify/functions/_guest-app');
 const guestSession = require('../../netlify/functions/guest-session').handler;
-const guestDrive = require('../../netlify/functions/guest-drive').handler;
+const guestDriveModule = require('../../netlify/functions/guest-drive');
+const guestDrive = guestDriveModule.handler;
 
 function body(response) {
   return JSON.parse(response.body);
@@ -63,18 +64,17 @@ test('Drive webhook generates the contract PDF via service account without calli
   process.env.GOOGLE_DRIVE_APPS_SCRIPT_SECRET = 'apps-script-secret';
 
   const driveSA = require('../../netlify/functions/_google-drive');
-  const pdfRender = require('../../netlify/functions/_pdf-render');
   const contractTemplate = require('../../netlify/functions/_contract-template');
 
   const originals = {
     isConfigured: driveSA.isConfigured,
     findOrCreateFolder: driveSA.findOrCreateFolder,
-    uploadFile: driveSA.uploadFile,
-    htmlToPdfBuffer: pdfRender.htmlToPdfBuffer
+    uploadFile: driveSA.uploadFile
   };
 
   const uploads = [];
   let appsScriptCalled = false;
+  let pdfInputRecord = null;
 
   try {
     driveSA.isConfigured = async () => true;
@@ -84,11 +84,12 @@ test('Drive webhook generates the contract PDF via service account without calli
       uploads.push({ name: args.name, mimeType: args.mimeType, folderId: args.folderId });
       return { id: `id-${uploads.length}`, name: args.name, webViewLink: `https://drive/${args.name}` };
     };
-    pdfRender.htmlToPdfBuffer = async html => {
-      assert.ok(html.includes('Contrato de Hospedaje'));
-      assert.ok(html.includes('TEST-200'));
-      return Buffer.from('%PDF-fake-contents');
-    };
+    guestDriveModule._test.setDeps({
+      renderContractPDF: async record => {
+        pdfInputRecord = record;
+        return Buffer.from('%PDF-fake-contents');
+      }
+    });
 
     global.fetch = async () => {
       appsScriptCalled = true;
@@ -121,6 +122,10 @@ test('Drive webhook generates the contract PDF via service account without calli
     assert.match(pdfUpload.name, /^contrato-TEST-200-/);
     assert.equal(pdfUpload.folderId, 'folder-02_contratos');
 
+    /* Confirm renderContractPDF was called with the correct booking code. */
+    assert.ok(pdfInputRecord, 'renderContractPDF must have been called');
+    assert.equal(pdfInputRecord.bookingCode, 'TEST-200');
+
     /* Confirm the template escapes HTML so guest names with `<` cannot inject markup. */
     const sampleHtml = contractTemplate.renderContractHTML({
       bookingCode: 'X<>&"', signedName: 'A <b> B'
@@ -130,7 +135,7 @@ test('Drive webhook generates the contract PDF via service account without calli
     driveSA.isConfigured = originals.isConfigured;
     driveSA.findOrCreateFolder = originals.findOrCreateFolder;
     driveSA.uploadFile = originals.uploadFile;
-    pdfRender.htmlToPdfBuffer = originals.htmlToPdfBuffer;
+    guestDriveModule._test.resetDeps();
     global.fetch = originalFetch;
   }
 });
