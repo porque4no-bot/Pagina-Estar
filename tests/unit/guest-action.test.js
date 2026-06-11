@@ -228,3 +228,31 @@ test('guest-action contract: falls back to x-forwarded-for and rejects bogus ack
   assert.equal(persisted.acknowledgedAt, '', 'invalid client acknowledgedAt is dropped');
   guestActionModule._test.resetDeps();
 });
+
+test('guest-action contract_preview: returns 200 with rendered HTML and does not persist', async () => {
+  const token = validToken();
+  const captured = [];
+  guestActionModule._test.setDeps({
+    protectRecord: record => record,
+    guestStore: () => ({
+      setJSON: async (key, value) => { captured.push({ key, value }); }
+    })
+  });
+
+  const event = makeEvent({
+    type: 'contract_preview',
+    lang: 'en',
+    guests: [{ guest: { firstName: 'John', lastName: 'Doe', documentType: 'Passport', documentNumber: '123' }, isPrimary: true }]
+  }, token);
+
+  const res = await guestAction(event);
+  assert.equal(res.statusCode, 200);
+  const data = body(res);
+  assert.equal(data.ok, true);
+  assert.match(data.html, /<!DOCTYPE html>/i);
+  assert.match(data.html, /Hospitality Agreement/i); // English title
+  assert.match(data.html, /John Doe/i); // Guest name is in it
+  assert.equal(captured.length, 0, 'No event was persisted for preview');
+
+  guestActionModule._test.resetDeps();
+});

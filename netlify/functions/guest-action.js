@@ -180,7 +180,8 @@ function buildEvent(type, body, session, event) {
       checkIn: cleanText(body.checkIn, 20) || cleanText(session.checkIn, 20) || '',
       checkOut: cleanText(body.checkOut, 20) || cleanText(session.checkOut, 20) || '',
       roomName: cleanText(body.roomName, 120) || cleanText(session.roomName, 120) || '',
-      capacity: Number.isFinite(Number(session.capacity)) ? Number(session.capacity) : guests.length
+      capacity: Number.isFinite(Number(session.capacity)) ? Number(session.capacity) : guests.length,
+      lang: cleanText(body.lang || 'es', 5)
     };
     let renderedHtml = '';
     try {
@@ -237,6 +238,31 @@ exports.handler = async event => {
     const session = deps.requireGuest(event);
     const body = parseJsonBody(event, 50000);
     const type = String(body.type || '');
+
+    if (type === 'contract_preview') {
+      const guests = sanitizeContractGuests(body.guests);
+      const primaryGuest = guests.find(guest => guest.isPrimary) || guests[0] || {};
+      const contractRecord = {
+        bookingCode: session.sub,
+        guestName: session.guest,
+        signedName: cleanText(body.signedName || (primaryGuest.firstName && `${primaryGuest.firstName} ${primaryGuest.lastName || ''}`.trim()) || session.guest, 160),
+        phone: primaryGuest.phone || '',
+        email: primaryGuest.email || '',
+        guests,
+        acceptedTerms: false,
+        contractVersion: cleanText(body.contractVersion || CURRENT_CONTRACT_VERSION, 80),
+        signedAt: new Date().toISOString(),
+        consentText: cleanText(body.consentText, 600),
+        checkIn: cleanText(body.checkIn, 20) || cleanText(session.checkIn, 20) || '',
+        checkOut: cleanText(body.checkOut, 20) || cleanText(session.checkOut, 20) || '',
+        roomName: cleanText(body.roomName, 120) || cleanText(session.roomName, 120) || '',
+        capacity: Number.isFinite(Number(session.capacity)) ? Number(session.capacity) : guests.length,
+        lang: cleanText(body.lang || 'es', 5)
+      };
+      const html = renderContractHTML(contractRecord);
+      return json(200, { ok: true, html });
+    }
+
     const record = buildEvent(type, body, session, event);
     await deps.guestStore('guest-events').setJSON(record.eventId, deps.protectRecord(record));
 

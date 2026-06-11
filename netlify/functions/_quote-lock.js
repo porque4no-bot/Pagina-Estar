@@ -13,7 +13,6 @@
  * Exports:
  *   acquireQuoteLock(quoteId, transactionId, deps?)
  *     -> { acquired: true }                       — first writer, proceed
- *     -> { acquired: true, alreadyOurs: true }    — same tx retrying, proceed
  *     -> { acquired: true, blobsUnavailable: true } — fail-open when Blobs unavailable
  *     -> { acquired: false, ownerTx, startedAt }  — another tx holds the lock
  *
@@ -52,10 +51,6 @@ async function acquireQuoteLock(quoteId, transactionId, deps = {}) {
     let existing;
     try { existing = await lockStore.get(quoteId, { type: 'json' }); }
     catch (readErr) { existing = null; }
-
-    if (existing && existing.transactionId === transactionId) {
-      return { acquired: true, alreadyOurs: true };
-    }
 
     const isStale = !existing || (Date.now() - (existing.startedAt || 0)) > LOCK_STALE_MS;
     if (isStale) {

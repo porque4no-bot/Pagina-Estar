@@ -114,7 +114,7 @@ test('a refused lock blocks the booking and alerts the admin', async () => {
   });
 });
 
-test('an already-held lock by the same transaction proceeds idempotently', async () => {
+test('a successfully acquired lock proceeds with the booking', async () => {
   await withOtasyncCredentials(async () => {
     const quote = baseQuote();
     const saved = [];
@@ -123,7 +123,7 @@ test('an already-held lock by the same transaction proceeds idempotently', async
       transaction(),
       CORS,
       dependencies(quote, {
-        acquireQuoteLock: async () => ({ acquired: true, alreadyOurs: true }),
+        acquireQuoteLock: async () => ({ acquired: true }),
         saveQuote: async (_s, q) => saved.push(q)
       })
     );
