@@ -78,15 +78,19 @@ async function fetchRecentApproved() {
   return { transactions: all };
 }
 
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function orphanAlertHtml(orphans) {
   const rows = orphans.map(o => `
     <tr>
-      <td>${o.quoteId || '(none)'}</td>
-      <td>${o.transactionId}</td>
-      <td>${o.reference || '(none)'}</td>
+      <td>${esc(o.quoteId || '(none)')}</td>
+      <td>${esc(o.transactionId)}</td>
+      <td>${esc(o.reference || '(none)')}</td>
       <td>${o.amountCents != null ? (o.amountCents / 100).toLocaleString('es-CO') : '?'}</td>
-      <td>${o.createdAt || '?'}</td>
-      <td>${o.reason}</td>
+      <td>${esc(o.createdAt || '?')}</td>
+      <td>${esc(o.reason)}</td>
     </tr>`).join('');
   return `
     <h2>Pagos Wompi sin reserva en OTASync</h2>

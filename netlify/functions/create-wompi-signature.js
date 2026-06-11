@@ -1,6 +1,12 @@
 const crypto = require('crypto');
 const { getQuoteStore, loadQuote, effectiveStatus, computeQuoteTotal } = require('./_quotes-store');
 
+function timingSafeEqual(a, b) {
+  const ba = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  return ba.length === bb.length && ba.length > 0 && crypto.timingSafeEqual(ba, bb);
+}
+
 function corsHeaders() {
   const headers = {
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -64,6 +70,7 @@ exports.handler = async (event) => {
   const reference = cleanReference(body.reference);
   const clientAmountInCents = parseInt(body.amountInCents, 10);
   const currency = String(body.currency || 'COP').trim().toUpperCase();
+  const publicToken = String(body.publicToken || '').trim();
 
   if (!reference || reference.length > 255 || !Number.isFinite(clientAmountInCents) || clientAmountInCents <= 0 || currency !== 'COP') {
     return json(400, { error: 'Invalid Wompi signature payload' });
@@ -83,6 +90,10 @@ exports.handler = async (event) => {
       return json(503, { error: 'Cotización no disponible. Intenta de nuevo.' });
     }
     if (!quote) return json(404, { error: 'Cotización no encontrada' });
+
+    if (quote.publicToken && !timingSafeEqual(publicToken, quote.publicToken)) {
+      return json(403, { error: 'Token de acceso inválido' });
+    }
 
     const status = effectiveStatus(quote);
     if (status === 'cancelada' || status === 'vencida' || status === 'aceptada') {

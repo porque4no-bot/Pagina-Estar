@@ -1,37 +1,4 @@
-const fs = require('fs');
-const path = require('path');
-
-// Helper to load local .env variables if not already set
-function loadEnv() {
-  if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') {
-    return;
-  }
-  try {
-    const envPath = path.join(__dirname, '../../.env');
-    if (fs.existsSync(envPath)) {
-      const envContent = fs.readFileSync(envPath, 'utf8');
-      envContent.split('\n').forEach(line => {
-        const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-        if (match) {
-          const key = match[1];
-          let value = match[2] || '';
-          if (value.startsWith('"') && value.endsWith('"')) {
-            value = value.substring(1, value.length - 1);
-          } else if (value.startsWith("'") && value.endsWith("'")) {
-            value = value.substring(1, value.length - 1);
-          }
-          if (!process.env[key]) {
-            process.env[key] = value.trim();
-          }
-        }
-      });
-    }
-  } catch (e) {
-    console.error('Failed to load local .env file:', e.message);
-  }
-}
-
-loadEnv();
+require('./_env');
 
 // In-memory rate limiter: max 15 requests per IP per minute
 const getBookingRateLimit = new Map(); // ip -> [timestamps]

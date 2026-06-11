@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+require('./_env');
 const crypto = require('crypto');
 const { getStore } = require('@netlify/blobs');
 const {
@@ -9,38 +10,6 @@ const { getAvailabilityByType, findUnavailable, releaseHold, buildExtrasFromQuot
 const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
 
 const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
-
-// Helper to load local .env variables if not already set (e.g. local development)
-function loadEnv() {
-  if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') {
-    return;
-  }
-  try {
-    const envPath = path.join(__dirname, '../../.env');
-    if (fs.existsSync(envPath)) {
-      const envContent = fs.readFileSync(envPath, 'utf8');
-      envContent.split('\n').forEach(line => {
-        const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-        if (match) {
-          const key = match[1];
-          let value = match[2] || '';
-          if (value.startsWith('"') && value.endsWith('"')) {
-            value = value.substring(1, value.length - 1);
-          } else if (value.startsWith("'") && value.endsWith("'")) {
-            value = value.substring(1, value.length - 1);
-          }
-          if (!process.env[key]) {
-            process.env[key] = value.trim();
-          }
-        }
-      });
-    }
-  } catch (e) {
-    console.error('Failed to load local .env file:', e.message);
-  }
-}
-
-loadEnv();
 
 /* Session key (pkey) shared across functions via Netlify Blobs.
    See _otasync.getSessionKey for the implementation. */
@@ -321,6 +290,9 @@ function buildQuoteRooms(quote, roomDetails) {
      { acquired: true }                     — first writer, proceed
      { acquired: true, alreadyOurs: true }  — same transaction retrying, proceed
      { acquired: false, ownerTx, startedAt } — another transaction holds the lock */
+const LOCK_STALE_MS = 5 * 60 * 1000; // 5 minutes: a lock older than this is treated as abandoned
+const LOCK_TTL_S   = 360;            // 6 min blob TTL — auto-expiry safety net
+
 async function acquireQuoteLock(quoteId, transactionId) {
   let lockStore;
   try { lockStore = getStore({ name: 'quote-locks', consistency: 'strong' }); }
@@ -333,22 +305,43 @@ async function acquireQuoteLock(quoteId, transactionId) {
   }
 
   try {
-    await lockStore.setJSON(quoteId, { transactionId, startedAt: Date.now() }, { onlyIfNew: true });
+    await lockStore.setJSON(quoteId, { transactionId, startedAt: Date.now() }, { onlyIfNew: true, ttl: LOCK_TTL_S });
     return { acquired: true };
   } catch (e) {
-    /* Lock already exists. If it's our own retry, proceed idempotently;
-       otherwise refuse so the second writer doesn't double-book. */
+    /* Lock already exists. Check staleness first; if stale, overwrite. */
     let existing;
     try { existing = await lockStore.get(quoteId, { type: 'json' }); }
     catch (readErr) { existing = null; }
+
     if (existing && existing.transactionId === transactionId) {
       return { acquired: true, alreadyOurs: true };
     }
+
+    const isStale = !existing || (Date.now() - (existing.startedAt || 0)) > LOCK_STALE_MS;
+    if (isStale) {
+      try {
+        await lockStore.setJSON(quoteId, { transactionId, startedAt: Date.now() }, { ttl: LOCK_TTL_S });
+        console.warn(`[wompi-webhook] overwrote stale lock for ${quoteId} (owner was ${existing && existing.transactionId})`);
+        return { acquired: true };
+      } catch (overwriteErr) {
+        console.error('[wompi-webhook] stale lock overwrite failed:', overwriteErr.message);
+      }
+    }
+
     return {
       acquired: false,
       ownerTx: existing && existing.transactionId,
       startedAt: existing && existing.startedAt
     };
+  }
+}
+
+async function releaseQuoteLock(quoteId) {
+  try {
+    const lockStore = getStore({ name: 'quote-locks', consistency: 'strong' });
+    await lockStore.delete(quoteId);
+  } catch (e) {
+    console.warn('[wompi-webhook] releaseQuoteLock failed (non-fatal):', e.message);
   }
 }
 
@@ -370,6 +363,7 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
     getSessionKey,
     fetch,
     acquireQuoteLock,
+    releaseQuoteLock,
     ...overrides
   };
   const quoteId = transaction.reference;
@@ -420,6 +414,11 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
     } catch (e) { console.error('[wompi-webhook] double-pay alert email failed:', e.message); }
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Quote already being processed by another transaction', ownerTx: lock.ownerTx }) };
   }
+
+  /* Wrap the rest of processing so the lock is always released on exit.
+     The quote is saved as 'aceptada' before the lock is released, so
+     a concurrent webhook retrying after release hits the duplicate check. */
+  try {
 
   // Verify the paid amount matches the server-computed total (anti-tampering).
   const { totalCents } = deps.computeQuoteTotal(quote);
@@ -662,7 +661,10 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
     }
   } catch (e) { console.error('[wompi-webhook] confirmation email failed:', e.message); }
 
-  return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, bookingCode }) };
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, bookingCode }) };
+  } finally {
+    if (!lock.blobsUnavailable) await deps.releaseQuoteLock(quoteId);
+  }
 }
 
 exports.handler = async (event, context) => {
