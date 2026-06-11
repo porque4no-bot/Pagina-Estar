@@ -1,16 +1,30 @@
 const crypto = require('crypto');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const {
-  archiveGuestPayload,
+  archiveGuestPayload: _archiveGuestPayload,
   cleanText,
   corsHeaders,
-  guestStore,
+  guestStore: _guestStore,
   json,
   parseJsonBody,
-  protectRecord,
-  requireGuest,
-  syncGuestEvent
+  protectRecord: _protectRecord,
+  requireGuest: _requireGuest,
+  syncGuestEvent: _syncGuestEvent
 } = require('./_guest-app');
+
+const defaultDeps = {
+  archiveGuestPayload: _archiveGuestPayload,
+  guestStore: _guestStore,
+  protectRecord: _protectRecord,
+  requireGuest: _requireGuest,
+  syncGuestEvent: _syncGuestEvent
+};
+const deps = { ...defaultDeps };
+
+exports._test = {
+  setDeps(overrides = {}) { Object.assign(deps, overrides); },
+  resetDeps() { Object.assign(deps, defaultDeps); }
+};
 
 const SERVICE_CATALOG = {
   breakfast: { name: 'Desayuno local', price: 28000 },
@@ -145,15 +159,15 @@ exports.handler = async event => {
   if (!limited.ok) return rateLimitResponse(corsHeaders(), limited.retryAfter);
 
   try {
-    const session = requireGuest(event);
+    const session = deps.requireGuest(event);
     const body = parseJsonBody(event, 50000);
     const type = String(body.type || '');
     const record = buildEvent(type, body, session);
-    await guestStore('guest-events').setJSON(record.eventId, protectRecord(record));
+    await deps.guestStore('guest-events').setJSON(record.eventId, deps.protectRecord(record));
 
-    const sync = await syncGuestEvent(record);
+    const sync = await deps.syncGuestEvent(record);
     const archive = type === 'contract'
-      ? await archiveGuestPayload({ kind: 'guest-contract', record })
+      ? await deps.archiveGuestPayload({ kind: 'guest-contract', record })
       : { configured: false, delivered: false };
 
     const response = {

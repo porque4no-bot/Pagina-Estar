@@ -1270,6 +1270,16 @@
     const button = $('#signContract');
     const signedName = $('#signedName').value.trim();
     const acceptedTerms = $('#contractAccepted').checked;
+    if (!signedName) {
+      setStatus($('#contractStatus'), 'Escribe tu nombre completo para firmar.', 'error');
+      $('#signedName').focus();
+      return;
+    }
+    if (!acceptedTerms) {
+      setStatus($('#contractStatus'), 'Debes aceptar el contrato para continuar.', 'error');
+      $('#contractAccepted').focus();
+      return;
+    }
     saveActiveGuestFromForm();
     const data = await submitAction({
       type: 'contract',
