@@ -153,6 +153,7 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | `booking-status` | Polls webhook confirmation status after payment (used by motor-app polling loop) |
 | `send-confirmation` | Sends email confirmation to guest via Resend |
 | `get-booking` | Retrieves a booking by reference code — **requires a second factor (email or surname)**; returns a uniform not-found on mismatch so an enumerated code alone discloses no PII |
+| `request-cancellation` | Records a guest cancellation request (same second-factor gate as `get-booking`), alerts the hotel team and acknowledges the guest by email. Does **not** auto-cancel in OTASync nor auto-refund — refund rails pending (see `docs/pendientes.md`) |
 | `get-booking-rating` | Fetches Booking.com rating via `PROXY_URL`; returns hardcoded fallback if unconfigured |
 | `get-reviews` | Fetches property reviews |
 

@@ -116,6 +116,6 @@ function adminAvailabilityLostHtml({ quote, shortfalls }) {
 }
 
 module.exports = {
-  sendEmail, adminEmail,
+  sendEmail, adminEmail, esc, formatCOP, formatDateES,
   paymentConfirmationHtml, adminPendingHtml, adminAvailabilityLostHtml
 };

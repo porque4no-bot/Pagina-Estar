@@ -295,3 +295,6 @@ exports.handler = async (event, context) => {
 };
 
 exports._test = { identityMatches, normalizeName };
+/* Shared with request-cancellation so both endpoints apply the exact same
+   second-factor gate and reservation normalization. */
+exports.helpers = { identityMatches, normalizeName, normalizeReservation, calcNights };
