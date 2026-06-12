@@ -63,7 +63,7 @@
   "howToGet": "Cómo llegar",
   "howToGetDesc": "Carrera 23 #62-70, Manizales. Parqueadero cubierto disponible.",
   "checkInOut": "Check-in / check-out",
-  "checkInOutDesc": "Llegada desde las 3:00 pm. Salida antes de las 12:00 m.",
+  "checkInOutDesc": "Llegada desde las 3:00 pm. Salida antes de las 11:00 am.",
   "directContact": "Contacto directo",
   "manageBooking": "Gestionar reserva",
   "manageIntro": "Consulta, modifica o cancela tu reserva. Solo necesitas el código y tu correo.",
@@ -146,7 +146,7 @@
   "extrasDescs": {
     "desayuno": "Café, fruta y huevos cada mañana",
     "parqueadero": "Garaje cubierto en el edificio",
-    "late": "Salida hasta las 3:00 pm (sujeto a disponibilidad)",
+    "late": "Salida hasta las 5:00 pm (sujeto a disponibilidad)",
     "early": "Entrada desde las 10:00 am (sujeto a disponibilidad)",
     "traslado": "Hacia o desde La Nubia",
     "tour": "4 horas con guía local certificado"

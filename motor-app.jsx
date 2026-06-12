@@ -1027,6 +1027,35 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
   );
 }
 
+/* ── MobileSummaryBar (sticky total on phones) ─────────────
+   The editorial sidebar summary is hidden at <=680px; this collapsible
+   sticky bar keeps the running total visible while the guest fills the
+   form on mobile. Tapping it expands the full BookingSummary. */
+function MobileSummaryBar({ booking, search, lang }) {
+  const [open, setOpen] = useState(false);
+  if (!booking.room) return null;
+  const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
+  if (!calc) return null;
+  const nights = dateDiff(search.checkin, search.checkout);
+  const t = i18nEngine[lang];
+  return (
+    <div className={`be-mobile-summary${open ? ' open' : ''}`}>
+      <button type="button" className="be-msum-bar" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+        <span className="be-msum-info">
+          <span className="be-msum-meta">{(lang === 'es' ? 'Total online hoy' : 'Total online today')} · {nights} {nights === 1 ? t.noche : t.noches}</span>
+          <span className="be-msum-total">{formatCOP(calc.subtotal)}</span>
+        </span>
+        <Icon name="chevron-down" size={20} className="be-msum-chevron" />
+      </button>
+      {open && (
+        <div className="be-msum-panel">
+          <BookingSummary booking={booking} search={search} lang={lang} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── BookingSummary (sidebar editorial) ───────────── */
 function BookingSummary({ booking, search, lang }) {
   const t = i18nEngine[lang];
@@ -1814,6 +1843,11 @@ function BookingEngine() {
             <p className="t-body-sm" style={{ margin: 0, color: 'var(--fg-muted)' }}>
               {lang === 'es' ? 'Tu pago fue aprobado. Esto puede tomar unos segundos…' : 'Your payment was approved. This may take a few seconds…'}
             </p>
+            <p className="t-body-sm" style={{ margin: '4px 0 0 0', color: 'var(--fg-muted)' }}>
+              {lang === 'es'
+                ? 'Puedes cerrar esta ventana con tranquilidad: te enviaremos la confirmación por correo en cuanto el proceso termine.'
+                : 'You can safely close this window: we will email your confirmation as soon as the process finishes.'}
+            </p>
           </div>
         </div>
       </div>
@@ -1868,6 +1902,7 @@ function BookingEngine() {
         <PaymentReturnNotice status={initialParams.payment} lang={lang} />
         <SearchBar search={search} onSearch={handleSearch} lang={lang} />
         <StepProgress currentStep={currentStep} lang={lang} />
+        <MobileSummaryBar booking={booking} search={search} lang={lang} />
         <div className="be-body">
           <div className="be-steps">
 

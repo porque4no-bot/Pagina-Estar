@@ -5480,3 +5480,6 @@ textarea:focus-visible,
   .quote-total-final span:last-child { font-size: 22px; }
   a[href]::after { content: none !important; }
 }
+
+/* Contact form SLA reassurance note */
+.form-sla-note{margin:-4px 0 18px;font:600 13px var(--font-body);color:var(--olive-700)}
