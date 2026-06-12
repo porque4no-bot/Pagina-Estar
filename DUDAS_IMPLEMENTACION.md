@@ -1,5 +1,34 @@
 # 📋 Dudas y decisiones para implementar las mejoras (todas las fases)
 
+---
+
+## ✅ ESTADO (actualizado tras implementación)
+
+**Fase 0 y Fase 1: IMPLEMENTADAS** con las decisiones del cliente. **Fase 2: EN PAUSA** (políticas a revisar con los fundadores).
+
+| # | Decisión registrada |
+|---|---|
+| 1.1 | Check-out siempre 11:00 a. m. (todas las tipologías y estadías) |
+| 1.2 | Late check-out hasta 5:00 p. m. por $60.000 (corrige el $80.000 de la guest app) |
+| 2.1 | Texto de polling aprobado |
+| 3.1 | Resumen móvil: barra sticky superior expandible (opción a) |
+| 4.1 | SLA contacto: menos de 24 horas |
+| 4.2 | SLA Concierge guest app: máximo 10 min en horario 6–10 a. m. y 4–10 p. m. |
+| 5.1 | Reseñas de Booking reutilizadas en empresas/grupos/vivir + score en vivo |
+| 5.2 | Sin testimonios propios aún → nota TODO para personalizar por persona |
+| 6.1 | Empresas: valor = facilidades/servicio/cercanía (no ahorro) |
+| 7 | Empresas: mismas tarifas públicas, hasta 15% por convenio, nota de contratación directa (sin sobrecosto de broker) |
+| 8.1 | Grupos: descuento por persona hasta 30% (sin rangos rígidos) |
+| 8.2 | Bloqueo 48h sin compromiso para reservas con >1 semana de anticipación |
+| 8.3 | Grupos: anticipo de al menos 50% |
+| 9.1 | (técnico, resuelto sin tu intervención) Confirmación "✓ Documento cargado" |
+| 9.2 | Badge del carrito (oculto cuando vacío) |
+
+**Fase 2 (en pausa hasta revisar con fundadores):** cancelación (10.1–10.4), FAQ (11.1–11.5), estadía larga (12.1–12.5). Quedan abajo tal cual para cuando tengas los datos.
+
+---
+
+
 > **Cómo usar este documento:** responde marcando junto a cada número (ej. *"1 → 11:00 para todo"*, *"7a → desde $180.000"*). Lo que dejes sin responder, lo implemento con la opción marcada como **(default propuesto)**. Lo que está como **[BLOQUEANTE]** no puedo inventarlo: necesito tu dato real (precios, políticas, SLA).
 >
 > Leyenda: 🟥 Fase 0 · 🟧 Fase 1 · 🟨 Fase 2
