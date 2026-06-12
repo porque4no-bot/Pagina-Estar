@@ -34,10 +34,10 @@
 - `vivir.html` **sí** publica matriz completa por tipología y tramo (1-2 / 3-5 / 6-11 / 12+ meses) → es el patrón a replicar.
 - **Impacto:** El B2B abandona o difiere la decisión cuando no hay ancla de precio. Un "desde $X corporativo/noche" reduce la fricción sin comprometer la negociación final.
 
-### 🟠 Ausencia de testimonios (solo números)
-- Hay prueba social cuantitativa fuerte (Booking 9.0 · 126 reseñas, Superhost, RNT 276306) en el hero y `nosotros.html`, pero **ningún quote de cliente** en toda la web.
-- Empresas lista logos (Universidad Nacional, Hospital de Caldas, Sura...) pero **sin caso de éxito narrativo ni cifra de ahorro**.
-- **Impacto:** El número "9.0" es estático; un testimonio con nombre/cara convierte mejor, especialmente en `empresas`, `grupos` y `vivir` (estos dos últimos sin ninguna prueba social).
+### 🟠 Prueba social sólo en la home (B2B sin testimonios)
+- La **home sí tiene una sección de reseñas completa** (`index.html:861+`): 9+ testimonios reales de Booking.com con texto, autor, país, perfil y fecha, alimentados por `get-reviews.js` + `get-booking-rating.js` vía scraper (`PROXY_URL`) con fallback. El rating 9.0 se mantiene actualizado automáticamente. **Esto es una fortaleza, no un vacío.**
+- El vacío real está en **`empresas.html`, `grupos.html`, `vivir.html` y `nosotros.html`: 0 bloques de testimonio** (verificado). Empresas lista logos pero **sin caso de éxito narrativo ni cifra de ahorro**.
+- **Impacto:** La oportunidad no es "crear testimonios" sino **reutilizar el componente de reseñas de la home** (y/o añadir 1-2 testimonios por segmento) en las páginas B2B, donde hoy la decisión es de mayor ticket y no hay prueba social.
 
 ### 🟡 SLA de respuesta inconsistente
 - "Menos de 24 horas" aparece en empresas/grupos/vivir/contacto, pero **no** en el panel Concierge de `guest.html` ni en el formulario de `contacto.html` (sin feedback post-envío).
@@ -144,7 +144,7 @@
 | # | Acción | Página(s) | Por qué |
 |---|---|---|---|
 | 7 | Publicar **precio ancla** corporativo y escala de descuento por unidades | `empresas.html`, `grupos.html` | Desbloquea decisión B2B |
-| 8 | Añadir **testimonios reales** (CFO, médico residente, organizador) | `empresas`, `grupos`, `vivir`, `nosotros` | Convierte donde hoy solo hay números/logos |
+| 8 | **Reutilizar la sección de reseñas de la home** en páginas B2B (+1-2 testimonios por segmento) | `empresas`, `grupos`, `vivir`, `nosotros` | Lleva la prueba social que ya existe a donde hoy no la hay |
 | 9 | Criterios + SLA + tasa de aprobación de estadía larga | `vivir.html` | Cierra el principal vacío de la mejor página |
 | 10 | Ejemplos numéricos de reembolso + acotar a "7–10 días hábiles" | `cancelacion.html` | Elimina ansiedad y consultas repetidas |
 | 11 | Expandir FAQ a ~12 preguntas y enlazar a cancelación | `faq.html` | Reduce contactos post-reserva |
@@ -158,7 +158,7 @@
 | Dimensión | Nota | Comentario |
 |---|---|---|
 | Marca y tono | 9/10 | Cálido, local, humano; "estar" como verbo |
-| Confianza (B2C) | 8.5/10 | Sellos fuertes; falta testimonio cualitativo |
+| Confianza (B2C) | 9/10 | Sellos fuertes + sección de reseñas Booking con scraper en vivo |
 | Confianza (B2B) | 6/10 | Logos sí, casos/cifras/precio no |
 | Motor de reserva | 8/10 | Robusto; fricciones de carrito/polling en móvil |
 | Claridad de precios | 7/10 | Excelente en `vivir`, opaca en B2B |
