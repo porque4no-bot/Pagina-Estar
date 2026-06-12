@@ -141,7 +141,67 @@ reembolsos.
 
 ---
 
-## 4. Notas relacionadas (de la misma revisión, sin dueño aún)
+## 4. Booking.com — configurar el cobro de las reservas
+
+**Objetivo:** dejar de depender del cobro manual de las reservas que entran
+por Booking.com y definir el modelo de pago oficial del canal.
+
+**Los dos modelos posibles:**
+
+1. **Payments by Booking.com (recomendado evaluar primero).** Booking le
+   cobra al huésped (tarjeta, PSE, wallets — métodos que el hotel no podría
+   aceptar solo) y le paga al hotel por uno de dos medios según el país:
+   - **Tarjeta de crédito virtual (VCC):** una Mastercard digital por
+     reserva, que se activa normalmente el día del check-in y se cobra como
+     cualquier tarjeta no presente. Se puede cobrar hasta 6 meses después
+     del check-out (extensible otros 6). **Requisito operativo:** un medio
+     para cobrar tarjeta no presente — datáfono con digitación manual
+     (Redeban/Credibanco) o terminal virtual del adquirente. Conectar esto
+     con el procedimiento de datáfono del punto 3.
+   - **Transferencia bancaria:** payout consolidado; disponibilidad por país.
+   Ventajas: elimina no-shows con tarjetas inválidas, menos manejo PCI de
+   tarjetas de huéspedes, cobro garantizado. Contras: fee adicional de
+   procesamiento sobre la comisión, y flujo de caja atado a la fecha de
+   activación de la VCC.
+2. **Cobro directo por el hotel (modelo actual implícito):** Booking pasa
+   los datos de la tarjeta del huésped (requiere acceso PCI activado en la
+   extranet) y el hotel cobra manualmente según su política. Contras: carga
+   operativa, tarjetas declinadas/no válidas, riesgo PCI, disputas.
+
+**Pasos para configurarlo (extranet):**
+1. Extranet → **Finanzas → Payments by Booking.com** (u "Online payments"):
+   verificar elegibilidad de la propiedad en Colombia y el medio de payout
+   ofrecido (VCC vs transferencia).
+2. Revisar/ajustar **políticas de prepago y cancelación por plan de tarifa** —
+   determinan cuándo Booking le cobra al huésped (al reservar, a X días del
+   check-in, o no reembolsable inmediato) y por tanto cuándo hay plata.
+3. Si el payout es VCC: confirmar con el banco/adquirente que el datáfono
+   permite **digitación manual de tarjeta no presente** (o solicitar terminal
+   virtual), y documentar en recepción el procedimiento de cobro de VCC
+   (fecha de activación, monto exacto, no sobrepasar el saldo).
+4. Definir el tratamiento de **no-shows y cancelaciones tardías** del canal
+   (Booking cobra y paga vía VCC según la política configurada).
+5. **Conciliación:** las reservas de Booking llegan a OTASync por el channel
+   manager, pero el dinero (VCC/transferencia) y la factura de comisión van
+   por otro lado — incluir este flujo en la conciliación contable (fase
+   Odoo, punto 1: ventas OTA + comisiones Booking como gasto).
+
+**Preguntas para el account manager de Booking:**
+- ¿Qué medios de payout están habilitados para Colombia y esta propiedad?
+- ¿Fee de procesamiento de Payments by Booking sobre la comisión actual?
+- ¿Se puede activar por plan de tarifa (p. ej. solo no-reembolsables) o es
+  todo-o-nada?
+- ¿Cómo se manejan los reembolsos al huésped cuando Booking cobró (los hace
+  Booking directamente)?
+
+**Fuentes:**
+- [Payments by Booking.com — FAQs oficiales](https://partner.booking.com/en-us/help/policies-payments/payment-products/payments-bookingcom-faqs)
+- [Booking.com — Online Payments (partners)](https://partner.booking.com/en-us/solutions/online-payments)
+- [Cloudbeds — FAQ de tarjetas virtuales (VCC) de Booking.com](https://myfrontdesk.cloudbeds.com/hc/en-us/articles/44061325834779-Booking-com-VCC-FAQ)
+
+---
+
+## 5. Notas relacionadas (de la misma revisión, sin dueño aún)
 
 - Pre-hold de inventario en el checkout directo (reutilizar `createHold`).
 - Reintento con backoff en `insertReservation` (hoy 1 intento / timeout 10 s).
