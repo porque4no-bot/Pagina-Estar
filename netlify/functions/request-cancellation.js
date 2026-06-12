@@ -82,6 +82,76 @@ function guestAckHtml({ booking }) {
     <p>— Equipo Estar, Manizales</p>`;
 }
 
+/* Core flow shared by the HTTP handler and the WhatsApp bot
+   (_whatsapp-bot.js). Returns a discriminated result:
+     { ok: false, code: 'not_found' | 'not_cancellable' | 'notify_failed' }
+     { ok: true,  code: 'submitted' | 'already_requested', booking }
+   Throws on infrastructure errors (OTASync down) — callers map that to their
+   own error response. */
+async function submitCancellationRequest({ bookingCode, providedFactor, clientIp, source }) {
+  const booking = await fetchReservation(bookingCode);
+  /* Uniform not-found on mismatch — same anti-enumeration contract as
+     get-booking (A-1/A-2). */
+  if (!booking || !bookingHelpers.identityMatches(booking, providedFactor)) {
+    return { ok: false, code: 'not_found' };
+  }
+  if (!booking.canCancel) {
+    return { ok: false, code: 'not_cancellable', status: booking.status };
+  }
+
+  /* Idempotency + audit trail. Blobs being unavailable (local dev) must not
+     block the request — the admin email is the operative notification. */
+  let store = null;
+  try {
+    const { getStore } = require('@netlify/blobs');
+    store = getStore({ name: 'cancellation-requests', consistency: 'strong' });
+    const existing = await store.get(bookingCode);
+    if (existing) {
+      const prev = JSON.parse(existing);
+      if (prev.requestedAt && Date.now() - prev.requestedAt < DEDUP_WINDOW_MS) {
+        return { ok: true, code: 'already_requested', booking };
+      }
+    }
+  } catch (e) {
+    if (process.env.DEBUG) console.warn('[request-cancellation] Blobs unavailable, skipping dedup:', e.message);
+    store = null;
+  }
+
+  const adminResult = await sendEmail({
+    to: adminEmail(),
+    subject: `Solicitud de cancelación — ${booking.bookingCode}`,
+    html: adminCancellationHtml({ booking, clientIp: clientIp || 'unknown' })
+  });
+  if (!adminResult.sent) {
+    /* If the hotel was not notified the request would silently die; tell
+       the guest to use WhatsApp instead of faking success. */
+    console.error('[request-cancellation] admin alert failed for', booking.bookingCode);
+    return { ok: false, code: 'notify_failed' };
+  }
+
+  if (booking.guestEmail) {
+    try {
+      await sendEmail({
+        to: booking.guestEmail,
+        subject: `Recibimos tu solicitud de cancelación — ${booking.bookingCode}`,
+        html: guestAckHtml({ booking })
+      });
+    } catch (e) {
+      console.error('[request-cancellation] guest ack failed:', e.message);
+    }
+  }
+
+  if (store) {
+    try {
+      await store.set(bookingCode, JSON.stringify({ requestedAt: Date.now(), clientIp: clientIp || 'unknown', status: booking.status, source: source || 'web' }));
+    } catch (e) {
+      if (process.env.DEBUG) console.warn('[request-cancellation] audit write failed:', e.message);
+    }
+  }
+
+  return { ok: true, code: 'submitted', booking };
+}
+
 exports.handler = async (event) => {
   const allowedOrigin = process.env.ALLOWED_ORIGIN;
   const corsHeaders = {
@@ -120,72 +190,29 @@ exports.handler = async (event) => {
   }
 
   try {
-    const booking = await fetchReservation(bookingCode);
-    /* Uniform not-found on mismatch — same anti-enumeration contract as
-       get-booking (A-1/A-2). */
-    if (!booking || !bookingHelpers.identityMatches(booking, providedFactor)) {
-      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: false, found: false }) };
-    }
-    if (!booking.canCancel) {
-      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: false, found: true, reason: 'not_cancellable', status: booking.status }) };
-    }
-
     const clientIp = event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
                      event.headers['x-nf-client-connection-ip'] || 'unknown';
+    const result = await submitCancellationRequest({ bookingCode, providedFactor, clientIp, source: 'web' });
 
-    /* Idempotency + audit trail. Blobs being unavailable (local dev) must not
-       block the request — the admin email is the operative notification. */
-    let store = null;
-    try {
-      const { getStore } = require('@netlify/blobs');
-      store = getStore({ name: 'cancellation-requests', consistency: 'strong' });
-      const existing = await store.get(bookingCode);
-      if (existing) {
-        const prev = JSON.parse(existing);
-        if (prev.requestedAt && Date.now() - prev.requestedAt < DEDUP_WINDOW_MS) {
-          return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, alreadyRequested: true }) };
-        }
-      }
-    } catch (e) {
-      if (process.env.DEBUG) console.warn('[request-cancellation] Blobs unavailable, skipping dedup:', e.message);
-      store = null;
+    if (result.code === 'not_found') {
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: false, found: false }) };
     }
-
-    const adminResult = await sendEmail({
-      to: adminEmail(),
-      subject: `Solicitud de cancelación — ${booking.bookingCode}`,
-      html: adminCancellationHtml({ booking, clientIp })
-    });
-    if (!adminResult.sent) {
-      /* If the hotel was not notified the request would silently die; tell
-         the guest to use WhatsApp instead of faking success. */
-      console.error('[request-cancellation] admin alert failed for', booking.bookingCode);
+    if (result.code === 'not_cancellable') {
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: false, found: true, reason: 'not_cancellable', status: result.status }) };
+    }
+    if (result.code === 'notify_failed') {
       return { statusCode: 502, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'notify_failed' }) };
     }
-
-    if (booking.guestEmail) {
-      try {
-        await sendEmail({
-          to: booking.guestEmail,
-          subject: `Recibimos tu solicitud de cancelación — ${booking.bookingCode}`,
-          html: guestAckHtml({ booking })
-        });
-      } catch (e) {
-        console.error('[request-cancellation] guest ack failed:', e.message);
-      }
+    if (result.code === 'already_requested') {
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, alreadyRequested: true }) };
     }
-
-    if (store) {
-      try {
-        await store.set(bookingCode, JSON.stringify({ requestedAt: Date.now(), clientIp, status: booking.status }));
-      } catch (e) {
-        if (process.env.DEBUG) console.warn('[request-cancellation] audit write failed:', e.message);
-      }
-    }
-
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true }) };
   } catch (error) {
     console.error('[request-cancellation] Error:', error.message);
     return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'Failed to submit cancellation request' }) };
   }
 };
+
+exports.submitCancellationRequest = submitCancellationRequest;
+/* Reused by the WhatsApp bot for read-only booking lookups. */
+exports.fetchReservation = fetchReservation;

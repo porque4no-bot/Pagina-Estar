@@ -192,6 +192,15 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | `upload-drive-credentials` | Service account credential upload (admin) |
 | `drive-probe` | Health check for Google Drive integration |
 
+**WhatsApp chatbot (Meta Cloud API):**
+
+| Function | Purpose |
+|---|---|
+| `whatsapp-webhook` | Receives Cloud API events: GET handshake (`hub.challenge`), POST signature validation (`X-Hub-Signature-256`, raw body), per-message dedupe, routes to `_whatsapp-bot`. Kill switch: `WHATSAPP_BOT_ENABLED` |
+| `whatsapp-probe` | Admin health check (Firebase auth): reports config booleans and verifies token + phone number id against the Graph API |
+
+See `docs/whatsapp-bot.md` for setup (credentials checklist, sandbox, flows, 24h window/templates).
+
 **Shared modules (prefixed `_`, not HTTP-callable):**
 
 | Module | Purpose |
@@ -207,6 +216,8 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | `_google-drive` | Google Drive API integration (service account) |
 | `_firebase-auth` | Firebase authentication for admin pages |
 | `_rate-limit` | Request rate limiting |
+| `_whatsapp` | WhatsApp Cloud API client: sendText/sendButtons/sendList/sendTemplate/markRead, webhook signature validation; mock no-op without credentials |
+| `_whatsapp-bot` | Bot conversation engine: state machine (Blobs sessions, 30-min TTL), ES/EN copy, date/guest parsers; calls `_otasync` for live availability and `request-cancellation` for cancellations |
 
 **OTASync/Kunas API reference:** `docs/kunas-api.md`. OTASync supports native webhooks (`reservation` insert/edit/cancel, `avail` edit, `prices`, `restrictions`) and a `reservation/delete/reservation` endpoint to release quote holds.
 
@@ -340,6 +351,19 @@ GA4 on-page tracking and Consent Mode v2 are injected by `build.js`. `consent.js
 renders the cookie banner and flips Consent Mode to granted only on opt-in
 (analytics/ads default to **denied** for every visitor). Ad pixels are emitted
 into the build **only** when their IDs are configured.
+
+**WhatsApp chatbot (Meta Cloud API):**
+```
+WHATSAPP_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+WHATSAPP_APP_SECRET=
+WHATSAPP_VERIFY_TOKEN=
+WHATSAPP_GRAPH_VERSION=
+WHATSAPP_BOT_ENABLED=
+```
+Without token/phone-number-id every send is a logged no-op (mock mode); the
+webhook rejects POSTs when `WHATSAPP_APP_SECRET` is unset. Setup guide:
+`docs/whatsapp-bot.md`.
 
 **Misc:**
 ```
