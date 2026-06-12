@@ -32,7 +32,7 @@ Meta Cloud API ──POST──▶ /api/whatsapp-webhook   (firma X-Hub-Signatur
 ## Modo IA (Claude)
 
 Con `ANTHROPIC_API_KEY` configurada, la conversación deja de ser un árbol de
-menús: **Claude** (`claude-opus-4-8` por defecto, configurable) entiende
+menús: **Claude** (`claude-haiku-4-5` por defecto — rápido y económico para chat; configurable) entiende
 lenguaje natural en español/inglés, responde preguntas generales del hotel y
 actúa a través de cuatro herramientas que reutilizan la lógica de negocio
 existente:
@@ -46,8 +46,9 @@ existente:
 
 Detalles de implementación (`_whatsapp-ai.js`):
 - **Loop manual de tool use** (Messages API) con máximo 5 iteraciones por
-  mensaje, adaptive thinking y `effort: low` por defecto (chat sensible a
-  latencia; subir vía `WHATSAPP_AI_EFFORT`).
+  mensaje. En modelos que lo soportan (Opus 4.6+/Sonnet 4.6) se activa
+  adaptive thinking con `effort: low`; en Haiku esos parámetros se omiten
+  automáticamente (`modelParams`).
 - **Memoria**: turnos de texto (sin bloques de tools) en la sesión de Blobs,
   ventana de 20 mensajes, TTL 30 min.
 - **Prompt caching**: tools + system prompt estables con breakpoint
@@ -59,10 +60,13 @@ Detalles de implementación (`_whatsapp-ai.js`):
 - **Degradación**: sin API key o ante cualquier error del modelo, el bot cae
   a la máquina de estados determinista (los menús de abajo). La palabra
   *agente* escala a humano por código, sin pasar por el modelo.
-- **Costo/latencia**: el modelo es configurable (`WHATSAPP_AI_MODEL`) — para
-  abaratar se puede usar `claude-haiku-4-5`; el default prioriza calidad de
-  servicio. Si las respuestas se cortan por timeout del function, subir el
-  timeout de funciones en Netlify (plan) o bajar `WHATSAPP_AI_TIMEOUT_MS`.
+- **Modelo**: `claude-haiku-4-5` por defecto — prioriza latencia (timeout de
+  functions de Netlify, experiencia de chat) y costo (5× más barato), con
+  calidad sobrada para un dominio acotado donde la seguridad vive en las
+  herramientas. Para máxima calidad conversacional, `WHATSAPP_AI_MODEL=claude-opus-4-8`
+  (los parámetros thinking/effort se adaptan solos al modelo). Si las
+  respuestas se cortan por timeout del function, subir el timeout en Netlify
+  o bajar `WHATSAPP_AI_TIMEOUT_MS`.
 
 ## Flujos implementados (modo determinista / fallback)
 
@@ -96,7 +100,7 @@ WHATSAPP_BOT_ENABLED=       # 'true' para que el bot responda (kill switch)
 
 # Modo IA (Claude)
 ANTHROPIC_API_KEY=          # habilita el modo IA; sin ella, menús deterministas
-WHATSAPP_AI_MODEL=          # opcional, default claude-opus-4-8
+WHATSAPP_AI_MODEL=          # opcional, default claude-haiku-4-5
 WHATSAPP_AI_EFFORT=         # opcional: low (default) | medium | high
 WHATSAPP_AI_MAX_TOKENS=     # opcional, default 8000
 WHATSAPP_AI_TIMEOUT_MS=     # opcional, default 50000

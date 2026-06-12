@@ -28,11 +28,27 @@
      other credential-gated integration in this repo. */
 
 const SITE_URL = process.env.URL || 'https://estar.com.co';
-const DEFAULT_MODEL = 'claude-opus-4-8';
+/* Haiku by default: this is a latency-sensitive chat surface running inside a
+   Netlify function timeout, the job is well-scoped (short turns, 4 tools) and
+   security lives in the tools, not the model. Switch WHATSAPP_AI_MODEL to
+   claude-opus-4-8 for maximum conversational quality. */
+const DEFAULT_MODEL = 'claude-haiku-4-5';
 const DEFAULT_EFFORT = 'low';            /* latency-sensitive chat; raise via env */
 const DEFAULT_MAX_TOKENS = 8000;         /* ceiling, not target — covers thinking + reply */
 const MAX_TOOL_ITERATIONS = 5;
 const MAX_HISTORY_MESSAGES = 20;
+
+/* Adaptive thinking and output_config.effort are only accepted by some model
+   families (Opus 4.6+, Sonnet 4.6, Fable/Mythos 5) — sending them to Haiku
+   returns a 400. Build the request shape per model. */
+function modelParams(model, effort) {
+  const supportsAdaptive = /(?:opus-4-[678]|sonnet-4-6|fable-5|mythos-5)/.test(model);
+  if (!supportsAdaptive) return {};
+  return {
+    thinking: { type: 'adaptive' },
+    output_config: { effort }
+  };
+}
 
 function aiConfig() {
   return {
@@ -259,8 +275,7 @@ async function handleWithAI(msg, session, deps) {
     const response = await client.messages.create({
       model: cfg.model,
       max_tokens: cfg.maxTokens,
-      thinking: { type: 'adaptive' },
-      output_config: { effort: cfg.effort },
+      ...modelParams(cfg.model, cfg.effort),
       system: [{
         type: 'text',
         text: buildSystemPrompt(deps.roomMeta, todayIso),
@@ -322,6 +337,6 @@ async function handleWithAI(msg, session, deps) {
 }
 
 module.exports = {
-  isEnabled, handleWithAI, executeTool, buildSystemPrompt,
+  isEnabled, handleWithAI, executeTool, buildSystemPrompt, modelParams,
   TOOLS, MAX_TOOL_ITERATIONS, MAX_HISTORY_MESSAGES, aiConfig
 };

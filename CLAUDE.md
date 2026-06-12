@@ -362,7 +362,7 @@ WHATSAPP_VERIFY_TOKEN=
 WHATSAPP_GRAPH_VERSION=
 WHATSAPP_BOT_ENABLED=
 ANTHROPIC_API_KEY=        # AI mode (Claude); unset = deterministic menu flows
-WHATSAPP_AI_MODEL=        # default claude-opus-4-8
+WHATSAPP_AI_MODEL=        # default claude-haiku-4-5 (claude-opus-4-8 for max quality)
 WHATSAPP_AI_EFFORT=       # default low
 WHATSAPP_AI_MAX_TOKENS=   # default 8000
 WHATSAPP_AI_TIMEOUT_MS=   # default 50000

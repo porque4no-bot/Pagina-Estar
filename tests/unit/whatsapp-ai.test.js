@@ -72,11 +72,26 @@ test('plain answer: one model turn, history persisted and text returned', async 
   assert.equal(reply, '¡Hola! ¿En qué te ayudo?');
   assert.equal(session.aiHistory.length, 2);
   assert.equal(session.aiHistory[0].content, 'hola, una pregunta');
-  /* Request shape: stable system with cache breakpoint, tools present */
+  /* Request shape: stable system with cache breakpoint, tools present.
+     Default model is Haiku → no thinking/effort params (they 400 there). */
   const req = client.calls[0];
   assert.ok(Array.isArray(req.tools) && req.tools.length === 4);
   assert.deepEqual(req.system[0].cache_control, { type: 'ephemeral' });
-  assert.deepEqual(req.thinking, { type: 'adaptive' });
+  assert.match(req.model, /haiku/);
+  assert.equal(req.thinking, undefined);
+  assert.equal(req.output_config, undefined);
+});
+
+test('modelParams adapts to each model family', () => {
+  assert.deepEqual(ai.modelParams('claude-haiku-4-5', 'low'), {});
+  assert.deepEqual(ai.modelParams('claude-opus-4-8', 'low'), {
+    thinking: { type: 'adaptive' },
+    output_config: { effort: 'low' }
+  });
+  assert.deepEqual(ai.modelParams('claude-sonnet-4-6', 'medium'), {
+    thinking: { type: 'adaptive' },
+    output_config: { effort: 'medium' }
+  });
 });
 
 test('tool loop: check_availability executes and result feeds the final answer', async () => {
