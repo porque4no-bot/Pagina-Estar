@@ -132,10 +132,51 @@ test('executeTool: capacity filter and cancellation passthrough', async () => {
   assert.equal(avail.rooms.length, 1);
   assert.equal(avail.rooms[0].name, 'Selección');
 
+  /* Cancellation only works for a booking verified in this session. */
+  const session = { verifiedBookings: ['EST-1'] };
   const cancel = JSON.parse(await ai.executeTool('request_cancellation',
     { booking_code: 'EST-1', email_or_lastname: 'Pérez' },
-    { ...deps, guestNumber: '57300' }));
+    { ...deps, guestNumber: '57300', session }));
   assert.deepEqual(cancel, { ok: true, code: 'submitted' });
+});
+
+test('hard gate: cancellation is refused for bookings not verified in this chat', async () => {
+  const { deps } = makeBizDeps({
+    submitCancellation: async () => { throw new Error('must not be called'); }
+  });
+  const out = JSON.parse(await ai.executeTool('request_cancellation',
+    { booking_code: 'EST-999', email_or_lastname: 'Pérez' },
+    { ...deps, guestNumber: '57300', session: { verifiedBookings: [] } }));
+  assert.deepEqual(out, { ok: false, code: 'not_verified_in_chat' });
+});
+
+test('lookup_booking verifies the code for the session and correlates the phone', async () => {
+  const booking = {
+    bookingCode: 'EST-77', status: 'confirmed', roomName: 'Clásica',
+    checkIn: '2026-07-01', checkOut: '2026-07-04', nights: 3, canCancel: true,
+    guestPhone: '+57 310 249 0414'
+  };
+  const { deps } = makeBizDeps({ lookupBooking: async () => booking });
+  const session = {};
+  const out = JSON.parse(await ai.executeTool('lookup_booking',
+    { booking_code: 'est-77', email_or_lastname: 'Pérez' },
+    { ...deps, guestNumber: '573102490414', session }));
+  assert.equal(out.found, true);
+  assert.equal(out.phoneMatchesWhatsApp, true);
+  assert.deepEqual(session.verifiedBookings, ['EST-77']);
+
+  /* Different WhatsApp number → mismatch flagged, lookup still works */
+  const session2 = {};
+  const out2 = JSON.parse(await ai.executeTool('lookup_booking',
+    { booking_code: 'EST-77', email_or_lastname: 'Pérez' },
+    { ...deps, guestNumber: '573000000000', session: session2 }));
+  assert.equal(out2.phoneMatchesWhatsApp, false);
+
+  /* After verification, cancellation passes the gate */
+  const cancel = JSON.parse(await ai.executeTool('request_cancellation',
+    { booking_code: 'EST-77', email_or_lastname: 'Pérez' },
+    { ...deps, guestNumber: '573102490414', session }));
+  assert.equal(cancel.ok, true);
 });
 
 test('executeTool: notify_team emails the admin with guest context', async () => {

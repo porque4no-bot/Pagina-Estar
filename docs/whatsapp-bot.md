@@ -32,7 +32,25 @@ Meta Cloud API ──POST──▶ /api/whatsapp-webhook   (firma X-Hub-Signatur
 ## Modo IA (Claude)
 
 Con `ANTHROPIC_API_KEY` configurada, la conversación deja de ser un árbol de
-menús: **Claude** (`claude-haiku-4-5` por defecto — rápido y económico para chat; configurable) entiende
+menús y opera un **pipeline de doble modelo**:
+
+```
+mensaje → [1. GUARDIÁN (_whatsapp-guard)] → [2. CONCIERGE (_whatsapp-ai)] → respuesta
+            clasifica seguridad               conversa + herramientas
+            malicioso ⇒ bloquea               la autorización vive en CÓDIGO
+            (nunca entra al historial)        dentro de las herramientas
+```
+
+**1. Guardián** (`claude-haiku-4-5`, salida estructurada JSON): clasifica cada
+mensaje como `safe` / `suspicious` / `malicious` ANTES de que el conversacional
+lo vea. Detecta prompt injection, suplantación de personal/sistema, extracción
+de datos de otros huéspedes y manipulación para saltarse verificaciones. Un
+mensaje bloqueado recibe respuesta neutra y **nunca entra al historial** (no
+puede envenenar turnos futuros); al tercer bloqueo en una sesión se alerta al
+equipo por correo. Si el guardián falla, el mensaje pasa (fail-open): la
+defensa real está en las reglas del concierge y en los gates de código.
+
+**2. Concierge** (`claude-haiku-4-5` por defecto, configurable): entiende
 lenguaje natural en español/inglés, responde preguntas generales del hotel y
 actúa a través de cuatro herramientas que reutilizan la lógica de negocio
 existente:
@@ -53,10 +71,18 @@ Detalles de implementación (`_whatsapp-ai.js`):
   ventana de 20 mensajes, TTL 30 min.
 - **Prompt caching**: tools + system prompt estables con breakpoint
   `cache_control`; lo único volátil es la fecha (precisión día).
-- **Guardrails**: precios solo por herramienta, pago solo en la web, segundo
-  factor obligatorio para datos de reservas, sin datos de pago por chat,
-  instrucción anti-inyección, y `stop_reason: refusal` manejado con mensaje
-  de fallback.
+- **Autorización en código, no en el prompt**: cancelar exige que el código
+  de reserva haya sido verificado con segundo factor (lookup_booking exitoso)
+  **en esa misma conversación** (`session.verifiedBookings`) — la herramienta
+  rechaza cualquier otro código aunque el modelo lo pida. Además se coteja el
+  número de WhatsApp contra el teléfono de la reserva (`phoneMatchesWhatsApp`,
+  últimos 10 dígitos): un mismatch no bloquea (la gente escribe desde otros
+  números) pero el modelo lo trata con cautela y el correo de cancelación al
+  equipo registra siempre el número solicitante (`whatsapp:+57...`).
+- **Guardrails de prompt**: precios solo por herramienta, pago solo en la web,
+  segundo factor obligatorio para datos de reservas, sin datos de pago por
+  chat, instrucción anti-inyección, y `stop_reason: refusal` manejado con
+  mensaje de fallback.
 - **Degradación**: sin API key o ante cualquier error del modelo, el bot cae
   a la máquina de estados determinista (los menús de abajo). La palabra
   *agente* escala a humano por código, sin pasar por el modelo.
@@ -104,6 +130,9 @@ WHATSAPP_AI_MODEL=          # opcional, default claude-haiku-4-5
 WHATSAPP_AI_EFFORT=         # opcional: low (default) | medium | high
 WHATSAPP_AI_MAX_TOKENS=     # opcional, default 8000
 WHATSAPP_AI_TIMEOUT_MS=     # opcional, default 50000
+WHATSAPP_GUARD_ENABLED=     # 'false' desactiva el guardián (default: activo)
+WHATSAPP_GUARD_MODEL=       # opcional, default claude-haiku-4-5
+WHATSAPP_GUARD_TIMEOUT_MS=  # opcional, default 8000
 ```
 
 Sin `WHATSAPP_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID` todo envío es un no-op

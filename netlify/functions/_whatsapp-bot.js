@@ -395,6 +395,34 @@ async function handleIncoming(msg, deps) {
     const aiMod = deps.aiModule || require('./_whatsapp-ai');
     if (aiMod.isEnabled()) {
       try {
+        /* Dual-model pipeline: a fast guard model screens the message for
+           prompt injection / impersonation / data-extraction BEFORE the
+           concierge model sees it. Blocked messages get a neutral reply and
+           never enter the AI history (no conversation poisoning). The guard
+           classifies; authorization (e.g. who may cancel which booking) is
+           enforced in code inside _whatsapp-ai's tools. */
+        const guardMod = deps.guardModule || require('./_whatsapp-guard');
+        if (guardMod.isEnabled() && msg.text) {
+          const verdict = await guardMod.screenMessage(msg, session, deps);
+          if (verdict.blocked) {
+            session.guardStrikes = (session.guardStrikes || 0) + 1;
+            if (session.guardStrikes === 3) {
+              try {
+                await deps.sendEmail({
+                  to: deps.adminEmail(),
+                  subject: `WhatsApp bot: intentos de manipulación repetidos (+${msg.from})`,
+                  html: `<p>El filtro de seguridad bloqueó 3 mensajes de este número en la misma sesión.</p>
+                         <ul><li><strong>Número:</strong> +${msg.from}</li>
+                         <li><strong>Último motivo:</strong> ${String(verdict.reason || '').replace(/</g, '&lt;')}</li>
+                         <li><strong>Categorías:</strong> ${String((verdict.categories || []).join(', ')).replace(/</g, '&lt;')}</li></ul>`
+                });
+              } catch (e) { console.error('[whatsapp-bot] guard alert failed:', e.message); }
+            }
+            await deps.wa.sendText(msg.from, guardMod.blockReply(session.lang));
+            return session;
+          }
+        }
+
         const aiMsg = { ...msg };
         if (!aiMsg.text && replyId) {
           /* A tap on a legacy button arrives with no free text — translate

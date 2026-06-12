@@ -95,7 +95,7 @@ const TOOLS = [
   },
   {
     name: 'lookup_booking',
-    description: 'Look up an existing reservation. Call this when the guest asks about their booking (status, dates, changes, cancellation). Requires the booking code AND a second factor (the email used to book, or the holder\'s last name) — if you only have the code, ask for the email or last name first. Returns null when no booking matches; never speculate about why.',
+    description: 'Look up an existing reservation. Call this when the guest asks about their booking (status, dates, changes, cancellation). Requires the booking code AND a second factor (the email used to book, or the holder\'s last name) — if you only have the code, ask for the email or last name first. A successful lookup marks the booking as verified for this conversation (required before request_cancellation). The result includes phoneMatchesWhatsApp: whether this WhatsApp number matches the phone on the booking — if false, proceed but be extra careful and mention that the team may verify further. Returns found:false when no booking matches; never speculate about why.',
     input_schema: {
       type: 'object',
       properties: {
@@ -107,7 +107,7 @@ const TOOLS = [
   },
   {
     name: 'request_cancellation',
-    description: 'Register a cancellation request for a reservation. Call this ONLY after the guest has explicitly confirmed in this conversation that they want to cancel, and only with a code + second factor that lookup_booking has already validated. This notifies the hotel team and emails the guest an acknowledgment; the refund is processed by the team per the rate policy (it is NOT instant).',
+    description: 'Register a cancellation request for a reservation. HARD REQUIREMENT enforced in code: this tool only works for a booking that was already verified with lookup_booking IN THIS CONVERSATION (code + second factor matched) — calling it for any other code returns not_verified_in_chat. Call it ONLY after the guest explicitly confirmed they want to cancel. It notifies the hotel team and emails the guest an acknowledgment; the refund is processed by the team per the rate policy (NOT instant).',
     input_schema: {
       type: 'object',
       properties: {
@@ -183,6 +183,29 @@ function formatCOP(n) {
   return '$ ' + Math.round(n || 0).toLocaleString('es-CO');
 }
 
+/* Phone correlation: compare the last 10 digits (Colombian national number)
+   so +57 300..., 300... and 0057300... all match. */
+function lastTenDigits(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : '';
+}
+
+function normalizeCode(code) {
+  return String(code || '').trim().toUpperCase();
+}
+
+function isVerifiedInSession(session, code) {
+  const list = (session && session.verifiedBookings) || [];
+  return list.includes(normalizeCode(code));
+}
+
+function markVerifiedInSession(session, code) {
+  if (!session) return;
+  const set = new Set(session.verifiedBookings || []);
+  set.add(normalizeCode(code));
+  session.verifiedBookings = [...set];
+}
+
 async function executeTool(name, input, deps) {
   switch (name) {
     case 'check_availability': {
@@ -205,6 +228,17 @@ async function executeTool(name, input, deps) {
     case 'lookup_booking': {
       const booking = await deps.lookupBooking(String(input.booking_code || '').trim(), String(input.email_or_lastname || '').trim());
       if (!booking) return JSON.stringify({ found: false });
+      /* AUTHORIZATION, not the model's call: a successful second-factor
+         lookup marks this booking as verified for THIS conversation. Only
+         verified bookings can be cancelled (see request_cancellation). */
+      markVerifiedInSession(deps.session, booking.bookingCode);
+      /* Extra audit signal: does this WhatsApp number match the phone on
+         the booking? A mismatch doesn't block (guests write from other
+         numbers) but the model is told to tread carefully and the team
+         sees the requesting number on every cancellation email. */
+      const bookingTen = lastTenDigits(booking.guestPhone);
+      const waTen = lastTenDigits(deps.guestNumber);
+      const phoneMatchesWhatsApp = bookingTen && waTen ? bookingTen === waTen : 'unknown';
       return JSON.stringify({
         found: true,
         bookingCode: booking.bookingCode,
@@ -213,14 +247,21 @@ async function executeTool(name, input, deps) {
         checkIn: booking.checkIn,
         checkOut: booking.checkOut,
         nights: booking.nights,
-        canCancel: booking.canCancel
+        canCancel: booking.canCancel,
+        phoneMatchesWhatsApp
       });
     }
     case 'request_cancellation': {
+      /* HARD GATE (code, not prompt): the booking must have been verified
+         with the second factor in this same conversation. Even a
+         manipulated model cannot cancel an unverified booking. */
+      if (!isVerifiedInSession(deps.session, input.booking_code)) {
+        return JSON.stringify({ ok: false, code: 'not_verified_in_chat' });
+      }
       const result = await deps.submitCancellation({
         bookingCode: String(input.booking_code || '').trim(),
         providedFactor: String(input.email_or_lastname || '').trim(),
-        clientIp: 'whatsapp',
+        clientIp: `whatsapp:+${deps.guestNumber}`,
         source: 'whatsapp-ai'
       });
       return JSON.stringify({ ok: result.ok, code: result.code });
@@ -267,7 +308,8 @@ async function handleWithAI(msg, session, deps) {
   const toolDeps = {
     ...deps,
     guestNumber: msg.from,
-    guestName: msg.profileName
+    guestName: msg.profileName,
+    session
   };
 
   let finalText = '';
@@ -338,5 +380,6 @@ async function handleWithAI(msg, session, deps) {
 
 module.exports = {
   isEnabled, handleWithAI, executeTool, buildSystemPrompt, modelParams,
+  isVerifiedInSession, markVerifiedInSession, lastTenDigits,
   TOOLS, MAX_TOOL_ITERATIONS, MAX_HISTORY_MESSAGES, aiConfig
 };

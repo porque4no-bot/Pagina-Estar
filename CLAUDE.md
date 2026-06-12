@@ -218,7 +218,8 @@ See `docs/whatsapp-bot.md` for setup (credentials checklist, sandbox, flows, 24h
 | `_rate-limit` | Request rate limiting |
 | `_whatsapp` | WhatsApp Cloud API client: sendText/sendButtons/sendList/sendTemplate/markRead, webhook signature validation; mock no-op without credentials |
 | `_whatsapp-bot` | Bot conversation engine: state machine (Blobs sessions, 30-min TTL), ES/EN copy, date/guest parsers; calls `_otasync` for live availability and `request-cancellation` for cancellations. Routes to `_whatsapp-ai` first when `ANTHROPIC_API_KEY` is set |
-| `_whatsapp-ai` | AI mode: Claude (`@anthropic-ai/sdk`, Messages API, manual tool-use loop) drives the conversation with tools `check_availability` / `lookup_booking` / `request_cancellation` / `notify_team`; text-only history in the session blob; falls back to the state machine on error |
+| `_whatsapp-ai` | AI mode: Claude (`@anthropic-ai/sdk`, Messages API, manual tool-use loop) drives the conversation with tools `check_availability` / `lookup_booking` / `request_cancellation` / `notify_team`; text-only history in the session blob; falls back to the state machine on error. **Authorization is code, not prompt**: cancellation requires a second-factor-verified lookup in the same conversation (`verifiedBookings`), and the WhatsApp number is correlated against the booking phone for audit |
+| `_whatsapp-guard` | Security pre-filter (dual-model pipeline): a fast classifier screens every message for prompt injection / impersonation / data extraction BEFORE the concierge model; `malicious` ⇒ blocked with neutral reply, never enters AI history; 3 strikes ⇒ admin alert; fail-open on classifier errors |
 
 **OTASync/Kunas API reference:** `docs/kunas-api.md`. OTASync supports native webhooks (`reservation` insert/edit/cancel, `avail` edit, `prices`, `restrictions`) and a `reservation/delete/reservation` endpoint to release quote holds.
 
@@ -366,6 +367,8 @@ WHATSAPP_AI_MODEL=        # default claude-haiku-4-5 (claude-opus-4-8 for max qu
 WHATSAPP_AI_EFFORT=       # default low
 WHATSAPP_AI_MAX_TOKENS=   # default 8000
 WHATSAPP_AI_TIMEOUT_MS=   # default 50000
+WHATSAPP_GUARD_ENABLED=   # security pre-filter; 'false' to disable
+WHATSAPP_GUARD_MODEL=     # default claude-haiku-4-5
 ```
 Without token/phone-number-id every send is a logged no-op (mock mode); the
 webhook rejects POSTs when `WHATSAPP_APP_SECRET` is unset. Setup guide:
