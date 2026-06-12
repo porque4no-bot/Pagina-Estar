@@ -217,7 +217,8 @@ See `docs/whatsapp-bot.md` for setup (credentials checklist, sandbox, flows, 24h
 | `_firebase-auth` | Firebase authentication for admin pages |
 | `_rate-limit` | Request rate limiting |
 | `_whatsapp` | WhatsApp Cloud API client: sendText/sendButtons/sendList/sendTemplate/markRead, webhook signature validation; mock no-op without credentials |
-| `_whatsapp-bot` | Bot conversation engine: state machine (Blobs sessions, 30-min TTL), ES/EN copy, date/guest parsers; calls `_otasync` for live availability and `request-cancellation` for cancellations |
+| `_whatsapp-bot` | Bot conversation engine: state machine (Blobs sessions, 30-min TTL), ES/EN copy, date/guest parsers; calls `_otasync` for live availability and `request-cancellation` for cancellations. Routes to `_whatsapp-ai` first when `ANTHROPIC_API_KEY` is set |
+| `_whatsapp-ai` | AI mode: Claude (`@anthropic-ai/sdk`, Messages API, manual tool-use loop) drives the conversation with tools `check_availability` / `lookup_booking` / `request_cancellation` / `notify_team`; text-only history in the session blob; falls back to the state machine on error |
 
 **OTASync/Kunas API reference:** `docs/kunas-api.md`. OTASync supports native webhooks (`reservation` insert/edit/cancel, `avail` edit, `prices`, `restrictions`) and a `reservation/delete/reservation` endpoint to release quote holds.
 
@@ -360,6 +361,11 @@ WHATSAPP_APP_SECRET=
 WHATSAPP_VERIFY_TOKEN=
 WHATSAPP_GRAPH_VERSION=
 WHATSAPP_BOT_ENABLED=
+ANTHROPIC_API_KEY=        # AI mode (Claude); unset = deterministic menu flows
+WHATSAPP_AI_MODEL=        # default claude-opus-4-8
+WHATSAPP_AI_EFFORT=       # default low
+WHATSAPP_AI_MAX_TOKENS=   # default 8000
+WHATSAPP_AI_TIMEOUT_MS=   # default 50000
 ```
 Without token/phone-number-id every send is a logged no-op (mock mode); the
 webhook rejects POSTs when `WHATSAPP_APP_SECRET` is unset. Setup guide:

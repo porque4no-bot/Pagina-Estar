@@ -29,7 +29,42 @@ Meta Cloud API ──POST──▶ /api/whatsapp-webhook   (firma X-Hub-Signatur
 | `netlify/functions/_whatsapp-bot.js` | Conversación: menú, flujo de reserva (fechas → huéspedes → disponibilidad real + deep link a `reservar.html`), gestión de reserva (código + apellido/email), cancelación, info (vivir/empresas/check-in/ubicación), handoff a humano |
 | `netlify/functions/whatsapp-probe.js` | Health check admin (Firebase auth): config presente + verificación del número contra Graph |
 
-## Flujos implementados
+## Modo IA (Claude)
+
+Con `ANTHROPIC_API_KEY` configurada, la conversación deja de ser un árbol de
+menús: **Claude** (`claude-opus-4-8` por defecto, configurable) entiende
+lenguaje natural en español/inglés, responde preguntas generales del hotel y
+actúa a través de cuatro herramientas que reutilizan la lógica de negocio
+existente:
+
+| Tool | Qué hace |
+|---|---|
+| `check_availability` | Disponibilidad y precios en vivo desde OTASync + enlace de reserva con fechas precargadas. El modelo tiene prohibido citar precios de memoria |
+| `lookup_booking` | Consulta de reserva con el mismo segundo factor de `get-booking` (la verificación vive en la herramienta, no en el prompt) |
+| `request_cancellation` | Solicitud de cancelación auditada (núcleo compartido con la web), solo tras confirmación explícita del huésped |
+| `notify_team` | Escala a humano con resumen accionable (cotizaciones de larga estadía/empresas, quejas, problemas de pago, o cuando el huésped lo pide) |
+
+Detalles de implementación (`_whatsapp-ai.js`):
+- **Loop manual de tool use** (Messages API) con máximo 5 iteraciones por
+  mensaje, adaptive thinking y `effort: low` por defecto (chat sensible a
+  latencia; subir vía `WHATSAPP_AI_EFFORT`).
+- **Memoria**: turnos de texto (sin bloques de tools) en la sesión de Blobs,
+  ventana de 20 mensajes, TTL 30 min.
+- **Prompt caching**: tools + system prompt estables con breakpoint
+  `cache_control`; lo único volátil es la fecha (precisión día).
+- **Guardrails**: precios solo por herramienta, pago solo en la web, segundo
+  factor obligatorio para datos de reservas, sin datos de pago por chat,
+  instrucción anti-inyección, y `stop_reason: refusal` manejado con mensaje
+  de fallback.
+- **Degradación**: sin API key o ante cualquier error del modelo, el bot cae
+  a la máquina de estados determinista (los menús de abajo). La palabra
+  *agente* escala a humano por código, sin pasar por el modelo.
+- **Costo/latencia**: el modelo es configurable (`WHATSAPP_AI_MODEL`) — para
+  abaratar se puede usar `claude-haiku-4-5`; el default prioriza calidad de
+  servicio. Si las respuestas se cortan por timeout del function, subir el
+  timeout de funciones en Netlify (plan) o bajar `WHATSAPP_AI_TIMEOUT_MS`.
+
+## Flujos implementados (modo determinista / fallback)
 
 - **Menú principal** (botones): Reservar · Mi reserva · Más opciones.
 - **Reservar**: pide fechas (`15/08 al 18/08`, `del 15 al 18 de agosto`, ISO),
@@ -58,6 +93,13 @@ WHATSAPP_APP_SECRET=        # App secret — firma X-Hub-Signature-256
 WHATSAPP_VERIFY_TOKEN=      # string arbitrario para el handshake del webhook
 WHATSAPP_GRAPH_VERSION=     # opcional, default v25.0
 WHATSAPP_BOT_ENABLED=       # 'true' para que el bot responda (kill switch)
+
+# Modo IA (Claude)
+ANTHROPIC_API_KEY=          # habilita el modo IA; sin ella, menús deterministas
+WHATSAPP_AI_MODEL=          # opcional, default claude-opus-4-8
+WHATSAPP_AI_EFFORT=         # opcional: low (default) | medium | high
+WHATSAPP_AI_MAX_TOKENS=     # opcional, default 8000
+WHATSAPP_AI_TIMEOUT_MS=     # opcional, default 50000
 ```
 
 Sin `WHATSAPP_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID` todo envío es un no-op

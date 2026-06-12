@@ -378,15 +378,56 @@ async function handleIncoming(msg, deps) {
   const replyId = msg.replyId || '';
 
   try {
-    /* Global commands first — they cut through any state. */
+    /* Human handoff first — a deterministic escape hatch that behaves the
+       same whether the AI is enabled or not. */
+    if (replyId === 'bot_human' || /\b(agente|asesor|humano|persona|agent|human)\b/.test(lower)) {
+      await handleHuman(deps, msg, session, t);
+      return session;
+    }
+
+    /* ── AI mode (Claude) ──────────────────────────────
+       With ANTHROPIC_API_KEY configured, Claude runs the whole conversation
+       through _whatsapp-ai (live availability, booking lookup, cancellation
+       and human handoff as tools). The keyword/state machine below stays as
+       the fallback for unconfigured environments and AI failures. The
+       'agente' shortcut above remains deterministic on purpose — guests can
+       always escape to a human even if the AI misbehaves. */
+    const aiMod = deps.aiModule || require('./_whatsapp-ai');
+    if (aiMod.isEnabled()) {
+      try {
+        const aiMsg = { ...msg };
+        if (!aiMsg.text && replyId) {
+          /* A tap on a legacy button arrives with no free text — translate
+             the intent so the model can pick the conversation up. */
+          const replyText = {
+            bot_book: 'Quiero reservar / ver disponibilidad',
+            bot_manage: 'Quiero consultar mi reserva',
+            bot_more: 'Ver más opciones',
+            bot_vivir: 'Información de estadías largas',
+            bot_empresas: 'Información para empresas y grupos',
+            bot_checkin: 'Información de check-in y horarios',
+            bot_ubicacion: '¿Dónde están ubicados?',
+            bot_cancel: 'Quiero cancelar mi reserva',
+            bot_menu: 'Hola'
+          };
+          aiMsg.text = replyText[replyId] || 'Hola';
+        }
+        const reply = await aiMod.handleWithAI(aiMsg, session, deps);
+        session.state = 'MAIN';
+        session.data = {};
+        await deps.wa.sendText(msg.from, reply);
+        return session;
+      } catch (e) {
+        console.error('[whatsapp-bot] AI path failed, falling back to state machine:', e.message);
+        /* fall through to the deterministic flow below */
+      }
+    }
+
+    /* Global commands — they cut through any state. */
     if (replyId === 'bot_menu' || /^(menu|menú|inicio|start|hola|hello|hi|buenas)\b/.test(lower)) {
       session.state = 'MAIN';
       session.data = {};
       await sendMainMenu(deps, msg.from, t, msg.profileName);
-      return session;
-    }
-    if (replyId === 'bot_human' || /\b(agente|asesor|humano|persona|agent|human)\b/.test(lower)) {
-      await handleHuman(deps, msg, session, t);
       return session;
     }
 
