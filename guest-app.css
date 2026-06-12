@@ -201,3 +201,6 @@ body.guest-modal-open{overflow:hidden}
 /* Concierge SLA note */
 .guest-sla-note{display:flex;align-items:center;gap:8px;margin:0 0 4px;font:500 12px var(--font-body);line-height:1.4;color:var(--olive-700);background:var(--olive-100,rgba(155,144,101,.12));border-radius:8px;padding:8px 10px}
 .guest-sla-note i{width:15px;height:15px;flex-shrink:0}
+
+/* Cart badge: hide when empty (overrides the grid display) */
+.guest-cart-button span[hidden]{display:none}

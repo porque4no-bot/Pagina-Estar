@@ -415,7 +415,7 @@
     state.document = slot.document;
     if (slot.document) {
       $('#uploadTitle').textContent = slot.document.name;
-      $('#uploadMeta').textContent = `${(slot.document.size / 1024 / 1024).toFixed(2)} MB · listo para analizar`;
+      $('#uploadMeta').textContent = `✓ Documento cargado · ${(slot.document.size / 1024 / 1024).toFixed(2)} MB · listo para analizar`;
       $('#analyzeDocument').disabled = false;
     } else {
       $('#uploadTitle').textContent = 'Subir archivo';
@@ -1524,7 +1524,10 @@
 
   function renderCart() {
     const items = Object.values(state.cart);
-    $('#cartCount').textContent = items.reduce((sum, item) => sum + item.quantity, 0);
+    const count = items.reduce((sum, item) => sum + item.quantity, 0);
+    const countEl = $('#cartCount');
+    countEl.textContent = count;
+    countEl.hidden = count === 0; /* hide the badge when the cart is empty */
     $('#cartTotal').textContent = money(cartTotal());
     const container = $('#cartItems');
     if (!items.length) {
