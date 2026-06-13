@@ -153,6 +153,7 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | `booking-status` | Polls webhook confirmation status after payment (used by motor-app polling loop) |
 | `send-confirmation` | Sends email confirmation to guest via Resend |
 | `get-booking` | Retrieves a booking by reference code — **requires a second factor (email or surname)**; returns a uniform not-found on mismatch so an enumerated code alone discloses no PII |
+| `request-cancellation` | Records a guest cancellation request (same second-factor gate as `get-booking`), alerts the hotel team and acknowledges the guest by email. Does **not** auto-cancel in OTASync nor auto-refund — refund rails pending (see `docs/pendientes.md`) |
 | `get-booking-rating` | Fetches Booking.com rating via `PROXY_URL`; returns hardcoded fallback if unconfigured |
 | `get-reviews` | Fetches property reviews |
 
@@ -191,6 +192,15 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | `upload-drive-credentials` | Service account credential upload (admin) |
 | `drive-probe` | Health check for Google Drive integration |
 
+**WhatsApp chatbot (Meta Cloud API):**
+
+| Function | Purpose |
+|---|---|
+| `whatsapp-webhook` | Receives Cloud API events: GET handshake (`hub.challenge`), POST signature validation (`X-Hub-Signature-256`, raw body), per-message dedupe, routes to `_whatsapp-bot`. Kill switch: `WHATSAPP_BOT_ENABLED` |
+| `whatsapp-probe` | Admin health check (Firebase auth): reports config booleans and verifies token + phone number id against the Graph API |
+
+See `docs/whatsapp-bot.md` for setup (credentials checklist, sandbox, flows, 24h window/templates).
+
 **Shared modules (prefixed `_`, not HTTP-callable):**
 
 | Module | Purpose |
@@ -206,6 +216,10 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | `_google-drive` | Google Drive API integration (service account) |
 | `_firebase-auth` | Firebase authentication for admin pages |
 | `_rate-limit` | Request rate limiting |
+| `_whatsapp` | WhatsApp Cloud API client: sendText/sendButtons/sendList/sendTemplate/markRead, webhook signature validation; mock no-op without credentials |
+| `_whatsapp-bot` | Bot conversation engine: state machine (Blobs sessions, 30-min TTL), ES/EN copy, date/guest parsers; calls `_otasync` for live availability and `request-cancellation` for cancellations. Routes to `_whatsapp-ai` first when `ANTHROPIC_API_KEY` is set |
+| `_whatsapp-ai` | AI mode: Claude (`@anthropic-ai/sdk`, Messages API, manual tool-use loop) drives the conversation with tools `check_availability` / `lookup_booking` / `request_cancellation` / `notify_team`; text-only history in the session blob; falls back to the state machine on error. **Authorization is code, not prompt**: cancellation requires a second-factor-verified lookup in the same conversation (`verifiedBookings`), and the WhatsApp number is correlated against the booking phone for audit |
+| `_whatsapp-guard` | Security pre-filter (dual-model pipeline): a fast classifier screens every message for prompt injection / impersonation / data extraction BEFORE the concierge model; `malicious` ⇒ blocked with neutral reply, never enters AI history; 3 strikes ⇒ admin alert; fail-open on classifier errors |
 
 **OTASync/Kunas API reference:** `docs/kunas-api.md`. OTASync supports native webhooks (`reservation` insert/edit/cancel, `avail` edit, `prices`, `restrictions`) and a `reservation/delete/reservation` endpoint to release quote holds.
 
@@ -339,6 +353,26 @@ GA4 on-page tracking and Consent Mode v2 are injected by `build.js`. `consent.js
 renders the cookie banner and flips Consent Mode to granted only on opt-in
 (analytics/ads default to **denied** for every visitor). Ad pixels are emitted
 into the build **only** when their IDs are configured.
+
+**WhatsApp chatbot (Meta Cloud API):**
+```
+WHATSAPP_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+WHATSAPP_APP_SECRET=
+WHATSAPP_VERIFY_TOKEN=
+WHATSAPP_GRAPH_VERSION=
+WHATSAPP_BOT_ENABLED=
+ANTHROPIC_API_KEY=        # AI mode (Claude); unset = deterministic menu flows
+WHATSAPP_AI_MODEL=        # default claude-haiku-4-5 (claude-opus-4-8 for max quality)
+WHATSAPP_AI_EFFORT=       # default low
+WHATSAPP_AI_MAX_TOKENS=   # default 8000
+WHATSAPP_AI_TIMEOUT_MS=   # default 50000
+WHATSAPP_GUARD_ENABLED=   # security pre-filter; 'false' to disable
+WHATSAPP_GUARD_MODEL=     # default claude-haiku-4-5
+```
+Without token/phone-number-id every send is a logged no-op (mock mode); the
+webhook rejects POSTs when `WHATSAPP_APP_SECRET` is unset. Setup guide:
+`docs/whatsapp-bot.md`.
 
 **Misc:**
 ```

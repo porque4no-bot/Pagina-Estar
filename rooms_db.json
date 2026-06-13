@@ -175,7 +175,7 @@
         "tiers": [
           {
             "featured": false,
-            "amount": "$ 2.800.000",
+            "amount": "$ 3.350.000",
             "save": {
               "es": "Sin descuento",
               "en": "No discount"
@@ -183,15 +183,15 @@
           },
           {
             "featured": false,
-            "amount": "$ 2.000.000",
+            "amount": "$ 2.400.000",
             "save": {
-              "es": "Ahorras 29%",
-              "en": "Save 29%"
+              "es": "Ahorras 28%",
+              "en": "Save 28%"
             }
           },
           {
             "featured": true,
-            "amount": "$ 1.800.000",
+            "amount": "$ 2.150.000",
             "save": {
               "es": "Más pedido — 36%",
               "en": "Best seller — 36%"
@@ -199,10 +199,10 @@
           },
           {
             "featured": false,
-            "amount": "$ 1.700.000",
+            "amount": "$ 2.000.000",
             "save": {
-              "es": "Ahorras 39%",
-              "en": "Save 39%"
+              "es": "Ahorras 40%",
+              "en": "Save 40%"
             }
           }
         ]
@@ -391,7 +391,7 @@
         "tiers": [
           {
             "featured": false,
-            "amount": "$ 3.200.000",
+            "amount": "$ 3.800.000",
             "save": {
               "es": "Sin descuento",
               "en": "No discount"
@@ -399,7 +399,7 @@
           },
           {
             "featured": false,
-            "amount": "$ 2.400.000",
+            "amount": "$ 2.850.000",
             "save": {
               "es": "Ahorras 25%",
               "en": "Save 25%"
@@ -407,7 +407,7 @@
           },
           {
             "featured": true,
-            "amount": "$ 2.100.000",
+            "amount": "$ 2.500.000",
             "save": {
               "es": "Más pedido — 34%",
               "en": "Best seller — 34%"
@@ -415,10 +415,10 @@
           },
           {
             "featured": false,
-            "amount": "$ 2.000.000",
+            "amount": "$ 2.400.000",
             "save": {
-              "es": "Ahorras 38%",
-              "en": "Save 38%"
+              "es": "Ahorras 37%",
+              "en": "Save 37%"
             }
           }
         ]
@@ -607,7 +607,7 @@
         "tiers": [
           {
             "featured": false,
-            "amount": "$ 3.000.000",
+            "amount": "$ 3.550.000",
             "save": {
               "es": "Sin descuento",
               "en": "No discount"
@@ -615,7 +615,7 @@
           },
           {
             "featured": false,
-            "amount": "$ 2.200.000",
+            "amount": "$ 2.600.000",
             "save": {
               "es": "Ahorras 27%",
               "en": "Save 27%"
@@ -623,15 +623,15 @@
           },
           {
             "featured": true,
-            "amount": "$ 2.000.000",
+            "amount": "$ 2.400.000",
             "save": {
-              "es": "Más pedido — 33%",
-              "en": "Best seller — 33%"
+              "es": "Más pedido — 32%",
+              "en": "Best seller — 32%"
             }
           },
           {
             "featured": false,
-            "amount": "$ 1.850.000",
+            "amount": "$ 2.200.000",
             "save": {
               "es": "Ahorras 38%",
               "en": "Save 38%"
@@ -824,7 +824,7 @@
         "tiers": [
           {
             "featured": false,
-            "amount": "$ 3.200.000",
+            "amount": "$ 3.800.000",
             "save": {
               "es": "Sin descuento",
               "en": "No discount"
@@ -832,7 +832,7 @@
           },
           {
             "featured": false,
-            "amount": "$ 2.300.000",
+            "amount": "$ 2.750.000",
             "save": {
               "es": "Ahorras 28%",
               "en": "Save 28%"
@@ -840,7 +840,7 @@
           },
           {
             "featured": true,
-            "amount": "$ 2.100.000",
+            "amount": "$ 2.500.000",
             "save": {
               "es": "Más pedido — 34%",
               "en": "Best seller — 34%"
@@ -848,7 +848,7 @@
           },
           {
             "featured": false,
-            "amount": "$ 1.950.000",
+            "amount": "$ 2.300.000",
             "save": {
               "es": "Ahorras 39%",
               "en": "Save 39%"
@@ -1042,7 +1042,7 @@
         "tiers": [
           {
             "featured": false,
-            "amount": "$ 3.000.000",
+            "amount": "$ 3.550.000",
             "save": {
               "es": "Sin descuento",
               "en": "No discount"
@@ -1050,7 +1050,7 @@
           },
           {
             "featured": false,
-            "amount": "$ 2.200.000",
+            "amount": "$ 2.600.000",
             "save": {
               "es": "Ahorras 27%",
               "en": "Save 27%"
@@ -1058,15 +1058,15 @@
           },
           {
             "featured": true,
-            "amount": "$ 2.000.000",
+            "amount": "$ 2.400.000",
             "save": {
-              "es": "Más pedido — 33%",
-              "en": "Best seller — 33%"
+              "es": "Más pedido — 32%",
+              "en": "Best seller — 32%"
             }
           },
           {
             "featured": false,
-            "amount": "$ 1.850.000",
+            "amount": "$ 2.200.000",
             "save": {
               "es": "Ahorras 38%",
               "en": "Save 38%"

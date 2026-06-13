@@ -58,6 +58,7 @@ function normalizeReservation(raw) {
     guestName: `${guest.first_name || ''} ${guest.last_name || ''}`.trim(),
     guestLastName: String(guest.last_name || ''),
     guestEmail: String(guest.email || guest.mail || raw.guest_email || raw.email || ''),
+    guestPhone: String(guest.phone || guest.mobile || raw.guest_phone || raw.phone || ''),
     roomName: room.room_type || room.name || '',
     checkIn,
     checkOut,
@@ -275,6 +276,7 @@ exports.handler = async (event, context) => {
     // Do not echo internal-only comparison fields back to the client.
     delete normalized.guestLastName;
     delete normalized.guestEmail;
+    delete normalized.guestPhone;
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -295,3 +297,6 @@ exports.handler = async (event, context) => {
 };
 
 exports._test = { identityMatches, normalizeName };
+/* Shared with request-cancellation so both endpoints apply the exact same
+   second-factor gate and reservation normalization. */
+exports.helpers = { identityMatches, normalizeName, normalizeReservation, calcNights };
