@@ -215,3 +215,67 @@ por Booking.com y definir el modelo de pago oficial del canal.
   recordatorio de cotización por vencer.
 - IVA en check-in: checklist operativo en guest app + reporte mensual de IVA
   diferido vs. cobrado.
+
+---
+
+## 6. Decisiones de negocio tomadas — pendientes de implementar
+
+Decididas el 2026-06-13. Falta aplicarlas (tocan varios archivos
+cliente + el motor + el bot); conviene hacerlo en una sola pasada coherente.
+
+### 6.1 Política de cancelación por plan de tarifa
+Reemplaza el esquema actual ("Flexible 48 h" / "Best Price no reembolsable").
+Dos planes:
+- **Flexible:** cancelación gratuita hasta las **6:00 PM del día anterior**
+  al check-in. Después, penalidad (definir: ¿primera noche?).
+- **Estricta:** cancelación gratuita hasta **7 días antes** del check-in.
+  Después, no reembolsable (definir penalidad exacta).
+
+Impacto:
+- `cancelacion.html` / `en/cancelacion.html` — reescribir secciones 1 y 2
+  (hoy "48 horas" + "No Reembolsable"). ES y EN.
+- Etiquetas de tarifa en `motor-app.jsx` + `i18n/motor.*.json`
+  (`resCancelPolicy`, labels Flexible/Best Price) y `reservar.html`.
+- System prompt del bot (`_whatsapp-ai.js` → tarifas).
+- **Idealmente** crear los 2 planes como rate plans reales en OTASync (hoy
+  la Flexible se calcula como `precio / 0.9` en el cliente) para paridad con
+  Booking — ver decisión D abajo (cuánto cuesta más la Flexible).
+- Pendiente confirmar: penalidad por cancelación tardía y por no-show en
+  cada plan.
+
+### 6.2 Cobro por mascota
+- **$200.000 por reserva** (monto fijo, NO por noche, NO por mascota).
+- Reemplaza el lenguaje de "depósito" para estadía corta. Confirmar si en
+  **larga estadía** sigue siendo depósito reembolsable o también este cobro.
+- Impacto: añadir como cargo en el motor (extra fijo) y, si se cobra en
+  larga estadía, en cotizaciones; actualizar `faq.html`, `vivir.html`,
+  `cancelacion.html` y el system prompt del bot ("mascotas con depósito" →
+  "mascotas con cobro de $200.000 por reserva").
+
+### 6.3 Parqueadero — eliminar como servicio propio
+- Estar **no** ofrece ni cobra parqueadero. Hay un **parqueadero público
+  cercano** (ajeno a la propiedad). Quitar toda mención a parqueadero
+  cubierto/seguro "en el edificio" y todo cobro.
+- Impacto (muchos puntos):
+  - `_pricing.js` — quitar `parqueadero` de `EXTRAS_PRICES` y de
+    `EXTRAS_KEYS`. **Ojo:** `EXTRAS_KEYS` define el orden del `extrasMask`
+    de 6 bits en la referencia Wompi; quitarlo del medio corre los bits
+    (revisar `_direct-pricing.js` y `motor-app.jsx` para no romper reservas
+    en vuelo — mejor dejar el slot vacío/reservado que reindexar).
+  - `reservar.html` / `en/reservar.html` — quitar de `BE_EXTRAS` y del
+    cálculo (`if(extras.parqueadero)...`).
+  - `guest.html` — quitar la tarjeta de servicio `parking` ($25k) y la
+    mención en "Agregar servicios".
+  - `cotizar-admin.html` / `cotizacion.html` — quitar `parqueadero` del
+    catálogo de servicios de cotizaciones.
+  - `faq.html` / `en/faq.html` — cambiar la respuesta de "sí, parqueadero
+    cubierto en el edificio" por "parqueadero público cercano, ajeno a la
+    propiedad".
+  - System prompt del bot — quitar "parqueadero cubierto disponible
+    (reservable como extra)".
+
+### 6.4 Inconsistencia detectada a resolver de paso
+- **Hora de check-out**: `index.html` (schema `checkoutTime`) dice **12:00**;
+  `faq.html` dice **11:00 AM**. Definir la correcta y unificar (afecta también
+  el extra "late checkout" y el system prompt del bot, que hoy dice 11:00).
+
