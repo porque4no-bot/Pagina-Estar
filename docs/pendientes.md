@@ -223,25 +223,88 @@ por Booking.com y definir el modelo de pago oficial del canal.
 Decididas el 2026-06-13. Falta aplicarlas (tocan varios archivos
 cliente + el motor + el bot); conviene hacerlo en una sola pasada coherente.
 
-### 6.1 Política de cancelación por plan de tarifa
+### 6.1 Planes de tarifa y política de cancelación
 Reemplaza el esquema actual ("Flexible 48 h" / "Best Price no reembolsable").
-Dos planes:
-- **Flexible:** cancelación gratuita hasta las **6:00 PM del día anterior**
-  al check-in. Después, penalidad (definir: ¿primera noche?).
-- **Estricta:** cancelación gratuita hasta **7 días antes** del check-in.
-  Después, no reembolsable (definir penalidad exacta).
+Se crean como **rate plans REALES en OTASync** (no calculados en el cliente),
+para paridad con Booking/Airbnb:
+- **Estricta** = tarifa base. Cancelación gratuita hasta **7 días antes** del
+  check-in; después, no reembolsable.
+- **Flexible** = base **+10%**. Cancelación gratuita hasta las **6:00 PM del
+  día anterior** al check-in; después, penalidad.
+- **No-show / cancelación tardía** (ambos planes): se cobra **la primera
+  noche + impuestos + 3,5% del total de la reserva** (el 3,5% cubre la
+  comisión de la pasarela de tarjetas, que no se reembolsa).
 
-Impacto:
-- `cancelacion.html` / `en/cancelacion.html` — reescribir secciones 1 y 2
-  (hoy "48 horas" + "No Reembolsable"). ES y EN.
-- Etiquetas de tarifa en `motor-app.jsx` + `i18n/motor.*.json`
-  (`resCancelPolicy`, labels Flexible/Best Price) y `reservar.html`.
-- System prompt del bot (`_whatsapp-ai.js` → tarifas).
-- **Idealmente** crear los 2 planes como rate plans reales en OTASync (hoy
-  la Flexible se calcula como `precio / 0.9` en el cliente) para paridad con
-  Booking — ver decisión D abajo (cuánto cuesta más la Flexible).
-- Pendiente confirmar: penalidad por cancelación tardía y por no-show en
-  cada plan.
+Notas de implementación:
+- Hoy la Flexible se calcula como `precio / 0.9` (= +11,1%) en
+  `_direct-pricing.js` y `motor-app.jsx`. Con rate plans reales en OTASync,
+  `check-availability` debe devolver **ambos precios desde OTASync** y el
+  motor deja de calcular el ±%. Mientras tanto, si se mantiene el cálculo,
+  alinear a `× 1.10` (10% exacto, no 11,1%).
+- Reescribir `cancelacion.html` / `en/cancelacion.html` (secciones 1 y 2),
+  etiquetas de tarifa en `motor-app.jsx` + `i18n/motor.*.json`, system prompt
+  del bot, y la política que muestra `ManageBooking`.
+
+### 6.5 Reprecio de extras (late checkout / early check-in)
+Dejan de ser montos fijos; pasan a **% del precio estándar por noche** de la
+habitación (tarifa base/Estricta):
+- **Late checkout** hasta las **2:00 PM** → **15%** de la noche estándar.
+  (Hoy: $60.000 fijo, "hasta las 3:00 pm" — cambia hora y modelo.)
+- **Early check-in** escalonado (entre más temprano, más caro):
+  - Entrada **2 h antes** del check-in (≈1:00 PM) → **15%**
+  - Entrada desde las **10:00 AM** → **35%**
+  - Entrada desde las **6:00 AM** (o antes) → **50%**
+  (Hoy: $50.000 fijo, "desde las 10:00 am".)
+- Impacto: `_pricing.js` (multiplicadores % en vez de `flat`), `reservar.html`
+  (`BE_EXTRAS` + cálculo), y el system prompt del bot. El early pasa de 1 a 3
+  opciones — revisar el `extrasMask` de la referencia Wompi.
+- Pendiente: ¿desayuno ($20k/persona/noche) se mantiene igual? (no se mencionó)
+
+### 6.6 Métodos de pago en la web (PSE y Nequi)
+- PSE y Nequi **ya están habilitados en la cuenta Wompi** y el widget de
+  Wompi los ofrece dentro de su flujo. La opción de pago en `reservar.html`
+  ya los menciona en su descripción ("Tarjetas colombianas, PSE, Nequi,
+  Bancolombia"). **Verificar** que aparezcan en el checkout de Wompi en
+  producción; si se quiere, darles visibilidad propia (íconos) en la UI.
+
+### 6.7 Identidad legal y documentos descargables
+- **Razón social:** Mirada SAS · **NIT:** 902032515 (confirmar dígito de
+  verificación, p. ej. 902.032.515-?).
+- Incluir la razón social + NIT en `aviso-legal.html` y `privacidad.html`
+  (hoy solo aparece la marca "estar" — hallazgo legal pendiente).
+- Nueva sección para **descargar RUT y la Cámara de Comercio más reciente**
+  (facilita la gestión a las empresas). Ubicación sugerida: portal corporativo
+  (`empresas.html`) y/o footer legal.
+- Los documentos deben **autoactualizarse al más reciente subido en una
+  carpeta de Google Drive** — ya existe integración Drive (`_google-drive`,
+  service account); reutilizarla para servir/enlazar el archivo vigente.
+
+### 6.8 Reembolsos — tiempos por método + formulario de cuenta
+Política de tiempos a publicar (sujeto a los tiempos de cada proveedor):
+
+| Método de pago | Reembolso | Tiempo estimado |
+|---|---|---|
+| Tarjeta (Wompi) | Por la pasarela | hasta ~10 días hábiles (depende del banco emisor) |
+| Tarjeta (Mercado Pago) | API de reembolsos | hasta ~15 días hábiles |
+| PSE / Nequi / Bancolombia | **Transferencia manual** | definir SLA (p. ej. 5 días hábiles) |
+| Efectivo / datáfono en sitio | **Transferencia manual** | definir SLA |
+| Booking.com (VCC) | Lo gestiona Booking | según Booking |
+
+- Para los métodos **no autogestionables** (todo lo "manual" de arriba),
+  cuando se apruebe una cancelación con reembolso: enviar al huésped un
+  **formulario** donde indique **a qué cuenta** quiere el reembolso (banco,
+  tipo y número de cuenta, titular, documento) + correo de notificación al
+  equipo para tramitarlo. Engancha con `request-cancellation` (hoy solo
+  registra la solicitud; falta el paso de captura de cuenta + el correo con
+  los datos para tesorería).
+- Publicar la tabla de tiempos en `cancelacion.html` con la nota "los plazos
+  dependen de los tiempos de procesamiento de cada medio de pago".
+
+### 6.9 Hora de check-out — resolver inconsistencia
+- `index.html` (schema `checkoutTime`) dice **12:00**; `faq.html` dice
+  **11:00 AM**. Definir la correcta y unificar (afecta el late checkout y el
+  system prompt del bot, que hoy dice 11:00). *(Nota: con late checkout hasta
+  las 2:00 PM, el check-out estándar debe ser una sola hora — definirla.)*
 
 ### 6.2 Cobro por mascota
 - **$200.000 por reserva** (monto fijo, NO por noche, NO por mascota).
@@ -274,8 +337,7 @@ Impacto:
   - System prompt del bot — quitar "parqueadero cubierto disponible
     (reservable como extra)".
 
-### 6.4 Inconsistencia detectada a resolver de paso
-- **Hora de check-out**: `index.html` (schema `checkoutTime`) dice **12:00**;
-  `faq.html` dice **11:00 AM**. Definir la correcta y unificar (afecta también
-  el extra "late checkout" y el system prompt del bot, que hoy dice 11:00).
+### 6.4 Estructura legal de larga estadía (punto 7) — SE MANTIENE PENDIENTE
+- Confirmar hospedaje turístico vs. arrendamiento (decisión del huésped:
+  dejar pendiente por ahora). Afecta la validez de la retención de depósito.
 
