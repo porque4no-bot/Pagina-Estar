@@ -9,6 +9,24 @@ Fecha: 2026-06-16 · Estado: propuesta para validar (no implementado).
 
 ---
 
+## Contexto confirmado (2026-06-16)
+
+- **Odoo:** versión **19, licencia custom** → podemos usar la API externa **y**
+  construir módulos a medida. Máxima flexibilidad.
+- **Facturación / contabilidad:** ya implementada en Odoo, automatizada con
+  **Numera** (todo el módulo contable). ⇒ **No construimos la integración DIAN**;
+  nuestro trabajo es **alimentar Odoo** correctamente (clientes, ventas,
+  facturas) y Numera se encarga del módulo contable / electrónico. *(Falta
+  confirmar cómo encaja Numera con Odoo — ver §8.)*
+- **DataCrédito:** **hay contrato** ⇒ la evaluación financiera **se automatiza**
+  por API (no queda solo manual). Falta saber el producto/endpoints contratados.
+- **Alcance de clientes:** **todos** los clientes en el maestro, para CRM,
+  marketing y demás (no solo empresas/larga estadía).
+- **Cotizaciones:** se **sincronizan** desde nuestra UI a Odoo (no se migran a
+  Odoo nativo).
+
+---
+
 ## 1. Objetivo
 
 Pasar de sistemas aislados a un ecosistema con **una sola fuente de verdad por
@@ -105,10 +123,13 @@ Las que planteaste + las que detecto, priorizadas:
 | K | **Portal corporativo self-service** (cotizaciones, reservas, facturas, saldo, descarga de documentos) | Promesa `empresas.html` | 5 |
 | L | **Documentos propios** (RUT/Cámara) servidos desde Drive, autoactualizados | Gestión proveedores | 1/2 |
 
-## 5. Flujo de evaluación financiera (detalle — punto E)
+## 5. Evaluación financiera (detalle — punto E)
 
 Hoy: se consulta DataCrédito y se piden extractos por correo; la decisión vive
-en la cabeza de alguien. Objetivo: convertirlo en un flujo con registro.
+en la cabeza de alguien. Objetivo: convertirlo en un flujo con registro y un
+**modelo de scoring explícito y configurable**.
+
+### 5.1 Flujo
 
 ```
 Solicitud (larga estadía / crédito empresa)
@@ -116,20 +137,68 @@ Solicitud (larga estadía / crédito empresa)
        · autorización Habeas Data FINANCIERO (Ley 1266) — explícita
        · carga de extractos / documentos (cifrado, como guest app)
        · creación/match del partner en Odoo
-  → Consulta DataCrédito (API si hay contrato; si no, tarea de consulta manual)
-  → Registro en el cliente (Odoo): score, decisión, cupo, vigencia, adjuntos
+  → Consulta DataCrédito por API (hay contrato) con la autorización
+  → Motor de scoring (ver 5.2/5.3) → decisión
+  → Registro en el cliente (Odoo): score, decisión, cupo, depósito/garantía,
+    payment_terms, vigencia (re-evaluar p. ej. cada 12 meses), adjuntos
   → Gatea: aprobación de larga estadía / habilitar "pago a 30 días"
 ```
 
-**Consideraciones legales y de seguridad (no opcionales):**
-- **DataCrédito** (operado por Experian) requiere **contrato con el buró** para
-  consultar por API, y **autorización de Habeas Data Financiero (Ley 1266 de
-  2008)** del titular para cada consulta — distinta de la Ley 1581 general.
-- **Extractos bancarios** = dato financiero sensible: cifrado en reposo, acceso
-  por rol en Odoo, política de retención y borrado. Alternativa a la carga
-  manual: agregadores de open banking (Belvo, Truora, etc.) — requieren
-  contrato propio.
-- Definir **quién** puede ver la información financiera (rol restringido).
+### 5.2 Modelo propuesto — personas (larga estadía)
+
+> Nota: el objetivo correcto es que **la obligación (canon) no supere ~30% del
+> ingreso** (= ingreso ≥ ~3,3× el canon), que es el estándar de arrendamiento —
+> no al revés. Todos los umbrales son perillas configurables.
+
+5 factores → semáforo → decisión:
+
+| Factor | Peso | 🟢 Verde | 🟡 Amarillo | 🔴 Rojo |
+|---|---|---|---|---|
+| **Capacidad de pago** (canon / ingreso neto) | alto | ≤ 30% | 30–40% | > 40% |
+| **Score DataCrédito** (~150–950) | alto | ≥ 700 | 560–699 | < 560 o mora vigente / reporte negativo activo |
+| **Carga financiera total** ((cuotas actuales + canon) / ingreso) | medio | ≤ 50% | 50–65% | > 65% |
+| **Estabilidad de ingresos** | medio | empleado indefinido, antigüedad | independiente / nómada con soporte | sin soporte verificable |
+| **Validación de extractos** (3 meses) | medio | abonos coinciden con lo declarado, saldo sano | inconsistencias menores | sobregiros recurrentes / no coincide |
+
+**Decisión:**
+- **Aprobado:** mayoría verde, sin rojo en capacidad de pago ni en score.
+- **Aprobado con garantía** (codeudor, póliza de arrendamiento, o depósito
+  mayor): amarillos, o un rojo en carga/estabilidad/extractos.
+- **Rechazado:** rojo en capacidad de pago o en score, o mora vigente.
+
+Salida → en el cliente: `decision`, `cupo`, `deposito_requerido`,
+`requiere_codeudor`.
+
+### 5.3 Modelo propuesto — empresas (crédito a 30 días)
+
+1. **Existencia y antigüedad:** Cámara de Comercio (≥ ~1–2 años), RUT al día,
+   objeto social coherente.
+2. **DataCrédito Empresas:** score empresarial, comportamiento de pago,
+   reportes negativos.
+3. **Solvencia:** estados financieros / extractos; ventas vs. cupo solicitado.
+4. **Cupo y plazo:** asignar un **cupo de crédito** (monto máximo vivo a 30
+   días) conservador al inicio, y ampliarlo con historial de pago puntual.
+
+### 5.4 Automatización y registro
+
+- Consulta DataCrédito por **API** desde la capa de integración (o un módulo
+  Odoo a medida — tenemos custom), con la autorización del titular.
+- El motor de scoring (5.2/5.3) puede vivir en un **módulo Odoo** (donde está
+  contabilidad) o en nuestra capa; el resultado se escribe en el cliente.
+- Re-evaluación periódica (vigencia 12 meses) y al renovar larga estadía.
+
+### 5.5 Consideraciones legales y de seguridad (no opcionales)
+
+- **Habeas Data Financiero (Ley 1266 de 2008):** autorización explícita del
+  titular para **cada** consulta a DataCrédito — distinta de la Ley 1581
+  general. Redactar el texto con el abogado.
+- **Extractos bancarios** = dato financiero sensible: cifrado en reposo (como
+  guest app), **acceso por rol** en Odoo, política de retención/borrado.
+  Alternativa futura a la carga manual: agregadores de open banking
+  (Belvo/Truora) — requieren contrato propio.
+- **Marketing:** si los clientes entran al CRM para campañas, se requiere
+  **autorización de tratamiento con finalidad de marketing** (opt-in), separada
+  de la transaccional.
 
 ## 6. Plan de trabajo por fases
 
@@ -185,38 +254,36 @@ redactar la autorización de habeas data financiero.
 - **PII sensible:** extractos y datos financieros exigen cifrado, acceso por rol
   y retención definida.
 
-## 8. Dudas y decisiones que necesito de ti
+## 8. Decisiones — resueltas y pendientes
 
-**Sobre Odoo:**
-1. ¿Ya tienen instancia de Odoo? ¿Qué edición/hosting — **Odoo Online (SaaS),
-   Odoo.sh, o self-host/Community**? (Define si podemos poner módulos a medida.)
-2. ¿Ya emiten **factura electrónica DIAN** con algún software/proveedor hoy, o
-   arrancamos de cero en Odoo? ¿Qué proveedor tecnológico/PAC prefieren?
-3. ¿Quién opera Odoo día a día (contador/equipo)? Define cuánto automatizamos vs
-   dejamos nativo de Odoo.
+**Resueltas (2026-06-16):**
+- ✅ Odoo **19 custom** (API + módulos a medida).
+- ✅ Facturación ya en Odoo con **Numera**; no construimos DIAN, alimentamos Odoo.
+- ✅ **Contrato DataCrédito** → evaluación automatizada por API.
+- ✅ Alcance: **todos** los clientes en el maestro (CRM + marketing).
+- ✅ Cotizaciones: **sincronizar** desde nuestra UI a Odoo.
+- ✅ Criterios de evaluación: modelo propuesto en §5.2/5.3 (ajustar umbrales).
 
-**Sobre clientes y alcance:**
-4. ¿El maestro de clientes incluye **solo empresas + larga estadía**, o también
-   **cada huésped directo/OTA**? (Recomiendo: todos como partner, con PII mínima
-   para los transitorios.)
-5. ¿Migramos datos existentes (clientes/cotizaciones/facturas de Excel u otro
-   sistema) a Odoo, o partimos limpio?
-6. **Cotizaciones:** ¿migramos el motor de cotizaciones a `sale.order` de Odoo,
-   o mantenemos nuestra UI actual (con holds en OTASync) y la **sincronizamos**
-   a Odoo? (Sincronizar es más rápido; migrar es más "Odoo nativo".)
+**Pendientes (nuevas, ahora que conocemos el stack):**
+1. **Numera ↔ Odoo:** ¿Numera está **integrado dentro de Odoo** (creamos la
+   factura/venta en Odoo y Numera la procesa hacia DIAN), o es un sistema
+   aparte que Odoo sincroniza? Define dónde y cómo creamos los documentos.
+2. **Acceso a Odoo 19:** URL de la instancia, base de datos, y un **usuario
+   de integración con API key** (permisos de ventas/contactos/facturación).
+   ¿Self-host o Odoo.sh? (para saber cómo desplegar un módulo a medida.)
+3. **Producto DataCrédito:** ¿qué producto/API tienen contratado (p. ej. Score,
+   Perfil Crédito, DataCrédito Empresas)? Credenciales y documentación del API.
+4. **Umbrales del modelo financiero** (§5.2/5.3): confírmame/ajusta los cortes
+   (score mínimo, % capacidad de pago, cupo inicial de empresas).
+5. **Migración de datos:** ¿hay clientes/cotizaciones/facturas previos (Excel u
+   otro) para importar al maestro, o partimos de lo que entre de aquí en
+   adelante?
+6. **Marketing:** ¿se usará Odoo para campañas (email/CRM)? → necesitamos
+   capturar **opt-in de marketing** separado del consentimiento transaccional.
 
-**Sobre evaluación financiera:**
-7. ¿Tienen **contrato/API con DataCrédito (Experian)** o lo consultan por portal
-   manualmente? (Define si la Fase 3 automatiza la consulta o solo la registra.)
-8. Extractos bancarios: ¿seguimos con **carga manual** del documento, o evalúan
-   un agregador de **open banking** (Belvo/Truora)?
-9. ¿Qué criterios definen la **viabilidad/cupo** hoy? (Para poder modelarlos:
-   score mínimo, ingresos vs canon, etc.)
-
-**Sobre prioridad:**
-10. ¿Por dónde arrancamos? Mi recomendación: **Fase 0 (decisiones) → Fase 1
-    (maestro de clientes)** como base, porque sin el partner unificado nada de lo
-    demás (facturas, evaluación, CxC) se puede colgar correctamente.
+**Arranque recomendado:** **Fase 1 (maestro de clientes)** — el conector
+`_odoo.js` + sincronizar contactos. Es la fundación y de bajo riesgo (no toca
+dinero todavía); sin el cliente unificado nada de lo demás se cuelga bien.
 
 ## 9. Mi recomendación de arranque
 
