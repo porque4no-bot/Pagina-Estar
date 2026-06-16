@@ -209,6 +209,40 @@ test('upsertPartner reintenta sin vat si Odoo rechaza el NIT (localización CO)'
   clearEnv();
 });
 
+test('upsertPartner adjunta una etiqueta existente (category_id con comando (4,id))', async () => {
+  setEnv();
+  const odoo = require(ODOO);
+  odoo._resetAuthCache();
+  let createdValues = null;
+  const { transport } = fakeTransport({
+    'common.authenticate': 7,
+    'res.partner.category.search': [50],   // la etiqueta ya existe
+    'res.partner.search': [],
+    'res.partner.create': (posArgs) => { createdValues = posArgs[0]; return 1; }
+  });
+  await odoo.upsertPartner({ name: 'X', email: 'x@y.co', tags: ['Corporativo'] }, { transport });
+  assert.deepEqual(createdValues.category_id, [[4, 50]]);
+  clearEnv();
+});
+
+test('upsertPartner crea la etiqueta si no existe y la adjunta', async () => {
+  setEnv();
+  const odoo = require(ODOO);
+  odoo._resetAuthCache();
+  let createdValues = null, createdCat = null;
+  const { transport } = fakeTransport({
+    'common.authenticate': 7,
+    'res.partner.category.search': [],     // no existe → se crea
+    'res.partner.category.create': (posArgs) => { createdCat = posArgs[0]; return 77; },
+    'res.partner.search': [],
+    'res.partner.create': (posArgs) => { createdValues = posArgs[0]; return 1; }
+  });
+  await odoo.upsertPartner({ name: 'Y', email: 'y@z.co', tags: ['Larga estadía'] }, { transport });
+  assert.equal(createdCat.name, 'Larga estadía');
+  assert.deepEqual(createdValues.category_id, [[4, 77]]);
+  clearEnv();
+});
+
 test('upsertPartner exige al menos name, email o vat', async () => {
   setEnv();
   const odoo = require(ODOO);

@@ -259,6 +259,7 @@ exports.handler = async (event, context) => {
       email: sanitized.email,
       phone: sanitized.whatsapp,
       isCompany: true,
+      tags: ['Corporativo'],
       comment: `Contacto: ${sanitized.contacto}. Origen: formulario corporativo (empresas.html).`
     });
   } catch (odooErr) {

@@ -20,6 +20,7 @@ const FORM_HANDLERS = {
     name: (data.nombre || '').trim() || (data.correo || '').trim(),
     email: (data.correo || '').trim(),
     isCompany: false,
+    tags: ['Larga estadía'],
     comment: 'Solicitud de larga estadía (vivir.html). ' + [
       data.motivo_viaje ? `Motivo: ${data.motivo_viaje}` : '',
       data.tiempo_estimado ? `Tiempo: ${data.tiempo_estimado}` : '',

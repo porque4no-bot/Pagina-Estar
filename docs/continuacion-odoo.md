@@ -108,17 +108,34 @@ Resuelto: los clientes del hotel se asignan a **Mirada SAS (5)** vía
 el contexto; sin la variable quedan compartidos (compat. hacia atrás). Cubierto
 por tests en `tests/unit/odoo.test.js` y el diagnóstico confirma la visibilidad.
 
-## Paso 3 — Completar la Fase 1 (casi listo)
+## Paso 3 — Fase 1 ✅ (canales propios) + etiquetas de origen
 
-`upsertPartner` enganchado en:
-- ✅ **Cotización corporativa** (`request-quote.js`) — empresa.
-- ✅ **Reservas pagadas** (`wompi-webhook.js`): cotización pagada → empresa;
-  reserva directa → huésped (persona, dedup por email). No fatal, asignado a
-  Mirada (5), mock sin credenciales.
-- ⏳ **Larga estadía** (`vivir.html`): confirmado que es un **form NATIVO de
-  Netlify** (`data-netlify="true"`, sin función). Para engancharlo: notificación
-  de Netlify Forms (`submission-created`) → función, o convertir el form a un
-  `fetch` a una función como `request-quote`. Mini-proyecto aparte.
+`upsertPartner` enganchado en TODOS los canales que controlamos, cada uno con su
+etiqueta de origen (`res.partner.category` — segmentación tipo CRM SIN el módulo
+CRM; `upsertPartner` acepta `tags` y crea/añade la categoría con (4,id)):
+- ✅ **Cotización corporativa** (`request-quote.js`) → empresa · "Corporativo".
+- ✅ **Reservas pagadas** (`wompi-webhook.js`): cotización → empresa "Corporativo";
+  reserva directa → persona "Huésped directo".
+- ✅ **Larga estadía** (`vivir.html`): vía `submission-created.js` (función de
+  EVENTO de Netlify; el form sigue siendo nativo) → persona "Larga estadía".
+
+## CRM en Odoo — estado y decisión
+
+El módulo **CRM NO está instalado** (`crm.lead`/`crm.team` no existen); solo
+Contabilidad + Contactos. Sí hay `res.partner.category` (etiquetas, ya en uso) y
+`utm.campaign`. Para CRM real (pipeline/marketing) habría que **instalar los apps**
+(decisión del dueño; posible costo de licencia) o **módulos a medida** (requieren
+acceso a Odoo.sh/self-host — hoy solo tenemos API). **Decisión (2026-06-16):**
+por ahora se **segmenta con etiquetas** (hecho); instalar CRM queda aparte.
+
+## Kunas/OTASync → Odoo (clientes reales) — PENDIENTE, falta API
+
+Decidido hacer **ambas**: backfill de los existentes + sync de las nuevas (sobre
+`otasync-webhook.js`). **Bloqueo:** el API de OTASync para LEER huéspedes/reservas
+("Get reservations" / "Search guest") **no está en `docs/kunas-api.md`** y no hay
+credenciales OTASync locales. Falta UNA de: la doc de esos endpoints, o
+credenciales OTASync (`OTASYNC_TOKEN/USERNAME/PASSWORD`), o un payload de ejemplo
+del webhook de reserva. Captura el flujo real, incluidos huéspedes de Booking/OTAs.
 
 ## Fase 2 — hallazgos del Odoo real (sondeo de solo lectura, 2026-06-15)
 

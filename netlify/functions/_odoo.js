@@ -150,6 +150,22 @@ async function upsertPartner(data, opts) {
     if (Array.isArray(found) && found.length) existingId = found[0];
   }
 
+  /* Etiquetas de contacto (segmentación tipo CRM SIN necesitar el módulo CRM):
+     resuelve/crea cada `res.partner.category` por nombre y la AÑADE al partner
+     con el comando (4,id) — añade, no reemplaza las etiquetas que ya tenga. */
+  if (Array.isArray(data.tags) && data.tags.length) {
+    const tagIds = [];
+    for (const raw of data.tags) {
+      const nm = String(raw || '').trim().slice(0, 100);
+      if (!nm) continue;
+      const hit = await executeKw('res.partner.category', 'search', [[['name', '=', nm]]], withCtx({ limit: 1 }), transport);
+      const id = (Array.isArray(hit) && hit.length) ? hit[0]
+        : await executeKw('res.partner.category', 'create', [{ name: nm }], withCtx(), transport);
+      if (id) tagIds.push(id);
+    }
+    if (tagIds.length) values.category_id = tagIds.map(id => [4, id]);
+  }
+
   async function persist(vals) {
     if (existingId) {
       await executeKw('res.partner', 'write', [[existingId], vals], withCtx(), transport);

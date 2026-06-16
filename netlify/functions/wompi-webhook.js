@@ -504,6 +504,7 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
       email: quote.email,
       phone: sanitizePhone(quote.telefono),
       isCompany: true,
+      tags: ['Corporativo'],
       comment: `Cliente corporativo. Cotización ${quoteId}${quote.contacto ? '. Contacto: ' + quote.contacto : ''}.`
     });
   } catch (odooErr) {
@@ -1314,6 +1315,7 @@ exports.handler = async (event, context) => {
         email: decoded.email,
         phone: sanitizePhone(decoded.phone),
         isCompany: false,
+        tags: ['Huésped directo'],
         comment: `Huésped de reserva directa ${finalBookingCode}.`
       });
     } catch (odooErr) {
