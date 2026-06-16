@@ -122,6 +122,15 @@ por tests en `tests/unit/odoo.test.js` y el diagnóstico confirma la visibilidad
 
 ## Fase 2 — hallazgos del Odoo real (sondeo de solo lectura, 2026-06-15)
 
+> ⛔ **EN PAUSA (2026-06-15):** la **facturación la integra OTRO EQUIPO**. Por
+> decisión del dueño, **no construir** la creación de facturas (`account.move`,
+> diario FACTURA DE VENTA, DIAN/Numera) hasta que ese equipo termine. Nuestro
+> alcance en Odoo se limita al **maestro de clientes** (`res.partner`). Cuando se
+> retome: impuesto del hospedaje = **IVA 19%** (`account.tax` id 1930). Coordinar
+> la creación de partners con ese equipo (las facturas cuelgan del partner).
+
+Hallazgos del sondeo (guardados para cuando se retome):
+
 - ❗ **No hay módulo de Ventas** (`sale.order` no existe). Solo Contabilidad
   (`account.move`). ⇒ la Fase 2 crea **facturas de cliente directamente**, no
   `sale.order` (más simple que el plan original).
