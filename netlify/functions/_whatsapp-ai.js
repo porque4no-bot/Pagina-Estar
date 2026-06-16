@@ -218,7 +218,7 @@ async function executeTool(name, input, deps) {
       for (const [id, room] of Object.entries(pricing.byRoomType || {})) {
         const meta = deps.roomMeta[id] || {};
         if (meta.capacity && meta.capacity < guests) continue;
-        if (room.available !== undefined && room.available <= 0) continue;
+        if (room.available === false) continue;
         rooms.push({ name: meta.name || `Tipo ${id}`, capacity: meta.capacity, pricePerNight: formatCOP(room.avgPrice) });
       }
       return JSON.stringify({
@@ -270,14 +270,15 @@ async function executeTool(name, input, deps) {
       return JSON.stringify({ ok: result.ok, code: result.code });
     }
     case 'notify_team': {
+      const { esc } = require('./_email');
       const result = await deps.sendEmail({
         to: deps.adminEmail(),
         subject: `WhatsApp bot: ${input.reason} (+${deps.guestNumber})`,
         html: `<p>El asistente de WhatsApp pide seguimiento humano.</p>
                <ul><li><strong>Número:</strong> +${deps.guestNumber}</li>
-               <li><strong>Nombre (perfil):</strong> ${String(deps.guestName || '—').replace(/</g, '&lt;')}</li>
-               <li><strong>Motivo:</strong> ${String(input.reason).replace(/</g, '&lt;')}</li></ul>
-               <p>${String(input.summary || '').replace(/</g, '&lt;')}</p>
+               <li><strong>Nombre (perfil):</strong> ${esc(deps.guestName || '—')}</li>
+               <li><strong>Motivo:</strong> ${esc(input.reason || '')}</li></ul>
+               <p>${esc(input.summary || '')}</p>
                <p>Respóndele directamente desde la app de WhatsApp Business.</p>`
       });
       return JSON.stringify({ notified: Boolean(result && result.sent !== false) });

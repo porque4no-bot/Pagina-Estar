@@ -346,7 +346,7 @@ async function handleAvailability(deps, msg, session, t) {
   for (const [id, room] of Object.entries(pricing.byRoomType || {})) {
     const meta = deps.roomMeta[id] || {};
     if (meta.capacity && meta.capacity < guests) continue;
-    if (room.available !== undefined && room.available <= 0) continue;
+    if (room.available === false) continue;
     rows.push(t.availRoom(meta.name || `Tipo ${id}`, formatCOP(room.avgPrice), meta.capacity || guests));
   }
 

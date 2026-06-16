@@ -105,7 +105,9 @@ async function submitCancellationRequest({ bookingCode, providedFactor, clientIp
   try {
     const { getStore } = require('@netlify/blobs');
     store = getStore({ name: 'cancellation-requests', consistency: 'strong' });
-    const existing = await store.get(bookingCode);
+    /* Clave canónica (id de reserva de OTASync), robusta a casing/espacios del
+       input — así dos solicitudes de la MISMA reserva no evaden el dedup. */
+    const existing = await store.get(booking.bookingCode);
     if (existing) {
       const prev = JSON.parse(existing);
       if (prev.requestedAt && Date.now() - prev.requestedAt < DEDUP_WINDOW_MS) {
@@ -143,7 +145,7 @@ async function submitCancellationRequest({ bookingCode, providedFactor, clientIp
 
   if (store) {
     try {
-      await store.set(bookingCode, JSON.stringify({ requestedAt: Date.now(), clientIp: clientIp || 'unknown', status: booking.status, source: source || 'web' }));
+      await store.set(booking.bookingCode, JSON.stringify({ requestedAt: Date.now(), clientIp: clientIp || 'unknown', status: booking.status, source: source || 'web' }));
     } catch (e) {
       if (process.env.DEBUG) console.warn('[request-cancellation] audit write failed:', e.message);
     }
