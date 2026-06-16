@@ -57,7 +57,9 @@ function buildPartnerValues(data) {
   if (data.phone) values.phone = String(data.phone).slice(0, 50);
   if (data.isCompany !== undefined) values.is_company = Boolean(data.isCompany);
   if (data.comment) values.comment = String(data.comment).slice(0, 2000);
-  if (data.country) values.country_code = String(data.country).slice(0, 2);
+  /* Nota: el país no se setea aquí. `country_code` en res.partner es de solo
+     lectura (related de country_id); habría que resolver country_id por código
+     (res.country) — se hará en una fase posterior si se necesita. */
   return values;
 }
 
@@ -130,12 +132,30 @@ async function upsertPartner(data, opts) {
     if (Array.isArray(found) && found.length) existingId = found[0];
   }
 
-  if (existingId) {
-    await executeKw('res.partner', 'write', [[existingId], values], {}, transport);
-    return { id: existingId, created: false, isMock: false };
+  async function persist(vals) {
+    if (existingId) {
+      await executeKw('res.partner', 'write', [[existingId], vals], {}, transport);
+      return { id: existingId, created: false, isMock: false };
+    }
+    const id = await executeKw('res.partner', 'create', [vals], {}, transport);
+    return { id, created: true, isMock: false };
   }
-  const id = await executeKw('res.partner', 'create', [values], {}, transport);
-  return { id, created: true, isMock: false };
+
+  try {
+    return await persist(values);
+  } catch (err) {
+    /* La localización colombiana de Odoo puede rechazar el NIT en `vat` por
+       formato/dígito de verificación. Para no perder el cliente, reintentamos
+       sin `vat` y dejamos el NIT en la nota. Otros errores (auth/red) se
+       propagan. */
+    if (values.vat) {
+      const { vat, ...rest } = values;
+      rest.comment = `${rest.comment ? rest.comment + ' ' : ''}NIT: ${vat}.`.slice(0, 2000);
+      const out = await persist(rest);
+      return { ...out, vatRejected: true };
+    }
+    throw err;
+  }
 }
 
 /* Para tests: limpiar el uid cacheado entre escenarios. */

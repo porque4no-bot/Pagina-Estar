@@ -35,7 +35,13 @@ function fakeTransport(handlers) {
         const model = args[3], objMethod = args[4];
         key = `${model}.${objMethod}`;
         const h = handlers[key];
-        result = typeof h === 'function' ? h(args[5], args[6]) : h;
+        try {
+          result = typeof h === 'function' ? h(args[5], args[6]) : h;
+        } catch (e) {
+          // Un handler que lanza simula un error de Odoo (p. ej. validación).
+          calls.push({ key, args });
+          return { json: async () => ({ jsonrpc: '2.0', id: body.id, error: { message: e.message } }) };
+        }
       }
       calls.push({ key, args });
       return { json: async () => ({ jsonrpc: '2.0', id: body.id, result }) };
@@ -131,6 +137,34 @@ test('upsertPartner deduplica por email cuando no hay vat', async () => {
   await odoo.upsertPartner({ name: 'Ana', email: 'Ana@Mail.CO' }, { transport });
   const search = calls.find(c => c.key === 'res.partner.search');
   assert.deepEqual(search.args[5][0], [['email', '=ilike', 'ana@mail.co']]);
+  clearEnv();
+});
+
+test('upsertPartner reintenta sin vat si Odoo rechaza el NIT (localización CO)', async () => {
+  setEnv();
+  const odoo = require(ODOO);
+  odoo._resetAuthCache();
+  let createdValues = null;
+  const { transport } = fakeTransport({
+    'common.authenticate': 7,
+    'res.partner.search': [],
+    'res.partner.create': (posArgs) => {
+      const values = posArgs[0];   // create recibe [values]
+      if (values.vat) throw new Error('El NIT no es válido para la localización');
+      createdValues = values;
+      return 77;
+    }
+  });
+  const r = await odoo.upsertPartner(
+    { name: 'Hospital', nit: '900123456-7', email: 'c@h.co', comment: 'Origen X.' },
+    { transport }
+  );
+  assert.equal(r.id, 77);
+  assert.equal(r.created, true);
+  assert.equal(r.vatRejected, true);
+  // se creó sin vat y el NIT quedó en la nota
+  assert.equal(createdValues.vat, undefined);
+  assert.match(createdValues.comment, /NIT: 900123456-7\./);
   clearEnv();
 });
 
