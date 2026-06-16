@@ -8,6 +8,11 @@ re-investigar.
 
 ## 1. Integración con Odoo (ERP / contabilidad)
 
+> **Ampliado en `docs/plan-integracion-odoo-otasync.md`** — arquitectura
+> objetivo (cliente como eje), topología Odoo↔OTASync↔desarrollo propio,
+> evaluación financiera (DataCrédito + extractos), plan por fases y las
+> decisiones abiertas. Lo de abajo es el resumen original.
+
 **Estado actual:** no existe ninguna integración. La única mención de Odoo en
 el proyecto es la promesa comercial de `empresas.html` ("Una sola factura
 mensual… Compatible con Odoo, SAP y QuickBooks"). Hoy el dinero y las
