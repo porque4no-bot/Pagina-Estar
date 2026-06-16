@@ -24,9 +24,6 @@ test('reservar.html calcTotal extras prices match _pricing', () => {
   // if(extras.desayuno)ex+=20000*search.guests*nights;
   assert.equal(numberAfter(/extras\.desayuno\)\s*ex\s*\+=\s*(\d+)\s*\*\s*search\.guests/),
     EXTRAS_PRICES.desayuno.price, 'desayuno price drifted between front-end and server');
-  // if(extras.parqueadero)ex+=25000*nights;
-  assert.equal(numberAfter(/extras\.parqueadero\)\s*ex\s*\+=\s*(\d+)\s*\*\s*nights/),
-    EXTRAS_PRICES.parqueadero.price, 'parqueadero price drifted');
   // if(extras.late)ex+=60000;
   assert.equal(numberAfter(/extras\.late\)\s*ex\s*\+=\s*(\d+)/),
     EXTRAS_PRICES.late.price, 'late price drifted');
@@ -46,7 +43,6 @@ test('reservar.html BE_EXTRAS catalogue prices match _pricing', () => {
     return parseInt(m[1], 10);
   };
   assert.equal(priceFor('desayuno'), EXTRAS_PRICES.desayuno.price);
-  assert.equal(priceFor('parqueadero'), EXTRAS_PRICES.parqueadero.price);
   assert.equal(priceFor('late'), EXTRAS_PRICES.late.price);
   assert.equal(priceFor('early'), EXTRAS_PRICES.early.price);
 });

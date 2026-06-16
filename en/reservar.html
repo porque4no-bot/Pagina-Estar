@@ -522,7 +522,6 @@
   ];
   const BE_EXTRAS = [
     { id:'desayuno', name:'Breakfast', desc:'Coffee, fruit and eggs every morning', price:20000, unit:'/person/night', icon:'coffee' },
-    { id:'parqueadero', name:'Parking', desc:'Covered garage in the building', price:25000, unit:'/night', icon:'car' },
     { id:'late', name:'Late check-out', desc:'Check out until 3:00 pm (subject to availability)', price:60000, unit:'per booking', icon:'clock' },
     { id:'early', name:'Early check-in', desc:'Check in from 10:00 am (subject to availability)', price:50000, unit:'per booking', icon:'sunrise' }
   ];
@@ -543,7 +542,6 @@
     const roomSub=nightly*nights;
     let ex=0;
     if(extras.desayuno)ex+=20000*search.guests*nights;
-    if(extras.parqueadero)ex+=25000*nights;
     if(extras.late)ex+=60000;
     if(extras.early)ex+=50000;
     const sub=roomSub+ex,iva=Math.round(sub*.19);

@@ -463,7 +463,6 @@ function ExtrasPanel({ extras, setExtras, search, onContinue, lang }) {
   function extraTotal(ex) {
     if (!extras[ex.id]) return 0;
     if (ex.id === 'desayuno') return ex.price * search.guests * nights;
-    if (ex.id === 'parqueadero') return ex.price * nights;
     if (ex.id === 'tour') return ex.price * search.guests;
     return ex.price;
   }
@@ -1115,9 +1114,6 @@ function BookingSummary({ booking, search, lang }) {
             if (ex.id === 'desayuno') {
               exTotal = ex.price * search.guests * nights;
               breakdown = `${formatCOP(ex.price)} × ${search.guests} ${search.guests === 1 ? t.huesped : t.huespedes} × ${nights} ${nights === 1 ? t.noche : t.noches}`;
-            } else if (ex.id === 'parqueadero') {
-              exTotal = ex.price * nights;
-              breakdown = `${formatCOP(ex.price)} × ${nights} ${nights === 1 ? t.noche : t.noches}`;
             } else if (ex.id === 'tour') {
               exTotal = ex.price * search.guests;
               breakdown = `${formatCOP(ex.price)} × ${search.guests} ${search.guests === 1 ? t.huesped : t.huespedes}`;
