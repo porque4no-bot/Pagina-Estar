@@ -136,14 +136,27 @@ empresa Mirada, ligado al partner. Etiquetas de origen del partner
 (`res.partner.category`: Corporativo / Huésped directo / Larga estadía) siguen
 activas. (Reservas pagadas → cliente, NO lead, porque ya son clientes ganados.)
 
-## Kunas/OTASync → Odoo (clientes reales) — PENDIENTE, falta API
+## Kunas/OTASync → Odoo (clientes reales)
 
-Decidido hacer **ambas**: backfill de los existentes + sync de las nuevas (sobre
-`otasync-webhook.js`). **Bloqueo:** el API de OTASync para LEER huéspedes/reservas
-("Get reservations" / "Search guest") **no está en `docs/kunas-api.md`** y no hay
-credenciales OTASync locales. Falta UNA de: la doc de esos endpoints, o
-credenciales OTASync (`OTASYNC_TOKEN/USERNAME/PASSWORD`), o un payload de ejemplo
-del webhook de reserva. Captura el flujo real, incluidos huéspedes de Booking/OTAs.
+Decidido hacer **ambas**. Estado tras explorar el API real (ya con credenciales):
+
+**Continuo (nuevas reservas) — CONSTRUIDO ✅.** `otasync-webhook.js` extrae el
+huésped del objeto `reservation` del webhook (`extractGuest` → `upsertPartner`,
+etiquetado por canal: Booking.com, Airbnb, …). Omite el canal web propio (lo
+maneja `wompi-webhook`). No fatal; en DEBUG loguea el payload para verificar la
+forma real. **Para activarlo falta:** (1) registrar un webhook en OTASync hacia
+`https://estar.com.co/api/otasync-webhook` (hoy solo hay uno, de SIRE; ninguno al
+nuestro) — es una escritura, requiere OK; (2) `OTASYNC_*` + `OTASYNC_WEBHOOK_SECRET`
++ vars de Odoo en Netlify; (3) verificar los nombres de campo del huésped con la
+primera reserva real.
+
+**Backfill (existentes) — BLOQUEADO.** Los endpoints de listado no están
+documentados y resistieron 4 rondas: `reservation/data/reservations` → 500 opaco;
+`guests/data/guests` → "date is not valid" con todo formato (ISO, timestamp,
+nombres). Sí funciona `reservation/data/reservation` (uno, por `id_reservations`)
+pero falta enumerar los ids. Desbloqueo: pedir a **Kunas soporte** el contrato
+exacto de "Get reservations"/"Guests", o **exportar CSV** desde la UI de Kunas e
+importarlo.
 
 ## Fase 2 — hallazgos del Odoo real (sondeo de solo lectura, 2026-06-15)
 
