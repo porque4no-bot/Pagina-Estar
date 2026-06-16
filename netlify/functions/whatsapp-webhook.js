@@ -25,25 +25,44 @@ const bot = require('./_whatsapp-bot');
 const memoryProcessed = new Map();
 const DEDUP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
-async function alreadyProcessed(messageId) {
-  if (!messageId) return false;
+/* Reclama atómicamente un id de mensaje para que dos entregas concurrentes
+   (reintento de Meta + cold start de Netlify) no lo procesen ambas. Devuelve
+   true si NOSOTROS lo reclamamos (procesar), false si ya estaba reclamado/manejado
+   (omitir). Usa la escritura condicional del blob (onlyIfNew) para atomicidad;
+   cae a un Map en memoria por proceso. */
+async function claimMessage(messageId) {
+  if (!messageId) return true;
   try {
     const { getStore } = require('@netlify/blobs');
     const store = getStore({ name: 'whatsapp-processed', consistency: 'strong' });
     const existing = await store.get(messageId);
-    if (existing && Date.now() - parseInt(existing, 10) < DEDUP_MAX_AGE_MS) return true;
-    await store.set(messageId, String(Date.now()));
-    return false;
+    if (existing && Date.now() - parseInt(existing, 10) < DEDUP_MAX_AGE_MS) return false;
+    const res = await store.set(messageId, String(Date.now()), { onlyIfNew: true });
+    if (res && res.modified === false) return false; // otra invocación lo reclamó primero
+    return true;
   } catch (e) {
     const ts = memoryProcessed.get(messageId);
-    if (ts && Date.now() - ts < DEDUP_MAX_AGE_MS) return true;
+    if (ts && Date.now() - ts < DEDUP_MAX_AGE_MS) return false;
     memoryProcessed.set(messageId, Date.now());
     if (memoryProcessed.size > 5000) {
       for (const [id, t] of memoryProcessed) {
         if (Date.now() - t > DEDUP_MAX_AGE_MS) memoryProcessed.delete(id);
       }
     }
-    return false;
+    return true;
+  }
+}
+
+/* Libera el claim cuando el manejo falló, para que el reintento de Meta NO se
+   pierda en silencio (preferimos un posible duplicado a un drop). */
+async function releaseClaim(messageId) {
+  if (!messageId) return;
+  try {
+    const { getStore } = require('@netlify/blobs');
+    const store = getStore({ name: 'whatsapp-processed', consistency: 'strong' });
+    await store.delete(messageId);
+  } catch (e) {
+    memoryProcessed.delete(messageId);
   }
 }
 
@@ -135,23 +154,28 @@ exports.handler = async (event) => {
 
   const messages = extractMessages(payload);
   for (const msg of messages) {
+    if (!msg.from) continue;
+    if (!botEnabled) {
+      console.log(`[whatsapp-webhook] bot disabled; message from +${msg.from} logged only.`);
+      continue;
+    }
+    let claimed = false;
     try {
-      if (!msg.from || await alreadyProcessed(msg.id)) continue;
-      if (!botEnabled) {
-        console.log(`[whatsapp-webhook] bot disabled; message from +${msg.from} logged only.`);
-        continue;
-      }
+      claimed = await claimMessage(msg.id);
+      if (!claimed) continue;
       /* Blue checks first — guests read "seen" as "being handled". */
       markRead(msg.id).catch(() => {});
       await bot.handleIncoming(msg);
     } catch (e) {
-      /* Never bubble: a bot bug must not make Meta retry (duplicate replies)
-         or disable the subscription. */
+      /* Never bubble: a bot bug must not make Meta disable the subscription.
+         Pero liberamos el claim para que el reintento de Meta reprocese y no se
+         pierda el mensaje en un fallo transitorio. */
       console.error('[whatsapp-webhook] handler error:', e.message);
+      if (claimed) { try { await releaseClaim(msg.id); } catch (_) {} }
     }
   }
 
   return { statusCode: 200, headers, body: JSON.stringify({ received: true }) };
 };
 
-exports._test = { extractMessages, alreadyProcessed };
+exports._test = { extractMessages, claimMessage, releaseClaim };

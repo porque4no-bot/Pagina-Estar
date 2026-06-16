@@ -266,11 +266,14 @@ const sentPaymentEmails = new Set();
 async function shouldSendPaymentEmail(transactionId, kind) {
   const key = `wompi-${transactionId}-${kind}`;
   if (sentPaymentEmails.has(key)) return false;
+  /* Cap igual que processedTransactionIds, para no crecer sin límite en
+     instancias calientes de larga vida. */
+  if (sentPaymentEmails.size >= 500) sentPaymentEmails.delete(sentPaymentEmails.values().next().value);
   sentPaymentEmails.add(key);
   if (paymentEmailStore) {
     try {
       if (await paymentEmailStore.get(key)) return false;
-      await paymentEmailStore.set(key, '1', { ttl: 86400 * 7 });
+      await paymentEmailStore.set(key, '1');
     } catch (e) {
       if (process.env.DEBUG) console.warn('[payment-emails] dedup store failed:', e.message);
     }
@@ -311,7 +314,7 @@ function paymentPendingEmailHtml({ name, code }) {
    guest in the reference itself; COT- quotes store the contact in Blobs.
    Never throws — guest notifications must not affect webhook processing. */
 async function notifyGuestPaymentOutcome(transaction, kind, overrides = {}) {
-  const deps = { sendEmail, getQuoteStore, loadQuote, ...overrides };
+  const deps = { sendEmail, getQuoteStore, loadQuote, effectiveStatus, ...overrides };
   try {
     if (!(await shouldSendPaymentEmail(transaction.id, kind))) return;
 
@@ -320,7 +323,10 @@ async function notifyGuestPaymentOutcome(transaction, kind, overrides = {}) {
       // Corporate quote: the contact lives in the stored quote.
       const store = deps.getQuoteStore();
       const quote = await deps.loadQuote(store, transaction.reference);
-      if (quote && quote.email) {
+      /* No contradecir una cotización ya resuelta: si ya está aceptada (reserva
+         confirmada) o cancelada/vencida, no enviar "tu pago no pudo procesarse". */
+      const qStatus = quote ? deps.effectiveStatus(quote) : null;
+      if (quote && quote.email && qStatus !== 'aceptada' && qStatus !== 'cancelada' && qStatus !== 'vencida') {
         const base = (process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
         contact = {
           email: quote.email,
@@ -859,8 +865,12 @@ exports.handler = async (event, context) => {
     const failedDecoded = decodeReference(transaction.reference);
     const bookingCodeForLog = failedDecoded ? failedDecoded.bookingCode : transaction.reference;
     console.error(`FAILED PAYMENT — status=${transaction.status}, transactionId=${transaction.id}, bookingCode=${bookingCodeForLog}, amount_cents=${transaction.amount_in_cents}, reference=${obfuscateReference(transaction.reference)}. Manual follow-up required.`);
-    // Tell the guest the charge didn't go through (non-fatal, deduped per tx).
-    await notifyGuestPaymentOutcome(transaction, 'declined');
+    /* Email al huésped solo para rechazos genuinos. VOIDED = transacción que fue
+       APROBADA y luego anulada/revertida (sí hubo cobro), así que "no se realizó
+       ningún cobro" sería falso; VOIDED solo se registra para seguimiento manual. */
+    if (transaction.status === 'DECLINED' || transaction.status === 'ERROR') {
+      await notifyGuestPaymentOutcome(transaction, 'declined');
+    }
     return {
       statusCode: 200,
       headers: corsHeaders,

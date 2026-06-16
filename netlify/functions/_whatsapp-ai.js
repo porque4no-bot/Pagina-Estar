@@ -56,9 +56,12 @@ function aiConfig() {
     model: process.env.WHATSAPP_AI_MODEL || DEFAULT_MODEL,
     effort: process.env.WHATSAPP_AI_EFFORT || DEFAULT_EFFORT,
     maxTokens: parseInt(process.env.WHATSAPP_AI_MAX_TOKENS, 10) || DEFAULT_MAX_TOKENS,
-    /* Netlify functions default to a 10s timeout; leave headroom so a slow
-       model turn degrades into the fallback message instead of a dead reply. */
-    requestTimeoutMs: parseInt(process.env.WHATSAPP_AI_TIMEOUT_MS, 10) || 50000
+    /* Debe quedar POR DEBAJO del límite de ejecución de la función Netlify
+       (10s por defecto, 26s máx.) para que un turno lento degrade en el mensaje
+       de fallback en vez de morir sin responder (un default de 50s nunca
+       disparaba el fallback: la función se mataba antes). Si subes el timeout de
+       la función en Netlify, sube esta variable acorde. */
+    requestTimeoutMs: parseInt(process.env.WHATSAPP_AI_TIMEOUT_MS, 10) || 8000
   };
 }
 
