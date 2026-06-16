@@ -114,8 +114,8 @@ const CONTRACT_CLAUSES = [
   },
   {
     num: 'QUINTA', title: { es: 'Horarios y entrega', en: 'Schedules and Checkout' },
-    es: 'El check-in se realiza a partir de las 3:00 p. m. y el check-out hasta las 12:00 m. del día de salida. Toda permanencia posterior sin acuerdo previo causará un cargo adicional. Hotel Estar podrá retener objetos olvidados hasta por 30 días, transcurridos los cuales se dispondrá de ellos según política interna.',
-    en: 'Check-in is from 3:00 p.m. and check-out by 12:00 noon on the departure day. Any extended stay without prior agreement will incur an additional charge. Hotel Estar may retain forgotten items for up to 30 days; afterwards they will be disposed of per internal policy.'
+    es: 'El check-in se realiza a partir de las 3:00 p. m. y el check-out hasta las 11:00 a. m. del día de salida. Toda permanencia posterior sin acuerdo previo causará un cargo adicional. Hotel Estar podrá retener objetos olvidados hasta por 30 días, transcurridos los cuales se dispondrá de ellos según política interna.',
+    en: 'Check-in is from 3:00 p.m. and check-out by 11:00 a.m. on the departure day. Any extended stay without prior agreement will incur an additional charge. Hotel Estar may retain forgotten items for up to 30 days; afterwards they will be disposed of per internal policy.'
   }
 ];
 

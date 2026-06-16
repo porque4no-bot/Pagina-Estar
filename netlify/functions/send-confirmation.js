@@ -141,7 +141,7 @@ function buildEmailHtml({
                         <td style="padding:16px 20px;width:50%;">
                           <p style="margin:0 0 4px 0;font-family:Arial,sans-serif;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#9A9A8A;">Salida</p>
                           <p style="margin:0;font-family:Georgia,serif;font-size:14px;color:#2C2C2C;">${checkOutFormatted}</p>
-                          <p style="margin:4px 0 0 0;font-family:Arial,sans-serif;font-size:11px;color:#9A9A8A;">Check-out antes de las 12:00 m.</p>
+                          <p style="margin:4px 0 0 0;font-family:Arial,sans-serif;font-size:11px;color:#9A9A8A;">Check-out antes de las 11:00 a. m.</p>
                         </td>
                       </tr>
                     </table>

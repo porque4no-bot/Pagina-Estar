@@ -1174,7 +1174,7 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
           </div>
           <div>
             <span className="be-eyebrow">{t.checkout}</span>
-            <p className="be-confirm-val">{fmtDate(search.checkout)} · 12:00 pm</p>
+            <p className="be-confirm-val">{fmtDate(search.checkout)} · 11:00 am</p>
           </div>
         </div>
         <div className="be-confirm-row">
