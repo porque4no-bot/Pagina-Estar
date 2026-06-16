@@ -243,6 +243,35 @@ test('upsertPartner crea la etiqueta si no existe y la adjunta', async () => {
   clearEnv();
 });
 
+test('createLead crea una oportunidad ligada al partner (company_id + contexto)', async () => {
+  setEnv();
+  process.env.ODOO_COMPANY_ID = '5';
+  const odoo = require(ODOO);
+  odoo._resetAuthCache();
+  let vals = null, kw = null;
+  const { transport } = fakeTransport({
+    'common.authenticate': 7,
+    'crm.lead.create': (posArgs, kwargs) => { vals = posArgs[0]; kw = kwargs; return 321; }
+  });
+  const r = await odoo.createLead({ subject: 'Cotización corporativa — ACME', partnerId: 9, email: 'A@ACME.co', phone: '300', description: 'x' }, { transport });
+  assert.equal(r.id, 321);
+  assert.equal(vals.type, 'opportunity');
+  assert.equal(vals.partner_id, 9);
+  assert.equal(vals.name, 'Cotización corporativa — ACME');
+  assert.equal(vals.email_from, 'a@acme.co');
+  assert.equal(vals.company_id, 5);
+  assert.deepEqual(kw.context, { allowed_company_ids: [5] });
+  delete process.env.ODOO_COMPANY_ID;
+  clearEnv();
+});
+
+test('createLead sin credenciales es no-op mock', async () => {
+  clearEnv();
+  const odoo = require(ODOO);
+  const r = await odoo.createLead({ subject: 'X' });
+  assert.deepEqual(r, { id: null, isMock: true });
+});
+
 test('upsertPartner exige al menos name, email o vat', async () => {
   setEnv();
   const odoo = require(ODOO);

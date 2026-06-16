@@ -119,14 +119,22 @@ CRM; `upsertPartner` acepta `tags` y crea/añade la categoría con (4,id)):
 - ✅ **Larga estadía** (`vivir.html`): vía `submission-created.js` (función de
   EVENTO de Netlify; el form sigue siendo nativo) → persona "Larga estadía".
 
-## CRM en Odoo — estado y decisión
+## CRM en Odoo — INSTALADO y enganchado (2026-06-16)
 
-El módulo **CRM NO está instalado** (`crm.lead`/`crm.team` no existen); solo
-Contabilidad + Contactos. Sí hay `res.partner.category` (etiquetas, ya en uso) y
-`utm.campaign`. Para CRM real (pipeline/marketing) habría que **instalar los apps**
-(decisión del dueño; posible costo de licencia) o **módulos a medida** (requieren
-acceso a Odoo.sh/self-host — hoy solo tenemos API). **Decisión (2026-06-16):**
-por ahora se **segmenta con etiquetas** (hecho); instalar CRM queda aparte.
+La licencia (Custom) cubre todos los apps sin costo extra → se instalaron por API
+(`ir.module.module` `button_immediate_install`): **CRM, Email Marketing, Marketing
+Automation, SMS Marketing** (todos `installed`, verificado). Contactos ya estaba.
+
+Enganche (`_odoo.js` → `createLead`): además del cliente, el interés entrante crea
+una **oportunidad** (`crm.lead`, `type=opportunity`, empresa Mirada 5, ligada al
+partner):
+- ✅ Cotización corporativa (`request-quote.js`) → "Cotización corporativa — <empresa>".
+- ✅ Larga estadía (`submission-created.js`) → "Larga estadía — <nombre>".
+
+Verificado contra el Odoo real: el lead cae en equipo "Sales", etapa "New",
+empresa Mirada, ligado al partner. Etiquetas de origen del partner
+(`res.partner.category`: Corporativo / Huésped directo / Larga estadía) siguen
+activas. (Reservas pagadas → cliente, NO lead, porque ya son clientes ganados.)
 
 ## Kunas/OTASync → Odoo (clientes reales) — PENDIENTE, falta API
 

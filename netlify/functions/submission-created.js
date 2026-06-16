@@ -31,6 +31,12 @@ const FORM_HANDLERS = {
   })
 };
 
+/* Asunto de la oportunidad (lead CRM) por formulario. Solo los forms aquí
+   listados generan oportunidad además del contacto. */
+const LEAD_SUBJECTS = {
+  'estancias-largas': (v) => `Larga estadía — ${v.name}`
+};
+
 exports.handler = async (event) => {
   let payload;
   try {
@@ -52,11 +58,15 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { upsertPartner } = require('./_odoo');
-    const r = await upsertPartner(values);
-    if (process.env.DEBUG) console.log(`[submission-created] Odoo upsert (${formName}):`, r && (r.id || (r.isMock ? 'mock' : '')));
+    const { upsertPartner, createLead } = require('./_odoo');
+    const partner = await upsertPartner(values);
+    if (process.env.DEBUG) console.log(`[submission-created] Odoo upsert (${formName}):`, partner && (partner.id || (partner.isMock ? 'mock' : '')));
+    const mkSubject = LEAD_SUBJECTS[formName];
+    if (partner && partner.id && mkSubject) {
+      await createLead({ subject: mkSubject(values), partnerId: partner.id, email: values.email, description: values.comment });
+    }
   } catch (err) {
-    console.error(`[submission-created] Odoo upsert (${formName}) no fatal:`, err.message);
+    console.error(`[submission-created] Odoo (${formName}) no fatal:`, err.message);
   }
 
   return { statusCode: 200, body: 'ok' };

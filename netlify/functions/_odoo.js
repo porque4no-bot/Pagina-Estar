@@ -192,10 +192,36 @@ async function upsertPartner(data, opts) {
   }
 }
 
+/* ── CRM: crear una oportunidad (lead) ──
+   Requiere el módulo CRM instalado en Odoo. Se usa para interés entrante
+   (cotización corporativa, larga estadía) ligado al partner, para que ventas le
+   haga seguimiento en el embudo. Devuelve { id, isMock }. No-op mock sin
+   credenciales. El llamador lo envuelve en try/catch (no fatal). */
+async function createLead(data, opts) {
+  opts = opts || {};
+  if (!isConfigured()) {
+    if (process.env.DEBUG) console.log('[odoo] mock createLead:', data && data.subject);
+    return { id: null, isMock: true };
+  }
+  const transport = opts.transport;
+  const c = odooConfig();
+  const ctx = c.companyId ? { allowed_company_ids: [c.companyId] } : null;
+  const withCtx = (kw) => (ctx ? { ...(kw || {}), context: ctx } : (kw || {}));
+  const values = { name: String(data.subject || 'Solicitud web').slice(0, 200), type: 'opportunity' };
+  if (data.partnerId) values.partner_id = data.partnerId;
+  if (data.contactName) values.contact_name = String(data.contactName).slice(0, 200);
+  if (data.email) values.email_from = String(data.email).toLowerCase().trim().slice(0, 254);
+  if (data.phone) values.phone = String(data.phone).slice(0, 50);
+  if (data.description) values.description = String(data.description).slice(0, 2000);
+  if (c.companyId) values.company_id = c.companyId;
+  const id = await executeKw('crm.lead', 'create', [values], withCtx(), transport);
+  return { id, isMock: false };
+}
+
 /* Para tests: limpiar el uid cacheado entre escenarios. */
 function _resetAuthCache() { cachedUid = null; }
 
 module.exports = {
   odooConfig, isConfigured, normalizeVat, buildPartnerValues,
-  jsonRpc, authenticate, executeKw, upsertPartner, _resetAuthCache
+  jsonRpc, authenticate, executeKw, upsertPartner, createLead, _resetAuthCache
 };

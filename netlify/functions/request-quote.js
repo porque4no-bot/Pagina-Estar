@@ -253,8 +253,8 @@ exports.handler = async (event, context) => {
      Odoo. No fatal — nunca bloquea la solicitud de cotización. Sin credenciales
      de Odoo es un no-op logueado. */
   try {
-    const { upsertPartner } = require('./_odoo');
-    await upsertPartner({
+    const { upsertPartner, createLead } = require('./_odoo');
+    const partner = await upsertPartner({
       name: sanitized.empresa,
       email: sanitized.email,
       phone: sanitized.whatsapp,
@@ -262,8 +262,20 @@ exports.handler = async (event, context) => {
       tags: ['Corporativo'],
       comment: `Contacto: ${sanitized.contacto}. Origen: formulario corporativo (empresas.html).`
     });
+    /* Con el CRM instalado, además del cliente creamos una OPORTUNIDAD en el
+       embudo para que ventas le haga seguimiento. No fatal. */
+    if (partner && partner.id) {
+      await createLead({
+        subject: `Cotización corporativa — ${sanitized.empresa}`,
+        partnerId: partner.id,
+        contactName: sanitized.contacto,
+        email: sanitized.email,
+        phone: sanitized.whatsapp,
+        description: `Tipo de estadía: ${sanitized.tipoEstadia}. Habitaciones: ${sanitized.numHabitaciones}. Fechas: ${sanitized.fechaCheckin || '—'} → ${sanitized.fechaCheckout || '—'}. ${sanitized.comentarios || ''}`.trim()
+      });
+    }
   } catch (odooErr) {
-    console.error('[request-quote] Odoo upsert no fatal:', odooErr.message);
+    console.error('[request-quote] Odoo (cliente/lead) no fatal:', odooErr.message);
   }
 
   return {
