@@ -244,6 +244,125 @@ function obfuscateReference(ref) {
   return ref.length > 8 ? `${ref.substring(0, 4)}...${ref.substring(ref.length - 4)}` : '***';
 }
 
+/* ── Guest notifications for non-approved payments ──────────────────────
+   Deduped in a store SEPARATE from 'processed-transactions': marking a
+   PENDING transaction there would make its later APPROVED webhook look like
+   a duplicate and skip the reservation. This store only dedupes the
+   courtesy emails. Mirrored in mercadopago-webhook.js (rollback provider). */
+let paymentEmailStore;
+try {
+  paymentEmailStore = getStore({ name: 'payment-failure-emails', consistency: 'strong' });
+} catch (e) {
+  if (process.env.DEBUG) console.warn('[payment-emails] Blobs unavailable, using in-memory dedup only:', e.message);
+  paymentEmailStore = null;
+}
+const sentPaymentEmails = new Set();
+
+/* True the first time a (transaction, kind) pair is seen. Marked BEFORE the
+   send so concurrent webhook retries can't double-email; a courtesy email
+   lost to a send failure is not retried. If Blobs is unavailable we still
+   send — Wompi retries webhooks, so a duplicate email is possible, but
+   that's preferable to the guest never learning the outcome. */
+async function shouldSendPaymentEmail(transactionId, kind) {
+  const key = `wompi-${transactionId}-${kind}`;
+  if (sentPaymentEmails.has(key)) return false;
+  /* Cap igual que processedTransactionIds, para no crecer sin límite en
+     instancias calientes de larga vida. */
+  if (sentPaymentEmails.size >= 500) sentPaymentEmails.delete(sentPaymentEmails.values().next().value);
+  sentPaymentEmails.add(key);
+  if (paymentEmailStore) {
+    try {
+      if (await paymentEmailStore.get(key)) return false;
+      await paymentEmailStore.set(key, '1');
+    } catch (e) {
+      if (process.env.DEBUG) console.warn('[payment-emails] dedup store failed:', e.message);
+    }
+  }
+  return true;
+}
+
+function paymentDeclinedEmailHtml({ name, code, retryUrl }) {
+  return `<!DOCTYPE html><html lang="es"><body style="font-family:Arial,sans-serif;color:#2C2C2C;">
+    <h2 style="color:#9A3B12;">Tu pago no pudo procesarse</h2>
+    <p>Hola ${escapeHtml(name) || 'viajero/a'},</p>
+    <p>Tu entidad financiera no aprobó el pago de tu reserva${code ? ` <strong>${escapeHtml(String(code))}</strong>` : ''} en Hotel Estar. <strong>No se realizó ningún cobro</strong> y la reserva no quedó confirmada.</p>
+    <p>Los motivos más comunes son:</p>
+    <ul>
+      <li>Fondos insuficientes o cupo de la tarjeta excedido</li>
+      <li>Límites para compras por internet configurados con tu banco</li>
+      <li>Verificación 3D Secure no completada</li>
+    </ul>
+    <p>Puedes intentarlo de nuevo cuando quieras:</p>
+    <p><a href="${retryUrl}" style="display:inline-block;padding:12px 24px;background:#2C2C2C;border-radius:8px;color:#fff;text-decoration:none;font-size:13px;">Reintentar mi reserva</a></p>
+    <p style="font-size:12px;color:#9A9A8A;">¿Necesitas ayuda? Escríbenos a reservas@estar.com.co o al +57 310 249 0414.</p>
+  </body></html>`;
+}
+
+function paymentPendingEmailHtml({ name, code }) {
+  return `<!DOCTYPE html><html lang="es"><body style="font-family:Arial,sans-serif;color:#2C2C2C;">
+    <h2 style="color:#9A6A2E;">Tu pago está en proceso</h2>
+    <p>Hola ${escapeHtml(name) || 'viajero/a'},</p>
+    <p>Tu banco aún está procesando el pago de tu reserva${code ? ` <strong>${escapeHtml(String(code))}</strong>` : ''} en Hotel Estar. Esto puede tomar unos minutos.</p>
+    <p>Apenas el banco apruebe la transacción te enviaremos la confirmación automáticamente — no necesitas hacer nada más.</p>
+    <p><strong>Importante: no vuelvas a pagar.</strong> Un segundo intento podría generar un cobro doble.</p>
+    <p style="font-size:12px;color:#9A9A8A;">¿Dudas? Escríbenos a reservas@estar.com.co o al +57 310 249 0414.</p>
+  </body></html>`;
+}
+
+/* Email the guest when a payment is declined/voided/errored ('declined') or
+   still being processed by the bank ('pending'). Direct bookings encode the
+   guest in the reference itself; COT- quotes store the contact in Blobs.
+   Never throws — guest notifications must not affect webhook processing. */
+async function notifyGuestPaymentOutcome(transaction, kind, overrides = {}) {
+  const deps = { sendEmail, getQuoteStore, loadQuote, effectiveStatus, ...overrides };
+  try {
+    if (!(await shouldSendPaymentEmail(transaction.id, kind))) return;
+
+    let contact = null;
+    if (QUOTE_ID_RE.test(transaction.reference || '')) {
+      // Corporate quote: the contact lives in the stored quote.
+      const store = deps.getQuoteStore();
+      const quote = await deps.loadQuote(store, transaction.reference);
+      /* No contradecir una cotización ya resuelta: si ya está aceptada (reserva
+         confirmada) o cancelada/vencida, no enviar "tu pago no pudo procesarse". */
+      const qStatus = quote ? deps.effectiveStatus(quote) : null;
+      if (quote && quote.email && qStatus !== 'aceptada' && qStatus !== 'cancelada' && qStatus !== 'vencida') {
+        const base = (process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
+        contact = {
+          email: quote.email,
+          name: quote.contacto || quote.empresa || '',
+          code: transaction.reference,
+          retryUrl: quote.publicToken
+            ? `${base}/cotizacion.html?id=${encodeURIComponent(transaction.reference)}&t=${encodeURIComponent(quote.publicToken)}`
+            : `${base}/empresas.html`
+        };
+      }
+    } else {
+      // Direct booking: the guest is encoded in the reference itself.
+      const decoded = decodeReference(transaction.reference);
+      if (decoded && decoded.email) {
+        contact = {
+          email: decoded.email,
+          name: decoded.firstName || '',
+          code: decoded.bookingCode || '',
+          retryUrl: 'https://estar.com.co/reservar.html'
+        };
+      }
+    }
+    if (!contact) return;
+
+    await deps.sendEmail({
+      to: contact.email,
+      subject: kind === 'pending'
+        ? 'Tu pago está en proceso — Hotel Estar'
+        : 'Tu pago no pudo procesarse — Hotel Estar',
+      html: kind === 'pending' ? paymentPendingEmailHtml(contact) : paymentDeclinedEmailHtml(contact)
+    });
+  } catch (e) {
+    console.error(`[wompi-webhook] guest ${kind} payment email failed:`, e.message);
+  }
+}
+
 // Build OTASync reservation rooms array from quote items (expands `unidades`).
 function buildQuoteRooms(quote, roomDetails) {
   const rooms = [];
@@ -614,6 +733,25 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
       await trackPurchase({ transactionId: String(bookingCode), value: paidAmount });
     } catch (e) { /* analytics never blocks */ }
 
+    /* Maestro de clientes (Fase 1): la empresa pagadora queda como partner en
+       Odoo. Va DESPUÉS de crear la reserva y guardar la cotización como aceptada,
+       para que una demora/caída de Odoo nunca impida la reserva ya pagada
+       (mismo orden seguro que la reserva directa). No fatal. */
+    try {
+      const { upsertPartner } = require('./_odoo');
+      await upsertPartner({
+        name: quote.empresa || quote.contacto || 'Empresa',
+        vat: quote.nit,
+        email: quote.email,
+        phone: sanitizePhone(quote.telefono),
+        isCompany: true,
+        tags: ['Corporativo'],
+        comment: `Cliente corporativo. Cotización ${quoteId}${quote.contacto ? '. Contacto: ' + quote.contacto : ''}.`
+      });
+    } catch (odooErr) {
+      console.error('[wompi-webhook] Odoo upsert (cotización) no fatal:', odooErr.message);
+    }
+
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, bookingCode }) };
   } finally {
     if (!lock.blobsUnavailable) await deps.releaseQuoteLock(quoteId);
@@ -727,6 +865,12 @@ exports.handler = async (event, context) => {
     const failedDecoded = decodeReference(transaction.reference);
     const bookingCodeForLog = failedDecoded ? failedDecoded.bookingCode : transaction.reference;
     console.error(`FAILED PAYMENT — status=${transaction.status}, transactionId=${transaction.id}, bookingCode=${bookingCodeForLog}, amount_cents=${transaction.amount_in_cents}, reference=${obfuscateReference(transaction.reference)}. Manual follow-up required.`);
+    /* Email al huésped solo para rechazos genuinos. VOIDED = transacción que fue
+       APROBADA y luego anulada/revertida (sí hubo cobro), así que "no se realizó
+       ningún cobro" sería falso; VOIDED solo se registra para seguimiento manual. */
+    if (transaction.status === 'DECLINED' || transaction.status === 'ERROR') {
+      await notifyGuestPaymentOutcome(transaction, 'declined');
+    }
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -735,6 +879,10 @@ exports.handler = async (event, context) => {
   }
 
   if (transaction.status !== 'APPROVED') {
+    if (transaction.status === 'PENDING') {
+      // Bank still processing: warn the guest not to pay again (double charge).
+      await notifyGuestPaymentOutcome(transaction, 'pending');
+    }
     if (process.env.DEBUG) console.log(`Transaction status is not APPROVED: ${transaction.status}. Skipping PMS insertion.`);
     return {
       statusCode: 200,
@@ -1168,6 +1316,22 @@ exports.handler = async (event, context) => {
       } catch (e) { /* non-fatal */ }
     }
 
+    /* Maestro de clientes (Fase 1): el huésped directo queda como partner
+       (persona) en Odoo, deduplicado por email. No fatal. */
+    try {
+      const { upsertPartner } = require('./_odoo');
+      await upsertPartner({
+        name: `${decoded.firstName || ''} ${decoded.lastName || ''}`.trim() || decoded.email,
+        email: decoded.email,
+        phone: sanitizePhone(decoded.phone),
+        isCompany: false,
+        tags: ['Huésped directo'],
+        comment: `Huésped de reserva directa ${finalBookingCode}.`
+      });
+    } catch (odooErr) {
+      console.error('[wompi-webhook] Odoo upsert (huésped) no fatal:', odooErr.message);
+    }
+
     /* A-6: server-side conversion (Measurement Protocol). Same transaction_id
        as the client purchase so GA4 dedupes. value = online subtotal charged. */
     try {
@@ -1224,5 +1388,6 @@ exports._test = {
   mustChargeDirectBookingIva,
   directBookingPricing,
   handleQuotePayment,
-  acquireQuoteLock
+  acquireQuoteLock,
+  notifyGuestPaymentOutcome
 };

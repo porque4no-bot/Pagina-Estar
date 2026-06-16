@@ -12,6 +12,7 @@
     "test:report": "playwright show-report"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
     "@googleapis/drive": "^20.2.0",
     "@netlify/blobs": "^10.7.9",
     "pdfkit": "^0.19.0",

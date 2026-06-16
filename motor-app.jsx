@@ -1312,11 +1312,39 @@ function ManageBooking({ onBack, lang }) {
   const t = i18nEngine[lang];
   const [code, setCode] = useState('');
   const [email, setEmail] = useState('');
-  // result: null | 'loading' | 'found' | 'not-found' | 'error'
+  // result: null | 'loading' | 'found' | 'not-found' | 'error' | 'cancel-requested'
   const [result, setResult] = useState(null);
   const [bookingData, setBookingData] = useState(null);
   const [showCancel, setShowCancel] = useState(false);
   const [searchError, setSearchError] = useState(null);
+  const [cancelSending, setCancelSending] = useState(false);
+  const [cancelError, setCancelError] = useState(null);
+
+  async function doRequestCancellation() {
+    setCancelSending(true);
+    setCancelError(null);
+    try {
+      const response = await fetch('/api/request-cancellation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code.trim(), email: email.trim() })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.success) {
+        setShowCancel(false);
+        setResult('cancel-requested');
+      } else if (data && data.reason === 'not_cancellable') {
+        setCancelError(t.resCancelNotCancellable);
+      } else {
+        setCancelError(t.resCancelSendError);
+      }
+    } catch (err) {
+      console.error('[ManageBooking] Cancellation request failed:', err.message);
+      setCancelError(t.resCancelSendError);
+    } finally {
+      setCancelSending(false);
+    }
+  }
 
   async function doSearch(e) {
     e.preventDefault();
@@ -1407,9 +1435,15 @@ function ManageBooking({ onBack, lang }) {
             )}
           </div>
           <div className="be-manage-actions">
-            <button className="be-btn-secondary">
+            <a className="be-btn-secondary" target="_blank" rel="noopener noreferrer"
+              href={`https://api.whatsapp.com/send/?phone=573102490414&text=${encodeURIComponent(
+                (lang === 'es'
+                  ? `Hola, quiero modificar las fechas de mi reserva ${bookingData.bookingCode}.`
+                  : `Hi, I would like to modify the dates of my booking ${bookingData.bookingCode}.`)
+              )}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
               <Icon name="calendar" size={14} /> {t.resModDates}
-            </button>
+            </a>
             {bookingData.canCancel && (
               <button className="be-btn-danger" onClick={() => setShowCancel(true)}>
                 {t.resCancel}
@@ -1430,13 +1464,36 @@ function ManageBooking({ onBack, lang }) {
           <p style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink-500)', marginBottom: 20, lineHeight: 1.6 }}>
             {t.resCancelConfirmDesc}
           </p>
+          {cancelError && (
+            <p style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--terracotta-700)', marginBottom: 16 }}>
+              {cancelError}
+            </p>
+          )}
           <div style={{ display: 'flex', gap: 12 }}>
-            <button className="be-btn-danger"
-              onClick={() => { setResult(null); setBookingData(null); setShowCancel(false); setCode(''); setEmail(''); }}>
-              {t.resCancelConfirmYes}
+            <button className="be-btn-danger" disabled={cancelSending} onClick={doRequestCancellation}>
+              {cancelSending ? (
+                <><div className="be-spinner-small" style={{ display: 'inline-block', marginRight: 8 }}></div>{t.resCancelSending}</>
+              ) : t.resCancelConfirmYes}
             </button>
-            <button className="be-btn-secondary" onClick={() => setShowCancel(false)}>{t.back}</button>
+            <button className="be-btn-secondary" disabled={cancelSending} onClick={() => { setShowCancel(false); setCancelError(null); }}>{t.back}</button>
           </div>
+        </div>
+      )}
+
+      {result === 'cancel-requested' && (
+        <div className="be-manage-result" style={{ marginTop: 24 }}>
+          <div className="be-manage-found-header">
+            <span>✶</span>
+            <div>
+              <span className="be-eyebrow">{t.resCancelRequested}</span>
+              <p style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 17, color: 'var(--white)' }}>
+                {bookingData ? bookingData.bookingCode : code}
+              </p>
+            </div>
+          </div>
+          <p style={{ padding: '16px 22px', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--ink-500)', lineHeight: 1.6 }}>
+            {t.resCancelRequestedDesc}
+          </p>
         </div>
       )}
 

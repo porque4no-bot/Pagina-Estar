@@ -375,6 +375,16 @@ function buildRoomsFromQuote(quote) {
   return { rooms, nights };
 }
 
+/* insertReservation runs AFTER an approved payment: a transient network blip,
+   timeout or 5xx here strands the booking in manual-pending. Retry transient
+   failures up to 3 attempts total with exponential backoff (1s, 2s). 4xx
+   responses are NOT retried — a bad payload won't fix itself. Each attempt
+   re-runs the whole withSessionRetry cycle, so expired-session (401) re-logins
+   stay handled there without double-wrapping. */
+const INSERT_MAX_ATTEMPTS = 3;
+const INSERT_BACKOFF_MS = [1000, 2000];
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 async function insertReservation(payload) {
   const makeRequest = async (pkey) => {
     const body = { ...payload, key: pkey };
@@ -392,9 +402,31 @@ async function insertReservation(payload) {
       throw err.name === 'AbortError' ? new Error('Request timeout during reservation insert') : err;
     }
   };
-  const res = await withSessionRetry(makeRequest);
-  if (!res.ok) throw new Error(`insert/reservation returned status ${res.status}`);
-  return res.json();
+
+  let lastErr = null;
+  for (let attempt = 1; attempt <= INSERT_MAX_ATTEMPTS; attempt++) {
+    let res;
+    try {
+      res = await withSessionRetry(makeRequest);
+    } catch (err) {
+      /* fetch/network error or timeout — transient, retry with backoff */
+      lastErr = err;
+      if (attempt === INSERT_MAX_ATTEMPTS) throw lastErr;
+      console.warn(`[otasync] insert/reservation attempt ${attempt}/${INSERT_MAX_ATTEMPTS} failed (${err.message}); retrying in ${INSERT_BACKOFF_MS[attempt - 1]}ms`);
+      await sleep(INSERT_BACKOFF_MS[attempt - 1]);
+      continue;
+    }
+    if (res.ok) return res.json();
+    /* 5xx is a transient server-side failure; anything else (4xx) is final. */
+    if (res.status >= 500 && attempt < INSERT_MAX_ATTEMPTS) {
+      console.warn(`[otasync] insert/reservation attempt ${attempt}/${INSERT_MAX_ATTEMPTS} returned status ${res.status}; retrying in ${INSERT_BACKOFF_MS[attempt - 1]}ms`);
+      await sleep(INSERT_BACKOFF_MS[attempt - 1]);
+      continue;
+    }
+    throw new Error(`insert/reservation returned status ${res.status}`);
+  }
+  /* Unreachable (the last attempt always returns or throws) — kept for safety. */
+  throw lastErr || new Error('insert/reservation failed');
 }
 
 /* Create a tentative reservation that holds the quoted rooms. Returns the

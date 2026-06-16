@@ -209,6 +209,34 @@ exports.handler = async (event, context) => {
     comentarios: String(body.comentarios || '').slice(0, 1000)
   };
 
+  /* Maestro de clientes (Fase 1): empresa como partner en Odoo + oportunidad
+     CRM. Va ANTES del envío de email para que la sincronización NO dependa de
+     RESEND (si falta la key, igual entra el cliente). No fatal — nunca bloquea
+     la solicitud. Mock sin credenciales de Odoo. */
+  try {
+    const { upsertPartner, createLead } = require('./_odoo');
+    const partner = await upsertPartner({
+      name: sanitized.empresa,
+      email: sanitized.email,
+      phone: sanitized.whatsapp,
+      isCompany: true,
+      tags: ['Corporativo'],
+      comment: `Contacto: ${sanitized.contacto}. Origen: formulario corporativo (empresas.html).`
+    });
+    if (partner && partner.id) {
+      await createLead({
+        subject: `Cotización corporativa — ${sanitized.empresa}`,
+        partnerId: partner.id,
+        contactName: sanitized.contacto,
+        email: sanitized.email,
+        phone: sanitized.whatsapp,
+        description: `Tipo de estadía: ${sanitized.tipoEstadia}. Habitaciones: ${sanitized.numHabitaciones}. Fechas: ${sanitized.fechaCheckin || '—'} → ${sanitized.fechaCheckout || '—'}. ${sanitized.comentarios || ''}`.trim()
+      });
+    }
+  } catch (odooErr) {
+    console.error('[request-quote] Odoo (cliente/lead) no fatal:', odooErr.message);
+  }
+
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) {
     if (process.env.DEBUG) console.log('[request-quote] RESEND_API_KEY no configurada. Solicitud recibida:', sanitized.empresa);
