@@ -108,13 +108,32 @@ Resuelto: los clientes del hotel se asignan a **Mirada SAS (5)** vía
 el contexto; sin la variable quedan compartidos (compat. hacia atrás). Cubierto
 por tests en `tests/unit/odoo.test.js` y el diagnóstico confirma la visibilidad.
 
-## Paso 3 — Completar la Fase 1  ← SIGUIENTE
+## Paso 3 — Completar la Fase 1 (casi listo)
 
-Enganchar `upsertPartner` también en:
-- **Reservas pagadas** (`wompi-webhook.js`): cada huésped directo → cliente en
-  Odoo (mayor volumen para el CRM). Persona, no empresa.
-- **Larga estadía** (formulario de `vivir.html`): ojo, revisar si ese form es
-  nativo de Netlify o llama a una función — define cómo se engancha.
+`upsertPartner` enganchado en:
+- ✅ **Cotización corporativa** (`request-quote.js`) — empresa.
+- ✅ **Reservas pagadas** (`wompi-webhook.js`): cotización pagada → empresa;
+  reserva directa → huésped (persona, dedup por email). No fatal, asignado a
+  Mirada (5), mock sin credenciales.
+- ⏳ **Larga estadía** (`vivir.html`): confirmado que es un **form NATIVO de
+  Netlify** (`data-netlify="true"`, sin función). Para engancharlo: notificación
+  de Netlify Forms (`submission-created`) → función, o convertir el form a un
+  `fetch` a una función como `request-quote`. Mini-proyecto aparte.
+
+## Fase 2 — hallazgos del Odoo real (sondeo de solo lectura, 2026-06-15)
+
+- ❗ **No hay módulo de Ventas** (`sale.order` no existe). Solo Contabilidad
+  (`account.move`). ⇒ la Fase 2 crea **facturas de cliente directamente**, no
+  `sale.order` (más simple que el plan original).
+- Impuestos de venta: **IVA 19% = `account.tax` id 1930**, **INC 8% = id 1943**.
+- Diarios de venta: **FACTURA DE VENTA (FV) = id 111** (¿factura electrónica DIAN
+  vía Numera? — confirmar), COTIZACION = 105, Sales/INV = 89, Nota Crédito = 112.
+- Catálogo: 2931 productos (elegir/crear el de "hospedaje" con cuenta de ingreso
+  + impuesto).
+- ⚠️ Crear una `account.move` en el diario FV = **factura electrónica DIAN real**
+  (difícil de revertir → nota crédito). Decisiones abiertas antes de construir:
+  (A) auto-emitir vs solo borrador vs aún no; (B) impuesto del hospedaje (IVA 19%
+  probable); (C) cómo procesa Numera el diario FV; (D) producto/cuenta de ingreso.
 
 ## Después (Fase 2+)
 

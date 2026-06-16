@@ -492,6 +492,24 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
   const now = new Date().toISOString();
   const paidAmount = paidCents / 100;
 
+  /* Maestro de clientes (Fase 1): la empresa pagadora queda como partner en
+     Odoo (deduplicada por NIT/email, asignada a la empresa del hotel). El pago
+     ya es válido aquí, así que el cliente es real aunque la reserva falle luego.
+     No fatal: un error de Odoo nunca afecta la reserva ya pagada. */
+  try {
+    const { upsertPartner } = require('./_odoo');
+    await upsertPartner({
+      name: quote.empresa || quote.contacto || 'Empresa',
+      vat: quote.nit,
+      email: quote.email,
+      phone: sanitizePhone(quote.telefono),
+      isCompany: true,
+      comment: `Cliente corporativo. Cotización ${quoteId}${quote.contacto ? '. Contacto: ' + quote.contacto : ''}.`
+    });
+  } catch (odooErr) {
+    console.error('[wompi-webhook] Odoo upsert (cotización) no fatal:', odooErr.message);
+  }
+
   // Kunas credentials
   const token = process.env.OTASYNC_TOKEN || '';
   const username = process.env.OTASYNC_USERNAME || '';
@@ -1285,6 +1303,21 @@ exports.handler = async (event, context) => {
       try {
         await stayIdemStore.set(stayIdemKey, JSON.stringify({ bookingCode: finalBookingCode, transactionId: transaction.id, createdAt: Date.now() }));
       } catch (e) { /* non-fatal */ }
+    }
+
+    /* Maestro de clientes (Fase 1): el huésped directo queda como partner
+       (persona) en Odoo, deduplicado por email. No fatal. */
+    try {
+      const { upsertPartner } = require('./_odoo');
+      await upsertPartner({
+        name: `${decoded.firstName || ''} ${decoded.lastName || ''}`.trim() || decoded.email,
+        email: decoded.email,
+        phone: sanitizePhone(decoded.phone),
+        isCompany: false,
+        comment: `Huésped de reserva directa ${finalBookingCode}.`
+      });
+    } catch (odooErr) {
+      console.error('[wompi-webhook] Odoo upsert (huésped) no fatal:', odooErr.message);
     }
 
     /* A-6: server-side conversion (Measurement Protocol). Same transaction_id
