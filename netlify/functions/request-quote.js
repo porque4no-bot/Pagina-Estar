@@ -249,6 +249,22 @@ exports.handler = async (event, context) => {
     console.error('[request-quote] Error enviando notificación:', err.message);
   }
 
+  /* Maestro de clientes (Fase 1): crear/encontrar la empresa como partner en
+     Odoo. No fatal — nunca bloquea la solicitud de cotización. Sin credenciales
+     de Odoo es un no-op logueado. */
+  try {
+    const { upsertPartner } = require('./_odoo');
+    await upsertPartner({
+      name: sanitized.empresa,
+      email: sanitized.email,
+      phone: sanitized.whatsapp,
+      isCompany: true,
+      comment: `Contacto: ${sanitized.contacto}. Origen: formulario corporativo (empresas.html).`
+    });
+  } catch (odooErr) {
+    console.error('[request-quote] Odoo upsert no fatal:', odooErr.message);
+  }
+
   return {
     statusCode: 200,
     headers: corsHeaders,

@@ -216,6 +216,7 @@ See `docs/whatsapp-bot.md` for setup (credentials checklist, sandbox, flows, 24h
 | `_google-drive` | Google Drive API integration (service account) |
 | `_firebase-auth` | Firebase authentication for admin pages |
 | `_rate-limit` | Request rate limiting |
+| `_odoo` | Odoo connector (ERP/CRM/contabilidad) — Fase 1 *maestro de clientes*: `upsertPartner` crea/encuentra un `res.partner` deduplicado por NIT/email vía JSON-RPC. Mock no-op sin credenciales. Hoy lo invoca `request-quote`. Plan: `docs/plan-integracion-odoo-otasync.md` |
 | `_whatsapp` | WhatsApp Cloud API client: sendText/sendButtons/sendList/sendTemplate/markRead, webhook signature validation; mock no-op without credentials |
 | `_whatsapp-bot` | Bot conversation engine: state machine (Blobs sessions, 30-min TTL), ES/EN copy, date/guest parsers; calls `_otasync` for live availability and `request-cancellation` for cancellations. Routes to `_whatsapp-ai` first when `ANTHROPIC_API_KEY` is set |
 | `_whatsapp-ai` | AI mode: Claude (`@anthropic-ai/sdk`, Messages API, manual tool-use loop) drives the conversation with tools `check_availability` / `lookup_booking` / `request_cancellation` / `notify_team`; text-only history in the session blob; falls back to the state machine on error. **Authorization is code, not prompt**: cancellation requires a second-factor-verified lookup in the same conversation (`verifiedBookings`), and the WhatsApp number is correlated against the booking phone for audit |

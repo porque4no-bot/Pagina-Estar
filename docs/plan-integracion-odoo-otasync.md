@@ -171,13 +171,41 @@ Salida → en el cliente: `decision`, `cupo`, `deposito_requerido`,
 
 ### 5.3 Modelo propuesto — empresas (crédito a 30 días)
 
-1. **Existencia y antigüedad:** Cámara de Comercio (≥ ~1–2 años), RUT al día,
-   objeto social coherente.
-2. **DataCrédito Empresas:** score empresarial, comportamiento de pago,
-   reportes negativos.
-3. **Solvencia:** estados financieros / extractos; ventas vs. cupo solicitado.
-4. **Cupo y plazo:** asignar un **cupo de crédito** (monto máximo vivo a 30
-   días) conservador al inicio, y ampliarlo con historial de pago puntual.
+La pregunta empresarial no es "¿puede pagar una noche?" sino "¿le damos
+**crédito** (pagar a 30 días en vez de por adelantado) y por **cuánto cupo**?".
+
+**Factores:**
+1. **Existencia y antigüedad** (Cámara de Comercio): empresa constituida, RUT al
+   día, objeto social coherente. Antigüedad: ≥ 2 años = sólido · 1–2 años =
+   revisar · < 1 año = arrancar en contado o cupo bajo.
+2. **DataCrédito Empresas:** score empresarial, moras vigentes, reportes
+   negativos, hábito de pago con otros proveedores.
+3. **Solvencia / capacidad:** estados financieros o extractos (liquidez,
+   endeudamiento); referencias comerciales si las hay.
+4. **Volumen esperado con Estar:** cuánto proyecta consumir al mes → el cupo
+   debe cubrir ~1–2 meses de ese consumo.
+
+**Asignación de cupo (arranque conservador):**
+- Cupo inicial = el **menor** entre (a) un tope fijo prudente y (b) ~1 mes de
+  consumo proyectado.
+- **Se amplía con historial de pago puntual** (p. ej. tras 3–6 meses sin mora,
+  subir el cupo).
+- **Política de bloqueo:** si el saldo vivo supera el cupo, o hay factura
+  vencida > N días, las nuevas reservas a crédito vuelven a **contado** hasta
+  ponerse al día.
+
+**Decisión:**
+- **Crédito aprobado** (cupo + plazo 30 días): antigüedad ≥ mínima, sin moras
+  vigentes, score aceptable.
+- **Crédito condicionado** (cupo bajo, garantía o anticipo parcial): antigüedad
+  corta o score medio.
+- **Solo contado:** moras vigentes, score bajo o información insuficiente.
+
+**Operativa en Odoo (reutilizamos, no construimos):**
+- Cupo → `res.partner.credit_limit`; plazo → `property_payment_term_id` (30 días).
+- Odoo ya trae **gestión de crédito y CxC**: alerta al superar el cupo, estados
+  de cuenta, *aging*, y **recordatorios de pago automáticos** (follow-ups). Se
+  aprovecha en lugar de reconstruirlo.
 
 ### 5.4 Automatización y registro
 
@@ -297,3 +325,40 @@ dinero todavía); sin el cliente unificado nada de lo demás se cuelga bien.
 > Este documento amplía y reemplaza el punto 1 ("Integración con Odoo") de
 > `docs/pendientes.md`. Las decisiones de tarifas/mascota/parqueadero y los
 > demás pendientes operativos siguen en ese archivo.
+
+---
+
+## 10. Cómo conseguir el acceso a Odoo (guía paso a paso)
+
+Necesito 4 datos para enchufar la integración. Esto se hace **una vez** en tu
+Odoo 19, idealmente con un usuario dedicado a la integración (no el tuyo
+personal), para poder revocarlo o auditarlo sin afectar a nadie.
+
+1. **`ODOO_URL`** — la dirección de tu Odoo, p. ej.
+   `https://miempresa.odoo.com` (Odoo.sh/Online) o tu dominio si es self-host.
+   Sin slash final.
+
+2. **`ODOO_DB`** — el nombre de la base de datos. En Odoo Online suele ser el
+   subdominio (la parte antes de `.odoo.com`). Si dudas, se ve en
+   **Ajustes → (modo desarrollador) → Información técnica**, o en la pantalla de
+   selección de base de datos (`/web/database/selector`).
+
+3. **Usuario de integración** — en **Ajustes → Usuarios**, crear un usuario
+   (p. ej. `integracion@estar.com.co`) con permisos de **Contactos**, **Ventas**
+   y **Facturación** (los que vayamos necesitando por fase). Ese login es el
+   `ODOO_USERNAME`.
+
+4. **`ODOO_API_KEY`** — entrando con ese usuario: **Avatar (arriba a la derecha)
+   → Mi perfil / Preferencias → pestaña "Seguridad de la cuenta" → API Keys →
+   "Nueva clave API"**. Se genera una clave que **reemplaza la contraseña** para
+   las llamadas por API. *(Requiere tener activada la verificación; si no
+   aparece la opción, activar el modo desarrollador.)*
+
+Con esos 4 valores los cargo en Netlify (como el resto de credenciales) y el
+conector pasa de **mock** a sincronizar de verdad — sin tocar el código.
+
+> **Nota Numera:** Numera está integrado con Odoo (y además gestiona nómina y
+> complejidades colombianas como software aparte). Para la facturación,
+> partimos del supuesto de que **creamos la venta/factura en Odoo y Numera la
+> procesa hacia DIAN**. Lo confirmamos cuando tengas acceso; no bloquea la
+> Fase 1 (clientes).
