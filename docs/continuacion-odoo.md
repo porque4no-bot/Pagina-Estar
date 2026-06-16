@@ -150,13 +150,15 @@ nuestro) — es una escritura, requiere OK; (2) `OTASYNC_*` + `OTASYNC_WEBHOOK_S
 + vars de Odoo en Netlify; (3) verificar los nombres de campo del huésped con la
 primera reserva real.
 
-**Backfill (existentes) — BLOQUEADO.** Los endpoints de listado no están
-documentados y resistieron 4 rondas: `reservation/data/reservations` → 500 opaco;
-`guests/data/guests` → "date is not valid" con todo formato (ISO, timestamp,
-nombres). Sí funciona `reservation/data/reservation` (uno, por `id_reservations`)
-pero falta enumerar los ids. Desbloqueo: pedir a **Kunas soporte** el contrato
-exacto de "Get reservations"/"Guests", o **exportar CSV** desde la UI de Kunas e
-importarlo.
+**Backfill (existentes) — LISTO, falta ejecutar.** Contrato de `guests/data/guests`
+resuelto: requiere `page` + `dfrom`/`dto` (estos 2 OBLIGATORIOS pese a que la doc
+los marca "opcionales"). El objeto guest trae `first_name/last_name/email/phone/
+country/id_channels/total_paid/total_arrivals/is_deleted/merged_to_guest`. Script
+`scripts/odoo-backfill-guests.js` (DRY RUN por defecto; `--commit` para escribir).
+Dry run sobre 9889: **118 huéspedes, 110 importables** (email válido, no borrados/
+fusionados; 109 con estadía real), 8 omitidos. Importa como partner persona,
+etiqueta "Huésped histórico", empresa Mirada, dedup por email. Falta solo la
+confirmación del dueño para correr `--commit`.
 
 ## Fase 2 — hallazgos del Odoo real (sondeo de solo lectura, 2026-06-15)
 
