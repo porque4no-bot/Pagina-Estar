@@ -157,8 +157,10 @@ country/id_channels/total_paid/total_arrivals/is_deleted/merged_to_guest`. Scrip
 `scripts/odoo-backfill-guests.js` (DRY RUN por defecto; `--commit` para escribir).
 Dry run sobre 9889: **118 huéspedes, 110 importables** (email válido, no borrados/
 fusionados; 109 con estadía real), 8 omitidos. Importa como partner persona,
-etiqueta "Huésped histórico", empresa Mirada, dedup por email. Falta solo la
-confirmación del dueño para correr `--commit`.
+etiqueta "Huésped histórico", empresa Mirada, dedup por email. **EJECUTADO
+(2026-06-16):** 76 creados + 34 actualizados, 0 errores → 87 contactos distintos
+etiquetados "Huésped histórico" en Mirada (87 < 110 porque varios comparten
+correo y se funden). Re-correrlo es idempotente (dedup por email).
 
 ## Fase 2 — hallazgos del Odoo real (sondeo de solo lectura, 2026-06-15)
 
