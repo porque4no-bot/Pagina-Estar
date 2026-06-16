@@ -49,11 +49,13 @@ const sentPaymentEmails = new Set();
 async function shouldSendPaymentEmail(paymentId, kind) {
   const key = `mp-${paymentId}-${kind}`;
   if (sentPaymentEmails.has(key)) return false;
+  /* Cap para no crecer sin límite en instancias calientes (igual que Wompi). */
+  if (sentPaymentEmails.size >= 500) sentPaymentEmails.delete(sentPaymentEmails.values().next().value);
   sentPaymentEmails.add(key);
   if (paymentEmailStore) {
     try {
       if (await paymentEmailStore.get(key)) return false;
-      await paymentEmailStore.set(key, '1', { ttl: 86400 * 7 });
+      await paymentEmailStore.set(key, '1');
     } catch (e) {
       if (process.env.DEBUG) console.warn('[payment-emails] dedup store failed:', e.message);
     }
@@ -252,8 +254,13 @@ exports.handler = async (event) => {
 
   if (transaction.status !== 'approved') {
     if (transaction.status === 'pending') {
-      // Bank still processing: warn the guest not to pay again (double charge).
-      await notifyGuestPaymentOutcome(transaction, 'pending');
+      /* "No vuelvas a pagar" solo aplica a tarjetas en proceso. En métodos
+         offline (PSE/Efecty/ticket), 'pending' significa que el huésped AÚN debe
+         pagar, así que ese mensaje sería engañoso → se omite. */
+      const pm = String(transaction.paymentMethod || '').toLowerCase();
+      if (/credit|debit|visa|master|amex|account_money/.test(pm)) {
+        await notifyGuestPaymentOutcome(transaction, 'pending');
+      }
     }
     return response(200, { message: `Payment status is ${transaction.status}. Skipping reservation.` });
   }

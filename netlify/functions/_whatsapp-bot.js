@@ -146,11 +146,14 @@ function parseDateRange(text, nowDate) {
   const t = String(text || '').toLowerCase().trim();
   const year = now.getUTCFullYear();
 
-  /* ISO pair */
-  let m = t.match(/(\d{4}-\d{2}-\d{2})\s*(?:al?|a|hasta|to|-|—|→)\s*(\d{4}-\d{2}-\d{2})/);
+  /* ISO pair — validar fechas reales (rechaza 2026-02-31) y checkout>checkin,
+     igual que las otras ramas, en vez de solo comparar strings. */
+  let m = t.match(/(\d{4})-(\d{2})-(\d{2})\s*(?:al?|a|hasta|to|-|—|→)\s*(\d{4})-(\d{2})-(\d{2})/);
   if (m) {
-    if (m[1] < m[2]) return { checkin: m[1], checkout: m[2] };
-    return null;
+    const checkin = toIso(parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10));
+    const checkout = toIso(parseInt(m[4], 10), parseInt(m[5], 10), parseInt(m[6], 10));
+    if (!checkin || !checkout || checkout <= checkin) return null;
+    return { checkin, checkout };
   }
 
   /* dd/mm [/yyyy] pair, separators / or - inside the date */

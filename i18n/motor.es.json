@@ -79,6 +79,7 @@
   "resCancelConfirmYes": "Sí, solicitar cancelación",
   "resCancelSending": "Enviando…",
   "resCancelSendError": "No pudimos enviar tu solicitud. Intenta de nuevo o escríbenos por WhatsApp.",
+  "resCancelNotCancellable": "Esta reserva ya no puede cancelarse (su estado cambió). Escríbenos por WhatsApp y te ayudamos.",
   "resCancelRequested": "Solicitud de cancelación enviada",
   "resCancelRequestedDesc": "Recibimos tu solicitud. Nuestro equipo la procesará según la política de tu tarifa y te confirmará por correo en menos de 24 horas.",
   "resCancelError": "No encontramos ninguna reserva con ese código y correo. Verifica los datos o escríbenos por WhatsApp.",

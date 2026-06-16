@@ -79,6 +79,7 @@
   "resCancelConfirmYes": "Yes, request cancellation",
   "resCancelSending": "Sending…",
   "resCancelSendError": "We could not send your request. Please try again or contact us on WhatsApp.",
+  "resCancelNotCancellable": "This booking can no longer be cancelled (its status changed). Please contact us on WhatsApp and we'll help.",
   "resCancelRequested": "Cancellation request sent",
   "resCancelRequestedDesc": "We received your request. Our team will process it according to your rate's policy and confirm by email within 24 hours.",
   "resCancelError": "We could not find any booking with that reference and email. Please check the details or contact us on WhatsApp.",

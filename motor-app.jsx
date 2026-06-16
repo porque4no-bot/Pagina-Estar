@@ -1304,6 +1304,8 @@ function ManageBooking({ onBack, lang }) {
       if (response.ok && data.success) {
         setShowCancel(false);
         setResult('cancel-requested');
+      } else if (data && data.reason === 'not_cancellable') {
+        setCancelError(t.resCancelNotCancellable);
       } else {
         setCancelError(t.resCancelSendError);
       }

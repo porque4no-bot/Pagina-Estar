@@ -97,6 +97,11 @@ async function jsonRpc(service, method, args, transport) {
 
 /* uid cacheado por proceso (la API key no expira con el uso). */
 let cachedUid = null;
+/* Upserts en vuelo por clave (vat/email): deduplica llamadas concurrentes del
+   MISMO cliente dentro del proceso (mitiga partners duplicados por race entre
+   search y create). El caso entre instancias distintas requeriría un lock o una
+   restricción única en Odoo. */
+const _inflightUpserts = new Map();
 async function authenticate(transport) {
   if (cachedUid) return cachedUid;
   const c = odooConfig();
@@ -141,62 +146,75 @@ async function upsertPartner(data, opts) {
   const ctx = c.companyId ? { allowed_company_ids: [c.companyId] } : null;
   const withCtx = (kw) => (ctx ? { ...(kw || {}), context: ctx } : (kw || {}));
 
-  let domain = null;
-  if (values.vat) domain = [['vat', '=', values.vat]];
-  else if (values.email) domain = [['email', '=ilike', values.email]];
+  /* Dedup en vuelo (por proceso): si ya hay un upsert del MISMO cliente en curso,
+     reusarlo en lugar de lanzar otro search+create en paralelo. */
+  const dedupKey = values.vat || (values.email ? String(values.email).toLowerCase() : '');
+  if (dedupKey && _inflightUpserts.has(dedupKey)) return _inflightUpserts.get(dedupKey);
 
-  let existingId = null;
-  if (domain) {
-    const found = await executeKw('res.partner', 'search', [domain], withCtx({ limit: 1 }), transport);
-    if (Array.isArray(found) && found.length) existingId = found[0];
-  }
+  const work = (async () => {
+    let domain = null;
+    if (values.vat) domain = [['vat', '=', values.vat]];
+    else if (values.email) domain = [['email', '=ilike', values.email]];
 
-  /* Etiquetas de contacto (segmentación tipo CRM SIN necesitar el módulo CRM):
-     resuelve/crea cada `res.partner.category` por nombre y la AÑADE al partner
-     con el comando (4,id) — añade, no reemplaza las etiquetas que ya tenga. */
-  if (Array.isArray(data.tags) && data.tags.length) {
-    try {
-      const tagIds = [];
-      for (const raw of data.tags) {
-        const nm = String(raw || '').trim().slice(0, 100);
-        if (!nm) continue;
-        const hit = await executeKw('res.partner.category', 'search', [[['name', '=', nm]]], withCtx({ limit: 1 }), transport);
-        const id = (Array.isArray(hit) && hit.length) ? hit[0]
-          : await executeKw('res.partner.category', 'create', [{ name: nm }], withCtx(), transport);
-        if (id) tagIds.push(id);
+    let existingId = null;
+    if (domain) {
+      const found = await executeKw('res.partner', 'search', [domain], withCtx({ limit: 1 }), transport);
+      if (Array.isArray(found) && found.length) existingId = found[0];
+    }
+
+    /* Etiquetas de contacto (segmentación tipo CRM SIN necesitar el módulo CRM):
+       resuelve/crea cada `res.partner.category` por nombre y la AÑADE al partner
+       con el comando (4,id) — añade, no reemplaza las etiquetas que ya tenga. */
+    if (Array.isArray(data.tags) && data.tags.length) {
+      try {
+        const tagIds = [];
+        for (const raw of data.tags) {
+          const nm = String(raw || '').trim().slice(0, 100);
+          if (!nm) continue;
+          const hit = await executeKw('res.partner.category', 'search', [[['name', '=', nm]]], withCtx({ limit: 1 }), transport);
+          const id = (Array.isArray(hit) && hit.length) ? hit[0]
+            : await executeKw('res.partner.category', 'create', [{ name: nm }], withCtx(), transport);
+          if (id) tagIds.push(id);
+        }
+        if (tagIds.length) values.category_id = tagIds.map(id => [4, id]);
+      } catch (tagErr) {
+        /* Las etiquetas son metadata secundaria: si su resolución falla
+           (red/timeout/5xx), el partner se crea igual sin category_id. */
+        if (process.env.DEBUG) console.log('[odoo] etiquetas no resueltas (el partner se crea igual):', tagErr.message);
       }
-      if (tagIds.length) values.category_id = tagIds.map(id => [4, id]);
-    } catch (tagErr) {
-      /* Las etiquetas son metadata secundaria: si su resolución falla
-         (red/timeout/5xx), el partner se crea igual sin category_id. */
-      if (process.env.DEBUG) console.log('[odoo] etiquetas no resueltas (el partner se crea igual):', tagErr.message);
     }
-  }
 
-  async function persist(vals) {
-    if (existingId) {
-      await executeKw('res.partner', 'write', [[existingId], vals], withCtx(), transport);
-      return { id: existingId, created: false, isMock: false };
+    async function persist(vals) {
+      if (existingId) {
+        await executeKw('res.partner', 'write', [[existingId], vals], withCtx(), transport);
+        return { id: existingId, created: false, isMock: false };
+      }
+      const id = await executeKw('res.partner', 'create', [vals], withCtx(), transport);
+      return { id, created: true, isMock: false };
     }
-    const id = await executeKw('res.partner', 'create', [vals], withCtx(), transport);
-    return { id, created: true, isMock: false };
-  }
 
-  try {
-    return await persist(values);
-  } catch (err) {
-    /* La localización colombiana de Odoo puede rechazar el NIT en `vat` por
-       formato/dígito de verificación. Para no perder el cliente, reintentamos
-       sin `vat` y dejamos el NIT en la nota. Otros errores (auth/red) se
-       propagan. */
-    if (values.vat) {
-      const { vat, ...rest } = values;
-      rest.comment = `${rest.comment ? rest.comment + ' ' : ''}NIT: ${vat}.`.slice(0, 2000);
-      const out = await persist(rest);
-      return { ...out, vatRejected: true };
+    try {
+      return await persist(values);
+    } catch (err) {
+      /* La localización colombiana de Odoo puede rechazar el NIT en `vat` por
+         formato/dígito de verificación. Para no perder el cliente, reintentamos
+         sin `vat` y dejamos el NIT en la nota. Otros errores (auth/red) se
+         propagan. */
+      if (values.vat) {
+        const { vat, ...rest } = values;
+        rest.comment = `${rest.comment ? rest.comment + ' ' : ''}NIT: ${vat}.`.slice(0, 2000);
+        const out = await persist(rest);
+        return { ...out, vatRejected: true };
+      }
+      throw err;
     }
-    throw err;
+  })();
+
+  if (dedupKey) {
+    _inflightUpserts.set(dedupKey, work);
+    work.finally(() => { _inflightUpserts.delete(dedupKey); });
   }
+  return work;
 }
 
 /* ── CRM: crear una oportunidad (lead) ──

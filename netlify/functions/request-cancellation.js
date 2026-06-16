@@ -99,21 +99,30 @@ async function submitCancellationRequest({ bookingCode, providedFactor, clientIp
     return { ok: false, code: 'not_cancellable', status: booking.status };
   }
 
-  /* Idempotency + audit trail. Blobs being unavailable (local dev) must not
-     block the request — the admin email is the operative notification. */
+  /* Idempotencia + auditoría. Reservamos el marcador ATÓMICAMENTE (onlyIfNew)
+     ANTES de enviar correos, para que dos solicitudes concurrentes de la misma
+     reserva no generen alertas duplicadas. Clave canónica (id de OTASync),
+     robusta a casing/espacios. Blobs no disponible (dev) no bloquea. */
   let store = null;
+  let claimed = false;
+  const dedupKey = booking.bookingCode;
   try {
     const { getStore } = require('@netlify/blobs');
     store = getStore({ name: 'cancellation-requests', consistency: 'strong' });
-    /* Clave canónica (id de reserva de OTASync), robusta a casing/espacios del
-       input — así dos solicitudes de la MISMA reserva no evaden el dedup. */
-    const existing = await store.get(booking.bookingCode);
+    const existing = await store.get(dedupKey);
     if (existing) {
       const prev = JSON.parse(existing);
       if (prev.requestedAt && Date.now() - prev.requestedAt < DEDUP_WINDOW_MS) {
         return { ok: true, code: 'already_requested', booking };
       }
     }
+    const marker = JSON.stringify({ requestedAt: Date.now(), clientIp: clientIp || 'unknown', status: booking.status, source: source || 'web' });
+    const res = await store.set(dedupKey, marker, { onlyIfNew: !existing });
+    if (!existing && res && res.modified === false) {
+      /* Otra invocación reclamó la misma reserva entre el get y el set. */
+      return { ok: true, code: 'already_requested', booking };
+    }
+    claimed = true;
   } catch (e) {
     if (process.env.DEBUG) console.warn('[request-cancellation] Blobs unavailable, skipping dedup:', e.message);
     store = null;
@@ -126,7 +135,9 @@ async function submitCancellationRequest({ bookingCode, providedFactor, clientIp
   });
   if (!adminResult.sent) {
     /* If the hotel was not notified the request would silently die; tell
-       the guest to use WhatsApp instead of faking success. */
+       the guest to use WhatsApp instead of faking success. Liberar el claim
+       para que un reintento pueda volver a notificar. */
+    if (claimed && store) { try { await store.delete(dedupKey); } catch (_) {} }
     console.error('[request-cancellation] admin alert failed for', booking.bookingCode);
     return { ok: false, code: 'notify_failed' };
   }
@@ -140,14 +151,6 @@ async function submitCancellationRequest({ bookingCode, providedFactor, clientIp
       });
     } catch (e) {
       console.error('[request-cancellation] guest ack failed:', e.message);
-    }
-  }
-
-  if (store) {
-    try {
-      await store.set(booking.bookingCode, JSON.stringify({ requestedAt: Date.now(), clientIp: clientIp || 'unknown', status: booking.status, source: source || 'web' }));
-    } catch (e) {
-      if (process.env.DEBUG) console.warn('[request-cancellation] audit write failed:', e.message);
     }
   }
 
