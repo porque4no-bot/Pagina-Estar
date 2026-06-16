@@ -646,11 +646,39 @@
       images: ['assets/photos/tipo5/1.webp', 'assets/photos/tipo5/2.webp', 'assets/photos/tipo5/3.webp', 'assets/photos/tipo5/4.webp'],
       amenities:[{icon:'building-2',l:'Vista a la ciudad'},{icon:'wifi',l:'WiFi fibra'},{icon:'tv',l:'TV Cable'},{icon:'cooking-pot',l:'Cocina equipada'},{icon:'shower-head',l:'Baño privado'}]}
   ];
+  /* Extras catalogue. `kind` drives both the UI (ExtrasPanel) and calcTotal:
+       perGuestNight | pct (% de la noche base) | earlyTiers (radio) | flat.
+     Los porcentajes y el precio de mascota deben coincidir con
+     netlify/functions/_pricing.js (pricing-constants.test.js lo valida). */
   const BE_EXTRAS = [
-    { id:'desayuno', name:'Desayuno', desc:'Café, fruta y huevos cada mañana', price:20000, unit:'/persona/noche', icon:'coffee' },
-    { id:'late', name:'Late check-out', desc:'Salida hasta las 5:00 pm (sujeto a disponibilidad)', price:60000, unit:'por reserva', icon:'clock' },
-    { id:'early', name:'Early check-in', desc:'Entrada desde las 10:00 am (sujeto a disponibilidad)', price:50000, unit:'por reserva', icon:'sunrise' }
+    { id:'desayuno', kind:'perGuestNight', name:'Desayuno', desc:'Café, fruta y huevos cada mañana', price:20000, unit:'/persona/noche', icon:'coffee' },
+    { id:'late', kind:'pct', pct:0.15, name:'Late check-out', desc:'Salida hasta las 2:00 pm (sujeto a disponibilidad)', unit:'15% de la noche', icon:'clock' },
+    { id:'early', kind:'earlyTiers', name:'Early check-in', desc:'Adelanta tu entrada (sujeto a disponibilidad)', icon:'sunrise',
+      tiers:[
+        { id:'t1', pct:0.15, label:'2 horas antes' },
+        { id:'t2', pct:0.35, label:'Desde las 10:00 am' },
+        { id:'t3', pct:0.50, label:'Desde las 6:00 am' }
+      ] },
+    { id:'mascota', kind:'flat', price:200000, name:'Mascota', desc:'Una mascota por reserva · IVA incluido', unit:'por reserva', icon:'paw-print' }
   ];
+  /* Posición de cada flag en el extrasMask de la referencia Wompi. APPEND ONLY:
+     nunca reordenar (rompe referencias de pagos en curso). Espejo de
+     netlify/functions/_pricing.js EXTRAS_KEYS.
+     orden: desayuno,parqueadero,late,early(t1),traslado,tour,early(t2),early(t3),mascota */
+  function buildExtrasMask(extras){
+    extras = extras || {};
+    return [
+      extras.desayuno ? '1' : '0',
+      '0',                              /* parqueadero (reservado) */
+      extras.late ? '1' : '0',
+      extras.early === 't1' ? '1' : '0',
+      '0',                              /* traslado (reservado) */
+      '0',                              /* tour (reservado) */
+      extras.early === 't2' ? '1' : '0',
+      extras.early === 't3' ? '1' : '0',
+      extras.mascota ? '1' : '0'
+    ].join('');
+  }
   const BE_PAYMENTS = [
     { id:'wompi', name:'Wompi', desc:'Tarjetas colombianas, PSE, Nequi, Bancolombia', icon:'credit-card' },
     { id:'mercadopago', name:'Mercado Pago', desc:'Tarjetas internacionales, cuenta Mercado Pago', icon:'credit-card' }
@@ -663,15 +691,26 @@
   function genCode(){return 'EST-'+Math.random().toString(36).slice(2,7).toUpperCase()}
   function calcTotal(room,rate,extras,search){
     if(!room)return null;
+    extras=extras||{};
     const nights=dateDiff(search.checkin,search.checkout);
     const nightly=rate==='best'?room.priceFlexible:Math.round(room.priceFlexible/0.9);
+    const base=room.priceFlexible;            /* los % usan la noche base (Best Price) */
     const roomSub=nightly*nights;
-    let ex=0;
-    if(extras.desayuno)ex+=20000*search.guests*nights;
-    if(extras.late)ex+=60000;
-    if(extras.early)ex+=50000;
-    const sub=roomSub+ex,iva=Math.round(sub*.19);
-    return{nights,nightly,roomSub,extrasSub:ex,subtotal:sub,iva,total:sub+iva};
+    /* extras gravables (entran al IVA) */
+    const lines=[];
+    if(extras.desayuno)lines.push({key:'desayuno',amount:20000*search.guests*nights});
+    if(extras.late)lines.push({key:'late',amount:Math.round(base*0.15)});
+    if(extras.early==='t1')lines.push({key:'early',tier:'t1',amount:Math.round(base*0.15)});
+    else if(extras.early==='t2')lines.push({key:'early',tier:'t2',amount:Math.round(base*0.35)});
+    else if(extras.early==='t3')lines.push({key:'early',tier:'t3',amount:Math.round(base*0.50)});
+    const exTaxable=lines.reduce((s,l)=>s+l.amount,0);
+    /* mascota: $200k IVA incluido → entra al cobro online pero no a la base de IVA */
+    const mascotaSub=extras.mascota?200000:0;
+    if(extras.mascota)lines.push({key:'mascota',amount:200000});
+    const taxable=roomSub+exTaxable;
+    const iva=Math.round(taxable*.19);
+    const sub=taxable+mascotaSub;             /* cobro online de hoy (sin IVA) */
+    return{nights,nightly,roomSub,extrasSub:exTaxable+mascotaSub,mascotaSub,taxable,subtotal:sub,iva,total:sub+iva,extrasLines:lines};
   }
 </script>
 <script src="motor-app.js"></script>

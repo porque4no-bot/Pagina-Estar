@@ -7,7 +7,7 @@ const {
   getQuoteStore, loadQuote, saveQuote, effectiveStatus, computeQuoteTotal
 } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable, releaseHold, buildExtrasFromQuote } = require('./_otasync');
-const { verifyDirectBookingAmount } = require('./_direct-pricing');
+const { verifyDirectBookingAmount, EXTRAS_KEYS, EXTRAS_PRICES } = require('./_direct-pricing');
 const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
 const { acquireQuoteLock, releaseQuoteLock } = require('./_quote-lock');
 const { trackPurchase } = require('./_analytics');
@@ -227,14 +227,20 @@ function mustChargeDirectBookingIva(decoded) {
 
 function directBookingPricing(decoded, paidAmount) {
   const mustPayIva = mustChargeDirectBookingIva(decoded);
-  const ivaAmount = Math.round(paidAmount * 0.19);
+  /* La mascota ($200k) viaja con IVA incluido: se excluye de la base de IVA
+     (el cobro online ya la incluye, no se vuelve a gravar en el alojamiento). */
+  const mascotaIdx = EXTRAS_KEYS.indexOf('mascota');
+  const mascotaCharge = (mascotaIdx >= 0 && decoded?.extrasMask && decoded.extrasMask[mascotaIdx] === '1')
+    ? (EXTRAS_PRICES.mascota?.price || 0) : 0;
+  const taxableBase = Math.max(0, paidAmount - mascotaCharge);
+  const ivaAmount = Math.round(taxableBase * 0.19);
   return {
     mustPayIva,
     ivaAmount,
     ivaNote: mustPayIva
       ? `POR COBRAR EN ALOJAMIENTO (${ivaAmount})`
       : `EXENTO PRELIMINAR - validar documento y motivo; si no corresponde, cobrar IVA (${ivaAmount})`,
-    roomPrice: mustPayIva ? Math.round(paidAmount * 1.19) : paidAmount
+    roomPrice: mustPayIva ? Math.round(taxableBase * 1.19) + mascotaCharge : paidAmount
   };
 }
 
@@ -1192,11 +1198,11 @@ exports.handler = async (event, context) => {
       note: `Wompi ID: ${transaction.id}, Ref: ${decoded.bookingCode}, Status: APPROVED`
     }];
 
-    // Map extras from extrasMask
-    // BE_EXTRAS: desayuno, parqueadero, late, early, traslado, tour
+    // Map extras from extrasMask (orden = _pricing.js EXTRAS_KEYS)
+    // desayuno, parqueadero, late, early(t1), traslado, tour, early(t2), early(t3), mascota
     const extrasList = [];
-    const extraNames = ['Desayuno', 'Parqueadero', 'Late Check-out', 'Early Check-in', 'Traslado Aeropuerto', 'Tour Manizales'];
-    for (let i = 0; i < 6; i++) {
+    const extraNames = ['Desayuno', 'Parqueadero', 'Late check-out (hasta 2pm)', 'Early check-in (2h antes)', 'Traslado Aeropuerto', 'Tour Manizales', 'Early check-in (desde 10am)', 'Early check-in (desde 6am)', 'Mascota'];
+    for (let i = 0; i < extraNames.length; i++) {
       if (decoded.extrasMask[i] === '1') {
         extrasList.push(extraNames[i]);
       }

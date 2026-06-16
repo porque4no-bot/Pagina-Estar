@@ -78,3 +78,27 @@ test('booking flow reaches the Wompi payment step', async ({ page }) => {
   await expect(page.locator('.be-step-active')).toContainText('Paga de manera segura');
   await expect(page.locator('.be-step-active .be-step-footer .be-btn-primary')).toBeEnabled();
 });
+
+test('extras: late check-out (%), an early-check-in tier and a pet update the summary', async ({ page }) => {
+  // Mock room avgPrice = 250.000 → late 15% = 37.500, early tier 2 35% = 87.500, pet = 200.000 (flat).
+  await page.goto('/reservar.html?checkin=2026-08-10&checkout=2026-08-13&guests=2');
+  await expect(page.locator('.be-room-card')).toBeVisible();
+  await page.locator('.be-room-select-btn').first().click();
+  await expect(page.locator('.be-step-active .be-step-title')).toHaveText('Extras y servicios');
+
+  // Inputs are visually hidden (the ✶ is the visible control), so click the labels.
+  // Late check-out (percentage-of-night checkbox)
+  await page.locator('.be-extra-row', { hasText: 'Late check-out' }).click();
+  // Early check-in: tier 2 (radio, "Desde las 10:00 am")
+  await page.locator('.be-extra-tier').nth(1).click();
+  // Mascota (flat, IVA included)
+  await page.locator('.be-extra-row', { hasText: 'Mascota' }).click();
+
+  const summary = page.locator('.be-summary-breakdown');
+  await expect(summary).toContainText('Late check-out');
+  await expect(summary).toContainText('Early check-in');
+  await expect(summary).toContainText('Mascota');
+  await expect(summary).toContainText('$ 37.500');   // late = 15% of 250.000
+  await expect(summary).toContainText('$ 87.500');   // early tier 2 = 35% of 250.000
+  await expect(summary).toContainText('$ 200.000');  // pet flat charge
+});

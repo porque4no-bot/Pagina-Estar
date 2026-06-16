@@ -435,8 +435,9 @@ async function processDirectPayment(transaction, corsHeaders) {
   }];
 
   const extrasList = [];
-  const extraNames = ['Desayuno', 'Parqueadero', 'Late Check-out', 'Early Check-in', 'Traslado Aeropuerto', 'Tour Manizales'];
-  for (let i = 0; i < 6; i++) {
+  // orden = _pricing.js EXTRAS_KEYS: desayuno, parqueadero, late, early(t1), traslado, tour, early(t2), early(t3), mascota
+  const extraNames = ['Desayuno', 'Parqueadero', 'Late check-out (hasta 2pm)', 'Early check-in (2h antes)', 'Traslado Aeropuerto', 'Tour Manizales', 'Early check-in (desde 10am)', 'Early check-in (desde 6am)', 'Mascota'];
+  for (let i = 0; i < extraNames.length; i++) {
     if (decoded.extrasMask[i] === '1') extrasList.push(extraNames[i]);
   }
   const extrasText = extrasList.length > 0 ? extrasList.join(', ') : 'Ninguno';

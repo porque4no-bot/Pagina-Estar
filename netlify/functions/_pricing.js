@@ -17,19 +17,24 @@ const EXTRA_GUEST_SURCHARGE = 31000;
 const PRICE_FALLBACK = 195000;
 
 /* Booking-engine extras. `multiplier` controls how the total is computed:
-   perGuestPerNight | perNight | flat. Positions 4-5 (traslado, tour) are
-   reserved in the extras mask but not surfaced in the UI. */
+   perGuestPerNight | perNight | flat | pctOfNight (pct of the base nightly rate).
+   parqueadero (pos 1) and traslado/tour (pos 4-5) are RESERVED in the mask but
+   not surfaced in the UI. NEVER reindex existing positions — new flags APPEND at
+   the END so in-flight payment references keep decoding correctly. */
 const EXTRAS_PRICES = {
-  desayuno:    { price: 20000, multiplier: 'perGuestPerNight' },
-  parqueadero: { price: 25000, multiplier: 'perNight' },
-  late:        { price: 60000, multiplier: 'flat' },
-  early:       { price: 50000, multiplier: 'flat' },
-  traslado:    { price: 0,     multiplier: 'flat' },
-  tour:        { price: 0,     multiplier: 'flat' }
+  desayuno:    { price: 20000,  multiplier: 'perGuestPerNight' },
+  parqueadero: { price: 25000,  multiplier: 'perNight' },   /* reservado (fuera de UI) */
+  late:        { pct: 0.15,     multiplier: 'pctOfNight' },  /* check-out hasta 2pm = 15% */
+  early:       { pct: 0.15,     multiplier: 'pctOfNight' },  /* early tramo 1 (2h antes) = 15% */
+  traslado:    { price: 0,      multiplier: 'flat' },        /* reservado */
+  tour:        { price: 0,      multiplier: 'flat' },        /* reservado */
+  early2:      { pct: 0.35,     multiplier: 'pctOfNight' },  /* early tramo 2 (desde 10am) = 35% */
+  early3:      { pct: 0.50,     multiplier: 'pctOfNight' },  /* early tramo 3 (desde 6am) = 50% */
+  mascota:     { price: 200000, multiplier: 'flat' }         /* $200k por reserva (IVA incluido) */
 };
 
-/* Order matters: index == position in the extras mask string. */
-const EXTRAS_KEYS = ['desayuno', 'parqueadero', 'late', 'early', 'traslado', 'tour'];
+/* Order matters: index == position in the extras mask string. APPEND ONLY. */
+const EXTRAS_KEYS = ['desayuno', 'parqueadero', 'late', 'early', 'traslado', 'tour', 'early2', 'early3', 'mascota'];
 
 module.exports = {
   EXTRA_GUEST_SURCHARGE,

@@ -454,17 +454,20 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
 }
 
 /* ── ExtrasPanel ──────────────────────────────────── */
-function ExtrasPanel({ extras, setExtras, search, onContinue, lang }) {
+function ExtrasPanel({ extras, setExtras, search, room, onContinue, lang }) {
   const t = i18nEngine[lang];
   const nights = dateDiff(search.checkin, search.checkout);
+  const base = room ? room.priceFlexible : 0; /* los % usan la noche base */
 
   function toggle(id) { setExtras(prev => ({ ...prev, [id]: !prev[id] })); }
+  function setEarly(tier) { setExtras(prev => ({ ...prev, early: prev.early === tier ? null : tier })); }
 
-  function extraTotal(ex) {
-    if (!extras[ex.id]) return 0;
-    if (ex.id === 'desayuno') return ex.price * search.guests * nights;
-    if (ex.id === 'tour') return ex.price * search.guests;
-    return ex.price;
+  /* Monto resuelto de un extra simple (no early tiers). */
+  function lineAmount(ex) {
+    if (ex.kind === 'perGuestNight') return ex.price * search.guests * nights;
+    if (ex.kind === 'pct') return Math.round(base * ex.pct);
+    if (ex.kind === 'flat') return ex.price;
+    return 0;
   }
 
   return (
@@ -474,7 +477,46 @@ function ExtrasPanel({ extras, setExtras, search, onContinue, lang }) {
         {BE_EXTRAS.map(ex => {
           const exName = t.extrasNames[ex.id] || ex.name;
           const exDesc = t.extrasDescs[ex.id] || ex.desc;
+
+          /* Early check-in: 3 tramos mutuamente excluyentes (radio). */
+          if (ex.kind === 'earlyTiers') {
+            const tiers = (t.extrasTiers && t.extrasTiers[ex.id]) || null;
+            return (
+              <div key={ex.id} className={`be-extra-row${extras.early ? ' checked' : ''}`} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Icon name={ex.icon} size={18} className="be-extra-icon" />
+                  <div className="be-extra-info">
+                    <span className="be-extra-name">{exName}</span>
+                    <span className="be-extra-desc">{exDesc}</span>
+                  </div>
+                </div>
+                <div className="be-extra-tiers" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+                  {ex.tiers.map((tier, ti) => {
+                    const active = extras.early === tier.id;
+                    const tierLabel = (tiers && tiers[ti]) || tier.label;
+                    return (
+                      <label key={tier.id} className={`be-extra-tier${active ? ' checked' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                        <input type="radio" name="be-early-tier" checked={active} onChange={() => setEarly(tier.id)} />
+                        <span style={{ flex: 1 }}>{tierLabel}</span>
+                        <span className="be-extra-total">{formatCOP(Math.round(base * tier.pct))}</span>
+                      </label>
+                    );
+                  })}
+                  {extras.early && (
+                    <button type="button" className="be-extra-clear"
+                      style={{ alignSelf: 'flex-start', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', fontSize: 12, opacity: 0.7, padding: 0 }}
+                      onClick={() => setEarly(null)}>
+                      {lang === 'es' ? 'Quitar early check-in' : 'Remove early check-in'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          /* Extras simples (checkbox): desayuno, late, mascota. */
           const exUnit = t.extrasUnits[ex.unit] || ex.unit;
+          const displayPrice = ex.kind === 'perGuestNight' ? ex.price : lineAmount(ex);
           return (
             <label key={ex.id} className={`be-extra-row${extras[ex.id] ? ' checked' : ''}`}>
               <div className="be-extra-check">
@@ -487,10 +529,10 @@ function ExtrasPanel({ extras, setExtras, search, onContinue, lang }) {
                 <span className="be-extra-desc">{exDesc}</span>
               </div>
               <div className="be-extra-price">
-                <span>{formatCOP(ex.price)}</span>
+                <span>{formatCOP(displayPrice)}</span>
                 <span className="be-extra-unit">{exUnit}</span>
-                {extras[ex.id] && extraTotal(ex) > 0 && (
-                  <span className="be-extra-total">= {formatCOP(extraTotal(ex))}</span>
+                {ex.kind === 'perGuestNight' && extras[ex.id] && lineAmount(ex) > 0 && (
+                  <span className="be-extra-total">= {formatCOP(lineAmount(ex))}</span>
                 )}
               </div>
             </label>
@@ -689,8 +731,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
     if (paymentMethod === 'mercadopago') {
       setLoading(true);
       const code = genCode();
-      const extrasKeys = ['desayuno', 'parqueadero', 'late', 'early', 'traslado', 'tour'];
-      const extrasMask = extrasKeys.map(k => booking.extras[k] ? '1' : '0').join('');
+      const extrasMask = buildExtrasMask(booking.extras);
 
       try {
         const response = await fetch('/api/create-mercadopago-preference', {
@@ -761,8 +802,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
         return dStr.replace(/-/g, '').substring(2);
       };
 
-      const extrasKeys = ['desayuno', 'parqueadero', 'late', 'early', 'traslado', 'tour'];
-      const extrasMask = extrasKeys.map(k => booking.extras[k] ? '1' : '0').join('');
+      const extrasMask = buildExtrasMask(booking.extras);
 
       const serialized = [
         '1', // version
@@ -1107,27 +1147,26 @@ function BookingSummary({ booking, search, lang }) {
       {calc && (
         <div className="be-summary-breakdown">
           <div className="be-summary-line sm"><span>{formatCOP(calc.nightly)} × {nights} {nights === 1 ? t.noche : t.noches}</span><span>{formatCOP(calc.roomSub)}</span></div>
-          {calc.extrasSub > 0 && BE_EXTRAS.filter(ex => booking.extras && booking.extras[ex.id]).map(ex => {
-            const exName = t.extrasNames[ex.id] || ex.name;
+          {calc.extrasLines && calc.extrasLines.map((line, li) => {
+            const exName = t.extrasNames[line.key] || line.key;
+            let label = exName;
             let breakdown = '';
-            let exTotal = 0;
-            if (ex.id === 'desayuno') {
-              exTotal = ex.price * search.guests * nights;
-              breakdown = `${formatCOP(ex.price)} × ${search.guests} ${search.guests === 1 ? t.huesped : t.huespedes} × ${nights} ${nights === 1 ? t.noche : t.noches}`;
-            } else if (ex.id === 'tour') {
-              exTotal = ex.price * search.guests;
-              breakdown = `${formatCOP(ex.price)} × ${search.guests} ${search.guests === 1 ? t.huesped : t.huespedes}`;
-            } else {
-              exTotal = ex.price;
-              breakdown = formatCOP(ex.price);
+            if (line.key === 'desayuno') {
+              breakdown = `${formatCOP(20000)} × ${search.guests} ${search.guests === 1 ? t.huesped : t.huespedes} × ${nights} ${nights === 1 ? t.noche : t.noches}`;
+            } else if (line.key === 'early' && line.tier) {
+              const tiers = t.extrasTiers && t.extrasTiers.early;
+              const earlyDef = BE_EXTRAS.find(e => e.id === 'early');
+              const ti = earlyDef && earlyDef.tiers ? earlyDef.tiers.findIndex(tt => tt.id === line.tier) : -1;
+              const tierLabel = (tiers && ti >= 0 && tiers[ti]) || (ti >= 0 ? earlyDef.tiers[ti].label : '');
+              if (tierLabel) label = `${exName} · ${tierLabel}`;
             }
             return (
-              <div key={ex.id} className="be-summary-line sm" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
+              <div key={line.key + li} className="be-summary-line sm" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                  <span>{exName}</span>
-                  <span>{formatCOP(exTotal)}</span>
+                  <span>{label}</span>
+                  <span>{formatCOP(line.amount)}</span>
                 </div>
-                <span style={{ fontSize: 10, opacity: 0.65, fontStyle: 'italic' }}>{breakdown}</span>
+                {breakdown && <span style={{ fontSize: 10, opacity: 0.65, fontStyle: 'italic' }}>{breakdown}</span>}
               </div>
             );
           })}
@@ -2041,7 +2080,7 @@ function BookingEngine() {
             <StepWrapper num="2" title={lang === 'es' ? "Extras y servicios" : "Extras & services"}
               state={stepState('extras')} summaryLine={extraSummary} lang={lang}
               onEdit={() => goToStep('extras')}>
-              <ExtrasPanel extras={extras} setExtras={setExtras} search={search}
+              <ExtrasPanel extras={extras} setExtras={setExtras} search={search} room={selectedRoom}
                 onContinue={() => setCurrentStep('guest')} lang={lang} />
             </StepWrapper>
 
