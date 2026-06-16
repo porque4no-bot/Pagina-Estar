@@ -22,6 +22,7 @@ const MODULES = [
   'booking-status', 'check-availability', 'create-booking',
   'create-mercadopago-preference', 'create-quote', 'create-wompi-signature',
   'drive-probe', 'get-booking', 'get-booking-rating', 'get-quote', 'get-reviews',
+  'odoo-probe',
   'guest-action', 'guest-checkin', 'guest-drive', 'guest-session', 'guest-sync',
   'list-quotes', 'mercadopago-webhook', 'otasync-webhook', 'purge-guest-data',
   'quote-availability', 'read-quote-audit', 'reconcile-payments',
