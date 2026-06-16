@@ -46,7 +46,7 @@ function extractGuest(resv) {
    real con la primera reserva entrante. */
 async function syncReservationGuests(events) {
   const { upsertPartner } = require('./_odoo');
-  const webChannelId = String(process.env.OTASYNC_CHANNEL_ID || '');
+  const webChannelId = String(process.env.OTASYNC_CHANNEL_ID || '66483');
   let n = 0;
   for (const ev of events) {
     if (ev.data_type !== 'reservation') continue;

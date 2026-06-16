@@ -492,25 +492,6 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
   const now = new Date().toISOString();
   const paidAmount = paidCents / 100;
 
-  /* Maestro de clientes (Fase 1): la empresa pagadora queda como partner en
-     Odoo (deduplicada por NIT/email, asignada a la empresa del hotel). El pago
-     ya es válido aquí, así que el cliente es real aunque la reserva falle luego.
-     No fatal: un error de Odoo nunca afecta la reserva ya pagada. */
-  try {
-    const { upsertPartner } = require('./_odoo');
-    await upsertPartner({
-      name: quote.empresa || quote.contacto || 'Empresa',
-      vat: quote.nit,
-      email: quote.email,
-      phone: sanitizePhone(quote.telefono),
-      isCompany: true,
-      tags: ['Corporativo'],
-      comment: `Cliente corporativo. Cotización ${quoteId}${quote.contacto ? '. Contacto: ' + quote.contacto : ''}.`
-    });
-  } catch (odooErr) {
-    console.error('[wompi-webhook] Odoo upsert (cotización) no fatal:', odooErr.message);
-  }
-
   // Kunas credentials
   const token = process.env.OTASYNC_TOKEN || '';
   const username = process.env.OTASYNC_USERNAME || '';
@@ -745,6 +726,25 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
     try {
       await trackPurchase({ transactionId: String(bookingCode), value: paidAmount });
     } catch (e) { /* analytics never blocks */ }
+
+    /* Maestro de clientes (Fase 1): la empresa pagadora queda como partner en
+       Odoo. Va DESPUÉS de crear la reserva y guardar la cotización como aceptada,
+       para que una demora/caída de Odoo nunca impida la reserva ya pagada
+       (mismo orden seguro que la reserva directa). No fatal. */
+    try {
+      const { upsertPartner } = require('./_odoo');
+      await upsertPartner({
+        name: quote.empresa || quote.contacto || 'Empresa',
+        vat: quote.nit,
+        email: quote.email,
+        phone: sanitizePhone(quote.telefono),
+        isCompany: true,
+        tags: ['Corporativo'],
+        comment: `Cliente corporativo. Cotización ${quoteId}${quote.contacto ? '. Contacto: ' + quote.contacto : ''}.`
+      });
+    } catch (odooErr) {
+      console.error('[wompi-webhook] Odoo upsert (cotización) no fatal:', odooErr.message);
+    }
 
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, bookingCode }) };
   } finally {

@@ -82,6 +82,7 @@ async function jsonRpc(service, method, args, transport) {
       signal: ctrl.signal
     });
     clearTimeout(tid);
+    if (res && res.ok === false) throw new Error('Odoo HTTP ' + res.status);
     const data = await res.json().catch(() => ({}));
     if (data && data.error) {
       const msg = (data.error.data && data.error.data.message) || data.error.message || 'Odoo RPC error';
@@ -154,16 +155,22 @@ async function upsertPartner(data, opts) {
      resuelve/crea cada `res.partner.category` por nombre y la AÑADE al partner
      con el comando (4,id) — añade, no reemplaza las etiquetas que ya tenga. */
   if (Array.isArray(data.tags) && data.tags.length) {
-    const tagIds = [];
-    for (const raw of data.tags) {
-      const nm = String(raw || '').trim().slice(0, 100);
-      if (!nm) continue;
-      const hit = await executeKw('res.partner.category', 'search', [[['name', '=', nm]]], withCtx({ limit: 1 }), transport);
-      const id = (Array.isArray(hit) && hit.length) ? hit[0]
-        : await executeKw('res.partner.category', 'create', [{ name: nm }], withCtx(), transport);
-      if (id) tagIds.push(id);
+    try {
+      const tagIds = [];
+      for (const raw of data.tags) {
+        const nm = String(raw || '').trim().slice(0, 100);
+        if (!nm) continue;
+        const hit = await executeKw('res.partner.category', 'search', [[['name', '=', nm]]], withCtx({ limit: 1 }), transport);
+        const id = (Array.isArray(hit) && hit.length) ? hit[0]
+          : await executeKw('res.partner.category', 'create', [{ name: nm }], withCtx(), transport);
+        if (id) tagIds.push(id);
+      }
+      if (tagIds.length) values.category_id = tagIds.map(id => [4, id]);
+    } catch (tagErr) {
+      /* Las etiquetas son metadata secundaria: si su resolución falla
+         (red/timeout/5xx), el partner se crea igual sin category_id. */
+      if (process.env.DEBUG) console.log('[odoo] etiquetas no resueltas (el partner se crea igual):', tagErr.message);
     }
-    if (tagIds.length) values.category_id = tagIds.map(id => [4, id]);
   }
 
   async function persist(vals) {

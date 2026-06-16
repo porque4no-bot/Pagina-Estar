@@ -272,6 +272,15 @@ test('createLead sin credenciales es no-op mock', async () => {
   assert.deepEqual(r, { id: null, isMock: true });
 });
 
+test('jsonRpc lanza ante HTTP no-ok (5xx) en vez de devolver undefined (falso éxito)', async () => {
+  setEnv();
+  const odoo = require(ODOO);
+  // Transporte que simula un 500 de Odoo.sh con cuerpo HTML (no-JSON).
+  const transport = async () => ({ ok: false, status: 500, json: async () => { throw new Error('not json'); } });
+  await assert.rejects(() => odoo.jsonRpc('common', 'version', [], transport), /Odoo HTTP 500/);
+  clearEnv();
+});
+
 test('upsertPartner exige al menos name, email o vat', async () => {
   setEnv();
   const odoo = require(ODOO);
