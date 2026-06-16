@@ -34,6 +34,7 @@ async function main() {
   console.log('DB  :', c.db || '(vacío)');
   console.log('USER:', c.username || '(vacío)');
   console.log('KEY :', c.apiKey ? '(presente, ' + c.apiKey.length + ' chars)' : '(vacío)');
+  console.log('EMPRESA:', c.companyId ? c.companyId + ' (los partners se asignan a esta empresa)' : '(sin ODOO_COMPANY_ID → partners compartidos)');
   line();
 
   if (!odoo.isConfigured()) {
@@ -104,13 +105,25 @@ async function main() {
       fail('Corrió en modo MOCK (no debería con credenciales presentes).');
     } else {
       ok('upsertPartner OK → id=' + r.id + ', creado=' + r.created + (r.vatRejected ? ', (NIT rechazado por la localización → guardado en la nota)' : ''));
-      // Leer dónde quedó (empresa)
+      // Leer dónde quedó (empresa) y confirmar que aparece en la UI
       try {
-        const p = await odoo.executeKw('res.partner', 'read', [[r.id], ['name', 'company_id', 'vat']]);
+        const ctx = c.companyId ? { context: { allowed_company_ids: [c.companyId] } } : {};
+        const p = await odoo.executeKw('res.partner', 'read', [[r.id], ['name', 'company_id', 'vat']], ctx);
         console.log('   Contacto:', JSON.stringify(p && p[0]));
-        console.log('   → Búscalo en Odoo → Contactos como "PRUEBA ODOO SAS". Si NO lo ves en la UI');
-        console.log('     pero acá salió un id, es un tema de filtro por empresa (multiempresa).');
-      } catch (e) { /* no crítico */ }
+        // Simular el filtro de la UI: ¿aparece en una búsqueda bajo ese contexto de empresa?
+        const seen = await odoo.executeKw('res.partner', 'search_read', [[['id', '=', r.id]], ['id', 'name', 'company_id']], ctx);
+        if (seen && seen.length) {
+          ok('Aparece en Contactos' + (c.companyId ? ' bajo la empresa ' + JSON.stringify((p[0] || {}).company_id) : ' (compartido, todas las empresas)') + '.');
+          if (c.companyId) {
+            console.log('   → En Odoo selecciona esa empresa en el selector (arriba a la derecha) y');
+            console.log('     búscalo en Contactos como "PRUEBA ODOO SAS".');
+          } else {
+            console.log('   → Búscalo en Odoo → Contactos como "PRUEBA ODOO SAS" (visible en cualquier empresa).');
+          }
+        } else {
+          fail('NO aparece en la búsqueda bajo el contexto actual — revisar la multiempresa.');
+        }
+      } catch (e) { console.log('   (no se pudo releer el contacto:', e.message + ')'); }
     }
   } catch (e) {
     fail('Falló la creación: ' + e.message);

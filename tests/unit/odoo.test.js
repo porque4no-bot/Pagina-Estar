@@ -8,7 +8,7 @@ const path = require('node:path');
 
 const ODOO = path.join(__dirname, '../../netlify/functions/_odoo.js');
 
-const ENV = ['ODOO_URL', 'ODOO_DB', 'ODOO_USERNAME', 'ODOO_API_KEY'];
+const ENV = ['ODOO_URL', 'ODOO_DB', 'ODOO_USERNAME', 'ODOO_API_KEY', 'ODOO_COMPANY_ID'];
 function clearEnv() { for (const k of ENV) delete process.env[k]; }
 function setEnv() {
   process.env.ODOO_URL = 'https://demo.odoo.com';
@@ -102,6 +102,47 @@ test('upsertPartner crea el partner cuando no existe', async () => {
   // dedup por vat
   const search = calls.find(c => c.key === 'res.partner.search');
   assert.deepEqual(search.args[5][0], [['vat', '=', '900123456-7']]);
+  clearEnv();
+});
+
+test('upsertPartner asigna company_id y pasa allowed_company_ids con ODOO_COMPANY_ID (multiempresa)', async () => {
+  setEnv();
+  process.env.ODOO_COMPANY_ID = '5';
+  const odoo = require(ODOO);
+  odoo._resetAuthCache();
+  let createdValues = null, createKwargs = null;
+  const { transport, calls } = fakeTransport({
+    'common.authenticate': 7,
+    'res.partner.search': [],
+    'res.partner.create': (posArgs, kwargs) => { createdValues = posArgs[0]; createKwargs = kwargs; return 88; }
+  });
+  const r = await odoo.upsertPartner(
+    { name: 'Cliente hotel', nit: '900123456-7', email: 'c@h.co' },
+    { transport }
+  );
+  assert.equal(r.id, 88);
+  // el partner queda asignado a la empresa configurada (la del hotel)
+  assert.equal(createdValues.company_id, 5);
+  // create y search van con el contexto de empresa permitido
+  assert.deepEqual(createKwargs.context, { allowed_company_ids: [5] });
+  const search = calls.find(c => c.key === 'res.partner.search');
+  assert.deepEqual(search.args[6].context, { allowed_company_ids: [5] });
+  clearEnv();
+});
+
+test('upsertPartner sin ODOO_COMPANY_ID deja el partner compartido (sin company_id ni contexto)', async () => {
+  setEnv();
+  const odoo = require(ODOO);
+  odoo._resetAuthCache();
+  let createdValues = null, createKwargs = null;
+  const { transport } = fakeTransport({
+    'common.authenticate': 7,
+    'res.partner.search': [],
+    'res.partner.create': (posArgs, kwargs) => { createdValues = posArgs[0]; createKwargs = kwargs; return 9; }
+  });
+  await odoo.upsertPartner({ name: 'Cliente', email: 'c@h.co' }, { transport });
+  assert.equal(createdValues.company_id, undefined);
+  assert.equal(createKwargs.context, undefined);
   clearEnv();
 });
 

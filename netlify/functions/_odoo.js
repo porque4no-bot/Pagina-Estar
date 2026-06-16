@@ -21,6 +21,10 @@
      ODOO_DB         nombre de la base de datos
      ODOO_USERNAME   login del usuario de integración (email)
      ODOO_API_KEY    API key del usuario (Preferencias → Seguridad de la cuenta)
+     ODOO_COMPANY_ID opcional. Si se setea (p. ej. la empresa del hotel), los
+                     partners se crean/actualizan asignados a esa empresa en
+                     bases MULTIEMPRESA. Sin él, quedan compartidos (visibles en
+                     todas las empresas).
      ODOO_TIMEOUT_MS opcional, default 10000
 */
 
@@ -30,6 +34,7 @@ function odooConfig() {
     db: process.env.ODOO_DB || '',
     username: process.env.ODOO_USERNAME || '',
     apiKey: process.env.ODOO_API_KEY || '',
+    companyId: parseInt(process.env.ODOO_COMPANY_ID, 10) || null,
     timeoutMs: parseInt(process.env.ODOO_TIMEOUT_MS, 10) || 10000
   };
 }
@@ -117,10 +122,23 @@ async function upsertPartner(data, opts) {
     return { id: null, created: false, isMock: true };
   }
   const transport = opts.transport;
+  const c = odooConfig();
   const values = buildPartnerValues(data);
   if (!values.name && !values.email && !values.vat) {
     throw new Error('upsertPartner requiere al menos name, email o vat');
   }
+
+  /* Multiempresa: si se configura ODOO_COMPANY_ID, el partner se asigna a esa
+     empresa (la del hotel, p. ej. Mirada SAS) para segregarlo del resto del
+     grupo y que sus ventas/facturas cuadren bajo esa empresa. Hay que pasar
+     `allowed_company_ids` en el contexto de cada llamada porque el usuario de
+     integración puede tener OTRA empresa por defecto: sin eso, la creación se
+     rechaza o el registro queda fuera del contexto y "no aparece". Sin la
+     variable, el partner queda compartido (company_id nulo → visible en todas
+     las empresas). */
+  if (c.companyId) values.company_id = c.companyId;
+  const ctx = c.companyId ? { allowed_company_ids: [c.companyId] } : null;
+  const withCtx = (kw) => (ctx ? { ...(kw || {}), context: ctx } : (kw || {}));
 
   let domain = null;
   if (values.vat) domain = [['vat', '=', values.vat]];
@@ -128,16 +146,16 @@ async function upsertPartner(data, opts) {
 
   let existingId = null;
   if (domain) {
-    const found = await executeKw('res.partner', 'search', [domain], { limit: 1 }, transport);
+    const found = await executeKw('res.partner', 'search', [domain], withCtx({ limit: 1 }), transport);
     if (Array.isArray(found) && found.length) existingId = found[0];
   }
 
   async function persist(vals) {
     if (existingId) {
-      await executeKw('res.partner', 'write', [[existingId], vals], {}, transport);
+      await executeKw('res.partner', 'write', [[existingId], vals], withCtx(), transport);
       return { id: existingId, created: false, isMock: false };
     }
-    const id = await executeKw('res.partner', 'create', [vals], {}, transport);
+    const id = await executeKw('res.partner', 'create', [vals], withCtx(), transport);
     return { id, created: true, isMock: false };
   }
 

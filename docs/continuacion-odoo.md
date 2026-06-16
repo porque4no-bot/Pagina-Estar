@@ -59,48 +59,56 @@ este chat, pero con este documento + los docs del repo queda al día.
 - **Decisiones/arquitectura:** `docs/plan-integracion-odoo-otasync.md`
   (incluye el modelo de evaluación financiera y la guía de credenciales).
 
-## El problema a resolver ahora
+## El problema — ✅ VERIFICADO Y RESUELTO EN LOCAL (2026-06-15)
 
-En la prueba sobre el deploy preview **el contacto no apareció** en Odoo. Causas
-posibles (el diagnóstico las distingue):
-1. Se llenó el formulario de **"Solicitar convenio"** de `empresas.html`, que es
-   un **form nativo de Netlify** y NO pasa por la función (el que sí llama a
-   Odoo es **"Solicitar cotización"**).
-2. Las variables de Odoo no estaban en el contexto **deploy-preview** → el
-   conector corrió en **modo mock**.
-3. **Multiempresa:** el contacto se creó pero quedó asignado a otra empresa y la
-   UI de Contactos lo **filtra por la empresa seleccionada**.
+`node scripts/odoo-test.js` contra el Odoo real: servidor **19.0+e** alcanzable,
+**autenticación OK** (uid=2), el usuario ve ~1000 contactos y el upsert/dedup del
+partner de prueba funciona.
 
-> Dato confirmado: la base de Odoo es **MULTIEMPRESA**.
+**Empresas del grupo (multiempresa confirmada).** El usuario de integración tiene
+permitidas `[1,3,4,5]` y entra por defecto en **DICI (1)**:
+
+| ID | Empresa | NIT |
+|---|---|---|
+| 1 | DICI S.A.S. *(default del usuario)* | 901386785-8 |
+| 3 | RIVO S.A.S. | 901079655-2 |
+| 4 | GRUPO PINAO S EN C A | 900436848-5 |
+| **5** | **MIRADA S.A.S** ← el hotel | **902032515-0** |
+
+**Causa real del "no apareció":** NO era la multiempresa. Un contacto
+**compartido** (`company_id=false`) sí se ve en todas las empresas (comprobado).
+Lo más probable fue (1) el formulario nativo de Netlify ("Solicitar convenio")
+que no pasa por la función, o (2) **modo mock** en deploy-preview (faltaban las
+variables de Odoo).
+
+**Decisión (multiempresa):** asignar los clientes del hotel a **Mirada SAS
+(company 5)** para segregarlos del grupo y alinear ventas/facturas. Implementado
+en `_odoo.js` con la variable **`ODOO_COMPANY_ID`**: setea `company_id` y pasa
+`allowed_company_ids` en el contexto de las llamadas. Verificado: "PRUEBA ODOO
+SAS" queda en `company_id=[5,"MIRADA S.A.S"]` y aparece en Contactos al
+seleccionar Mirada en el selector de empresa (arriba a la derecha).
+
+> ⚠️ **Producción (Netlify):** cargar las 4 variables de Odoo **+
+> `ODOO_COMPANY_ID=5`** en el panel (hoy en prod corre en mock). Recordar: los
+> contactos del hotel se ven con **Mirada** seleccionada, no con DICI.
 
 ---
 
-## Paso 1 — Diagnóstico (primero en local)
+## Paso 1 — Diagnóstico ✅ HECHO
 
-Ejecuta:
-```bash
-node scripts/odoo-test.js
-```
-Captura la salida. Confirma: servidor alcanzable + versión, **autenticación
-(uid)**, **empresa por defecto y empresas permitidas del usuario**, conteo de
-contactos, y la **creación del contacto de prueba** (id o el error exacto).
+`node scripts/odoo-test.js` (con `.env` y `--env-file`) corrido y verde: servidor
+19.0+e, auth uid=2, empresas permitidas `[1,3,4,5]`, Mirada SAS = **5**, y el
+contacto de prueba se crea/dedupica. Para repetirlo:
+`node --env-file=.env scripts/odoo-test.js`.
 
-➡️ **Anota el ID de la empresa del hotel (Mirada SAS)** dentro de ese Odoo
-(aparece en "Empresas permitidas"). Lo necesito para el Paso 2.
+## Paso 2 — Ajustar el conector a la multiempresa ✅ HECHO
 
-## Paso 2 — Ajustar el conector a la multiempresa
+Resuelto: los clientes del hotel se asignan a **Mirada SAS (5)** vía
+`ODOO_COMPANY_ID`. `_odoo.js` setea `company_id` y pasa `allowed_company_ids` en
+el contexto; sin la variable quedan compartidos (compat. hacia atrás). Cubierto
+por tests en `tests/unit/odoo.test.js` y el diagnóstico confirma la visibilidad.
 
-Según el resultado:
-- Si el contacto **se creó pero no se ve en la UI** → es filtro por empresa.
-  Decidir: crear los clientes en la **empresa del hotel** (setear `company_id`)
-  o dejarlos **compartidos** (`company_id` nulo, visibles en todas). Recomiendo
-  asignarlos a la empresa del hotel para que ventas/facturas cuadren después.
-  Implica setear `company_id` en `buildPartnerValues` y, posiblemente, pasar
-  `allowed_company_ids` en el contexto de las llamadas.
-- Si **falló la autenticación** → revisar DB/usuario/API key.
-- Si **falló el create por el NIT** → ya hay fallback; ver el detalle.
-
-## Paso 3 — Completar la Fase 1
+## Paso 3 — Completar la Fase 1  ← SIGUIENTE
 
 Enganchar `upsertPartner` también en:
 - **Reservas pagadas** (`wompi-webhook.js`): cada huésped directo → cliente en
