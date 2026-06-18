@@ -748,6 +748,7 @@
     $('#guestLogout').hidden = false;
     document.body.classList.add('guest-is-authenticated');
     renderBooking();
+    renderServicePrices();
     initializeGuestSlots();
     if (window.lucide) window.lucide.createIcons();
   }
@@ -1554,9 +1555,40 @@
     });
   }
 
+  /* Resolve the price of the %-of-night services (late/early check-out) for the
+     current booking. The server is the authority and re-prices every order from
+     netlify/functions/guest-action.js using the SAME formula — pct × (totalAmount
+     / nights), rounded to the peso — so the cart total the guest confirms always
+     matches what gets registered. Flat services keep their static data-service-price.
+     If the booking has no usable night base, the card is disabled (not orderable). */
+  function renderServicePrices() {
+    const booking = state.booking;
+    const nights = Number(booking && booking.nights) || 0;
+    const totalAmount = Number(booking && booking.totalAmount) || 0;
+    const nightBase = nights > 0 && totalAmount > 0 ? totalAmount / nights : 0;
+    $$('.guest-service-card[data-service-pct]').forEach(card => {
+      const pct = Number(card.dataset.servicePct) || 0;
+      const display = card.querySelector('[data-service-price-display]');
+      const addBtn = card.querySelector('.guest-add-service');
+      if (nightBase > 0 && pct > 0) {
+        const amount = Math.round(pct * nightBase);
+        card.dataset.servicePrice = String(amount);
+        /* Match the static cards' "$X.XXX" style (no space) so the grid reads
+           uniformly; the cart uses money() like the rest of the app. */
+        if (display) display.textContent = '$' + String(amount).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        if (addBtn) addBtn.disabled = false;
+      } else {
+        delete card.dataset.servicePrice;
+        if (display) display.textContent = `${Math.round(pct * 100)}% de la noche`;
+        if (addBtn) addBtn.disabled = true;
+      }
+    });
+  }
+
   function addService(card) {
     const id = card.dataset.serviceId;
     const price = Number(card.dataset.servicePrice);
+    if (!Number.isFinite(price) || price <= 0) return; /* %-of-night card not priceable yet */
     const name = card.querySelector('h3').textContent.trim();
     if (!state.cart[id]) state.cart[id] = { id, price, name, quantity: 0 };
     state.cart[id].quantity += 1;
