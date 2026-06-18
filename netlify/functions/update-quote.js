@@ -106,14 +106,24 @@ exports.handler = async (event, context) => {
       try { await saveQuote(store, existing); } catch (e) { /* non-fatal */ }
     }
 
-    /* Availability gate (same as create): block edits that can't be booked. */
+    /* Availability gate (same as create): block edits that can't be booked,
+       UNLESS the admin forces it (allowOverbooking). */
+    let availabilityOk = true;
+    let overbooking = false;
+    let unavailableRooms = [];
     if (sanitized.checkin && sanitized.checkout) {
       try {
         const { availByType, isMock } = await getAvailabilityByType(sanitized.checkin, sanitized.checkout);
         if (!isMock) {
           const shortfalls = findUnavailable(sanitized.items, availByType);
           if (shortfalls.length > 0) {
-            return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ error: 'Sin disponibilidad para las fechas seleccionadas', unavailable: shortfalls }) };
+            if (body.allowOverbooking === true) {
+              availabilityOk = false;
+              overbooking = true;
+              unavailableRooms = shortfalls;
+            } else {
+              return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ error: 'Sin disponibilidad para las fechas seleccionadas', unavailable: shortfalls }) };
+            }
           }
         }
       } catch (e) {
@@ -132,8 +142,10 @@ exports.handler = async (event, context) => {
       firstViewedAt: existing.firstViewedAt || null,
       lastViewedAt: existing.lastViewedAt || null,
       status: (existing.firstViewedAt) ? 'vista' : 'activa',
-      availabilityOk: true,
+      availabilityOk,
       availabilityCheckedAt: now,
+      overbooking,
+      unavailable: unavailableRooms,
       publicToken: existing.publicToken || crypto.randomBytes(24).toString('base64url'),
       bloquearHabitaciones: wantsHold,
       holdReservationIds: [],
@@ -148,8 +160,8 @@ exports.handler = async (event, context) => {
       before: existing, after: updated
     });
 
-    /* Recreate the hold if requested */
-    if (wantsHold && updated.checkin && updated.checkout) {
+    /* Recreate the hold if requested (never for overbooking — nothing to hold) */
+    if (wantsHold && !overbooking && updated.checkin && updated.checkout) {
       try {
         const holdId = await createHold(updated);
         if (holdId) { updated.holdReservationIds = [holdId]; await saveQuote(store, updated); }

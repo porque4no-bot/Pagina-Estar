@@ -125,16 +125,24 @@ function sanitizeQuoteInput(body) {
     };
   });
 
+  /* Adicionales: the admin enters a BASE unit price; the commission inflates it
+     exactly like room rates (precioBase internal, precioUnitario = inflated,
+     client-facing). computeQuoteTotal sums precioUnitario, so the markup flows
+     into the charged total. */
   const sv = body.servicios || {};
+  const mkSvc = (raw) => {
+    const b = sanitizeService(raw);
+    return { cantidad: b.cantidad, precioBase: b.precioUnitario, precioUnitario: effectiveTarifa(b.precioUnitario, comision) };
+  };
   const servicios = {
-    desayuno: sanitizeService(sv.desayuno),
-    almuerzo: sanitizeService(sv.almuerzo),
-    cena: sanitizeService(sv.cena),
-    personaAdicional: sanitizeService(sv.personaAdicional),
+    desayuno: mkSvc(sv.desayuno),
+    almuerzo: mkSvc(sv.almuerzo),
+    cena: mkSvc(sv.cena),
+    personaAdicional: mkSvc(sv.personaAdicional),
     otros: Array.isArray(sv.otros) ? sv.otros.slice(0, 20).map(o => {
       const imp = ['ninguno', 'iva', 'inc'].includes(o && o.impuesto) ? o.impuesto : 'ninguno';
       const b = sanitizeService(o);
-      return { descripcion: String((o && o.descripcion) || '').slice(0, 120), cantidad: b.cantidad, precioUnitario: b.precioUnitario, impuesto: imp };
+      return { descripcion: String((o && o.descripcion) || '').slice(0, 120), cantidad: b.cantidad, precioBase: b.precioUnitario, precioUnitario: effectiveTarifa(b.precioUnitario, comision), impuesto: imp };
     }).filter(o => o.descripcion && o.cantidad > 0) : []
   };
 
@@ -222,13 +230,25 @@ function toPublic(quote) {
   const {
     createdBy, comision, status, views, firstViewedAt, lastViewedAt,
     cancelledAt, cancelledBy, updatedAt, paidAt, transactionId, bookingCodes,
-    availabilityOk, availabilityCheckedAt, unavailable, reservationPending,
+    availabilityOk, availabilityCheckedAt, unavailable, reservationPending, overbooking,
     bloquearHabitaciones, holdReservationIds, publicToken, ...rest
   } = quote;
   rest.items = (rest.items || []).map(it => {
     const { tarifaBase, ...pub } = it;
     return pub;
   });
+  if (rest.servicios) {
+    const sv = rest.servicios;
+    const strip = (s) => { if (!s || typeof s !== 'object') return s; const { precioBase, ...pub } = s; return pub; };
+    rest.servicios = {
+      ...sv,
+      desayuno: strip(sv.desayuno),
+      almuerzo: strip(sv.almuerzo),
+      cena: strip(sv.cena),
+      personaAdicional: strip(sv.personaAdicional),
+      otros: Array.isArray(sv.otros) ? sv.otros.map(strip) : sv.otros
+    };
+  }
   return rest;
 }
 
