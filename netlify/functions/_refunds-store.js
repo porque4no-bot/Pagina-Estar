@@ -29,6 +29,10 @@ const ROUTE = {
   MANUAL_BANK: 'MANUAL_BANK'
 };
 
+/* Plazo máximo comunicado al huésped para tramitar un reembolso — TODOS los
+   medios (hoy todo es manual). Fuente única para correos y panel admin. */
+const REFUND_SLA_BUSINESS_DAYS = 15;
+
 /* Pure routing decision. Mercado Pago is the only provider with a refund API;
    its card/account-money payments are auto-refundable. Wompi has NO refund API
    in this account, so Wompi card = assisted support ticket and the rest
@@ -174,7 +178,7 @@ async function transitionStatus(bookingCode, newStatus, actor, notes, patch) {
 }
 
 module.exports = {
-  STATUS, ROUTE, refundRoute,
+  STATUS, ROUTE, REFUND_SLA_BUSINESS_DAYS, refundRoute,
   getRefundStore, recoverPaymentInfo,
   createRefundRequest, getRefund, listRefunds, transitionStatus
 };

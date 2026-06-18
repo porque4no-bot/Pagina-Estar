@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { refundRoute, ROUTE, STATUS, createRefundRequest } = require('../../netlify/functions/_refunds-store');
+const { refundRoute, ROUTE, STATUS, REFUND_SLA_BUSINESS_DAYS, createRefundRequest } = require('../../netlify/functions/_refunds-store');
 
 test('refundRoute: Mercado Pago card/account is gateway-auto', () => {
   assert.equal(refundRoute('mercadopago', 'visa'), ROUTE.GATEWAY_AUTO);
@@ -47,5 +47,10 @@ test('createRefundRequest returns not-created for a booking with no code', async
 test('STATUS exposes the documented refund lifecycle states', () => {
   assert.equal(STATUS.NEEDS_REVIEW, 'NEEDS_REVIEW');
   assert.equal(STATUS.APPROVED, 'APPROVED');
+  assert.equal(STATUS.PROCESSING, 'PROCESSING');
   assert.equal(STATUS.DONE, 'DONE');
+});
+
+test('REFUND_SLA_BUSINESS_DAYS is the single source for the 15-business-day promise', () => {
+  assert.equal(REFUND_SLA_BUSINESS_DAYS, 15);
 });

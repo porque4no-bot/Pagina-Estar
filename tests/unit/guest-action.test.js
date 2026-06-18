@@ -38,7 +38,11 @@ function makeEvent(payload, token) {
 }
 
 function validToken() {
-  return guestHelpers.signGuestToken({ bookingCode: 'EST-TEST-42', guestName: 'María López' }, 300);
+  // nights + totalAmount give a 320000 average-night base for %-of-night services.
+  return guestHelpers.signGuestToken(
+    { bookingCode: 'EST-TEST-42', guestName: 'María López', nights: 4, totalAmount: 1280000 },
+    300
+  );
 }
 
 test('guest-action rejects missing or invalid tokens', async () => {
@@ -88,14 +92,38 @@ test('guest-action order: persists event with sanitized items', async () => {
     type: 'order',
     items: [
       { id: 'breakfast', quantity: 2 },
-      { id: 'parking', quantity: 1 }
+      { id: 'laundry', quantity: 1 }
     ],
-    paymentPreference: 'room'
+    paymentPreference: 'account'
   }, token));
   assert.equal(res.statusCode, 201);
   const data = body(res);
   assert.equal(data.ok, true);
-  assert.equal(data.total, 2 * 20000 + 25000);
+  assert.equal(data.total, 2 * 20000 + 35000);
+});
+
+test('guest-action order: prices %-of-night services from the booking night base', async () => {
+  const token = validToken(); // night base = 1280000 / 4 = 320000
+  const res = await guestAction(makeEvent({
+    type: 'order',
+    items: [
+      { id: 'late_checkout', quantity: 1 }, // 15% × 320000 = 48000
+      { id: 'early_checkin', quantity: 1 }  // 25% × 320000 = 80000
+    ]
+  }, token));
+  assert.equal(res.statusCode, 201);
+  assert.equal(body(res).total, 48000 + 80000);
+});
+
+test('guest-action order: rejects %-of-night services when the token has no night base', async () => {
+  // Pre-deploy tokens lack nights/totalAmount, so the server can't price 15%-of-night.
+  const token = guestHelpers.signGuestToken({ bookingCode: 'EST-OLD-1', guestName: 'Old Token' }, 300);
+  const res = await guestAction(makeEvent({
+    type: 'order',
+    items: [{ id: 'late_checkout', quantity: 1 }]
+  }, token));
+  assert.equal(res.statusCode, 400);
+  assert.match(body(res).error, /iniciar sesión|precio/i);
 });
 
 test('guest-action order: 400 when items list is empty or all invalid', async () => {
@@ -103,6 +131,10 @@ test('guest-action order: 400 when items list is empty or all invalid', async ()
 
   const noItems = await guestAction(makeEvent({ type: 'order', items: [] }, token));
   assert.equal(noItems.statusCode, 400);
+
+  // parqueadero was retired — its id is no longer in the catalogue.
+  const retired = await guestAction(makeEvent({ type: 'order', items: [{ id: 'parking', quantity: 1 }] }, token));
+  assert.equal(retired.statusCode, 400);
 
   const badIds = await guestAction(makeEvent({ type: 'order', items: [{ id: 'rocket_fuel', quantity: 1 }] }, token));
   assert.equal(badIds.statusCode, 400);
@@ -255,4 +287,150 @@ test('guest-action contract_preview: returns 200 with rendered HTML and does not
   assert.equal(captured.length, 0, 'No event was persisted for preview');
 
   guestActionModule._test.resetDeps();
+});
+
+function setFolioDeps(onFolio) {
+  guestActionModule._test.setDeps({
+    protectRecord: record => record,
+    guestStore: () => ({ setJSON: async () => {} }),
+    archiveGuestPayload: async () => ({ delivered: false, configured: false }),
+    syncGuestEvent: async () => ({ delivered: false }),
+    postOrderToFolio: onFolio
+  });
+}
+
+test('guest-action order: posts charge-to-account orders to the folio when enabled', async () => {
+  const token = validToken();
+  const calls = [];
+  setFolioDeps(async (arg) => { calls.push(arg); return { posted: true, count: arg.items.length }; });
+  process.env.GUEST_SERVICE_FOLIO_ENABLED = 'true';
+  try {
+    const res = await guestAction(makeEvent({
+      type: 'order',
+      items: [{ id: 'breakfast', quantity: 2 }],
+      paymentPreference: 'account'
+    }, token));
+    assert.equal(res.statusCode, 201);
+    assert.equal(calls.length, 1, 'folio posting called once');
+    assert.equal(calls[0].idReservations, 'EST-TEST-42');
+    assert.equal(calls[0].items[0].name, 'Desayuno');
+    assert.equal(body(res).folio.posted, true);
+  } finally {
+    delete process.env.GUEST_SERVICE_FOLIO_ENABLED;
+    guestActionModule._test.resetDeps();
+  }
+});
+
+test('guest-action order: a folio failure does not fail the order', async () => {
+  const token = validToken();
+  setFolioDeps(async () => { throw new Error('OTASync down'); });
+  process.env.GUEST_SERVICE_FOLIO_ENABLED = 'true';
+  try {
+    const res = await guestAction(makeEvent({
+      type: 'order',
+      items: [{ id: 'breakfast', quantity: 1 }],
+      paymentPreference: 'account'
+    }, token));
+    assert.equal(res.statusCode, 201, 'order still succeeds');
+    assert.equal(body(res).folio.posted, false);
+    assert.match(body(res).folio.error, /OTASync down/);
+  } finally {
+    delete process.env.GUEST_SERVICE_FOLIO_ENABLED;
+    guestActionModule._test.resetDeps();
+  }
+});
+
+test('guest-action order: does NOT post to the folio when off or for online orders', async () => {
+  const token = validToken();
+  let called = 0;
+  setFolioDeps(async () => { called++; return { posted: true }; });
+  try {
+    // Flag off → no folio call even for 'account'.
+    await guestAction(makeEvent({ type: 'order', items: [{ id: 'breakfast', quantity: 1 }], paymentPreference: 'account' }, token));
+    // Flag on but 'online' → no folio call (charged after payment, Phase B).
+    process.env.GUEST_SERVICE_FOLIO_ENABLED = 'true';
+    await guestAction(makeEvent({ type: 'order', items: [{ id: 'breakfast', quantity: 1 }], paymentPreference: 'online' }, token));
+    assert.equal(called, 0, 'folio posting must not run when off or for online orders');
+  } finally {
+    delete process.env.GUEST_SERVICE_FOLIO_ENABLED;
+    guestActionModule._test.resetDeps();
+  }
+});
+
+test('guest-action order: online + wompi mode returns a signed checkout URL', async () => {
+  const token = validToken();
+  let checkoutArg = null;
+  guestActionModule._test.setDeps({
+    protectRecord: record => record,
+    guestStore: () => ({ setJSON: async () => {} }),
+    archiveGuestPayload: async () => ({ delivered: false, configured: false }),
+    syncGuestEvent: async () => ({ delivered: false }),
+    createGuestWompiCheckout: async (arg) => { checkoutArg = arg; return `https://checkout.wompi.co/p/?reference=${arg.record.eventId}`; }
+  });
+  process.env.GUEST_SERVICE_PAYMENT_MODE = 'wompi';
+  try {
+    const res = await guestAction(makeEvent({
+      type: 'order',
+      items: [{ id: 'breakfast', quantity: 1 }],
+      paymentPreference: 'online'
+    }, token));
+    assert.equal(res.statusCode, 201);
+    const data = body(res);
+    assert.equal(data.paymentRequired, true);
+    assert.match(data.paymentUrl, /checkout\.wompi\.co/);
+    assert.equal(checkoutArg.bookingCode, 'EST-TEST-42');
+    assert.equal(checkoutArg.record.total, 20000);
+  } finally {
+    delete process.env.GUEST_SERVICE_PAYMENT_MODE;
+    guestActionModule._test.resetDeps();
+  }
+});
+
+test('guest-action order: notifies the team with the order summary (Phase C)', async () => {
+  const token = validToken();
+  const mails = [];
+  guestActionModule._test.setDeps({
+    protectRecord: record => record,
+    guestStore: () => ({ setJSON: async () => {} }),
+    archiveGuestPayload: async () => ({ delivered: false, configured: false }),
+    syncGuestEvent: async () => ({ delivered: false }),
+    notifyOrderTeam: async (record) => { mails.push(record); }
+  });
+  try {
+    const res = await guestAction(makeEvent({
+      type: 'order',
+      items: [{ id: 'breakfast', quantity: 2 }, { id: 'laundry', quantity: 1 }],
+      paymentPreference: 'account',
+      deliveryTime: 'Mañana 8am'
+    }, token));
+    assert.equal(res.statusCode, 201);
+    assert.equal(mails.length, 1, 'team notified once');
+    assert.equal(mails[0].bookingCode, 'EST-TEST-42');
+    assert.equal(mails[0].total, 2 * 20000 + 35000);
+    assert.equal(mails[0].items.length, 2);
+    assert.equal(mails[0].paymentPreference, 'account');
+  } finally {
+    guestActionModule._test.resetDeps();
+  }
+});
+
+test('guest-action order: a team-notification failure does not fail the order', async () => {
+  const token = validToken();
+  guestActionModule._test.setDeps({
+    protectRecord: record => record,
+    guestStore: () => ({ setJSON: async () => {} }),
+    archiveGuestPayload: async () => ({ delivered: false, configured: false }),
+    syncGuestEvent: async () => ({ delivered: false }),
+    notifyOrderTeam: async () => { throw new Error('Resend down'); }
+  });
+  try {
+    const res = await guestAction(makeEvent({
+      type: 'order',
+      items: [{ id: 'breakfast', quantity: 1 }],
+      paymentPreference: 'account'
+    }, token));
+    assert.equal(res.statusCode, 201, 'order still succeeds despite mail failure');
+  } finally {
+    guestActionModule._test.resetDeps();
+  }
 });

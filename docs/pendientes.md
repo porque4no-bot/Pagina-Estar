@@ -297,6 +297,40 @@ pregunta del huésped:
   Wompi no las codifica).
 - **Emails faltantes:** pre-llegada, post-estadía, recordatorio de cotización por
   vencer (rechazado/pendiente ya existen).
+- **Pedidos de servicios del guest app → cobro y comunicación con Kunas.** Desde
+  2026-06-18 el guest app cobra todos los servicios desde el catálogo único
+  (`_services-catalog.js`) y guarda el pedido con el desglose (ítems, montos,
+  `paymentPreference` = `account` cargar a la cuenta / `online` pagar en línea).
+  La API de OTASync **sí** soporta el loop (`OTASync-Public-API.md`: `add_extra`,
+  `add_payment`, `get-reservation` con `id_reservations_rooms`).
+  - **Fase A — cargo al folio (HECHO, apagado).** `_otasync.js` →
+    `postOrderExtrasToFolio()` (+ `getExtras`/`insertExtra`/`ensureGuestServiceExtra`/
+    `getReservationFirstRoom`/`addReservationExtra`); `guest-action` lo llama best-effort
+    para pedidos `account`. **Gated por `GUEST_SERVICE_FOLIO_ENABLED='true'`** (off por
+    defecto). Usa un extra genérico "Pedido guest app" (auto-creado una vez, o
+    `OTASYNC_GUEST_SERVICE_EXTRA_ID`). **Probar en una reserva real antes de activar.**
+  - **Fase B — cobro online (HECHO, apagado).** `GUEST_SERVICE_PAYMENT_MODE=wompi`:
+    `guest-action` arma un Wompi Web Checkout **firmado server-side** (monto = total del
+    pedido; reference = eventId `GST-...`) y guarda un intent en `_guest-payments`
+    (store `guest-service-payments`). Al aprobar, `wompi-webhook.handleGuestServicePayment`
+    verifica el monto, postea `add_extra` + `add_payment` al folio y marca el intent `paid`.
+    Idempotente por `intent.status`; ante falla de folio marca `paid_folio_failed` y **no
+    reintenta** (add_extra no es idempotente) → seguimiento manual. Requiere
+    `WOMPI_PUBLIC_KEY`/`WOMPI_INTEGRITY_SECRET`/`WOMPI_WEBHOOK_SECRET`. **Probar en sandbox
+    Wompi + reserva real antes de activar.** Front: la guest app redirige al checkout y al
+    volver muestra aviso (`?order=`). Falta opcional: extender `reconcile-payments` para
+    detectar intents `pending`/`paid_folio_failed` viejos.
+  - **Fase C — correo al equipo (HECHO).** `guest-action.notifyOrderTeam` envía al
+    equipo (`adminEmail()` = `ADMIN_NOTIFY_EMAIL`) un resumen de cada pedido (reserva,
+    huésped, ítems, total, forma de pago, cuándo/notas) vía Resend. Best-effort: no-op
+    sin `RESEND_API_KEY`, y un fallo de correo nunca tumba el pedido.
+  El monto del late/early check-out se calcula como 15%/25% del **promedio de
+  noche** (`totalAmount / nights`, IVA incl.) — aproxima la tarifa neta del motor;
+  si se quiere exacto, firmar la tarifa neta de la habitación en el token de
+  `guest-session` (hoy firma `nights` + `totalAmount`).
+- Early check-in en guest app quedó al **25% plano** (paridad con el catálogo y
+  el motor). El modelo escalonado 15/35/50 de §6.5 sigue pendiente y, cuando se
+  implemente, debe cambiarse en las tres superficies a la vez (no solo aquí).
 
 ---
 

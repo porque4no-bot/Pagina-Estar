@@ -560,8 +560,163 @@ async function createConfirmedReservation(quote, opts) {
   return data.id_reservations || quote.quoteId;
 }
 
+/* ── Guest-app service orders → reservation folio ──────────────────────────
+   Posts the extras a guest ordered through the guest app onto their existing
+   OTASync/Kunas reservation so the charge shows on the folio at check-out. This
+   is what makes the guest app's "cargar a mi cuenta" reach Kunas. Gated by the
+   caller (guest-action) behind GUEST_SERVICE_FOLIO_ENABLED + hasOtasyncCreds().
+   Endpoints: docs/OTASync-Public-API.md → Extras / New reservations (add_extra). */
+
+/* Small POST helper mirroring the timeout + session-retry boilerplate the rest
+   of this module uses. The caller passes the body WITHOUT `key`; we inject the
+   live pkey. Throws on non-2xx so callers can log/alert. */
+async function otasyncPostJson(path, payload, { timeoutMs = 10000, label = path } = {}) {
+  const makeRequest = async (pkey) => {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const r = await fetch(`https://app.otasync.me${path}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, key: pkey }), signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      return r;
+    } catch (err) {
+      clearTimeout(tid);
+      throw err.name === 'AbortError' ? new Error(`Request timeout during ${label}`) : err;
+    }
+  };
+  const res = await withSessionRetry(makeRequest);
+  if (!res.ok) throw new Error(`${label} returned status ${res.status}`);
+  return res.json();
+}
+
+const GUEST_SERVICE_EXTRA_NAME = 'Pedido guest app';
+let guestServiceExtraIdCache = null;
+
+async function getExtras() {
+  const { token, propertyId } = otasyncCreds();
+  const data = await otasyncPostJson('/api/extras/data/extras',
+    { token, id_properties: propertyId }, { label: 'extras/data' });
+  return Array.isArray(data && data.extras) ? data.extras : [];
+}
+
+async function insertExtra({ name, price = 0, tax = 0, type = 'one' }) {
+  const { token, propertyId } = otasyncCreds();
+  return otasyncPostJson('/api/extras/insert/extra', {
+    token, id_properties: propertyId,
+    name, price, tax, type,
+    description: 'Cargos de servicios pedidos desde la guest app.',
+    period_type: 'period', dfrom: '2000-01-01', dto: '2099-12-31',
+    id_restriction_plans: 0, use_on_booking_engine: 0,
+    rooms: [], specific_rooms: [], image: ''
+  }, { label: 'extras/insert' });
+}
+
+/* id_extras for the generic "guest app order" line, resolved once and cached.
+   Each folio line carries the real service name; this just satisfies OTASync's
+   requirement that an extra reference an existing definition. tax:0 so the
+   price we send is the final charge (no tax added on top). Override with
+   OTASYNC_GUEST_SERVICE_EXTRA_ID to point at a pre-made extra instead. */
+async function ensureGuestServiceExtra() {
+  if (process.env.OTASYNC_GUEST_SERVICE_EXTRA_ID) {
+    return String(process.env.OTASYNC_GUEST_SERVICE_EXTRA_ID);
+  }
+  if (guestServiceExtraIdCache) return guestServiceExtraIdCache;
+  const extras = await getExtras();
+  const existing = extras.find(e =>
+    String(e && e.name).trim().toLowerCase() === GUEST_SERVICE_EXTRA_NAME.toLowerCase());
+  if (existing && existing.id_extras) {
+    guestServiceExtraIdCache = String(existing.id_extras);
+    return guestServiceExtraIdCache;
+  }
+  const created = await insertExtra({ name: GUEST_SERVICE_EXTRA_NAME });
+  const newId = created && (created.id_extras || created.id);
+  if (!newId) throw new Error('Could not resolve id_extras after inserting the guest-app extra');
+  guestServiceExtraIdCache = String(newId);
+  return guestServiceExtraIdCache;
+}
+
+/* The first room of a reservation (add_extra/add_payment attach to a room). */
+async function getReservationFirstRoom(idReservations) {
+  const { token, propertyId } = otasyncCreds();
+  const data = await otasyncPostJson('/api/reservation/data/reservation',
+    { token, id_properties: propertyId, id_reservations: String(idReservations) },
+    { label: 'reservation/data' });
+  const rows = Array.isArray(data && data.guests) ? data.guests : [];
+  const withRoom = rows.find(r => r && r.id_reservations_rooms);
+  return withRoom ? String(withRoom.id_reservations_rooms) : null;
+}
+
+async function addReservationExtra({ idReservations, idReservationsRooms, idExtras, name, pricePerUnit, quantity }) {
+  const { token, propertyId } = otasyncCreds();
+  return otasyncPostJson('/api/reservation/edit/add_extra', {
+    token, id_properties: propertyId, id_reservations: String(idReservations),
+    extra: {
+      id_reservation_extras: '0',
+      id_extras: String(idExtras),
+      name: String(name),
+      price_per_unit: String(pricePerUnit),
+      quantity: String(quantity),
+      id_reservations_rooms: String(idReservationsRooms)
+    }
+  }, { label: 'reservation/add_extra' });
+}
+
+/* Records a payment on a reservation (used when a guest-app order is paid online
+   — the charge goes on the folio via add_extra, the payment via add_payment, so
+   the folio nets out). */
+async function addReservationPayment({ idReservations, idReservationsRooms, amount, method = 'card', paymentDate, note }) {
+  const { token, propertyId } = otasyncCreds();
+  return otasyncPostJson('/api/reservation/edit/add_payment', {
+    token, id_properties: propertyId, id_reservations: String(idReservations),
+    payment: {
+      payment_date: paymentDate || new Date().toISOString().split('T')[0],
+      amount: String(amount),
+      method: String(method),
+      created_advance: 0,
+      id_reservations_rooms: String(idReservationsRooms),
+      ...(note ? { note: String(note) } : {})
+    }
+  }, { label: 'reservation/add_payment' });
+}
+
+/* Posts a guest-app order onto the reservation folio. Each item becomes an
+   add_extra charge; when `payment` is supplied (order paid online) a matching
+   add_payment is posted too, so the folio balance nets to zero. Returns a status
+   object; throws only on a hard OTASync failure (callers catch so the order —
+   already stored — is never lost over a folio hiccup). */
+async function postOrderExtrasToFolio({ idReservations, items, payment }) {
+  if (!hasOtasyncCreds()) return { posted: false, reason: 'no-creds' };
+  if (!idReservations || !Array.isArray(items) || !items.length) {
+    return { posted: false, reason: 'no-items' };
+  }
+  const idReservationsRooms = await getReservationFirstRoom(idReservations);
+  if (!idReservationsRooms) return { posted: false, reason: 'no-room' };
+  const idExtras = await ensureGuestServiceExtra();
+  for (const item of items) {
+    await addReservationExtra({
+      idReservations, idReservationsRooms, idExtras,
+      name: `${item.name} (app)`,
+      pricePerUnit: item.unitPrice,
+      quantity: item.quantity
+    });
+  }
+  let paymentPosted = false;
+  if (payment && Number(payment.amount) > 0) {
+    await addReservationPayment({
+      idReservations, idReservationsRooms,
+      amount: payment.amount, method: payment.method || 'card', note: payment.note
+    });
+    paymentPosted = true;
+  }
+  return { posted: true, count: items.length, idExtras, idReservationsRooms, paymentPosted };
+}
+
 module.exports = {
   otasyncCreds, hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
   buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, createConfirmedReservation,
-  getDynamicPricing, EXTRA_GUEST_SURCHARGE
+  getDynamicPricing, EXTRA_GUEST_SURCHARGE,
+  getExtras, insertExtra, ensureGuestServiceExtra, getReservationFirstRoom,
+  addReservationExtra, addReservationPayment, postOrderExtrasToFolio
 };

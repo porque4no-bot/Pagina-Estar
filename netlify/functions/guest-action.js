@@ -1,6 +1,10 @@
 const crypto = require('crypto');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const { renderContractHTML } = require('./_contract-template');
+const { SERVICES } = require('./_services-catalog');
+const { postOrderExtrasToFolio: _postOrderExtrasToFolio } = require('./_otasync');
+const { createGuestWompiCheckout: _createGuestWompiCheckout } = require('./_guest-payments');
+const { sendEmail, adminEmail, esc, formatCOP } = require('./_email');
 const {
   archiveGuestPayload: _archiveGuestPayload,
   cleanText,
@@ -43,13 +47,58 @@ function sha256Hex(value) {
   return crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');
 }
 
+/* Phase C — team notification. Emails the team a summary of every service order
+   so they can prepare/deliver it and settle it in Kunas (the paymentPreference
+   tells them whether it's charged to the folio or paid online). Best-effort:
+   sendEmail no-ops without RESEND_API_KEY, and the caller never fails the order
+   on a mail error. Internal ops mail → Spanish only, like the other admin alerts. */
+async function notifyOrderTeam(record) {
+  const cell = 'padding:6px 0;font-family:Arial,sans-serif;font-size:13px;color:#444;border-bottom:1px solid #eee;';
+  const rows = (record.items || []).map(it =>
+    `<tr><td style="${cell}">${esc(it.name)} × ${it.quantity}</td>` +
+    `<td style="${cell}text-align:right;">${formatCOP(it.subtotal)}</td></tr>`
+  ).join('');
+  const payLabel = record.paymentPreference === 'online' ? 'Pagar en línea' : 'Cargar a la cuenta';
+  const extras = [];
+  if (record.deliveryTime) extras.push(`<p style="margin:4px 0;font-size:13px;">Cuándo: <strong>${esc(record.deliveryTime)}</strong></p>`);
+  if (record.notes) extras.push(`<p style="margin:4px 0;font-size:13px;">Notas: ${esc(record.notes)}</p>`);
+  const html = `<!DOCTYPE html><html lang="es"><body style="font-family:Arial,sans-serif;color:#2C2C2C;">
+    <h2 style="color:#9A6A2E;">Nuevo pedido de servicios</h2>
+    <p>Reserva <strong>${esc(record.bookingCode)}</strong> · ${esc(record.guestName || '')}</p>
+    <table style="width:100%;max-width:480px;border-collapse:collapse;">${rows}
+      <tr><td style="padding-top:8px;font-weight:bold;">Total</td>
+      <td style="padding-top:8px;font-weight:bold;text-align:right;">${formatCOP(record.total)}</td></tr>
+    </table>
+    <p style="margin-top:12px;font-size:13px;">Forma de pago: <strong>${payLabel}</strong></p>
+    ${extras.join('')}
+    <p style="color:#888;font-size:12px;margin-top:14px;">Pedido ${esc(record.eventId)}</p>
+  </body></html>`;
+  return sendEmail({
+    to: adminEmail(),
+    subject: `Nuevo pedido de servicios — ${record.bookingCode}`,
+    html
+  });
+}
+
 const defaultDeps = {
   archiveGuestPayload: _archiveGuestPayload,
   guestStore: _guestStore,
   protectRecord: _protectRecord,
   requireGuest: _requireGuest,
-  syncGuestEvent: _syncGuestEvent
+  syncGuestEvent: _syncGuestEvent,
+  postOrderToFolio: _postOrderExtrasToFolio,
+  createGuestWompiCheckout: _createGuestWompiCheckout,
+  notifyOrderTeam
 };
+
+/* Site origin for the Wompi redirect-url, from the request (falls back to env
+   inside _guest-payments). */
+function originFromEvent(event) {
+  const h = (event && event.headers) || {};
+  const proto = h['x-forwarded-proto'] || h['X-Forwarded-Proto'] || 'https';
+  const host = h.host || h.Host || '';
+  return host ? `${proto}://${host}` : '';
+}
 const deps = { ...defaultDeps };
 
 exports._test = {
@@ -61,26 +110,83 @@ exports._test = {
   CURRENT_CONTRACT_VERSION
 };
 
-const SERVICE_CATALOG = {
-  breakfast: { name: 'Desayuno local', price: 20000 },
-  parking: { name: 'Parqueadero por noche', price: 25000 },
-  laundry: { name: 'Lavandería express', price: 35000 },
-  late_checkout: { name: 'Late check-out', price: 80000 },
-  airport_transfer: { name: 'Traslado aeropuerto', price: 120000 },
-  city_experience: { name: 'Experiencia cafetera', price: 95000 }
+/* Guest-app service ids → canonical catalog keys (_services-catalog.js). The
+   guest app (and the order records / contracts it has always stored) use these
+   ids; the single catalog is keyed by the booking-engine names. We keep the ids
+   the front-end already sends and pull every price from the catalog so the three
+   surfaces (reservas / cotización / guest app) can't silently drift again.
+   Parqueadero is intentionally absent — it was retired from every surface. */
+const GUEST_SERVICE_KEYS = {
+  breakfast: 'desayuno',
+  laundry: 'laundry',
+  late_checkout: 'late',
+  early_checkin: 'early',
+  airport_transfer: 'airport_transfer',
+  city_experience: 'city_experience',
+  mascota: 'mascota'
 };
 
-function sanitizeItems(items) {
+/* Derived from the catalog, keeping only services offered on the 'guest'
+   surface. Flat services carry a fixed `price`; %-of-night services (late/early
+   check-out) carry `pct` and are priced per booking in sanitizeItems(). */
+const SERVICE_CATALOG = Object.fromEntries(
+  Object.entries(GUEST_SERVICE_KEYS)
+    .map(([guestId, catalogKey]) => {
+      const svc = SERVICES[catalogKey];
+      if (!svc || !Array.isArray(svc.surfaces) || !svc.surfaces.includes('guest')) return null;
+      const entry = { name: svc.es };
+      if (svc.multiplier === 'pctOfNight') entry.pct = svc.pct;
+      else entry.price = svc.price;
+      return [guestId, entry];
+    })
+    .filter(Boolean)
+);
+
+/* Exposed for the anti-drift guard test (services-catalog.test.js). */
+exports._test.SERVICE_CATALOG = SERVICE_CATALOG;
+exports._test.GUEST_SERVICE_KEYS = GUEST_SERVICE_KEYS;
+
+/* Average paid night for the booking (totalAmount / nights), used as the base
+   for %-of-night services. totalAmount already includes IVA, so the resulting
+   late/early fee is IVA-inclusive — internally consistent with what the guest
+   sees, even if it's an approximation of the booking engine's net-rate math
+   (the owner accepted this on 2026-06-18). Returns 0 when not computable. */
+function nightBaseFromSession(session) {
+  const nights = Number(session && session.nights) || 0;
+  const totalAmount = Number(session && session.totalAmount) || 0;
+  return nights > 0 && totalAmount > 0 ? totalAmount / nights : 0;
+}
+
+/* Authoritative unit price. Flat → catalog price. %-of-night → pct × nightBase,
+   rounded to the peso (the guest app mirrors this exact formula client-side).
+   Returns null when a %-of-night service can't be priced (token missing the
+   night base, e.g. an order placed on a pre-deploy session). */
+function priceForService(service, nightBase) {
+  if (typeof service.pct === 'number') {
+    return nightBase > 0 ? Math.round(service.pct * nightBase) : null;
+  }
+  return service.price;
+}
+
+function sanitizeItems(items, session) {
+  const nightBase = nightBaseFromSession(session);
   return (Array.isArray(items) ? items : []).slice(0, 20).map(item => {
     const service = SERVICE_CATALOG[item.id];
     if (!service) return null;
+    const unitPrice = priceForService(service, nightBase);
+    if (unitPrice == null) {
+      throw Object.assign(
+        new Error('No pudimos calcular el precio de ese servicio. Vuelve a iniciar sesión e inténtalo de nuevo.'),
+        { statusCode: 400 }
+      );
+    }
     const quantity = Math.max(1, Math.min(10, parseInt(item.quantity, 10) || 1));
     return {
       id: item.id,
       name: service.name,
       quantity,
-      unitPrice: service.price,
-      subtotal: service.price * quantity
+      unitPrice,
+      subtotal: unitPrice * quantity
     };
   }).filter(Boolean);
 }
@@ -119,17 +225,21 @@ function buildEvent(type, body, session, event) {
   };
 
   if (type === 'order') {
-    const items = sanitizeItems(body.items);
+    const items = sanitizeItems(body.items, session);
     if (!items.length) throw Object.assign(new Error('Selecciona al menos un servicio.'), { statusCode: 400 });
+    /* paymentPreference is recorded so the team knows how to settle each order
+       in Kunas: 'account' = charge to the guest folio at check-out, 'online' =
+       paid (or to be paid) online. The full amount breakdown above travels with
+       the event so the Kunas posting is unambiguous. */
     return {
       ...base,
       items,
       total: items.reduce((sum, item) => sum + item.subtotal, 0),
       deliveryTime: cleanText(body.deliveryTime, 60),
       notes: cleanText(body.notes, 500),
-      paymentPreference: ['room', 'hotel', 'online'].includes(body.paymentPreference)
+      paymentPreference: ['account', 'online'].includes(body.paymentPreference)
         ? body.paymentPreference
-        : 'room'
+        : 'account'
     };
   }
 
@@ -281,14 +391,48 @@ exports.handler = async event => {
 
     if (type === 'order') {
       response.total = record.total;
-      response.paymentRequired =
-        record.paymentPreference === 'online' &&
-        process.env.GUEST_SERVICE_PAYMENT_MODE === 'payment_link';
-      if (response.paymentRequired && process.env.GUEST_SERVICE_PAYMENT_URL) {
+      response.paymentRequired = false;
+      const paymentMode = process.env.GUEST_SERVICE_PAYMENT_MODE;
+      if (record.paymentPreference === 'online' && paymentMode === 'wompi') {
+        /* Signed Wompi checkout with a server-authoritative amount (Phase B).
+           The charge + payment land on the reservation folio after Wompi
+           approves, via wompi-webhook → handleGuestServicePayment. */
+        try {
+          response.paymentUrl = await deps.createGuestWompiCheckout({
+            record, bookingCode: session.sub, redirectBase: originFromEvent(event)
+          });
+          response.paymentRequired = true;
+        } catch (payErr) {
+          console.error('[guest-action] wompi checkout build failed:', payErr.message);
+        }
+      } else if (record.paymentPreference === 'online' &&
+                 paymentMode === 'payment_link' && process.env.GUEST_SERVICE_PAYMENT_URL) {
         const url = new URL(process.env.GUEST_SERVICE_PAYMENT_URL);
         url.searchParams.set('reference', record.eventId);
         url.searchParams.set('amount', String(record.total));
         response.paymentUrl = url.toString();
+        response.paymentRequired = true;
+      }
+      /* Charge-to-account orders: post the charge onto the reservation folio in
+         OTASync/Kunas so reception sees it at check-out. Flagged + best-effort —
+         a folio hiccup never fails the order, which is already stored above.
+         ('online' orders post to the folio after payment, in the webhook — see
+         Phase B in docs/pendientes.md §5.) */
+      if (record.paymentPreference === 'account' &&
+          process.env.GUEST_SERVICE_FOLIO_ENABLED === 'true') {
+        try {
+          response.folio = await deps.postOrderToFolio({ idReservations: session.sub, items: record.items });
+        } catch (folioErr) {
+          console.error('[guest-action] folio posting failed:', folioErr.message);
+          response.folio = { posted: false, error: folioErr.message };
+        }
+      }
+
+      /* Phase C — notify the team (best-effort; never fails the order). */
+      try {
+        await deps.notifyOrderTeam(record);
+      } catch (mailErr) {
+        console.error('[guest-action] order team notification failed:', mailErr.message);
       }
     }
 

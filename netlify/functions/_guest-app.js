@@ -233,10 +233,17 @@ function base64url(value) {
 }
 
 function signGuestToken(booking, ttlSeconds = 24 * 60 * 60) {
+  /* nights + totalAmount are signed in so guest-action can price the
+     %-of-night services (late/early check-out) server-side WITHOUT trusting a
+     client-supplied amount. They are the booking's average paid night base
+     (totalAmount / nights). Absent on pre-existing tokens; guest-action rejects
+     %-of-night orders when they are missing (tokens roll over within 24h). */
   const payload = {
     sub: booking.bookingCode,
     guest: booking.guestName,
     capacity: booking.capacity,
+    nights: Number(booking.nights) || 0,
+    totalAmount: Number(booking.totalAmount) || 0,
     exp: Math.floor(Date.now() / 1000) + ttlSeconds
   };
   const encoded = base64url(JSON.stringify(payload));

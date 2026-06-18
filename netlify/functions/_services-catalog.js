@@ -8,8 +8,10 @@
  * (desayuno was $20k / $25k / $28k at the same time). This table is the
  * canonical value; `tests/unit/services-catalog.test.js` parses each surface
  * and fails the build if any diverges from here, so they can't silently split
- * again. The surfaces still declare their own copies for now — the next step
- * is to have them READ from this module (build.js can inject it like i18n).
+ * again. The guest app now READS from this module (guest-action.js builds its
+ * SERVICE_CATALOG from here, filtering surfaces.includes('guest')); the booking
+ * engine (_pricing.js) and quote admin (cotizar-admin.html) still keep their own
+ * copies, kept in lockstep by the guard test until they read from here too.
  *
  * Pricing model per service:
  *   multiplier: 'perGuestPerNight' | 'perNight' | 'pctOfNight' | 'flat' | 'perUnit'
@@ -19,16 +21,23 @@
  * Owner decisions baked in (2026-06-18): desayuno = $20.000 (era 20/25/28k);
  * late check-out = 15% de la noche; early check-in = 25% de la noche; the
  * booking engine was already canonical, quotes + guest app were aligned to it.
+ * Guest-app surface (owner decision 2026-06-18): offers desayuno, lavandería,
+ * late check-out (15%), early check-in (25%), traslado, experiencia y mascota;
+ * el parqueadero quedó retirado (no figura en este catálogo).
  */
 
 const SERVICES = {
   /* Sold across all surfaces */
   desayuno: { es: 'Desayuno', en: 'Breakfast', price: 20000, tax: 'inc', multiplier: 'perGuestPerNight', surfaces: ['booking', 'quote', 'guest'] },
 
-  /* Booking-engine extras (mask-encoded; see _pricing.js EXTRAS_KEYS) */
+  /* Booking-engine extras (mask-encoded; see _pricing.js EXTRAS_KEYS).
+     late + early are also offered in the guest app (owner decision 2026-06-18):
+     priced there as the same %-of-night, computed from the booking's average
+     paid night (totalAmount / nights, IVA included). mascota is a flat surcharge
+     offered in both the booking engine and the guest app. */
   late:    { es: 'Late check-out', en: 'Late check-out', pct: 0.15, tax: 'iva', multiplier: 'pctOfNight', surfaces: ['booking', 'guest'] },
-  early:   { es: 'Early check-in',  en: 'Early check-in',  pct: 0.25, tax: 'iva', multiplier: 'pctOfNight', surfaces: ['booking'] },
-  mascota: { es: 'Mascota', en: 'Pet', price: 200000, tax: 'included', multiplier: 'flat', surfaces: ['booking'] },
+  early:   { es: 'Early check-in',  en: 'Early check-in',  pct: 0.25, tax: 'iva', multiplier: 'pctOfNight', surfaces: ['booking', 'guest'] },
+  mascota: { es: 'Mascota', en: 'Pet', price: 200000, tax: 'included', multiplier: 'flat', surfaces: ['booking', 'guest'] },
 
   /* Corporate-quote services */
   almuerzo:         { es: 'Almuerzo', en: 'Lunch', price: 35000, tax: 'inc', multiplier: 'perUnit', surfaces: ['quote'] },

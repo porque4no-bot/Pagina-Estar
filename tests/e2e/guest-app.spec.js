@@ -104,7 +104,7 @@ async function mockGuestApis(page, captured = []) {
       body: JSON.stringify({
         ok: true,
         eventId: `GST-${payload.type.toUpperCase()}-100`,
-        total: payload.type === 'order' ? 28000 : undefined
+        total: payload.type === 'order' ? 20000 : undefined
       })
     });
   });
@@ -287,7 +287,7 @@ test('guest orders an additional service and contacts concierge', async ({ page 
   await page.locator('[data-guest-tab="services"]:visible').first().click();
   await page.locator('[data-service-id="breakfast"] .guest-add-service').click();
   await expect(page.locator('#cartCount')).toHaveText('1');
-  await expect(page.locator('#cartTotal')).toContainText('28');
+  await expect(page.locator('#cartTotal')).toContainText('20');
   await page.locator('#deliveryTime').fill('Al llegar');
   await page.locator('#submitOrder').click();
   await expect(page.locator('#orderStatus')).toContainText('Pedido recibido');
