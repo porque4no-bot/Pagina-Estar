@@ -199,7 +199,7 @@ function buildEmailHtml({
                                 <span style="display:inline-block;width:20px;height:20px;background-color:#C4956A;border-radius:50%;text-align:center;line-height:20px;font-family:Arial,sans-serif;font-size:10px;font-weight:700;color:#FFFFFF;">2</span>
                               </td>
                               <td>
-                                <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#2C2C2C;line-height:1.5;"><strong>Cómo llegar</strong><br/><span style="color:#555550;">Carrera 23 #62-70, Manizales.</span></p>
+                                <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#2C2C2C;line-height:1.5;"><strong>Cómo llegar</strong><br/><span style="color:#555550;">Cl. 61 #23-36, La Estrella, Manizales.</span></p>
                               </td>
                             </tr>
                           </table>
@@ -251,7 +251,7 @@ function buildEmailHtml({
           <tr>
             <td style="padding:24px 40px;text-align:center;">
               <p style="margin:0 0 6px 0;font-family:Arial,sans-serif;font-size:11px;color:#9A9A8A;">
-                <strong style="color:#555550;">Hotel Estar</strong> · Carrera 23 #62-70, Manizales, Caldas, Colombia
+                <strong style="color:#555550;">Hotel Estar</strong> · Cl. 61 #23-36, La Estrella, Manizales, Caldas, Colombia
               </p>
               <p style="margin:0;font-family:Arial,sans-serif;font-size:10px;color:#BCBCB0;line-height:1.5;">
                 Este correo es una confirmación automática de tu reserva. Guárdalo como comprobante.<br/>
