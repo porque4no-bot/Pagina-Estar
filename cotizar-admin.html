@@ -1306,7 +1306,22 @@ document.getElementById('createQuoteBtn').addEventListener('click', async functi
     const json = await res.json();
     if (res.status === 409 && Array.isArray(json.unavailable)) {
       const lines = json.unavailable.map(u => `• ${u.habitacion}: pediste ${u.requested}, disponibles ${u.available}`).join('\n');
-      throw new Error('Sin disponibilidad para las fechas seleccionadas:\n' + lines);
+      const proceed = window.confirm(
+        'No hay disponibilidad para las fechas seleccionadas:\n' + lines +
+        '\n\n¿Generar la cotización DE TODAS FORMAS (overbooking)?\n' +
+        'Se podrá enviar y el cliente podrá pagar, pero la reserva quedará PENDIENTE de gestión manual con el equipo.'
+      );
+      if (!proceed) throw new Error('Sin disponibilidad para las fechas seleccionadas:\n' + lines);
+      const resOver = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(Object.assign({}, payload, { allowOverbooking: true }))
+      });
+      const jsonOver = await resOver.json();
+      if (!resOver.ok) throw new Error(jsonOver.error || 'Error al guardar la cotización');
+      showSuccessPanel(jsonOver.quoteId, jsonOver.shareUrl, data.email, isEdit);
+      showToast('Cotización creada en overbooking — reserva quedará pendiente de gestión ⚠', 4000);
+      return;
     }
     if (!res.ok) throw new Error(json.error || 'Error al guardar la cotización');
 

@@ -49,6 +49,13 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ available: false, reason: status }) };
   }
 
+  /* Overbooking quote: the admin deliberately created it without availability.
+     Let payment proceed — the webhook books it as reservationPending and alerts
+     the team, instead of blocking the guest at the pay step. */
+  if (quote.overbooking === true) {
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ available: true, overbooking: true }) };
+  }
+
   if (!quote.checkin || !quote.checkout) {
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ available: true }) };
   }

@@ -47,20 +47,31 @@ exports.handler = async (event, context) => {
     const now = new Date();
     const sanitized = sanitizeQuoteInput(body);
 
-    /* Availability gate: block creation when the PMS lacks free units.
+    /* Availability gate: block creation when the PMS lacks free units, UNLESS
+       the admin explicitly forces it (allowOverbooking) — e.g. overbooking on
+       purpose. A forced quote is stored with availabilityOk:false + overbooking,
+       can still be paid, and lands as reservationPending for manual handling.
        Skipped when OTASync credentials are missing (local/mock). */
     let availabilityOk = true;
+    let overbooking = false;
+    let unavailableRooms = [];
     if (sanitized.checkin && sanitized.checkout) {
       try {
         const { availByType, isMock } = await getAvailabilityByType(sanitized.checkin, sanitized.checkout);
         if (!isMock) {
           const shortfalls = findUnavailable(sanitized.items, availByType);
           if (shortfalls.length > 0) {
-            return {
-              statusCode: 409,
-              headers: corsHeaders,
-              body: JSON.stringify({ error: 'Sin disponibilidad para las fechas seleccionadas', unavailable: shortfalls })
-            };
+            if (body.allowOverbooking === true) {
+              availabilityOk = false;
+              overbooking = true;
+              unavailableRooms = shortfalls;
+            } else {
+              return {
+                statusCode: 409,
+                headers: corsHeaders,
+                body: JSON.stringify({ error: 'Sin disponibilidad para las fechas seleccionadas', unavailable: shortfalls })
+              };
+            }
           }
         }
       } catch (e) {
@@ -80,6 +91,8 @@ exports.handler = async (event, context) => {
       createdBy: auth.email || 'admin',
       availabilityOk,
       availabilityCheckedAt: now.toISOString(),
+      overbooking,
+      unavailable: unavailableRooms,
       publicToken: generatePublicToken(),
       bloquearHabitaciones: body.bloquearHabitaciones === true,
       holdReservationIds: [],
@@ -96,8 +109,9 @@ exports.handler = async (event, context) => {
       return { statusCode: 503, headers: corsHeaders, body: JSON.stringify({ error: 'Almacenamiento no disponible. Intenta de nuevo.' }) };
     }
 
-    /* Optional: place a tentative hold in Kunas to block the rooms */
-    if (quoteData.bloquearHabitaciones && quoteData.checkin && quoteData.checkout) {
+    /* Optional: place a tentative hold in Kunas to block the rooms. Never for an
+       overbooking quote — the rooms are not free, so there is nothing to hold. */
+    if (quoteData.bloquearHabitaciones && !overbooking && quoteData.checkin && quoteData.checkout) {
       try {
         const holdId = await createHold(quoteData);
         if (holdId) {
