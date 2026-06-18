@@ -337,4 +337,174 @@ function renderContractPDF(record = {}) {
   });
 }
 
-module.exports = { renderContractPDF };
+/* ── quote renderer ──────────────────────────────────────────────────────── */
+
+function collectQuoteServices(q) {
+  const LABELS = { desayuno: 'Desayuno', almuerzo: 'Almuerzo', cena: 'Cena', personaAdicional: 'Persona adicional' };
+  const sv = (q && q.servicios) || {};
+  const rows = [];
+  ['desayuno', 'almuerzo', 'cena', 'personaAdicional'].forEach(k => {
+    const s = sv[k];
+    if (s && s.cantidad && s.precioUnitario) {
+      rows.push({ label: LABELS[k], cantidad: s.cantidad, precio: s.precioUnitario, sub: s.cantidad * s.precioUnitario });
+    }
+  });
+  (Array.isArray(sv.otros) ? sv.otros : []).forEach(o => {
+    if (o && o.cantidad && o.precioUnitario) {
+      rows.push({ label: o.descripcion || 'Servicio', cantidad: o.cantidad, precio: o.precioUnitario, sub: o.cantidad * o.precioUnitario });
+    }
+  });
+  return rows;
+}
+
+function quoteTableHeader(doc, cols, widths, y) {
+  let x = MARGIN;
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(OLIVE);
+  cols.forEach((c, i) => {
+    doc.text(c, x + 3, y, { width: widths[i] - 6, align: i === 0 ? 'left' : 'right' });
+    x += widths[i];
+  });
+  const lineY = y + 13;
+  doc.moveTo(MARGIN, lineY).lineTo(doc.page.width - MARGIN, lineY).strokeColor(BORDER).lineWidth(0.5).stroke();
+  return lineY + 4;
+}
+
+function quoteTableRow(doc, cells, widths, y) {
+  let x = MARGIN, maxY = y;
+  cells.forEach((c, i) => {
+    doc.font('Helvetica').fontSize(9).fillColor(INK)
+      .text(str(c), x + 3, y, { width: widths[i] - 6, align: i === 0 ? 'left' : 'right' });
+    maxY = Math.max(maxY, doc.y);
+    x += widths[i];
+  });
+  return maxY + 4;
+}
+
+/* renderQuotePDF(quote, totals) → Promise<Buffer>. Server-side PDF for the
+   corporate quote viewer (text-only, so no html2canvas/image/CORS fragility).
+   `totals` is the output of _quotes-store.computeQuoteTotal(quote). */
+function renderQuotePDF(quote = {}, totals = {}) {
+  return new Promise((resolve, reject) => {
+    const q = quote || {};
+    const quoteId = q.quoteId || 'COTIZACION';
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
+      info: { Title: `Cotización ${quoteId}`, Author: 'Hotel Estar', Subject: 'Cotización Comercial' }
+    });
+    const chunks = [];
+    doc.on('data', c => chunks.push(c));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    const contentW = doc.page.width - MARGIN * 2;
+
+    /* HEADER */
+    doc.font('Helvetica-Bold').fontSize(20).fillColor(OLIVE).text('Hotel Estar', MARGIN, MARGIN);
+    doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('APARTAESTUDIOS — MANIZALES', MARGIN);
+    const metaX = doc.page.width - MARGIN - 200;
+    doc.font('Helvetica').fontSize(8.5).fillColor(MUTED).text('Cotización N.º', metaX, MARGIN, { width: 200, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(INK).text(quoteId, metaX, doc.y, { width: 200, align: 'right' });
+    doc.font('Helvetica').fontSize(8).fillColor(MUTED)
+      .text('Emitida: ' + formatDateOnly(q.createdAt), metaX, doc.y, { width: 200, align: 'right' })
+      .text('Válida hasta: ' + formatDateOnly(q.expiresAt), metaX, doc.y, { width: 200, align: 'right' });
+    doc.y = Math.max(doc.y, MARGIN + 56) + 6;
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(INK).text('Cotización comercial', MARGIN, doc.y);
+
+    /* CLIENT */
+    sectionHeading(doc, 'Cliente');
+    kvRow(doc, 'Empresa', q.empresa);
+    if (q.contacto) kvRow(doc, 'Contacto', q.contacto);
+    if (q.email) kvRow(doc, 'Email', q.email);
+    if (q.telefono) kvRow(doc, 'Teléfono', q.telefono);
+    if (q.nit) kvRow(doc, 'NIT', q.nit);
+    if (q.referencia) kvRow(doc, 'Referencia', q.referencia);
+
+    /* STAY */
+    if (q.checkin || q.checkout || q.numPersonas) {
+      sectionHeading(doc, 'Estadía');
+      if (q.checkin) kvRow(doc, 'Check-in', formatDateOnly(q.checkin));
+      if (q.checkout) kvRow(doc, 'Check-out', formatDateOnly(q.checkout));
+      if (q.numPersonas) kvRow(doc, 'Personas', q.numPersonas);
+    }
+
+    /* ROOMS */
+    const items = Array.isArray(q.items) ? q.items : [];
+    if (items.length) {
+      sectionHeading(doc, 'Alojamiento');
+      const w = [contentW * 0.40, contentW * 0.12, contentW * 0.12, contentW * 0.18, contentW * 0.18];
+      const hdr = ['Tipología', 'Unid.', 'Noches', 'Tarifa/noche', 'Subtotal'];
+      let y = quoteTableHeader(doc, hdr, w, doc.y);
+      items.forEach(it => {
+        if (y + 22 > doc.page.height - MARGIN - 40) { doc.addPage(); y = quoteTableHeader(doc, hdr, w, MARGIN); }
+        y = quoteTableRow(doc, [it.habitacion, it.unidades, it.noches, formatMoney(it.tarifaPorNoche), formatMoney(it.subtotal)], w, y);
+      });
+      doc.y = y + 2;
+    }
+
+    /* SERVICES */
+    const svc = collectQuoteServices(q);
+    if (svc.length) {
+      sectionHeading(doc, 'Servicios adicionales');
+      const w = [contentW * 0.46, contentW * 0.12, contentW * 0.20, contentW * 0.22];
+      const hdr = ['Concepto', 'Cant.', 'Precio', 'Subtotal'];
+      let y = quoteTableHeader(doc, hdr, w, doc.y);
+      svc.forEach(s => {
+        if (y + 22 > doc.page.height - MARGIN - 40) { doc.addPage(); y = quoteTableHeader(doc, hdr, w, MARGIN); }
+        y = quoteTableRow(doc, [s.label, s.cantidad, formatMoney(s.precio), formatMoney(s.sub)], w, y);
+      });
+      doc.y = y + 2;
+    }
+
+    /* TOTALS (right column) */
+    doc.y += 8;
+    const tW = 240, tX = doc.page.width - MARGIN - tW;
+    const totalRow = (label, value, opts = {}) => {
+      const yy = doc.y;
+      const fs = opts.big ? 11 : 9.5;
+      doc.font(opts.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(fs).fillColor(opts.bold ? INK : MUTED)
+        .text(label, tX, yy, { width: tW * 0.5 });
+      doc.font(opts.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(fs).fillColor(INK)
+        .text(value, tX + tW * 0.5, yy, { width: tW * 0.5, align: 'right' });
+      doc.y = Math.max(doc.y, yy + fs) + 3;
+    };
+    totalRow('Subtotal', formatMoney(totals.subtotal));
+    if (totals.descuentoAmt > 0) totalRow('Descuento', '− ' + formatMoney(totals.descuentoAmt));
+    if (totals.iva > 0) totalRow('IVA (19%)', formatMoney(totals.iva));
+    if (totals.inc > 0) totalRow('INC (8%)', formatMoney(totals.inc));
+    doc.moveTo(tX, doc.y + 1).lineTo(doc.page.width - MARGIN, doc.y + 1).strokeColor(BORDER).lineWidth(0.5).stroke();
+    doc.y += 6;
+    totalRow('Total', formatMoney(totals.total), { bold: true, big: true });
+    if (q.numPersonas > 0 && totals.total > 0) totalRow('Valor por persona', formatMoney(totals.total / q.numPersonas));
+    doc.font('Helvetica-Oblique').fontSize(8).fillColor(MUTED)
+      .text('Impuestos incluidos en el total · Valores en COP', tX, doc.y + 2, { width: tW, align: 'right' });
+
+    /* POLICIES */
+    doc.y += 16;
+    sectionHeading(doc, 'Políticas');
+    doc.font('Helvetica').fontSize(9).fillColor(INK);
+    [
+      'Check-in desde las 3:00 p. m. · Check-out hasta las 11:00 a. m. (sujeto a disponibilidad).',
+      'Cancelación gratuita con al menos 48 horas de anticipación al check-in.',
+      'Pago a crédito sujeto a aprobación previa de la empresa con convenio vigente.',
+      'Impuestos (IVA 19% sobre alojamiento, INC 8% sobre alimentación) detallados en el total.'
+    ].forEach(p => { doc.text('•  ' + p, MARGIN, doc.y, { width: contentW }); doc.y += 2; });
+
+    if (q.condiciones) {
+      doc.y += 6;
+      sectionHeading(doc, 'Condiciones especiales');
+      doc.font('Helvetica').fontSize(9).fillColor(INK).text(String(q.condiciones), MARGIN, doc.y, { width: contentW });
+    }
+
+    /* FOOTER */
+    const footerY = doc.page.height - MARGIN - 24;
+    doc.moveTo(MARGIN, footerY).lineTo(doc.page.width - MARGIN, footerY).strokeColor(BORDER).lineWidth(0.5).stroke();
+    doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
+      .text('Hotel Estar · RNT 276306 · Cl. 61 #23-36, La Estrella · Manizales, Caldas — Colombia\nreservas@estar.com.co · +57 310 249 0414',
+        MARGIN, footerY + 5, { width: contentW, align: 'center' });
+
+    doc.end();
+  });
+}
+
+module.exports = { renderContractPDF, renderQuotePDF };
