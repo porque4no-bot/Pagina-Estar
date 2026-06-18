@@ -101,6 +101,11 @@
   status = 301
 
 [[redirects]]
+  from = "/pase-desayuno"
+  to = "/pase-desayuno.html"
+  status = 301
+
+[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
@@ -127,6 +132,13 @@
   for = "/cotizacion.html"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
+
+# Guest-facing breakfast passes (opened via signed link; no login, no camera).
+[[headers]]
+  for = "/pase-desayuno.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, no-cache, must-revalidate"
 
 [[headers]]
   for = "/guest.html"
