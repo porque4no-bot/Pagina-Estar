@@ -96,6 +96,11 @@
   status = 301
 
 [[redirects]]
+  from = "/desayuno"
+  to = "/desayuno.html"
+  status = 301
+
+[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
@@ -129,6 +134,14 @@
     X-Robots-Tag = "noindex, nofollow, noarchive"
     Cache-Control = "no-store, no-cache, must-revalidate"
     Permissions-Policy = "camera=(self), microphone=(), geolocation=(self)"
+
+# Breakfast staff panel: needs the camera for QR scanning; keep it out of search.
+[[headers]]
+  for = "/desayuno.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, no-cache, must-revalidate"
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=()"
 
 [[headers]]
   for = "/api/*"
