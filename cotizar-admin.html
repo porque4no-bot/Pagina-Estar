@@ -432,6 +432,47 @@
 .badge-cancelada { background: #F0DCDC; color: #8A2E2E; }
 .badge-vencida   { background: #EDE6D6; color: #8A6A2E; }
 .badge-unavailable { background: #F7D9C4; color: #9A3B12; margin-left: 4px; }
+/* Refund status badges */
+.badge-needs_review, .badge-needs_bank_details { background: #EDE6D6; color: #8A6A2E; }
+.badge-approved, .badge-bank_details_ready, .badge-processing, .badge-pending_provider { background: #DCE7F0; color: #2E5A82; }
+.badge-done { background: #D8EBD8; color: #2E6B3A; }
+.badge-denied, .badge-failed { background: #F0DCDC; color: #8A2E2E; }
+.badge-route { background: var(--paper-300); color: var(--ink-700); }
+/* Refund filter chips */
+.rf-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.rf-chip {
+  border: 1px solid var(--paper-400); background: var(--paper); border-radius: 999px;
+  padding: 7px 14px; font-family: var(--font-label); font-size: 11px; letter-spacing: 0.06em;
+  color: var(--ink-700); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+}
+.rf-chip:hover { border-color: var(--ink); }
+.rf-chip.is-active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.rf-chip-count {
+  background: var(--paper-300); color: var(--ink-700); border-radius: 999px;
+  padding: 1px 7px; font-size: 10px; min-width: 18px; text-align: center;
+}
+.rf-chip.is-active .rf-chip-count { background: rgba(255,255,255,0.25); color: var(--paper); }
+/* Refund detail modal body */
+.rf-grid { display: grid; grid-template-columns: max-content 1fr; gap: 7px 18px; align-items: baseline; }
+.rf-grid dt { font-family: var(--font-label); font-size: 11px; letter-spacing: 0.05em; color: var(--ink-500); }
+.rf-grid dd { margin: 0; font-family: var(--font-body); font-size: 13.5px; color: var(--ink); }
+.rf-section { margin-top: 20px; }
+.rf-section h4 {
+  margin: 0 0 10px; font-family: var(--font-label); font-size: 11px; letter-spacing: 0.08em;
+  color: var(--ink-500); text-transform: uppercase;
+}
+.rf-note {
+  background: var(--paper-200); border: 1px solid var(--paper-300); border-radius: 8px;
+  padding: 11px 14px; font-family: var(--font-body); font-size: 12.5px; line-height: 1.5; color: var(--ink-700);
+}
+.rf-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.rf-timeline { list-style: none; margin: 0; padding: 0; }
+.rf-timeline li {
+  padding: 9px 0; border-bottom: 1px solid var(--paper-200);
+  font-family: var(--font-body); font-size: 12.5px; color: var(--ink);
+}
+.rf-timeline li:last-child { border-bottom: none; }
+.rf-timeline .rf-ts { font-family: var(--font-label); font-size: 10.5px; color: var(--ink-500); letter-spacing: 0.05em; margin-bottom: 2px; }
 
 /* ── Audit history modal ── */
 .audit-backdrop {
@@ -566,6 +607,7 @@
       <div class="admin-tabs">
         <button type="button" class="admin-tab is-active" data-view="nueva">Nueva cotización</button>
         <button type="button" class="admin-tab" data-view="lista">Cotizaciones</button>
+        <button type="button" class="admin-tab" data-view="reembolsos">Reembolsos</button>
       </div>
     </div>
 
@@ -849,6 +891,49 @@
       </div>
     </div>
 
+    <!-- ══════════════ VIEW: Reembolsos ══════════════ -->
+    <div id="viewReembolsos" style="display:none">
+      <div class="rf-note" style="margin-bottom:20px">
+        Por ahora <strong>todos los reembolsos se tramitan manualmente</strong> (Wompi y Mercado Pago no permiten reembolso automático en esta cuenta).
+        El monto se define <strong>según la política de cancelación de la tarifa</strong>
+        (Flexible: gratis hasta 48 h antes del check-in · Best Price: no reembolsable)
+        y se procesa por el mismo medio de pago en un <strong>máximo de 15 días hábiles</strong>.
+      </div>
+
+      <div class="lista-toolbar">
+        <div id="rfFilters" class="rf-filters">
+          <button type="button" class="rf-chip is-active" data-filter="all">Todos <span class="rf-chip-count">0</span></button>
+          <button type="button" class="rf-chip" data-filter="review">Por revisar <span class="rf-chip-count">0</span></button>
+          <button type="button" class="rf-chip" data-filter="progress">En curso <span class="rf-chip-count">0</span></button>
+          <button type="button" class="rf-chip" data-filter="done">Reembolsados <span class="rf-chip-count">0</span></button>
+          <button type="button" class="rf-chip" data-filter="denied">Denegados <span class="rf-chip-count">0</span></button>
+        </div>
+        <button type="button" id="refreshRefundsBtn" class="btn btn-ghost-dark" style="padding:10px 16px; font-size:11px; margin-left:auto;">Actualizar</button>
+      </div>
+
+      <div id="rfLoading" style="display:none; padding:48px; text-align:center; font-family:var(--font-label); font-size:12px; color:var(--ink-500); letter-spacing:0.08em;">Cargando reembolsos…</div>
+      <div id="rfEmpty" style="display:none; padding:48px; text-align:center; font-family:var(--font-body); font-size:14px; color:var(--ink-500);">No hay solicitudes de reembolso.</div>
+      <div id="rfError" style="display:none; padding:24px; text-align:center; font-family:var(--font-label); font-size:12px; color:var(--error-700);"></div>
+
+      <div class="items-table-wrap" id="rfTableWrap" style="display:none">
+        <table class="items-table lista-table">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Huésped</th>
+              <th>Estadía</th>
+              <th>Pagado</th>
+              <th>Reembolso</th>
+              <th>Ruta</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rfBody"></tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 </main>
 
@@ -865,6 +950,20 @@
       <button type="button" class="audit-close" id="auditCloseBtn" aria-label="Cerrar">×</button>
     </div>
     <div class="audit-modal-body" id="auditBody"></div>
+  </div>
+</div>
+
+<!-- ── Refund detail / action modal ── -->
+<div id="refundBackdrop" class="audit-backdrop" role="dialog" aria-modal="true" aria-labelledby="rfTitle">
+  <div class="audit-modal">
+    <div class="audit-modal-head">
+      <div>
+        <h3 id="rfTitle">Reembolso</h3>
+        <div class="audit-quote-id" id="rfModalCode"></div>
+      </div>
+      <button type="button" class="audit-close" id="rfCloseBtn" aria-label="Cerrar">×</button>
+    </div>
+    <div class="audit-modal-body" id="rfModalBody"></div>
   </div>
 </div>
 
@@ -1467,7 +1566,13 @@ function switchView(view) {
   document.querySelectorAll('.admin-tab').forEach(t => t.classList.toggle('is-active', t.dataset.view === view));
   document.getElementById('viewNueva').style.display = view === 'nueva' ? 'block' : 'none';
   document.getElementById('viewLista').style.display = view === 'lista' ? 'block' : 'none';
+  document.getElementById('viewReembolsos').style.display = view === 'reembolsos' ? 'block' : 'none';
+  const titleEl = document.getElementById('pageTitle');
+  if (view === 'nueva') titleEl.textContent = editingQuoteId ? 'Editar cotización' : 'Nueva cotización';
+  else if (view === 'lista') titleEl.textContent = 'Cotizaciones';
+  else if (view === 'reembolsos') titleEl.textContent = 'Reembolsos';
   if (view === 'lista') loadQuotesList();
+  if (view === 'reembolsos') loadRefunds();
 }
 document.querySelectorAll('.admin-tab').forEach(t => {
   t.addEventListener('click', () => switchView(t.dataset.view));
@@ -1953,6 +2058,219 @@ function loadQuoteIntoForm(q) {
   updateTotals();
   switchView('nueva');
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ════════════════ Reembolsos ════════════════ */
+const REFUND_STATUS_LABEL = {
+  NEEDS_REVIEW: 'Por revisar',
+  APPROVED: 'Aprobado',
+  NEEDS_BANK_DETAILS: 'Faltan datos bancarios',
+  BANK_DETAILS_READY: 'Datos bancarios listos',
+  PROCESSING: 'En proceso',
+  PENDING_PROVIDER: 'En pasarela',
+  DONE: 'Reembolsado',
+  DENIED: 'Denegado',
+  FAILED: 'Falló'
+};
+const REFUND_ROUTE_LABEL = {
+  GATEWAY_AUTO: 'Mercado Pago',
+  GATEWAY_ASSISTED: 'Wompi · tarjeta',
+  MANUAL_BANK: 'Transferencia'
+};
+const REFUND_ROUTE_HOWTO = {
+  GATEWAY_AUTO: 'Reembolso por Mercado Pago: hazlo desde el panel de MP (Tu negocio → Actividad → reembolsar) y registra aquí el ID del reembolso.',
+  GATEWAY_ASSISTED: 'Wompi no tiene API de reembolso: abre un ticket en soporte Wompi para revertir la tarjeta y registra aquí el número de caso.',
+  MANUAL_BANK: 'Reembolso por transferencia: solicita al huésped los datos bancarios del titular y registra el comprobante al marcarlo como reembolsado.'
+};
+const RF_BUCKETS = {
+  all: () => true,
+  review: r => r.status === 'NEEDS_REVIEW',
+  progress: r => ['APPROVED', 'NEEDS_BANK_DETAILS', 'BANK_DETAILS_READY', 'PROCESSING', 'PENDING_PROVIDER'].includes(r.status),
+  done: r => r.status === 'DONE',
+  denied: r => r.status === 'DENIED' || r.status === 'FAILED'
+};
+let REFUNDS_CACHE = [];
+let RF_FILTER = 'all';
+
+function fmtCents(c) { return c == null ? '—' : formatCOP(c / 100); }
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  return d.toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+async function loadRefunds() {
+  const setBlock = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  setBlock('rfLoading', true); setBlock('rfEmpty', false); setBlock('rfError', false); setBlock('rfTableWrap', false);
+  try {
+    const token = await window.getAuthToken();
+    const res = await fetch('/api/get-pending-refunds', { headers: { 'Authorization': `Bearer ${token}` } });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Error al cargar');
+    REFUNDS_CACHE = json.refunds || [];
+    setBlock('rfLoading', false);
+    renderRefunds();
+  } catch (err) {
+    setBlock('rfLoading', false);
+    const el = document.getElementById('rfError');
+    el.textContent = '✗ ' + err.message;
+    el.style.display = '';
+  }
+}
+
+function renderRefunds() {
+  document.querySelectorAll('#rfFilters .rf-chip').forEach(chip => {
+    chip.classList.toggle('is-active', chip.dataset.filter === RF_FILTER);
+    const f = RF_BUCKETS[chip.dataset.filter];
+    const c = chip.querySelector('.rf-chip-count');
+    if (c) c.textContent = f ? REFUNDS_CACHE.filter(f).length : 0;
+  });
+  const rows = REFUNDS_CACHE.filter(RF_BUCKETS[RF_FILTER] || RF_BUCKETS.all);
+  const wrap = document.getElementById('rfTableWrap');
+  const empty = document.getElementById('rfEmpty');
+  if (!rows.length) { wrap.style.display = 'none'; empty.style.display = ''; return; }
+  empty.style.display = 'none'; wrap.style.display = '';
+  document.getElementById('rfBody').innerHTML = rows.map(r => {
+    const stay = (r.checkIn && r.checkOut) ? `${fmtShortDate(r.checkIn)} → ${fmtShortDate(r.checkOut)}` : '—';
+    const stCls = 'badge-' + String(r.status || '').toLowerCase();
+    return `
+      <tr data-code="${escHtml(r.bookingCode)}">
+        <td class="lista-id" data-label="Código">${escHtml(r.bookingCode)}</td>
+        <td data-label="Huésped">${escHtml(r.guestName || '—')}<br><span style="font-size:11px;color:var(--ink-500)">${escHtml(r.guestEmail || '')}</span></td>
+        <td style="white-space:nowrap" data-label="Estadía">${stay}</td>
+        <td class="lista-total" data-label="Pagado">${fmtCents(r.originalAmountCents)}</td>
+        <td data-label="Reembolso">${fmtCents(r.refundAmountCents)}</td>
+        <td data-label="Ruta"><span class="badge badge-route">${escHtml(REFUND_ROUTE_LABEL[r.route] || r.route || '—')}</span></td>
+        <td data-label="Estado"><span class="badge ${stCls}">${escHtml(REFUND_STATUS_LABEL[r.status] || r.status)}</span></td>
+        <td><div class="lista-actions"><button data-act="manage">Gestionar</button></div></td>
+      </tr>`;
+  }).join('');
+}
+
+document.getElementById('refreshRefundsBtn').addEventListener('click', loadRefunds);
+document.getElementById('rfFilters').addEventListener('click', function(e) {
+  const chip = e.target.closest('.rf-chip');
+  if (!chip) return;
+  RF_FILTER = chip.dataset.filter;
+  renderRefunds();
+});
+document.getElementById('rfBody').addEventListener('click', function(e) {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  openRefund(btn.closest('tr').dataset.code);
+});
+
+/* ── Refund detail / action modal ── */
+function rfClose() { document.getElementById('refundBackdrop').classList.remove('is-open'); }
+function rfOpen() { document.getElementById('refundBackdrop').classList.add('is-open'); }
+document.getElementById('rfCloseBtn').addEventListener('click', rfClose);
+document.getElementById('refundBackdrop').addEventListener('click', function(e) { if (e.target === this) rfClose(); });
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('refundBackdrop').classList.contains('is-open')) rfClose();
+});
+
+function openRefund(code) {
+  const r = REFUNDS_CACHE.find(x => x.bookingCode === code);
+  if (!r) return;
+  document.getElementById('rfModalCode').textContent = r.bookingCode + ' · ' + (REFUND_STATUS_LABEL[r.status] || r.status);
+  const body = document.getElementById('rfModalBody');
+  const isTerminal = r.status === 'DONE' || r.status === 'DENIED';
+  const isReview = r.status === 'NEEDS_REVIEW';
+  const stay = (r.checkIn && r.checkOut) ? `${fmtShortDate(r.checkIn)} → ${fmtShortDate(r.checkOut)}` : '—';
+  const maxCop = r.originalAmountCents ? Math.round(r.originalAmountCents / 100) : '';
+  const presetAmount = r.refundAmountCents != null ? Math.round(r.refundAmountCents / 100)
+    : (r.originalAmountCents ? Math.round(r.originalAmountCents / 100) : '');
+
+  const info = `<dl class="rf-grid">
+    <dt>Huésped</dt><dd>${escHtml(r.guestName || '—')}</dd>
+    <dt>Email</dt><dd>${escHtml(r.guestEmail || '—')}</dd>
+    <dt>Habitación</dt><dd>${escHtml(r.roomName || '—')}</dd>
+    <dt>Estadía</dt><dd>${stay}</dd>
+    <dt>Pagado</dt><dd>${fmtCents(r.originalAmountCents)}</dd>
+    <dt>Medio de pago</dt><dd>${escHtml(r.paymentProvider || '—')}${r.paymentMethod ? ' · ' + escHtml(r.paymentMethod) : ''}</dd>
+    <dt>Ruta</dt><dd>${escHtml(REFUND_ROUTE_LABEL[r.route] || r.route || '—')}</dd>
+    <dt>Motivo</dt><dd>${escHtml(r.refundReason || '—')}</dd>
+    ${r.refundAmountCents != null ? `<dt>Reembolso</dt><dd><strong>${fmtCents(r.refundAmountCents)}</strong></dd>` : ''}
+    ${r.payoutRef ? `<dt>Referencia</dt><dd>${escHtml(r.payoutRef)}</dd>` : ''}
+  </dl>`;
+
+  const howto = isTerminal ? '' : `<div class="rf-section"><div class="rf-note">${escHtml(REFUND_ROUTE_HOWTO[r.route] || '')} Plazo máximo: <strong>15 días hábiles</strong>. El monto se define según la política de la tarifa (Flexible: gratis hasta 48 h antes del check-in · Best Price: no reembolsable).</div></div>`;
+
+  const taField = '<div class="field" style="margin-top:12px"><label for="rfNotes">Nota interna</label><textarea id="rfNotes" class="it-input" rows="2" style="min-width:unset; width:100%; resize:vertical; font-family:var(--font-body)"></textarea></div>';
+  let actions;
+  if (isReview) {
+    actions = `<div class="rf-section">
+      <h4>Definir y aprobar</h4>
+      <div class="field"><label for="rfAmount">Monto a reembolsar (COP)${maxCop !== '' ? ' — máx. ' + formatCOP(maxCop) : ''}</label>
+        <input id="rfAmount" type="number" class="it-input" style="min-width:unset; width:100%" min="0" ${maxCop !== '' ? 'max="' + maxCop + '"' : ''} value="${presetAmount}"></div>
+      ${taField}
+      <div class="rf-actions">
+        <button type="button" class="btn btn-ink" id="rfApproveBtn" style="padding:11px 18px; font-size:11px;">Aprobar reembolso</button>
+        <button type="button" class="btn btn-ghost-dark" id="rfDenyBtn" style="padding:11px 18px; font-size:11px;">Denegar</button>
+      </div></div>`;
+  } else if (!isTerminal) {
+    actions = `<div class="rf-section">
+      <h4>Tramitar</h4>
+      <div class="field"><label for="rfPayoutRef">Referencia del pago / ticket (opcional)</label>
+        <input id="rfPayoutRef" type="text" class="it-input" style="min-width:unset; width:100%" placeholder="Ej. ID reembolso MP, # ticket Wompi, comprobante"></div>
+      ${taField}
+      <div class="rf-actions">
+        ${r.status !== 'PROCESSING' ? '<button type="button" class="btn btn-ghost-dark" id="rfProcessingBtn" style="padding:11px 18px; font-size:11px;">Marcar en proceso</button>' : ''}
+        <button type="button" class="btn btn-ink" id="rfDoneBtn" style="padding:11px 18px; font-size:11px;">Marcar reembolsado</button>
+      </div></div>`;
+  } else {
+    actions = `<div class="rf-section"><div class="rf-note">Solicitud cerrada (${escHtml(REFUND_STATUS_LABEL[r.status])}).${r.completedAt ? ' Reembolsado el ' + fmtDateTime(r.completedAt) + '.' : ''}${r.deniedReason ? ' Motivo: ' + escHtml(r.deniedReason) + '.' : ''}</div></div>`.replace('a. m..', 'a. m.').replace('p. m..', 'p. m.');
+  }
+
+  const log = Array.isArray(r.auditLog) ? r.auditLog.slice().reverse() : [];
+  const timeline = `<div class="rf-section"><h4>Historial</h4><ul class="rf-timeline">${
+    log.map(e => `<li><div class="rf-ts">${fmtDateTime(e.ts)} · ${escHtml(e.actor || 'sistema')}</div>${escHtml(e.notes || '')}${e.oldStatus ? ` <span style="color:var(--ink-500)">(${escHtml(REFUND_STATUS_LABEL[e.oldStatus] || e.oldStatus)} → ${escHtml(REFUND_STATUS_LABEL[e.newStatus] || e.newStatus)})</span>` : ''}</li>`).join('') || '<li>Sin movimientos.</li>'
+  }</ul></div>`;
+
+  body.innerHTML = info + howto + actions + timeline;
+  rfOpen();
+
+  const approve = document.getElementById('rfApproveBtn');
+  if (approve) approve.addEventListener('click', () => {
+    const amt = parseInt(document.getElementById('rfAmount').value, 10);
+    if (!Number.isFinite(amt) || amt <= 0) { alert('Ingresa un monto válido.'); return; }
+    if (maxCop !== '' && amt > maxCop) { alert('El reembolso no puede superar lo pagado (' + formatCOP(maxCop) + ').'); return; }
+    refundAction(code, 'approve', { amountCents: amt * 100, notes: document.getElementById('rfNotes').value });
+  });
+  const deny = document.getElementById('rfDenyBtn');
+  if (deny) deny.addEventListener('click', () => {
+    if (!confirm('¿Denegar el reembolso de ' + code + '? El huésped no recibirá devolución.')) return;
+    refundAction(code, 'deny', { notes: document.getElementById('rfNotes').value });
+  });
+  const proc = document.getElementById('rfProcessingBtn');
+  if (proc) proc.addEventListener('click', () => {
+    refundAction(code, 'mark-processing', { notes: document.getElementById('rfNotes').value });
+  });
+  const done = document.getElementById('rfDoneBtn');
+  if (done) done.addEventListener('click', () => {
+    if (!confirm('¿Confirmas que el reembolso de ' + code + ' ya fue pagado al huésped?')) return;
+    const refEl = document.getElementById('rfPayoutRef');
+    refundAction(code, 'mark-done', { notes: document.getElementById('rfNotes').value, payoutRef: refEl ? refEl.value : '' });
+  });
+}
+
+async function refundAction(code, action, extra) {
+  try {
+    const token = await window.getAuthToken();
+    const res = await fetch('/api/refund-admin-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(Object.assign({ bookingCode: code, action }, extra || {}))
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Error');
+    showToast('Reembolso actualizado ✓');
+    rfClose();
+    loadRefunds();
+  } catch (err) {
+    alert('✗ ' + err.message);
+  }
 }
 
 /* ── Init ── */

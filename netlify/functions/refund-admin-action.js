@@ -2,11 +2,20 @@ require('./_env');
 const { authenticateAdmin } = require('./_firebase-auth');
 const { getRefund, transitionStatus, STATUS, ROUTE } = require('./_refunds-store');
 
-/* Admin-only refund actions (the human GATE). Fase 1 moves NO money: it only
-   advances state. `approve` routes a record to APPROVED (gateway refunds, to be
-   executed later behind a second gate / dry-run) or to NEEDS_BANK_DETAILS
-   (manual transfers, which then collect the guest's bank info via the form).
-   `deny` closes it. `set-amount` records a (possibly partial) refund amount. */
+/* Admin-only refund actions (the human GATE). Moves NO money automatically —
+   today every refund is processed by hand (Wompi y Mercado Pago no permiten
+   reembolso automático en esta cuenta), so this endpoint only advances state and
+   records who did what (append-only audit), within the 15-business-day SLA.
+   Actions:
+     approve         → sets the amount and routes to NEEDS_BANK_DETAILS (manual
+                       transfer; bank form is Fase 2) or APPROVED (gateway refund
+                       done manually in the provider panel / support ticket).
+     deny            → closes the request (DENIED).
+     set-amount      → records a (possibly partial) refund amount per the policy.
+     mark-processing → the team started the manual refund (PROCESSING).
+     mark-done       → the refund was paid; records payoutRef and closes it (DONE).
+   The amount is decided by the admin SEGÚN LA POLÍTICA de la tarifa (Flexible
+   48 h / Best Price no reembolsable) — never auto-computed. */
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -29,14 +38,20 @@ exports.handler = async (event) => {
   const bookingCode = String(body.bookingCode || '').trim();
   const action = String(body.action || '').trim();
   const notes = String(body.notes || '').slice(0, 1000);
-  if (!bookingCode || !['approve', 'deny', 'set-amount'].includes(action)) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Faltan bookingCode o action válido (approve|deny|set-amount)' }) };
+  const payoutRef = String(body.payoutRef || '').slice(0, 200);
+  if (!bookingCode || !['approve', 'deny', 'set-amount', 'mark-processing', 'mark-done'].includes(action)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Faltan bookingCode o action válido (approve|deny|set-amount|mark-processing|mark-done)' }) };
   }
 
   let refund;
   try { refund = await getRefund(bookingCode); }
   catch (e) { return { statusCode: 503, headers, body: JSON.stringify({ error: 'Almacenamiento no disponible' }) }; }
   if (!refund) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Reembolso no encontrado' }) };
+
+  /* Terminal states are closed — no further transitions. */
+  if (refund.status === STATUS.DONE || refund.status === STATUS.DENIED) {
+    return { statusCode: 409, headers, body: JSON.stringify({ error: `El reembolso ya está cerrado (${refund.status}).` }) };
+  }
 
   /* Amount guard: never approve more than what was paid. */
   let amountCents = refund.refundAmountCents;
@@ -60,6 +75,20 @@ exports.handler = async (event) => {
     if (action === 'set-amount') {
       if (amountCents == null) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Falta amountCents' }) };
       const res = await transitionStatus(bookingCode, refund.status, actor, `Monto de reembolso fijado: ${amountCents} centavos`, { refundAmountCents: amountCents });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, refund: res.refund }) };
+    }
+
+    if (action === 'mark-processing') {
+      const res = await transitionStatus(bookingCode, STATUS.PROCESSING, actor,
+        notes || `Reembolso en proceso (${actor})`,
+        { processingAt: new Date().toISOString(), processingBy: actor });
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, refund: res.refund }) };
+    }
+
+    if (action === 'mark-done') {
+      const res = await transitionStatus(bookingCode, STATUS.DONE, actor,
+        notes || `Reembolso completado por ${actor}${payoutRef ? ` · ref ${payoutRef}` : ''}`,
+        { completedAt: new Date().toISOString(), completedBy: actor, payoutRef: payoutRef || null });
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, refund: res.refund }) };
     }
 
