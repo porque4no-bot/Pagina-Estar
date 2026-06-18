@@ -3,6 +3,7 @@ const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const { renderContractHTML } = require('./_contract-template');
 const { SERVICES } = require('./_services-catalog');
 const { postOrderExtrasToFolio: _postOrderExtrasToFolio } = require('./_otasync');
+const { createGuestWompiCheckout: _createGuestWompiCheckout } = require('./_guest-payments');
 const {
   archiveGuestPayload: _archiveGuestPayload,
   cleanText,
@@ -51,8 +52,18 @@ const defaultDeps = {
   protectRecord: _protectRecord,
   requireGuest: _requireGuest,
   syncGuestEvent: _syncGuestEvent,
-  postOrderToFolio: _postOrderExtrasToFolio
+  postOrderToFolio: _postOrderExtrasToFolio,
+  createGuestWompiCheckout: _createGuestWompiCheckout
 };
+
+/* Site origin for the Wompi redirect-url, from the request (falls back to env
+   inside _guest-payments). */
+function originFromEvent(event) {
+  const h = (event && event.headers) || {};
+  const proto = h['x-forwarded-proto'] || h['X-Forwarded-Proto'] || 'https';
+  const host = h.host || h.Host || '';
+  return host ? `${proto}://${host}` : '';
+}
 const deps = { ...defaultDeps };
 
 exports._test = {
@@ -345,14 +356,27 @@ exports.handler = async event => {
 
     if (type === 'order') {
       response.total = record.total;
-      response.paymentRequired =
-        record.paymentPreference === 'online' &&
-        process.env.GUEST_SERVICE_PAYMENT_MODE === 'payment_link';
-      if (response.paymentRequired && process.env.GUEST_SERVICE_PAYMENT_URL) {
+      response.paymentRequired = false;
+      const paymentMode = process.env.GUEST_SERVICE_PAYMENT_MODE;
+      if (record.paymentPreference === 'online' && paymentMode === 'wompi') {
+        /* Signed Wompi checkout with a server-authoritative amount (Phase B).
+           The charge + payment land on the reservation folio after Wompi
+           approves, via wompi-webhook → handleGuestServicePayment. */
+        try {
+          response.paymentUrl = await deps.createGuestWompiCheckout({
+            record, bookingCode: session.sub, redirectBase: originFromEvent(event)
+          });
+          response.paymentRequired = true;
+        } catch (payErr) {
+          console.error('[guest-action] wompi checkout build failed:', payErr.message);
+        }
+      } else if (record.paymentPreference === 'online' &&
+                 paymentMode === 'payment_link' && process.env.GUEST_SERVICE_PAYMENT_URL) {
         const url = new URL(process.env.GUEST_SERVICE_PAYMENT_URL);
         url.searchParams.set('reference', record.eventId);
         url.searchParams.set('amount', String(record.total));
         response.paymentUrl = url.toString();
+        response.paymentRequired = true;
       }
       /* Charge-to-account orders: post the charge onto the reservation folio in
          OTASync/Kunas so reception sees it at check-out. Flagged + best-effort —

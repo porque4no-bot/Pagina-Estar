@@ -356,3 +356,32 @@ test('guest-action order: does NOT post to the folio when off or for online orde
     guestActionModule._test.resetDeps();
   }
 });
+
+test('guest-action order: online + wompi mode returns a signed checkout URL', async () => {
+  const token = validToken();
+  let checkoutArg = null;
+  guestActionModule._test.setDeps({
+    protectRecord: record => record,
+    guestStore: () => ({ setJSON: async () => {} }),
+    archiveGuestPayload: async () => ({ delivered: false, configured: false }),
+    syncGuestEvent: async () => ({ delivered: false }),
+    createGuestWompiCheckout: async (arg) => { checkoutArg = arg; return `https://checkout.wompi.co/p/?reference=${arg.record.eventId}`; }
+  });
+  process.env.GUEST_SERVICE_PAYMENT_MODE = 'wompi';
+  try {
+    const res = await guestAction(makeEvent({
+      type: 'order',
+      items: [{ id: 'breakfast', quantity: 1 }],
+      paymentPreference: 'online'
+    }, token));
+    assert.equal(res.statusCode, 201);
+    const data = body(res);
+    assert.equal(data.paymentRequired, true);
+    assert.match(data.paymentUrl, /checkout\.wompi\.co/);
+    assert.equal(checkoutArg.bookingCode, 'EST-TEST-42');
+    assert.equal(checkoutArg.record.total, 20000);
+  } finally {
+    delete process.env.GUEST_SERVICE_PAYMENT_MODE;
+    guestActionModule._test.resetDeps();
+  }
+});

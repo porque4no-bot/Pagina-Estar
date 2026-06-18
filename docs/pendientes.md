@@ -232,11 +232,17 @@ por Booking.com y definir el modelo de pago oficial del canal.
     para pedidos `account`. **Gated por `GUEST_SERVICE_FOLIO_ENABLED='true'`** (off por
     defecto). Usa un extra genérico "Pedido guest app" (auto-creado una vez, o
     `OTASYNC_GUEST_SERVICE_EXTRA_ID`). **Probar en una reserva real antes de activar.**
-  - **Fase B — cobro online (FALTA).** Cobro `online` de verdad (link/checkout Wompi
-    con monto firmado server-side, mismo principio que reservas) y, al confirmar el
-    pago, postear `add_extra` + `add_payment` en la reserva. Hoy `guest-action` solo
-    arma un link si `GUEST_SERVICE_PAYMENT_MODE`/`GUEST_SERVICE_PAYMENT_URL` están
-    configurados. Idempotencia: no duplicar el cargo si el webhook reintenta.
+  - **Fase B — cobro online (HECHO, apagado).** `GUEST_SERVICE_PAYMENT_MODE=wompi`:
+    `guest-action` arma un Wompi Web Checkout **firmado server-side** (monto = total del
+    pedido; reference = eventId `GST-...`) y guarda un intent en `_guest-payments`
+    (store `guest-service-payments`). Al aprobar, `wompi-webhook.handleGuestServicePayment`
+    verifica el monto, postea `add_extra` + `add_payment` al folio y marca el intent `paid`.
+    Idempotente por `intent.status`; ante falla de folio marca `paid_folio_failed` y **no
+    reintenta** (add_extra no es idempotente) → seguimiento manual. Requiere
+    `WOMPI_PUBLIC_KEY`/`WOMPI_INTEGRITY_SECRET`/`WOMPI_WEBHOOK_SECRET`. **Probar en sandbox
+    Wompi + reserva real antes de activar.** Front: la guest app redirige al checkout y al
+    volver muestra aviso (`?order=`). Falta opcional: extender `reconcile-payments` para
+    detectar intents `pending`/`paid_folio_failed` viejos.
   - **Fase C — correo al equipo (FALTA).** Notificar cada pedido por correo (hoy solo
     viaja por `GUEST_APP_SYNC_WEBHOOK_URL` + Blob cifrado).
   El monto del late/early check-out se calcula como 15%/25% del **promedio de

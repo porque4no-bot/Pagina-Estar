@@ -663,10 +663,30 @@ async function addReservationExtra({ idReservations, idReservationsRooms, idExtr
   }, { label: 'reservation/add_extra' });
 }
 
-/* Posts every item of a guest-app order onto the reservation folio. Returns a
-   status object; throws only on a hard OTASync failure (the caller catches so
-   the guest's order — already stored — is never lost over a folio hiccup). */
-async function postOrderExtrasToFolio({ idReservations, items }) {
+/* Records a payment on a reservation (used when a guest-app order is paid online
+   — the charge goes on the folio via add_extra, the payment via add_payment, so
+   the folio nets out). */
+async function addReservationPayment({ idReservations, idReservationsRooms, amount, method = 'card', paymentDate, note }) {
+  const { token, propertyId } = otasyncCreds();
+  return otasyncPostJson('/api/reservation/edit/add_payment', {
+    token, id_properties: propertyId, id_reservations: String(idReservations),
+    payment: {
+      payment_date: paymentDate || new Date().toISOString().split('T')[0],
+      amount: String(amount),
+      method: String(method),
+      created_advance: 0,
+      id_reservations_rooms: String(idReservationsRooms),
+      ...(note ? { note: String(note) } : {})
+    }
+  }, { label: 'reservation/add_payment' });
+}
+
+/* Posts a guest-app order onto the reservation folio. Each item becomes an
+   add_extra charge; when `payment` is supplied (order paid online) a matching
+   add_payment is posted too, so the folio balance nets to zero. Returns a status
+   object; throws only on a hard OTASync failure (callers catch so the order —
+   already stored — is never lost over a folio hiccup). */
+async function postOrderExtrasToFolio({ idReservations, items, payment }) {
   if (!hasOtasyncCreds()) return { posted: false, reason: 'no-creds' };
   if (!idReservations || !Array.isArray(items) || !items.length) {
     return { posted: false, reason: 'no-items' };
@@ -682,7 +702,15 @@ async function postOrderExtrasToFolio({ idReservations, items }) {
       quantity: item.quantity
     });
   }
-  return { posted: true, count: items.length, idExtras, idReservationsRooms };
+  let paymentPosted = false;
+  if (payment && Number(payment.amount) > 0) {
+    await addReservationPayment({
+      idReservations, idReservationsRooms,
+      amount: payment.amount, method: payment.method || 'card', note: payment.note
+    });
+    paymentPosted = true;
+  }
+  return { posted: true, count: items.length, idExtras, idReservationsRooms, paymentPosted };
 }
 
 module.exports = {
@@ -690,5 +718,5 @@ module.exports = {
   buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, createConfirmedReservation,
   getDynamicPricing, EXTRA_GUEST_SURCHARGE,
   getExtras, insertExtra, ensureGuestServiceExtra, getReservationFirstRoom,
-  addReservationExtra, postOrderExtrasToFolio
+  addReservationExtra, addReservationPayment, postOrderExtrasToFolio
 };

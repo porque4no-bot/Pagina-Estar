@@ -6,7 +6,8 @@ const { getStore } = require('@netlify/blobs');
 const {
   getQuoteStore, loadQuote, saveQuote, effectiveStatus, computeQuoteTotal
 } = require('./_quotes-store');
-const { getAvailabilityByType, findUnavailable, releaseHold, buildExtrasFromQuote } = require('./_otasync');
+const { getAvailabilityByType, findUnavailable, releaseHold, buildExtrasFromQuote, postOrderExtrasToFolio } = require('./_otasync');
+const { loadIntent: loadGuestPaymentIntent, markIntentStatus: markGuestPaymentStatus, GUEST_ORDER_REF_RE } = require('./_guest-payments');
 const { verifyDirectBookingAmount, EXTRAS_KEYS, EXTRAS_PRICES } = require('./_direct-pricing');
 const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
 const { acquireQuoteLock, releaseQuoteLock } = require('./_quote-lock');
@@ -411,6 +412,64 @@ function buildQuoteRooms(quote, roomDetails) {
     }
   });
   return rooms;
+}
+
+/* Handle a Wompi payment whose reference is a guest-app service order (GST-...).
+   Loads the payment intent, verifies the paid amount matches what we signed,
+   posts the charge + payment onto the reservation folio in OTASync/Kunas, and
+   marks the intent paid (idempotent on the intent status). add_extra/add_payment
+   are NOT idempotent in OTASync and the caller pre-marks the transaction as
+   processed, so we never auto-retry: on a folio failure we flag the intent for
+   manual follow-up rather than risk duplicate folio lines. */
+async function handleGuestServicePayment(transaction, corsHeaders, overrides = {}) {
+  const deps = {
+    loadIntent: loadGuestPaymentIntent,
+    markIntentStatus: markGuestPaymentStatus,
+    postOrderToFolio: postOrderExtrasToFolio,
+    ...overrides
+  };
+  const reference = transaction.reference;
+  const reply = (obj) => ({ statusCode: 200, headers: corsHeaders, body: JSON.stringify(obj) });
+
+  let intent;
+  try {
+    intent = await deps.loadIntent(reference);
+  } catch (e) {
+    console.error('[wompi-webhook] guest-payment store unavailable:', e.message);
+    return reply({ message: 'Guest payment store unavailable; logged for manual follow-up' });
+  }
+  if (!intent) {
+    console.error(`[wompi-webhook] guest order ${reference} not found for paid transaction ${transaction.id}`);
+    return reply({ message: 'Guest order intent not found' });
+  }
+  if (intent.status === 'paid') {
+    return reply({ received: true, duplicate: true });
+  }
+
+  // Defense in depth: only post the amount we signed for this order.
+  const paidCents = Number(transaction.amount_in_cents);
+  const expectedCents = Number(intent.amountInCents);
+  if (Number.isFinite(paidCents) && Number.isFinite(expectedCents) && paidCents !== expectedCents) {
+    console.error(`[wompi-webhook] guest order ${reference} amount mismatch: paid=${paidCents}, expected=${expectedCents}, tx=${transaction.id}. Not posting; manual follow-up.`);
+    await deps.markIntentStatus(reference, 'amount_mismatch', { transactionId: transaction.id, paidCents });
+    return reply({ message: 'Amount mismatch; logged for manual follow-up' });
+  }
+
+  try {
+    const result = await deps.postOrderToFolio({
+      idReservations: intent.bookingCode,
+      items: intent.items,
+      payment: { amount: expectedCents / 100, method: 'card', note: `Pago en línea Wompi ${transaction.id}` }
+    });
+    await deps.markIntentStatus(reference, 'paid', {
+      transactionId: transaction.id, paidAt: new Date().toISOString(), folio: result
+    });
+    return reply({ received: true, folio: result });
+  } catch (e) {
+    console.error(`[wompi-webhook] guest order ${reference} folio posting failed for paid transaction ${transaction.id}: ${e.message}. MANUAL follow-up required.`);
+    await deps.markIntentStatus(reference, 'paid_folio_failed', { transactionId: transaction.id, error: e.message });
+    return reply({ message: 'Paid but folio posting failed; logged for manual follow-up' });
+  }
 }
 
 // Handle a Wompi payment whose reference is a stored quote id (COT-...).
@@ -920,6 +979,17 @@ exports.handler = async (event, context) => {
     }
   }
 
+  // Guest-app service order paid online: reference is the order eventId (GST-...).
+  // Gated by GUEST_SERVICE_PAYMENT_MODE=wompi so it's inert until Phase B is enabled.
+  if (GUEST_ORDER_REF_RE.test(transaction.reference || '') &&
+      process.env.GUEST_SERVICE_PAYMENT_MODE === 'wompi') {
+    addProcessedTransaction(transaction.id);
+    if (txStore) {
+      try { await txStore.set(String(transaction.id), '1', { ttl: 86400 }); } catch (e) { /* non-fatal */ }
+    }
+    return await handleGuestServicePayment(transaction, corsHeaders);
+  }
+
   // Corporate quote payment: reference is a stored quote id (COT-...).
   if (QUOTE_ID_RE.test(transaction.reference || '')) {
     // Mark processed before doing work to avoid duplicate reservations on retries
@@ -1403,6 +1473,7 @@ exports._test = {
   mustChargeDirectBookingIva,
   directBookingPricing,
   handleQuotePayment,
+  handleGuestServicePayment,
   acquireQuoteLock,
   notifyGuestPaymentOutcome
 };

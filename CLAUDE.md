@@ -186,7 +186,7 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 |---|---|
 | `guest-session` | Issues signed JWT session token (no OTASync credentials exposed to client) |
 | `guest-checkin` | Document upload handler; optional Azure Document Intelligence OCR; multi-occupant support |
-| `guest-action` | Guest requests: extras, modifications, cancellations |
+| `guest-action` | Guest requests: service orders (priced from `_services-catalog.js`), modifications, cancellations. Service orders can charge the reservation folio in OTASync/Kunas — `add_extra` on **"cargar a la cuenta"** (gated by `GUEST_SERVICE_FOLIO_ENABLED`), or a signed Wompi checkout on **"pagar en línea"** (`GUEST_SERVICE_PAYMENT_MODE=wompi`) settled by `wompi-webhook` (`add_extra`+`add_payment`). Both off by default. |
 | `guest-sync` | Receives guest events, stores AES-256-GCM encrypted in Blobs |
 | `guest-drive` | Forwards documents/data to Google Drive via Apps Script |
 | `upload-drive-credentials` | Service account credential upload (admin) |
@@ -315,8 +315,11 @@ GUEST_APP_SYNC_WEBHOOK_URL=
 GUEST_APP_SYNC_WEBHOOK_SECRET=
 GUEST_APP_DRIVE_WEBHOOK_URL=
 GUEST_APP_DRIVE_WEBHOOK_SECRET=
-GUEST_SERVICE_PAYMENT_MODE=
-GUEST_SERVICE_PAYMENT_URL=
+GUEST_SERVICE_PAYMENT_MODE=        # room_charge | payment_link | wompi (online charge → folio)
+GUEST_SERVICE_PAYMENT_URL=        # used when mode = payment_link
+GUEST_APP_BASE_URL=               # optional: site origin for the Wompi redirect-url
+GUEST_SERVICE_FOLIO_ENABLED=      # 'true' to post "cargar a la cuenta" orders to the Kunas folio
+OTASYNC_GUEST_SERVICE_EXTRA_ID=   # optional: id_extras for folio lines (else a generic one is auto-created)
 ```
 
 **Azure Document Intelligence (OCR):**
