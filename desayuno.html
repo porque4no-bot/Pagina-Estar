@@ -188,8 +188,11 @@
             '<div class="res-row"><span class="k">Huésped</span><span class="v">' + who + '</span></div>' +
             '<div class="res-row"><span class="k">Apartamento</span><span class="v">' + room + '</span></div>' +
             stayWarn +
-            '<p class="hint">El upgrade en el momento (cobro al folio o en línea) llega en la Fase 3.</p>' +
+            '<p class="hint">Esta tarifa no incluye desayuno. Puedes agregarlo y se carga a la cuenta.</p>' +
+            '<div class="actions"><button class="btn" id="upgradeBtn">Agregar desayuno</button></div>' +
           '</div>';
+        var ub = $('upgradeBtn');
+        if (ub) ub.addEventListener('click', function () { upgrade(status.bookingCode); });
         return;
       }
 
@@ -250,6 +253,26 @@
         toast(data.alreadyServed ? 'Ya estaba servido hoy' : 'Desayuno marcado ✓');
       } catch (e) {
         if (e.status) { render(e.status); }
+        toast(e.message);
+      }
+    }
+
+    async function upgrade(code) {
+      var btn = $('upgradeBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Agregando…'; }
+      try {
+        var data = await api('breakfast-upgrade', { code: code });
+        $('result').innerHTML =
+          '<div class="res res--done">' +
+            '<div class="res-banner">' + ICON_OK +
+              '<div><div class="big">Desayuno agregado</div><div class="sub">Reserva ' + escapeHtml(code) + '</div></div>' +
+            '</div>' +
+            '<div class="res-row"><span class="k">Agregados</span><span class="v">' + data.added + (data.added === 1 ? ' desayuno' : ' desayunos') + '</span></div>' +
+            '<div class="res-row"><span class="k">' + (data.chargedToFolio ? 'Cargado a la cuenta' : 'Por cobrar') + '</span><span class="v">$' + Number(data.amount).toLocaleString('es-CO') + '</span></div>' +
+          '</div>';
+        toast('Desayuno agregado ✓');
+      } catch (e) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Agregar desayuno'; }
         toast(e.message);
       }
     }

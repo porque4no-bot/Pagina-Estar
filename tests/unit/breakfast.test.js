@@ -56,9 +56,22 @@ test('extract: sin desayuno => no incluido', () => {
   assert.deepEqual(extractBreakfastEntitlement(raw, 2), { included: false, perDay: 0 });
 });
 
-test('extract: suma los desayunos de menores', () => {
-  const raw = { rooms: [{ first_meal: '', nights: [{ breakfast: 1, breakfast_children_1: 1 }] }] };
+test('extract: lee reservation_rooms (forma real del detalle de OTASync)', () => {
+  // El detalle de reserva entrega `reservation_rooms`, no `rooms`. Con el agregado
+  // `breakfast` por noche => perDay = ese número.
+  const raw = { reservation_rooms: [{ first_meal: 'breakfast', occupancy: 2, nights: [{ breakfast: 2, breakfast_adults: 2 }, { breakfast: 2, breakfast_adults: 2 }] }] };
+  assert.deepEqual(extractBreakfastEntitlement(raw, 2), { included: true, perDay: 2 });
+});
+
+test('extract: suma los desayunos de menores (desglose por tipo, sin agregado)', () => {
+  const raw = { reservation_rooms: [{ first_meal: 'breakfast', nights: [{ breakfast_adults: 1, breakfast_children_1: 1 }] }] };
   assert.deepEqual(extractBreakfastEntitlement(raw, 0), { included: true, perDay: 2 });
+});
+
+test('extract: no doble-cuenta cuando breakfast (agregado) ya incluye a los menores', () => {
+  // Si `breakfast` es el total de la noche y el desglose suma lo mismo, perDay = total.
+  const raw = { reservation_rooms: [{ first_meal: 'breakfast', nights: [{ breakfast: 3, breakfast_adults: 2, breakfast_children_1: 1 }] }] };
+  assert.deepEqual(extractBreakfastEntitlement(raw, 0), { included: true, perDay: 3 });
 });
 
 test('extract: varias habitaciones suman el derecho diario', () => {

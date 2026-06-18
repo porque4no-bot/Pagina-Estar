@@ -1862,7 +1862,10 @@ function BookingEngine() {
           nights,
           totalAmount,
           paidAmount,
-          phone: booking.guest?.tel || ''
+          phone: booking.guest?.tel || '',
+          /* Pase de desayuno (Fase 2): el correo añade el link a los pases QR
+             solo si la reserva trae desayuno. La clave del extra es 'desayuno'. */
+          breakfast: !!(booking.extras && booking.extras.desayuno)
         })
       })
       .then(r => r.json())

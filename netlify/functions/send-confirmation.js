@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 require('./_env');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
+const { signPassToken } = require('./_breakfast-pass');
 
 /**
  * Formats a COP amount as "$ 660.000"
@@ -58,7 +59,8 @@ function buildEmailHtml({
   nights,
   totalAmount,
   paidAmount,
-  phone
+  phone,
+  passUrl
 }) {
   guestName  = esc(guestName);
   bookingCode = esc(bookingCode);
@@ -226,6 +228,19 @@ function buildEmailHtml({
             </td>
           </tr>
 
+          <!-- Breakfast passes (only when the reservation includes breakfast) -->
+          ${passUrl ? `<tr>
+            <td style="padding:0 40px 28px 40px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F0EDE6;border-radius:8px;padding:20px 24px;">
+                <tr><td style="text-align:center;">
+                  <p style="margin:0 0 6px 0;font-family:Arial,sans-serif;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#7A7A6A;">Desayuno incluido</p>
+                  <p style="margin:0 0 16px 0;font-family:Georgia,serif;font-size:14px;color:#555550;line-height:1.6;">Muestra tu pase en el comedor. Ábrelo desde aquí — sin apps ni claves.</p>
+                  <a href="${passUrl}" style="display:inline-block;padding:12px 28px;background-color:#2C2C2C;border-radius:6px;font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#FFFFFF;text-decoration:none;letter-spacing:0.04em;">Ver mis pases de desayuno</a>
+                </td></tr>
+              </table>
+            </td>
+          </tr>` : ''}
+
           <!-- WhatsApp contact -->
           <tr>
             <td style="padding:0 40px 32px 40px;text-align:center;">
@@ -359,6 +374,19 @@ exports.handler = async (event, context) => {
   }
 
   // Build email HTML
+  // Pase de desayuno (Fase 2): si la reserva incluye desayuno, añade un link
+  // firmado a la página de pases (QR por persona). Retrocompatible: sin el flag
+  // `breakfast` en el body, el correo sale igual que antes.
+  let passUrl = '';
+  if (body.breakfast) {
+    try {
+      const base = (process.env.GUEST_APP_BASE_URL || process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
+      passUrl = `${base}/pase-desayuno?t=${signPassToken(bookingCode)}`;
+    } catch (e) {
+      if (process.env.DEBUG) console.warn('[send-confirmation] no se pudo firmar el pase:', e.message);
+    }
+  }
+
   const emailHtml = buildEmailHtml({
     guestName: guestName || 'Huésped',
     bookingCode: bookingCode || 'N/A',
@@ -368,7 +396,8 @@ exports.handler = async (event, context) => {
     nights: parseInt(nights) || 1,
     totalAmount: parseFloat(totalAmount) || 0,
     paidAmount: parseFloat(paidAmount) || parseFloat(totalAmount) || 0,
-    phone: phone || ''
+    phone: phone || '',
+    passUrl
   });
 
   // Send via Resend API

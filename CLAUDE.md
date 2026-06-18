@@ -55,6 +55,7 @@ Root HTML pages (Spanish, canonical):
 | `cotizacion.html` | Corporate quote viewer |
 | `cotizar-admin.html` | Admin: quote management (noindex) |
 | `desayuno.html` | Staff: breakfast-pass verifier — scan/lookup a reservation, mark breakfast served (noindex) |
+| `desayuno-admin.html` | Admin: breakfast analytics dashboard — served, peak hours, upgrades, total to settle (noindex) |
 | `privacidad.html` / `aviso-legal.html` / `cancelacion.html` / `cookies.html` / `escnna.html` | Legal |
 | `404.html` | Error page |
 
@@ -188,7 +189,8 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | `guest-session` | Issues signed JWT session token (no OTASync credentials exposed to client) |
 | `guest-checkin` | Document upload handler; optional Azure Document Intelligence OCR; multi-occupant support |
 | `guest-action` | Guest requests: service orders (priced from `_services-catalog.js`), modifications, cancellations. Service orders can charge the reservation folio in OTASync/Kunas — `add_extra` on **"cargar a la cuenta"** (gated by `GUEST_SERVICE_FOLIO_ENABLED`), or a signed Wompi checkout on **"pagar en línea"** (`GUEST_SERVICE_PAYMENT_MODE=wompi`) settled by `wompi-webhook` (`add_extra`+`add_payment`). Both off by default. Emails the team a summary of every order via Resend (`notifyOrderTeam`). |
-| `breakfast-status` / `breakfast-redeem` | Breakfast pass (Fase 1): staff scans a guest QR (`bookingCode:guestIndex`) to check entitlement and mark a breakfast served. Auth via `_staff-auth` (Firebase + `STAFF_EMAILS`). Redemptions stored in Blobs (`breakfast-redemptions`), idempotent 1/person/day. Staff panel: `desayuno.html` |
+| `breakfast-status` / `breakfast-redeem` / `breakfast-upgrade` | Breakfast pass: staff scans a guest QR (`bookingCode:guestIndex`) to check entitlement, mark a breakfast served, or (Fase 3) **add** breakfast to a no-breakfast reservation — charges the Kunas folio (reuses `_otasync.postOrderExtrasToFolio`, gated by `BREAKFAST_UPGRADE_ENABLED`) and records it as an `upgrade`. Auth via `_staff-auth` (Firebase + `STAFF_EMAILS`). Redemptions in Blobs (`breakfast-redemptions`), idempotent 1/person/day. Staff panel: `desayuno.html`; guest passes: `pase-desayuno.html` (Fase 2) |
+| `breakfast-analytics` | Breakfast pass (Fase 4): aggregates redemptions for the admin dashboard (`desayuno-admin.html`) — served (= base to settle the provider), included vs upgrades, amount, by-day and by-hour. Team auth. |
 | `guest-sync` | Receives guest events, stores AES-256-GCM encrypted in Blobs |
 | `guest-drive` | Forwards documents/data to Google Drive via Apps Script |
 | `upload-drive-credentials` | Service account credential upload (admin) |
