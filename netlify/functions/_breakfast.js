@@ -15,25 +15,34 @@ const { getReservationDetail } = require('./_guest-app');
 const { getBookingRedemptions, todayBogota } = require('./_breakfast-store');
 
 /* Extrae el derecho de desayuno del payload crudo de OTASync.
- * Estructura (docs/OTASync-Public-API.md): rooms[].first_meal === 'breakfast' y
- * rooms[].nights[].breakfast = nº de desayunos (adultos) esa noche, más
- * breakfast_children_N para menores. Tomamos el máximo por habitación como el
- * derecho diario (personas con desayuno) y sumamos las habitaciones. Defensivo
- * ante variaciones del payload; la forma exacta se valida con datos reales. */
+ * Estructura real (docs/OTASync-Public-API.md, detalle de reserva): el array de
+ * habitaciones es `reservation_rooms` (NO `rooms` — eso es disponibilidad), con
+ * reservation_rooms[].first_meal === 'breakfast' y reservation_rooms[].nights[]
+ * con `breakfast` (agregado de desayunos de la noche) y el desglose por tipo
+ * `breakfast_adults` / `breakfast_children_N` / `breakfast_seniors`. Por robustez
+ * leemos también `rooms` por si una variante del payload lo usa. El nº de
+ * desayunos por noche se toma como el MÁXIMO entre el agregado y el desglose:
+ * así es correcto tanto si `breakfast` es el total como si es solo adultos, sin
+ * doble-contar. Tomamos el máximo por habitación como derecho diario y sumamos
+ * las habitaciones. PENDIENTE: validar contra una reserva real con desayuno. */
 function extractBreakfastEntitlement(raw, fallbackCapacity) {
-  const rooms = Array.isArray(raw && raw.rooms) ? raw.rooms : [];
+  const rooms = Array.isArray(raw && raw.reservation_rooms) ? raw.reservation_rooms
+    : Array.isArray(raw && raw.rooms) ? raw.rooms
+    : [];
   let perDay = 0;
   let included = false;
 
   for (const room of rooms) {
-    const planHasBreakfast = String((room && room.first_meal) || '').toLowerCase().includes('breakfast');
-    const nights = Array.isArray(room && room.nights) ? room.nights : [];
+    if (!room) continue;
+    const planHasBreakfast = String(room.first_meal || '').toLowerCase().includes('breakfast');
+    const nights = Array.isArray(room.nights) ? room.nights : [];
     let roomPerDay = 0;
     for (const night of nights) {
-      const adults = Number(night && night.breakfast) || 0;
-      let children = 0;
-      for (let i = 1; i <= 7; i++) children += Number(night && night[`breakfast_children_${i}`]) || 0;
-      roomPerDay = Math.max(roomPerDay, adults + children);
+      if (!night) continue;
+      const aggregate = Number(night.breakfast) || 0;
+      let breakdown = (Number(night.breakfast_adults) || 0) + (Number(night.breakfast_seniors) || 0);
+      for (let i = 1; i <= 7; i++) breakdown += Number(night[`breakfast_children_${i}`]) || 0;
+      roomPerDay = Math.max(roomPerDay, aggregate, breakdown);
     }
     if (planHasBreakfast && roomPerDay === 0) {
       // El plan dice desayuno pero sin conteo por noche: cae a la ocupación.

@@ -131,8 +131,12 @@
     }
 
     function monthRange(ym) {
-      // ym = 'YYYY-MM' → fromDate, toDate
-      return { fromDate: ym + '-01', toDate: ym + '-31' };
+      // ym = 'YYYY-MM' → fromDate, toDate. Usa el último día REAL del mes (no '-31'
+      // fijo, que en febrero/meses de 30 da una fecha inexistente).
+      var parts = String(ym).split('-');
+      var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+      var lastDay = new Date(y, m, 0).getDate(); // día 0 del mes siguiente = último del actual
+      return { fromDate: ym + '-01', toDate: ym + '-' + String(lastDay).padStart(2, '0') };
     }
 
     async function load() {

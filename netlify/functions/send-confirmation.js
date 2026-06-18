@@ -234,7 +234,7 @@ function buildEmailHtml({
               <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F0EDE6;border-radius:8px;padding:20px 24px;">
                 <tr><td style="text-align:center;">
                   <p style="margin:0 0 6px 0;font-family:Arial,sans-serif;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#7A7A6A;">Desayuno incluido</p>
-                  <p style="margin:0 0 16px 0;font-family:Georgia,serif;font-size:14px;color:#555550;line-height:1.6;">Muestra tu pase en el comedor (7:00 a 10:00 a. m.). Ábrelo desde aquí — sin apps ni claves.</p>
+                  <p style="margin:0 0 16px 0;font-family:Georgia,serif;font-size:14px;color:#555550;line-height:1.6;">Muestra tu pase en el comedor. Ábrelo desde aquí — sin apps ni claves.</p>
                   <a href="${passUrl}" style="display:inline-block;padding:12px 28px;background-color:#2C2C2C;border-radius:6px;font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#FFFFFF;text-decoration:none;letter-spacing:0.04em;">Ver mis pases de desayuno</a>
                 </td></tr>
               </table>
