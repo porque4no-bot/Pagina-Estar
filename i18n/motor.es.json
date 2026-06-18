@@ -1,4 +1,8 @@
 {
+  "1": "1 persona",
+  "2": "2 personas",
+  "3": "3 personas",
+  "4": "4 personas o más",
   "modifySearch": "Modificar búsqueda",
   "cancel": "Cancelar",
   "checkin": "Llegada",
@@ -9,10 +13,6 @@
   "huespedes": "huéspedes",
   "noche": "noche",
   "noches": "noches",
-  "1": "1 persona",
-  "2": "2 personas",
-  "3": "3 personas",
-  "4": "4 personas o más",
   "stepRooms": "Habitación",
   "stepExtras": "Extras",
   "stepGuest": "Datos",
@@ -111,10 +111,7 @@
   "roomViews": {
     "Vista a la ciudad": "Vista a la ciudad",
     "Vista interior": "Vista interior",
-    "Vista ciudad": "Vista ciudad",
-    "Cordillera + balcón": "Balcón + cordillera",
-    "Panorámica": "Vista panorámica",
-    "Panorámica premium": "Panorámica premium"
+    "Vista ciudad": "Vista ciudad"
   },
   "roomAmenities": {
     "WiFi fibra": "WiFi fibra",
@@ -126,18 +123,8 @@
     "Vista a la ciudad": "Vista a la ciudad",
     "Hasta 5 personas": "Hasta 5 personas",
     "Hasta 3 personas": "Hasta 3 personas",
-    "Smart TV 43\"": "Smart TV 43\"",
-    "Smart TV 55\"": "Smart TV 55\"",
-    "Smart TV 65\"": "Smart TV 65\"",
-    "Cocina premium": "Cocina premium",
-    "Baño privado amplio": "Baño privado amplio",
     "Aseo semanal": "Aseo semanal",
-    "Balcón privado": "Balcón privado",
-    "Ambientes separados": "Ambientes separados",
     "Escritorio": "Escritorio",
-    "Vista panorámica": "Vista panorámica",
-    "Bañera": "Bañera",
-    "Terraza privada": "Terraza privada",
     "Hasta 4 personas": "Hasta 4 personas"
   },
   "extrasNames": {
