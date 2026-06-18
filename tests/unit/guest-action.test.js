@@ -288,3 +288,71 @@ test('guest-action contract_preview: returns 200 with rendered HTML and does not
 
   guestActionModule._test.resetDeps();
 });
+
+function setFolioDeps(onFolio) {
+  guestActionModule._test.setDeps({
+    protectRecord: record => record,
+    guestStore: () => ({ setJSON: async () => {} }),
+    archiveGuestPayload: async () => ({ delivered: false, configured: false }),
+    syncGuestEvent: async () => ({ delivered: false }),
+    postOrderToFolio: onFolio
+  });
+}
+
+test('guest-action order: posts charge-to-account orders to the folio when enabled', async () => {
+  const token = validToken();
+  const calls = [];
+  setFolioDeps(async (arg) => { calls.push(arg); return { posted: true, count: arg.items.length }; });
+  process.env.GUEST_SERVICE_FOLIO_ENABLED = 'true';
+  try {
+    const res = await guestAction(makeEvent({
+      type: 'order',
+      items: [{ id: 'breakfast', quantity: 2 }],
+      paymentPreference: 'account'
+    }, token));
+    assert.equal(res.statusCode, 201);
+    assert.equal(calls.length, 1, 'folio posting called once');
+    assert.equal(calls[0].idReservations, 'EST-TEST-42');
+    assert.equal(calls[0].items[0].name, 'Desayuno');
+    assert.equal(body(res).folio.posted, true);
+  } finally {
+    delete process.env.GUEST_SERVICE_FOLIO_ENABLED;
+    guestActionModule._test.resetDeps();
+  }
+});
+
+test('guest-action order: a folio failure does not fail the order', async () => {
+  const token = validToken();
+  setFolioDeps(async () => { throw new Error('OTASync down'); });
+  process.env.GUEST_SERVICE_FOLIO_ENABLED = 'true';
+  try {
+    const res = await guestAction(makeEvent({
+      type: 'order',
+      items: [{ id: 'breakfast', quantity: 1 }],
+      paymentPreference: 'account'
+    }, token));
+    assert.equal(res.statusCode, 201, 'order still succeeds');
+    assert.equal(body(res).folio.posted, false);
+    assert.match(body(res).folio.error, /OTASync down/);
+  } finally {
+    delete process.env.GUEST_SERVICE_FOLIO_ENABLED;
+    guestActionModule._test.resetDeps();
+  }
+});
+
+test('guest-action order: does NOT post to the folio when off or for online orders', async () => {
+  const token = validToken();
+  let called = 0;
+  setFolioDeps(async () => { called++; return { posted: true }; });
+  try {
+    // Flag off → no folio call even for 'account'.
+    await guestAction(makeEvent({ type: 'order', items: [{ id: 'breakfast', quantity: 1 }], paymentPreference: 'account' }, token));
+    // Flag on but 'online' → no folio call (charged after payment, Phase B).
+    process.env.GUEST_SERVICE_FOLIO_ENABLED = 'true';
+    await guestAction(makeEvent({ type: 'order', items: [{ id: 'breakfast', quantity: 1 }], paymentPreference: 'online' }, token));
+    assert.equal(called, 0, 'folio posting must not run when off or for online orders');
+  } finally {
+    delete process.env.GUEST_SERVICE_FOLIO_ENABLED;
+    guestActionModule._test.resetDeps();
+  }
+});

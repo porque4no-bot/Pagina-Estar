@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const { renderContractHTML } = require('./_contract-template');
 const { SERVICES } = require('./_services-catalog');
+const { postOrderExtrasToFolio: _postOrderExtrasToFolio } = require('./_otasync');
 const {
   archiveGuestPayload: _archiveGuestPayload,
   cleanText,
@@ -49,7 +50,8 @@ const defaultDeps = {
   guestStore: _guestStore,
   protectRecord: _protectRecord,
   requireGuest: _requireGuest,
-  syncGuestEvent: _syncGuestEvent
+  syncGuestEvent: _syncGuestEvent,
+  postOrderToFolio: _postOrderExtrasToFolio
 };
 const deps = { ...defaultDeps };
 
@@ -351,6 +353,20 @@ exports.handler = async event => {
         url.searchParams.set('reference', record.eventId);
         url.searchParams.set('amount', String(record.total));
         response.paymentUrl = url.toString();
+      }
+      /* Charge-to-account orders: post the charge onto the reservation folio in
+         OTASync/Kunas so reception sees it at check-out. Flagged + best-effort —
+         a folio hiccup never fails the order, which is already stored above.
+         ('online' orders post to the folio after payment, in the webhook — see
+         Phase B in docs/pendientes.md §5.) */
+      if (record.paymentPreference === 'account' &&
+          process.env.GUEST_SERVICE_FOLIO_ENABLED === 'true') {
+        try {
+          response.folio = await deps.postOrderToFolio({ idReservations: session.sub, items: record.items });
+        } catch (folioErr) {
+          console.error('[guest-action] folio posting failed:', folioErr.message);
+          response.folio = { posted: false, error: folioErr.message };
+        }
       }
     }
 
