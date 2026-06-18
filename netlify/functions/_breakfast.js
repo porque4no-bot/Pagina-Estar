@@ -5,9 +5,10 @@
  *     convención demo cuando no hay credenciales, y
  *   - las REDENCIONES ya registradas hoy (_breakfast-store).
  *
- * Funciona igual para reservas directas y de OTA: una OTA sin desayuno sale con
- * hasBreakfast=false y el panel ofrece el upgrade (Fase 3). El que liquida es el
- * sistema: solo cuenta lo registrado, así no hay doble contabilidad.
+ * El derecho se LEE de la reserva, no se asume por canal: una tarifa con
+ * desayuno (directa o de OTA) sale hasBreakfast=true; las que no lo traen
+ * (Airbnb siempre, u otra OTA sin esa tarifa) salen false y el panel ofrece el
+ * upgrade (Fase 3). El que liquida es el sistema: solo cuenta lo registrado.
  */
 
 const { getReservationDetail } = require('./_guest-app');
@@ -46,11 +47,15 @@ function extractBreakfastEntitlement(raw, fallbackCapacity) {
   return { included: included && perDay > 0, perDay };
 }
 
-/* Convención para el modo demo (sin OTASync), así se prueban verde y rojo:
- * códigos con OTA/SIN/NOBF salen sin desayuno; el resto, desayuno para todos. */
+/* Convención SOLO para el modo demo (sin OTASync), para probar verde y rojo:
+ * códigos con AIRBNB/SIN/NOBF salen sin desayuno; el resto, con desayuno.
+ * OJO: en producción el derecho NO se asume por canal — se lee de la reserva
+ * (extractBreakfastEntitlement). Una tarifa de OTA con desayuno sale verde;
+ * solo las que de verdad no lo traen (Airbnb siempre, u otra OTA sin esa
+ * tarifa) salen rojas para el upgrade. */
 function demoEntitlement(booking) {
   const code = String(booking.bookingCode || '').toUpperCase();
-  const noBreakfast = /OTA|SIN|NOBF/.test(code);
+  const noBreakfast = /AIRBNB|SIN|NOBF/.test(code);
   return { included: !noBreakfast, perDay: noBreakfast ? 0 : (Number(booking.capacity) || 2) };
 }
 

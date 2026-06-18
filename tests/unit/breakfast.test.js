@@ -45,7 +45,7 @@ test.beforeEach(() => {
   delete process.env.OTASYNC_PASSWORD;
 });
 
-// ── extractBreakfastEntitlement ──
+// ── extractBreakfastEntitlement (el derecho se LEE de la reserva, no del canal) ──
 test('extract: first_meal breakfast + nights.breakfast => incluido, perDay = personas', () => {
   const raw = { rooms: [{ first_meal: 'breakfast', occupancy: 2, nights: [{ breakfast: 2 }, { breakfast: 2 }] }] };
   assert.deepEqual(extractBreakfastEntitlement(raw, 2), { included: true, perDay: 2 });
@@ -74,13 +74,17 @@ test('extract: plan con desayuno pero sin conteo cae a la ocupación', () => {
   assert.deepEqual(extractBreakfastEntitlement(raw, 0), { included: true, perDay: 3 });
 });
 
-// ── demoEntitlement ──
-test('demo: un código normal incluye desayuno para toda la capacidad', () => {
+// ── demoEntitlement (el canal NO decide; sólo Airbnb/SIN salen sin desayuno) ──
+test('demo: una reserva con desayuno incluye para toda la capacidad', () => {
   assert.deepEqual(demoEntitlement({ bookingCode: 'EST-DEMO-2026', capacity: 2 }), { included: true, perDay: 2 });
 });
 
-test('demo: un código de OTA llega sin desayuno', () => {
-  assert.deepEqual(demoEntitlement({ bookingCode: 'EST-OTA-1', capacity: 2 }), { included: false, perDay: 0 });
+test('demo: una reserva de OTA con desayuno llega en verde (el canal no decide)', () => {
+  assert.deepEqual(demoEntitlement({ bookingCode: 'EST-BOOKING-5', capacity: 2 }), { included: true, perDay: 2 });
+});
+
+test('demo: una reserva sin desayuno (p.ej. Airbnb) llega en rojo', () => {
+  assert.deepEqual(demoEntitlement({ bookingCode: 'EST-AIRBNB-1', capacity: 2 }), { included: false, perDay: 0 });
 });
 
 // ── pickNextGuestIndex ──
@@ -141,8 +145,8 @@ test('resolve: demo con desayuno refleja servidos y restantes', async () => {
   assert.equal(after.remaining, after.perDay - 1);
 });
 
-test('resolve: demo OTA llega sin desayuno (candidato a upgrade)', async () => {
-  const s = await resolveBreakfastStatus('EST-OTA-7', { date: '2026-06-18' });
+test('resolve: demo sin desayuno (p.ej. Airbnb) llega en rojo, candidato a upgrade', async () => {
+  const s = await resolveBreakfastStatus('EST-AIRBNB-7', { date: '2026-06-18' });
   assert.equal(s.hasBreakfast, false);
   assert.equal(s.perDay, 0);
 });
