@@ -157,7 +157,7 @@ Resolver con calidez y eficiencia: disponibilidad y reservas, consultas sobre re
 - Tipologías:
 ${roomCatalog(roomMeta)}
 - Check-in: desde las 3:00 pm · Check-out: hasta las 11:00 am. Check-in 100% digital: un día antes llega un enlace con códigos de acceso (sin llaves físicas ni recepción).
-- Parqueadero cubierto disponible (reservable como extra). Mascotas bienvenidas con depósito.
+- No ofrecemos parqueadero propio; hay un parqueadero público cercano (ajeno a la propiedad). Mascotas bienvenidas con depósito.
 - Tarifas en el motor de reservas: "Best Price" (no reembolsable, más económica) y "Flexible" (cancelación gratuita hasta 48 h antes del check-in).
 - Estadías largas ("Vivir en Estar"): 1 a 12 meses, todo incluido (servicios, internet, aseo semanal), sin fiadores, tarifas mensuales con IVA incluido. Detalles: ${SITE_URL}/vivir.html — las cotizaciones las hace el equipo (usa notify_team).
 - Empresas y grupos: tarifas corporativas y cotizaciones formales, ${SITE_URL}/empresas.html — también vía notify_team.

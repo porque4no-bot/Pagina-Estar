@@ -61,7 +61,7 @@
   "successSent": "Confirmación enviada a",
   "beforeArrival": "Antes de llegar",
   "howToGet": "Cómo llegar",
-  "howToGetDesc": "Carrera 23 #62-70, Manizales. Parqueadero cubierto disponible.",
+  "howToGetDesc": "Carrera 23 #62-70, Manizales.",
   "checkInOut": "Check-in / check-out",
   "checkInOutDesc": "Llegada desde las 3:00 pm. Salida antes de las 11:00 am.",
   "directContact": "Contacto directo",
@@ -146,22 +146,26 @@
     "late": "Late check-out",
     "early": "Early check-in",
     "traslado": "Traslado aeropuerto",
-    "tour": "Tour Manizales"
+    "tour": "Tour Manizales",
+    "mascota": "Mascota"
   },
   "extrasDescs": {
     "desayuno": "Café, fruta y huevos cada mañana",
     "parqueadero": "Garaje cubierto en el edificio",
-    "late": "Salida hasta las 5:00 pm (sujeto a disponibilidad)",
-    "early": "Entrada desde las 10:00 am (sujeto a disponibilidad)",
+    "late": "Salida hasta las 2:00 pm (sujeto a disponibilidad)",
+    "early": "Entrada desde las 6:00 am (sujeto a disponibilidad)",
     "traslado": "Hacia o desde La Nubia",
-    "tour": "4 horas con guía local certificado"
+    "tour": "4 horas con guía local certificado",
+    "mascota": "Una mascota por reserva · IVA incluido"
   },
   "extrasUnits": {
     "/persona/noche": "/persona/noche",
     "/noche": "/noche",
     "por reserva": "por reserva",
     "por trayecto": "por trayecto",
-    "/persona": "/persona"
+    "/persona": "/persona",
+    "15% de la noche": "15% de la noche",
+    "25% de la noche": "25% de la noche"
   },
   "paymentNames": {
     "mercadopago": "Pago en línea seguro (Mercado Pago)",

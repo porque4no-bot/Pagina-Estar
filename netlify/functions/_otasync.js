@@ -325,7 +325,6 @@ function buildExtrasFromQuote(quote) {
     { key: 'desayuno', name: 'Desayuno' },
     { key: 'almuerzo', name: 'Almuerzo' },
     { key: 'cena', name: 'Cena' },
-    { key: 'parqueadero', name: 'Parqueadero' },
     { key: 'personaAdicional', name: 'Persona Adicional' }
   ];
   for (const { key, name } of named) {

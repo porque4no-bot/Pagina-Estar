@@ -50,7 +50,7 @@ function decodeDirectReference(ref) {
    the flexible rate via `Math.round(best / 0.9)`. */
 const PRICE_TOLERANCE_RATIO = 0.005;
 
-function computeExtrasTotal(extrasMask, guests, nights) {
+function computeExtrasTotal(extrasMask, guests, nights, baseNightly) {
   if (!extrasMask) return 0;
   let total = 0;
   for (let i = 0; i < EXTRAS_KEYS.length; i++) {
@@ -59,6 +59,7 @@ function computeExtrasTotal(extrasMask, guests, nights) {
     if (!ex) continue;
     if (ex.multiplier === 'perGuestPerNight') total += ex.price * guests * nights;
     else if (ex.multiplier === 'perNight') total += ex.price * nights;
+    else if (ex.multiplier === 'pctOfNight') total += Math.round((baseNightly || 0) * ex.pct);
     else total += ex.price;
   }
   return total;
@@ -75,24 +76,25 @@ async function computeDirectBookingTotals(decoded) {
   const guests = Math.max(1, parseInt(decoded.guestsCount) || 1);
   const pricing = await getDynamicPricing(decoded.checkin, decoded.checkout, guests);
   const nights = pricing.nights;
-  const extrasTotal = computeExtrasTotal(decoded.extrasMask, guests, nights);
 
   if (pricing.isMock) {
     /* Without OTASync credentials we cannot recompute authoritatively. The
        caller decides whether to accept (dev) or reject (production). */
-    return { isMock: true, nights, available: undefined, expectedSubtotals: [], extrasTotal };
+    return { isMock: true, nights, available: undefined, expectedSubtotals: [], extrasTotal: 0 };
   }
 
   const roomData = pricing.byRoomType[String(decoded.roomTypeId)];
   if (!roomData) {
-    return { isMock: false, nights, available: false, expectedSubtotals: [], extrasTotal, missing: true };
+    return { isMock: false, nights, available: false, expectedSubtotals: [], extrasTotal: 0, missing: true };
   }
 
   /* Front-end: priceFlexible = apiRoom.avgPrice (the value returned by OTA
      after the extra-guest surcharge is added). Best Price = priceFlexible,
-     Flexible rate = round(priceFlexible / 0.9). */
+     Flexible rate = round(priceFlexible / 0.9). Percentage extras (late/early)
+     use the BASE nightly (avgPrice = Best Price). */
   const bestNightly = roomData.avgPrice;
   const flexibleNightly = Math.round(roomData.avgPrice / 0.9);
+  const extrasTotal = computeExtrasTotal(decoded.extrasMask, guests, nights, bestNightly);
 
   const bestSubtotal = bestNightly * nights + extrasTotal;
   const flexibleSubtotal = flexibleNightly * nights + extrasTotal;
