@@ -19,7 +19,7 @@ const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const { sendEmail, adminEmail, esc, formatCOP, formatDateES } = require('./_email');
 const { helpers: bookingHelpers } = require('./get-booking');
 const { getSessionKey } = require('./_otasync');
-const { createRefundRequest, recoverPaymentInfo } = require('./_refunds-store');
+const { createRefundRequest, recoverPaymentInfo, REFUND_SLA_BUSINESS_DAYS } = require('./_refunds-store');
 
 /* A repeated request for the same booking within this window is answered as
    success without re-alerting the hotel (guests double-click / retry). */
@@ -67,7 +67,7 @@ function adminCancellationHtml({ booking, clientIp }) {
     <ol>
       <li>Verificar la tarifa de la reserva (Flexible: cancelación gratuita hasta 48 h antes del check-in · Best Price: no reembolsable) en la nota de OTASync.</li>
       <li>Cancelar la reserva en OTASync si la política lo permite.</li>
-      <li>Tramitar el reembolso por el canal de pago original (Wompi / Mercado Pago / datáfono / efectivo) y responder al huésped.</li>
+      <li>Tramitar el reembolso por el canal de pago original (Wompi / Mercado Pago / datáfono / efectivo) <strong>dentro de ${REFUND_SLA_BUSINESS_DAYS} días hábiles</strong> y responder al huésped. Registrar el avance en el panel (cotizar-admin → Reembolsos).</li>
     </ol>`;
 }
 
@@ -77,8 +77,9 @@ function guestAckHtml({ booking }) {
     (${esc(formatDateES(booking.checkIn))} → ${esc(formatDateES(booking.checkOut))}).</p>
     <p>Nuestro equipo la revisará según la política de tu tarifa
     (Flexible: cancelación gratuita hasta 48 horas antes del check-in ·
-    Best Price: no reembolsable) y te confirmará por este medio en menos de 24 horas,
-    incluyendo el detalle del reembolso cuando aplique.</p>
+    Best Price: no reembolsable) y te confirmará por este medio en menos de 24 horas.</p>
+    <p>Cuando el reembolso aplique, se procesa por el mismo medio de pago en un
+    máximo de <strong>${REFUND_SLA_BUSINESS_DAYS} días hábiles</strong>.</p>
     <p>Si necesitas ayuda inmediata escríbenos por WhatsApp: +57 310 249 0414.</p>
     <p>— Equipo Estar, Manizales</p>`;
 }
