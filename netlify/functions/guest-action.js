@@ -62,7 +62,7 @@ exports._test = {
 };
 
 const SERVICE_CATALOG = {
-  breakfast: { name: 'Desayuno local', price: 28000 },
+  breakfast: { name: 'Desayuno local', price: 20000 },
   parking: { name: 'Parqueadero por noche', price: 25000 },
   laundry: { name: 'Lavandería express', price: 35000 },
   late_checkout: { name: 'Late check-out', price: 80000 },

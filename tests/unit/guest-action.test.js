@@ -95,7 +95,7 @@ test('guest-action order: persists event with sanitized items', async () => {
   assert.equal(res.statusCode, 201);
   const data = body(res);
   assert.equal(data.ok, true);
-  assert.equal(data.total, 2 * 28000 + 25000);
+  assert.equal(data.total, 2 * 20000 + 25000);
 });
 
 test('guest-action order: 400 when items list is empty or all invalid', async () => {
