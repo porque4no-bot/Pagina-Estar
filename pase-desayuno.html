@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Pase de desayuno — Hotel Estar</title>
+  <link rel="icon" href="favicon.png">
+  <link rel="stylesheet" href="colors_and_type.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: var(--font-body, system-ui, sans-serif);
+      color: var(--ink, #2a2a28); background: var(--paper, #f6f3ec);
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 440px; margin: 0 auto; padding: 20px 16px 40px; }
+    .brand { text-align: center; margin-bottom: 18px; }
+    .brand img { height: 34px; }
+    .brand h1 { font-size: 18px; font-weight: 600; margin: 10px 0 0; }
+    .sub { text-align: center; font-size: 13px; color: var(--fg-muted, #6b6660); margin: 4px 0 0; }
+
+    .info { background: var(--white, #fff); border: 1px solid var(--border, #e0dccf); border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; }
+    .info .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+    .info .row .k { color: var(--fg-muted, #6b6660); }
+    .info .row .v { font-weight: 500; text-align: right; }
+
+    .banner { border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+    .banner.ok { background: var(--olive-100, #e7ecd9); color: var(--olive-700, #4a5733); }
+    .banner.no { background: var(--terracotta-100, #f6ddd0); color: var(--terracotta-700, #8a4226); }
+
+    .pass {
+      background: var(--white, #fff); border: 1px solid var(--border, #e0dccf); border-radius: 16px;
+      padding: 18px; margin-bottom: 14px; text-align: center;
+    }
+    .pass h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; }
+    .pass .qrbox { background: #fff; display: inline-block; padding: 10px; border-radius: 12px; border: 1px solid var(--border, #efe9db); }
+    .pass canvas, .pass img { display: block; }
+    .pass .meta { font-size: 12px; color: var(--fg-muted, #6b6660); margin: 12px 0 0; }
+    .pass .served { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 500; color: var(--olive-700, #4a5733); background: var(--olive-100, #e7ecd9); padding: 3px 10px; border-radius: 8px; }
+    .pass .code { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--fg-muted, #9a9488); margin-top: 8px; letter-spacing: .04em; }
+
+    .state { text-align: center; padding: 40px 16px; color: var(--fg-muted, #6b6660); font-size: 14px; }
+    .foot { text-align: center; font-size: 12px; color: var(--fg-muted, #9a9488); line-height: 1.6; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <img src="assets/logo.png" alt="estar">
+      <h1>Pase de desayuno</h1>
+      <p class="sub">Muéstralo en el comedor</p>
+    </div>
+    <div id="content"><div class="state">Cargando tus pases…</div></div>
+    <p class="foot">Hotel Estar · Comedor 7:00 a 10:00 a.m.<br>Si tienes dudas, escríbenos por WhatsApp.</p>
+  </div>
+
+  <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script>
+  (function () {
+    function $(id) { return document.getElementById(id); }
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function stateMsg(msg) { $('content').innerHTML = '<div class="state">' + esc(msg) + '</div>'; }
+
+    function fmtDate(d) {
+      if (!d) return '';
+      var p = String(d).slice(0, 10).split('-');
+      if (p.length !== 3) return d;
+      var m = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+      return parseInt(p[2], 10) + ' ' + (m[parseInt(p[1], 10) - 1] || '') + ' ' + p[0];
+    }
+
+    function render(data) {
+      var b = data.booking || {};
+      var room = [b.roomNumber, b.roomName].filter(Boolean).join(' · ') || '—';
+      var html = '';
+
+      html += '<div class="info">' +
+        '<div class="row"><span class="k">Huésped</span><span class="v">' + esc(b.guestName || '—') + '</span></div>' +
+        '<div class="row"><span class="k">Apartamento</span><span class="v">' + esc(room) + '</span></div>' +
+        (b.checkIn ? '<div class="row"><span class="k">Estadía</span><span class="v">' + esc(fmtDate(b.checkIn)) + ' → ' + esc(fmtDate(b.checkOut)) + '</span></div>' : '') +
+        '</div>';
+
+      if (data.hasBreakfast) {
+        html += '<div class="banner ok">Desayuno incluido · ' + data.perDay + (data.perDay === 1 ? ' persona' : ' personas') + ' por día</div>';
+      } else {
+        html += '<div class="banner no">Tu tarifa no incluye desayuno. Puedes agregarlo en el comedor.</div>';
+      }
+
+      (data.passes || []).forEach(function (p, idx) {
+        html += '<div class="pass">' +
+          '<h2>' + esc(p.label) + '</h2>' +
+          '<div class="qrbox"><canvas id="qr' + idx + '"></canvas></div>' +
+          '<p class="meta">Desayuno · 7:00 a 10:00 a.m.</p>' +
+          (p.served ? '<span class="served">Servido hoy ✓</span>' : '') +
+          '<p class="code">' + esc(p.code) + '</p>' +
+          '</div>';
+      });
+
+      $('content').innerHTML = html;
+
+      (data.passes || []).forEach(function (p, idx) {
+        var canvas = $('qr' + idx);
+        if (canvas && window.QRCode) {
+          window.QRCode.toCanvas(canvas, p.code, { width: 196, margin: 1 }, function () {});
+        }
+      });
+    }
+
+    var token = new URLSearchParams(location.search).get('t');
+    if (!token) { stateMsg('Link inválido. Pídele al hotel que te reenvíe tu pase.'); return; }
+
+    fetch('/api/breakfast-passes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: token })
+    }).then(function (res) {
+      return res.json().then(function (data) {
+        if (!res.ok) throw new Error(data.error || 'No fue posible cargar tus pases.');
+        return data;
+      });
+    }).then(render).catch(function (e) { stateMsg(e.message); });
+  })();
+  </script>
+</body>
+</html>
