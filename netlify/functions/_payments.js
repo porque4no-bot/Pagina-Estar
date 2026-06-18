@@ -224,6 +224,10 @@ async function processQuotePayment(transaction, corsHeaders) {
 
   const now = new Date().toISOString();
   const paidAmount = transaction.amountCents / 100;
+  /* Persist the payment method (already extracted in normalizeTransaction) so the
+     refund flow can later route gateway-auto (MP card) vs manual transfer
+     (PSE/Nequi/cash). Set once here; every save path below includes it. */
+  quote.paymentMethod = transaction.paymentMethod;
 
   if (!hasOtasyncCreds()) {
     quote.status = 'aceptada';
@@ -374,7 +378,7 @@ async function processDirectPayment(transaction, corsHeaders) {
           const store = getStore({ name: 'booking-results', consistency: 'strong' });
           await store.set(`direct-${decoded.bookingCode}`, JSON.stringify({
             bookingCode: decoded.bookingCode, reservationPending: true, reason: 'sold_out',
-            provider: transaction.provider, transactionId: transaction.id, createdAt: new Date().toISOString()
+            provider: transaction.provider, paymentMethod: transaction.paymentMethod, transactionId: transaction.id, createdAt: new Date().toISOString()
           }), { ttl: 86400 * 7 });
         } catch (e) { /* non-fatal */ }
         try {
@@ -536,6 +540,7 @@ async function processDirectPayment(transaction, corsHeaders) {
         bookingCode: finalBookingCode,
         otasyncId: data.id_reservations || null,
         provider: transaction.provider,
+        paymentMethod: transaction.paymentMethod,
         transactionId: transaction.id,
         createdAt: new Date().toISOString()
       }),
