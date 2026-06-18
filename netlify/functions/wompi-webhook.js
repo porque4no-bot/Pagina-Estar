@@ -1127,6 +1127,8 @@ exports.handler = async (event, context) => {
             bookingCode: decoded.bookingCode,
             reservationPending: true,
             reason: 'sold_out',
+            provider: 'wompi',
+            paymentMethod: transaction.payment_method_type,
             transactionId: transaction.id,
             createdAt: new Date().toISOString()
           }), { ttl: 86400 * 7 });
@@ -1310,7 +1312,14 @@ exports.handler = async (event, context) => {
     // Store result so the booking-status poller (and any retry) sees the code.
     if (directBookingResultStore) {
       try {
-        await directBookingResultStore.set(`direct-${decoded.bookingCode}`, JSON.stringify({ bookingCode: finalBookingCode }), { ttl: 86400 * 7 });
+        await directBookingResultStore.set(`direct-${decoded.bookingCode}`, JSON.stringify({
+          bookingCode: finalBookingCode,
+          provider: 'wompi',
+          paymentMethod: transaction.payment_method_type,
+          transactionId: transaction.id,
+          amountInCents: transaction.amount_in_cents,
+          createdAt: new Date().toISOString()
+        }), { ttl: 86400 * 7 });
       } catch (e) { /* non-fatal */ }
     }
 
