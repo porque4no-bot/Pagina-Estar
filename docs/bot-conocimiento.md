@@ -37,14 +37,10 @@ atender. Tiene dos propósitos:
 
 - **Check-in:** desde las 3:00 PM. 100% digital — un día antes llega un enlace
   con los códigos de acceso (sin llaves físicas).
-- **Check-out:** ⚠️ POR CONFIRMAR — el sitio dice 11:00 AM (FAQ) y 12:00 (home).
-  Definir una sola hora.
-- **Early check-in** (entrada anticipada, sujeto a disponibilidad), % del valor
-  de la noche estándar:
-  - 2 h antes (≈1:00 PM): 15%
-  - Desde las 10:00 AM: 35%
-  - Desde las 6:00 AM: 50%
-- **Late check-out** hasta las 2:00 PM: 15% del valor de la noche estándar.
+- **Check-out:** 11:00 AM (unificado en todo el sitio: home, FAQ, contrato).
+- **Early check-in** (entrada anticipada, sujeto a disponibilidad): **25% del
+  valor de la noche estándar** (tarifa única, desde las 6:00 AM).
+- **Late check-out** hasta las 2:00 PM: **15% del valor de la noche estándar**.
 - **¿Equipaje antes/después?** ⚠️ POR CONFIRMAR (¿se puede dejar maletas?).
 
 ## 3. Tarifas y reservas
@@ -143,16 +139,16 @@ atender. Tiene dos propósitos:
 
 ## Lo que necesito de ti para completar el bot
 
-Prioriza estas respuestas (son las que más pregunta un huésped):
+Prioriza estas respuestas (son las que más pregunta un huésped). La lista
+consolidada de datos por confirmar vive en `pendientes.md` §7.
 
-1. Hora de check-out definitiva.
-2. ¿Se puede compartir la dirección por chat o solo tras reservar? Dirección y
+1. ¿Se puede compartir la dirección por chat o solo tras reservar? Dirección y
    punto de referencia.
-3. Nombre y distancia del parqueadero público cercano.
-4. Desayuno: ¿se mantiene? ¿qué incluye? ¿precio?
-5. Reglas de mascotas (además del cobro de $200k).
-6. Aseo durante la estadía corta: ¿sí/no?
-7. Soporte fuera de horario: ¿hay un teléfono 24/7 para emergencias de acceso?
-8. Factura: ¿se emite a todos? ¿se pide en el chat o en la web?
-9. Recomendaciones de la zona que quieras que el bot maneje.
-10. ¿El bot puede ofrecer algo ante una queja, o siempre escala sin prometer?
+2. Nombre y distancia del parqueadero público cercano.
+3. Desayuno: ¿se mantiene? ¿qué incluye? ¿precio?
+4. Reglas de mascotas (además del cobro de $200k).
+5. Aseo durante la estadía corta: ¿sí/no?
+6. Soporte fuera de horario: ¿hay un teléfono 24/7 para emergencias de acceso?
+7. Factura: ¿se emite a todos? ¿se pide en el chat o en la web?
+8. Recomendaciones de la zona que quieras que el bot maneje.
+9. ¿El bot puede ofrecer algo ante una queja, o siempre escala sin prometer?

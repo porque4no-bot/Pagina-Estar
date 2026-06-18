@@ -362,3 +362,64 @@ conector pasa de **mock** a sincronizar de verdad — sin tocar el código.
 > partimos del supuesto de que **creamos la venta/factura en Odoo y Numera la
 > procesa hacia DIAN**. Lo confirmamos cuando tengas acceso; no bloquea la
 > Fase 1 (clientes).
+
+---
+
+## 11. Estado de ejecución (actualizado 2026-06-16)
+
+**Fase 1 (maestro de clientes): HECHA y verificada contra el Odoo real**
+(server 19.0+e, multiempresa `bpo-dici`).
+
+- **Conector `_odoo.js`** (JSON-RPC; mock sin credenciales): `upsertPartner`
+  deduplica por NIT (`vat`) → email; si la localización CO rechaza el NIT,
+  reintenta sin `vat` y lo anota. `createLead` crea la oportunidad CRM.
+- **Multiempresa:** el usuario de integración ve `[1,3,4,5]` y entra por defecto
+  en DICI (1). Los clientes del hotel se asignan a **Mirada SAS = company 5** vía
+  `ODOO_COMPANY_ID=5` (setea `company_id` + `allowed_company_ids`). Sin la
+  variable quedan compartidos (compatibilidad hacia atrás).
+
+  | ID | Empresa | NIT |
+  |---|---|---|
+  | 1 | DICI S.A.S. *(default del usuario)* | 901386785-8 |
+  | 3 | RIVO S.A.S. | 901079655-2 |
+  | 4 | GRUPO PINAO S EN C A | 900436848-5 |
+  | **5** | **MIRADA S.A.S** ← el hotel | **902032515-0** |
+
+- **Canales enganchados** (`upsertPartner` con etiqueta de origen
+  `res.partner.category`): cotización corporativa (`request-quote.js` →
+  "Corporativo"), reservas pagadas (`wompi-webhook.js` → "Corporativo" /
+  "Huésped directo"), larga estadía (`submission-created.js` → "Larga estadía"),
+  reservas de OTA (`otasync-webhook.js` → "Booking.com"/"Airbnb"/…).
+- **CRM instalado** por API (CRM, Email/SMS Marketing, Marketing Automation). El
+  interés entrante crea una `crm.lead` ligada al partner (equipo Sales, etapa New).
+- **Backfill de huéspedes (ejecutado 2026-06-16):**
+  `scripts/odoo-backfill-guests.js` (dry-run por defecto; `--commit` para
+  escribir). Importó 76 creados + 34 actualizados (idempotente por email),
+  etiqueta "Huésped histórico".
+- **Herramientas:** `node --env-file=.env scripts/odoo-test.js` (diagnóstico
+  local); `netlify/functions/odoo-probe.js` (health check admin, Firebase).
+- **Producción (Netlify):** cargar las 4 variables de Odoo + **`ODOO_COMPANY_ID=5`**
+  (hoy prod corre en mock). Template local: `docs/odoo-local.env.example`.
+
+### Para activar el continuo OTA → Odoo
+`otasync-webhook.js` extrae el huésped del evento `reservation` y hace
+`upsertPartner` (omite el canal web propio, que maneja `wompi-webhook`). Falta:
+(1) registrar un webhook en OTASync hacia `https://estar.com.co/api/otasync-webhook`
+(hoy solo existe el de SIRE) — es una escritura, requiere OK; (2) `OTASYNC_*` +
+`OTASYNC_WEBHOOK_SECRET` + vars de Odoo en Netlify; (3) verificar los nombres de
+campo del huésped con la primera reserva real.
+
+### Hallazgos del Odoo real para Fase 2 (hoy EN PAUSA — otro equipo)
+> La facturación electrónica la integra **otro equipo**; no construir
+> `account.move`/DIAN/Numera hasta que terminen. Nuestro alcance se limita al
+> maestro de clientes (`res.partner`).
+
+- **No hay módulo de Ventas** (`sale.order` no existe). Solo Contabilidad
+  (`account.move`) ⇒ Fase 2 crearía facturas de cliente directamente.
+- Impuestos: **IVA 19% = `account.tax` id 1930**, INC 8% = id 1943.
+- Diarios: **FACTURA DE VENTA (FV) = id 111** (¿e-factura DIAN vía Numera? —
+  confirmar), COTIZACION = 105, Nota Crédito = 112.
+- ⚠️ Crear una `account.move` en el diario FV = factura electrónica DIAN real
+  (difícil de revertir → nota crédito). Decisiones abiertas antes de construir:
+  auto-emitir vs solo borrador; producto/cuenta de ingreso de hospedaje; cómo
+  procesa Numera el diario FV.
