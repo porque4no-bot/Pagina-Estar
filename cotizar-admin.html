@@ -1021,7 +1021,7 @@ function initServicesTable() {
       <td><input type="number" class="it-input" data-field="cantidad" value="${defaultQtyFor(s.qtyMode)}" min="0" max="100000"></td>
       <td><input type="number" class="it-input" data-field="precio" value="${s.price}" min="0" step="1000"></td>
       <td style="font-family:var(--font-label); font-size:11px; color:var(--ink-500); letter-spacing:0.08em;">${TAX_LABEL[s.tax]}</td>
-      <td class="it-subtotal svc-subtotal">${formatCOP(defaultQtyFor(s.qtyMode) * s.price)}</td>
+      <td class="it-subtotal svc-subtotal">${formatCOP(defaultQtyFor(s.qtyMode) * effectiveTarifa(s.price))}</td>
     </tr>
   `).join('');
   document.getElementById('otrosBody').innerHTML = '';
@@ -1076,7 +1076,7 @@ function updateTotals() {
   document.querySelectorAll('#serviciosBody tr').forEach(tr => {
     const c = parseFloat(tr.querySelector('[data-field="cantidad"]').value) || 0;
     const p = parseFloat(tr.querySelector('[data-field="precio"]').value) || 0;
-    const s = c * p;
+    const s = c * effectiveTarifa(p);
     tr.querySelector('.svc-subtotal').textContent = formatCOP(s);
     if (tr.dataset.tax === 'iva') baseIvaSvc += s;
     else if (tr.dataset.tax === 'inc') baseInc += s;
@@ -1088,7 +1088,7 @@ function updateTotals() {
     const c = parseFloat(tr.querySelector('[data-field="cantidad"]').value) || 0;
     const p = parseFloat(tr.querySelector('[data-field="precio"]').value) || 0;
     const imp = tr.querySelector('[data-field="impuesto"]').value;
-    const s = c * p;
+    const s = c * effectiveTarifa(p);
     tr.querySelector('.svc-subtotal').textContent = formatCOP(s);
     if (imp === 'iva') baseIvaSvc += s;
     else if (imp === 'inc') baseInc += s;

@@ -156,6 +156,43 @@ test('sanitizeQuoteInput falls back from an invalid room ID to its room name', (
   assert.equal(result.items[0].subtotal, 500_000);
 });
 
+test('sanitizeQuoteInput inflates service prices by the commission, like room rates', () => {
+  const result = sanitizeQuoteInput({
+    comision: 20,
+    items: [{ roomTypeId: '31348', unidades: 1, tarifaBase: 100_000 }],
+    servicios: {
+      desayuno: { cantidad: 2, precioUnitario: 25_000 },
+      otros: [{ descripcion: 'Tour', cantidad: 1, precioUnitario: 80_000, impuesto: 'iva' }]
+    }
+  });
+  // Rooms: base 100k → +20% = 120k (existing behaviour, unchanged)
+  assert.equal(result.items[0].tarifaPorNoche, 120_000);
+  // Services now inflate the same way: base kept internally, precioUnitario = +20%
+  assert.equal(result.servicios.desayuno.precioBase, 25_000);
+  assert.equal(result.servicios.desayuno.precioUnitario, 30_000);
+  assert.equal(result.servicios.otros[0].precioBase, 80_000);
+  assert.equal(result.servicios.otros[0].precioUnitario, 96_000);
+});
+
+test('sanitizeQuoteInput leaves service prices untouched when commission is 0', () => {
+  const result = sanitizeQuoteInput({
+    comision: 0,
+    servicios: { desayuno: { cantidad: 1, precioUnitario: 25_000 } }
+  });
+  assert.equal(result.servicios.desayuno.precioUnitario, 25_000);
+});
+
+test('toPublic strips the internal service precioBase', () => {
+  const q = sanitizeQuoteInput({
+    comision: 10,
+    servicios: { desayuno: { cantidad: 1, precioUnitario: 20_000 } }
+  });
+  const pub = toPublic({ ...q, status: 'activa', comision: 10 });
+  assert.equal(pub.servicios.desayuno.precioUnitario, 22_000);
+  assert.equal(pub.servicios.desayuno.precioBase, undefined);
+  assert.equal(pub.comision, undefined);
+});
+
 test('effectiveStatus covers accepted, cancelled, expired and active quotes', () => {
   assert.equal(effectiveStatus({ status: 'aceptada' }), 'aceptada');
   assert.equal(effectiveStatus({ status: 'cancelada' }), 'cancelada');
