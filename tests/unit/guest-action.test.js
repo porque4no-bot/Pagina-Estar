@@ -385,3 +385,52 @@ test('guest-action order: online + wompi mode returns a signed checkout URL', as
     guestActionModule._test.resetDeps();
   }
 });
+
+test('guest-action order: notifies the team with the order summary (Phase C)', async () => {
+  const token = validToken();
+  const mails = [];
+  guestActionModule._test.setDeps({
+    protectRecord: record => record,
+    guestStore: () => ({ setJSON: async () => {} }),
+    archiveGuestPayload: async () => ({ delivered: false, configured: false }),
+    syncGuestEvent: async () => ({ delivered: false }),
+    notifyOrderTeam: async (record) => { mails.push(record); }
+  });
+  try {
+    const res = await guestAction(makeEvent({
+      type: 'order',
+      items: [{ id: 'breakfast', quantity: 2 }, { id: 'laundry', quantity: 1 }],
+      paymentPreference: 'account',
+      deliveryTime: 'Mañana 8am'
+    }, token));
+    assert.equal(res.statusCode, 201);
+    assert.equal(mails.length, 1, 'team notified once');
+    assert.equal(mails[0].bookingCode, 'EST-TEST-42');
+    assert.equal(mails[0].total, 2 * 20000 + 35000);
+    assert.equal(mails[0].items.length, 2);
+    assert.equal(mails[0].paymentPreference, 'account');
+  } finally {
+    guestActionModule._test.resetDeps();
+  }
+});
+
+test('guest-action order: a team-notification failure does not fail the order', async () => {
+  const token = validToken();
+  guestActionModule._test.setDeps({
+    protectRecord: record => record,
+    guestStore: () => ({ setJSON: async () => {} }),
+    archiveGuestPayload: async () => ({ delivered: false, configured: false }),
+    syncGuestEvent: async () => ({ delivered: false }),
+    notifyOrderTeam: async () => { throw new Error('Resend down'); }
+  });
+  try {
+    const res = await guestAction(makeEvent({
+      type: 'order',
+      items: [{ id: 'breakfast', quantity: 1 }],
+      paymentPreference: 'account'
+    }, token));
+    assert.equal(res.statusCode, 201, 'order still succeeds despite mail failure');
+  } finally {
+    guestActionModule._test.resetDeps();
+  }
+});

@@ -4,6 +4,7 @@ const { renderContractHTML } = require('./_contract-template');
 const { SERVICES } = require('./_services-catalog');
 const { postOrderExtrasToFolio: _postOrderExtrasToFolio } = require('./_otasync');
 const { createGuestWompiCheckout: _createGuestWompiCheckout } = require('./_guest-payments');
+const { sendEmail, adminEmail, esc, formatCOP } = require('./_email');
 const {
   archiveGuestPayload: _archiveGuestPayload,
   cleanText,
@@ -46,6 +47,39 @@ function sha256Hex(value) {
   return crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');
 }
 
+/* Phase C — team notification. Emails the team a summary of every service order
+   so they can prepare/deliver it and settle it in Kunas (the paymentPreference
+   tells them whether it's charged to the folio or paid online). Best-effort:
+   sendEmail no-ops without RESEND_API_KEY, and the caller never fails the order
+   on a mail error. Internal ops mail → Spanish only, like the other admin alerts. */
+async function notifyOrderTeam(record) {
+  const cell = 'padding:6px 0;font-family:Arial,sans-serif;font-size:13px;color:#444;border-bottom:1px solid #eee;';
+  const rows = (record.items || []).map(it =>
+    `<tr><td style="${cell}">${esc(it.name)} × ${it.quantity}</td>` +
+    `<td style="${cell}text-align:right;">${formatCOP(it.subtotal)}</td></tr>`
+  ).join('');
+  const payLabel = record.paymentPreference === 'online' ? 'Pagar en línea' : 'Cargar a la cuenta';
+  const extras = [];
+  if (record.deliveryTime) extras.push(`<p style="margin:4px 0;font-size:13px;">Cuándo: <strong>${esc(record.deliveryTime)}</strong></p>`);
+  if (record.notes) extras.push(`<p style="margin:4px 0;font-size:13px;">Notas: ${esc(record.notes)}</p>`);
+  const html = `<!DOCTYPE html><html lang="es"><body style="font-family:Arial,sans-serif;color:#2C2C2C;">
+    <h2 style="color:#9A6A2E;">Nuevo pedido de servicios</h2>
+    <p>Reserva <strong>${esc(record.bookingCode)}</strong> · ${esc(record.guestName || '')}</p>
+    <table style="width:100%;max-width:480px;border-collapse:collapse;">${rows}
+      <tr><td style="padding-top:8px;font-weight:bold;">Total</td>
+      <td style="padding-top:8px;font-weight:bold;text-align:right;">${formatCOP(record.total)}</td></tr>
+    </table>
+    <p style="margin-top:12px;font-size:13px;">Forma de pago: <strong>${payLabel}</strong></p>
+    ${extras.join('')}
+    <p style="color:#888;font-size:12px;margin-top:14px;">Pedido ${esc(record.eventId)}</p>
+  </body></html>`;
+  return sendEmail({
+    to: adminEmail(),
+    subject: `Nuevo pedido de servicios — ${record.bookingCode}`,
+    html
+  });
+}
+
 const defaultDeps = {
   archiveGuestPayload: _archiveGuestPayload,
   guestStore: _guestStore,
@@ -53,7 +87,8 @@ const defaultDeps = {
   requireGuest: _requireGuest,
   syncGuestEvent: _syncGuestEvent,
   postOrderToFolio: _postOrderExtrasToFolio,
-  createGuestWompiCheckout: _createGuestWompiCheckout
+  createGuestWompiCheckout: _createGuestWompiCheckout,
+  notifyOrderTeam
 };
 
 /* Site origin for the Wompi redirect-url, from the request (falls back to env
@@ -391,6 +426,13 @@ exports.handler = async event => {
           console.error('[guest-action] folio posting failed:', folioErr.message);
           response.folio = { posted: false, error: folioErr.message };
         }
+      }
+
+      /* Phase C — notify the team (best-effort; never fails the order). */
+      try {
+        await deps.notifyOrderTeam(record);
+      } catch (mailErr) {
+        console.error('[guest-action] order team notification failed:', mailErr.message);
       }
     }
 

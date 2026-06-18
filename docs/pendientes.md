@@ -243,8 +243,10 @@ por Booking.com y definir el modelo de pago oficial del canal.
     Wompi + reserva real antes de activar.** Front: la guest app redirige al checkout y al
     volver muestra aviso (`?order=`). Falta opcional: extender `reconcile-payments` para
     detectar intents `pending`/`paid_folio_failed` viejos.
-  - **Fase C — correo al equipo (FALTA).** Notificar cada pedido por correo (hoy solo
-    viaja por `GUEST_APP_SYNC_WEBHOOK_URL` + Blob cifrado).
+  - **Fase C — correo al equipo (HECHO).** `guest-action.notifyOrderTeam` envía al
+    equipo (`adminEmail()` = `ADMIN_NOTIFY_EMAIL`) un resumen de cada pedido (reserva,
+    huésped, ítems, total, forma de pago, cuándo/notas) vía Resend. Best-effort: no-op
+    sin `RESEND_API_KEY`, y un fallo de correo nunca tumba el pedido.
   El monto del late/early check-out se calcula como 15%/25% del **promedio de
   noche** (`totalAmount / nights`, IVA incl.) — aproxima la tarifa neta del motor;
   si se quiere exacto, firmar la tarifa neta de la habitación en el token de
