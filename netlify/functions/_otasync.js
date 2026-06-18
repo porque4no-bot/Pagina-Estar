@@ -565,7 +565,7 @@ async function createConfirmedReservation(quote, opts) {
    OTASync/Kunas reservation so the charge shows on the folio at check-out. This
    is what makes the guest app's "cargar a mi cuenta" reach Kunas. Gated by the
    caller (guest-action) behind GUEST_SERVICE_FOLIO_ENABLED + hasOtasyncCreds().
-   Endpoints: OTASync Public API → Extras / New reservations (add_extra). */
+   Endpoints: docs/OTASync-Public-API.md → Extras / New reservations (add_extra). */
 
 /* Small POST helper mirroring the timeout + session-retry boilerplate the rest
    of this module uses. The caller passes the body WITHOUT `key`; we inject the
