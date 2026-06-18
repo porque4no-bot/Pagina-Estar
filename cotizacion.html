@@ -320,6 +320,10 @@
             <span>Total</span>
             <span id="totalFinal">$ 0</span>
           </div>
+          <div class="quote-total-row" id="totalPorPersonaRow" style="display:none;font-size:13px;color:var(--ink-500)">
+            <span id="totalPorPersonaLabel">Valor por persona</span>
+            <span id="totalPorPersona">$ 0</span>
+          </div>
           <p class="quote-total-note">Impuestos incluidos en el total · Valores en Pesos Colombianos (COP)</p>
         </div>
       </div>
@@ -337,6 +341,7 @@
       <div class="quote-policies">
         <p class="quote-info-label">Políticas</p>
         <ul class="quote-policies-list">
+          <li>Check-in desde las 3:00 p. m. · Check-out hasta las 11:00 a. m. (horarios flexibles sujetos a disponibilidad, coordínalos con anticipación).</li>
           <li>Cancelación gratuita con al menos 48 horas de anticipación al check-in.</li>
           <li>Pago a crédito sujeto a aprobación previa de la empresa con convenio vigente.</li>
           <li>Impuestos (IVA 19% sobre alojamiento, INC 8% sobre alimentación) detallados en el total.</li>
@@ -613,7 +618,7 @@ function roomMetaFor(item) {
   return byName || null;
 }
 
-function renderRoomCards(items) {
+function renderRoomCards(items, numPersonas) {
   const wrap = document.getElementById('quoteRooms');
   wrap.innerHTML = items.map((it, idx) => {
     const meta = roomMetaFor(it);
@@ -640,7 +645,9 @@ function renderRoomCards(items) {
           </div>
           <div class="qr-price">
             <span class="qr-units">${it.unidades} u. × ${it.noches} noche${it.noches === 1 ? '' : 's'}</span>
+            ${it.tarifaPorNoche ? `<span class="qr-rate" style="font-size:12px;color:var(--ink-500)">${formatCOP(it.tarifaPorNoche)} / noche</span>` : ''}
             <span class="qr-line-total">${formatCOP(it.subtotal)}</span>
+            ${numPersonas > 0 ? `<span class="qr-perperson" style="font-size:11px;color:var(--ink-500)">${formatCOP(it.subtotal / numPersonas)} / persona</span>` : ''}
           </div>
           <i data-lucide="chevron-down" class="qr-chev"></i>
         </summary>
@@ -753,7 +760,7 @@ function renderQuote(q) {
   }
 
   /* Room accordion */
-  renderRoomCards(q.items || []);
+  renderRoomCards(q.items || [], q.numPersonas || 0);
   const subtotalItems = (q.items || []).reduce((s, it) => s + it.subtotal, 0);
 
   /* Services — accumulate tax bases */
@@ -823,6 +830,13 @@ function renderQuote(q) {
 
   setText('totalSubtotal', formatCOP(subtotal));
   setText('totalFinal', formatCOP(total));
+
+  /* Valor por persona (referencial): total ÷ número de personas */
+  if (q.numPersonas > 0 && total > 0) {
+    setText('totalPorPersonaLabel', 'Valor por persona (' + q.numPersonas + (q.numPersonas === 1 ? ' persona)' : ' personas)'));
+    setText('totalPorPersona', formatCOP(total / q.numPersonas));
+    document.getElementById('totalPorPersonaRow').style.display = '';
+  }
 
   if (descuentoAmt > 0) {
     const label = q.descuento.tipo === 'porcentaje' ? 'Descuento (' + q.descuento.valor + '%)' : 'Descuento';
