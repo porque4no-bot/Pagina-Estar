@@ -199,7 +199,7 @@ function buildEmailHtml({
                                 <span style="display:inline-block;width:20px;height:20px;background-color:#C4956A;border-radius:50%;text-align:center;line-height:20px;font-family:Arial,sans-serif;font-size:10px;font-weight:700;color:#FFFFFF;">2</span>
                               </td>
                               <td>
-                                <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#2C2C2C;line-height:1.5;"><strong>Cómo llegar</strong><br/><span style="color:#555550;">Carrera 23 #62-70, Manizales. Parqueadero cubierto disponible en el edificio.</span></p>
+                                <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#2C2C2C;line-height:1.5;"><strong>Cómo llegar</strong><br/><span style="color:#555550;">Carrera 23 #62-70, Manizales.</span></p>
                               </td>
                             </tr>
                           </table>

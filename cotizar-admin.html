@@ -694,7 +694,7 @@
     <div class="admin-card">
       <p class="admin-card-title">05 · Servicios adicionales</p>
       <p style="font-family:var(--font-body); font-size:13px; color:var(--ink-500); margin:0 0 16px;">
-        Las cantidades se prellenan con personas × noches; edítalas si es necesario. Alimentación lleva INC 8%; parqueadero y persona adicional, IVA 19%.
+        Las cantidades se prellenan con personas × noches; edítalas si es necesario. Alimentación lleva INC 8%; persona adicional, IVA 19%.
       </p>
       <div class="items-table-wrap">
         <table class="items-table">
@@ -1001,7 +1001,6 @@ const SERVICE_DEFS = [
   { key: 'desayuno',        label: 'Desayuno',          tax: 'inc', price: 25000, qtyMode: 'meal' },
   { key: 'almuerzo',        label: 'Almuerzo',          tax: 'inc', price: 35000, qtyMode: 'meal' },
   { key: 'cena',            label: 'Cena',              tax: 'inc', price: 35000, qtyMode: 'meal' },
-  { key: 'parqueadero',     label: 'Parqueadero',       tax: 'iva', price: 15000, qtyMode: 'nights' },
   { key: 'personaAdicional', label: 'Persona adicional', tax: 'iva', price: 50000, qtyMode: 'manual' }
 ];
 let otroIdCounter = 0;
@@ -1482,7 +1481,7 @@ function computeQuoteTotal(q) {
   const subtotalItems = (q.items || []).reduce((s, it) => s + (it.subtotal || 0), 0);
   const sv = q.servicios || {};
   let baseIva = 0, baseInc = 0, baseNone = 0;
-  ['parqueadero', 'personaAdicional'].forEach(k => { const s = sv[k]; if (s) baseIva += (s.cantidad || 0) * (s.precioUnitario || 0); });
+  ['personaAdicional'].forEach(k => { const s = sv[k]; if (s) baseIva += (s.cantidad || 0) * (s.precioUnitario || 0); });
   ['desayuno', 'almuerzo', 'cena'].forEach(k => { const s = sv[k]; if (s) baseInc += (s.cantidad || 0) * (s.precioUnitario || 0); });
   (sv.otros || []).forEach(o => {
     const sub = (o.cantidad || 0) * (o.precioUnitario || 0);

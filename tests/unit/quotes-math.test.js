@@ -44,10 +44,10 @@ test('computeQuoteTotal calculates rooms plus food and INC', () => {
   assert.equal(total.total, 1_298_000);
 });
 
-test('computeQuoteTotal calculates rooms plus parking IVA', () => {
+test('computeQuoteTotal calculates rooms plus extra-person IVA', () => {
   const total = computeQuoteTotal(quoteWith({
     items: [{ subtotal: 1_000_000 }],
-    servicios: { parqueadero: { cantidad: 2, precioUnitario: 25_000 } }
+    servicios: { personaAdicional: { cantidad: 2, precioUnitario: 25_000 } }
   }));
 
   assert.equal(total.subtotal, 1_050_000);
@@ -60,7 +60,7 @@ test('computeQuoteTotal applies percentage discounts pro-rata to IVA and INC', (
     items: [{ subtotal: 1_000_000 }],
     servicios: {
       desayuno: { cantidad: 2, precioUnitario: 50_000 },
-      parqueadero: { cantidad: 2, precioUnitario: 25_000 }
+      personaAdicional: { cantidad: 2, precioUnitario: 25_000 }
     },
     descuento: { tipo: 'porcentaje', valor: 10 }
   }));
@@ -77,7 +77,7 @@ test('computeQuoteTotal applies fixed discounts pro-rata and caps them at subtot
     items: [{ subtotal: 1_000_000 }],
     servicios: {
       desayuno: { cantidad: 2, precioUnitario: 50_000 },
-      parqueadero: { cantidad: 2, precioUnitario: 25_000 }
+      personaAdicional: { cantidad: 2, precioUnitario: 25_000 }
     },
     descuento: { tipo: 'fijo', valor: 115_000 }
   }));
@@ -256,7 +256,7 @@ test('buildExtrasFromQuote maps named services, custom extras and empty quotes',
   assert.deepEqual(buildExtrasFromQuote({
     servicios: {
       desayuno: { cantidad: 2, precioUnitario: 30_000 },
-      parqueadero: { cantidad: 1, precioUnitario: 20_000 },
+      personaAdicional: { cantidad: 1, precioUnitario: 20_000 },
       otros: [
         { descripcion: 'Decoración', cantidad: 1, precioUnitario: 80_000 },
         { descripcion: '', cantidad: 3, precioUnitario: 10_000 }
@@ -265,7 +265,7 @@ test('buildExtrasFromQuote maps named services, custom extras and empty quotes',
   }), {
     extras: [
       { id_extras: 0, name: 'Desayuno', qty: 2, price: 30_000, total_price: 60_000 },
-      { id_extras: 0, name: 'Parqueadero', qty: 1, price: 20_000, total_price: 20_000 },
+      { id_extras: 0, name: 'Persona Adicional', qty: 1, price: 20_000, total_price: 20_000 },
       { id_extras: 0, name: 'Decoración', qty: 1, price: 80_000, total_price: 80_000 }
     ],
     extrasPrice: 160_000

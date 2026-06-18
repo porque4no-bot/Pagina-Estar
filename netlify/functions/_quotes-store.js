@@ -138,7 +138,6 @@ function sanitizeQuoteInput(body) {
     desayuno: mkSvc(sv.desayuno),
     almuerzo: mkSvc(sv.almuerzo),
     cena: mkSvc(sv.cena),
-    parqueadero: mkSvc(sv.parqueadero),
     personaAdicional: mkSvc(sv.personaAdicional),
     otros: Array.isArray(sv.otros) ? sv.otros.slice(0, 20).map(o => {
       const imp = ['ninguno', 'iva', 'inc'].includes(o && o.impuesto) ? o.impuesto : 'ninguno';
@@ -183,11 +182,11 @@ function computeQuoteTotal(quote) {
   const q = quote || {};
   const subtotalItems = (q.items || []).reduce((s, it) => s + (it.subtotal || 0), 0);
 
-  const SVC_TAX = { desayuno: 'inc', almuerzo: 'inc', cena: 'inc', parqueadero: 'iva', personaAdicional: 'iva' };
+  const SVC_TAX = { desayuno: 'inc', almuerzo: 'inc', cena: 'inc', personaAdicional: 'iva' };
   const sv = q.servicios || {};
   let baseIvaSvc = 0, baseInc = 0, baseNone = 0;
 
-  ['desayuno', 'almuerzo', 'cena', 'parqueadero', 'personaAdicional'].forEach(k => {
+  ['desayuno', 'almuerzo', 'cena', 'personaAdicional'].forEach(k => {
     const s = sv[k];
     if (!s || !s.cantidad || !s.precioUnitario) return;
     const sub = s.cantidad * s.precioUnitario;
@@ -246,7 +245,6 @@ function toPublic(quote) {
       desayuno: strip(sv.desayuno),
       almuerzo: strip(sv.almuerzo),
       cena: strip(sv.cena),
-      parqueadero: strip(sv.parqueadero),
       personaAdicional: strip(sv.personaAdicional),
       otros: Array.isArray(sv.otros) ? sv.otros.map(strip) : sv.otros
     };

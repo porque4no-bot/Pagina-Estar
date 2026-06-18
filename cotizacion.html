@@ -764,14 +764,14 @@ function renderQuote(q) {
   const subtotalItems = (q.items || []).reduce((s, it) => s + it.subtotal, 0);
 
   /* Services — accumulate tax bases */
-  const SVC_LABELS = { desayuno: 'Desayuno', almuerzo: 'Almuerzo', cena: 'Cena', parqueadero: 'Parqueadero', personaAdicional: 'Persona adicional' };
-  const SVC_TAX = { desayuno: 'inc', almuerzo: 'inc', cena: 'inc', parqueadero: 'iva', personaAdicional: 'iva' };
+  const SVC_LABELS = { desayuno: 'Desayuno', almuerzo: 'Almuerzo', cena: 'Cena', personaAdicional: 'Persona adicional' };
+  const SVC_TAX = { desayuno: 'inc', almuerzo: 'inc', cena: 'inc', personaAdicional: 'iva' };
   const TAX_TAG = { iva: 'IVA 19%', inc: 'INC 8%', ninguno: 'Sin impuesto' };
   const sv = q.servicios || {};
   let baseIvaSvc = 0, baseInc = 0, baseNone = 0;
   const svcRows = [];
 
-  ['desayuno', 'almuerzo', 'cena', 'parqueadero', 'personaAdicional'].forEach(k => {
+  ['desayuno', 'almuerzo', 'cena', 'personaAdicional'].forEach(k => {
     const s = sv[k];
     if (!s || !s.cantidad || !s.precioUnitario) return;
     const sub = s.cantidad * s.precioUnitario;

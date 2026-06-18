@@ -22,8 +22,8 @@ function obfuscateEmail(email) {
   return name.length > 2 ? `${name[0]}***${name[name.length - 1]}@${domain}` : `***@${domain}`;
 }
 
-const SVC_LABELS = { desayuno: 'Desayuno', almuerzo: 'Almuerzo', cena: 'Cena', parqueadero: 'Parqueadero', personaAdicional: 'Persona adicional' };
-const SVC_TAX = { desayuno: 'inc', almuerzo: 'inc', cena: 'inc', parqueadero: 'iva', personaAdicional: 'iva' };
+const SVC_LABELS = { desayuno: 'Desayuno', almuerzo: 'Almuerzo', cena: 'Cena', personaAdicional: 'Persona adicional' };
+const SVC_TAX = { desayuno: 'inc', almuerzo: 'inc', cena: 'inc', personaAdicional: 'iva' };
 
 function escHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -36,7 +36,7 @@ function buildQuoteEmailHtml({ quote, quoteUrl }) {
   const sv = quote.servicios || {};
   let baseIvaSvc = 0, baseInc = 0, baseNone = 0;
   const svcRows = [];
-  ['desayuno', 'almuerzo', 'cena', 'parqueadero', 'personaAdicional'].forEach(k => {
+  ['desayuno', 'almuerzo', 'cena', 'personaAdicional'].forEach(k => {
     const s = sv[k];
     if (!s || !s.cantidad || !s.precioUnitario) return;
     const sub = s.cantidad * s.precioUnitario;

@@ -20,35 +20,41 @@ function numberAfter(pattern) {
   return parseInt(m[1], 10);
 }
 
-test('reservar.html calcTotal extras prices match _pricing', () => {
-  // if(extras.desayuno)ex+=20000*search.guests*nights;
-  assert.equal(numberAfter(/extras\.desayuno\)\s*ex\s*\+=\s*(\d+)\s*\*\s*search\.guests/),
+function floatAfter(pattern) {
+  const m = reservarHtml.match(pattern);
+  assert.ok(m, `pattern not found in reservar.html: ${pattern}`);
+  return parseFloat(m[1]);
+}
+
+test('reservar.html calcTotal extras math matches _pricing', () => {
+  // lines.push({key:'desayuno',amount:20000*search.guests*nights})
+  assert.equal(numberAfter(/extras\.desayuno\)lines\.push\(\{key:'desayuno',amount:(\d+)\*search\.guests/),
     EXTRAS_PRICES.desayuno.price, 'desayuno price drifted between front-end and server');
-  // if(extras.parqueadero)ex+=25000*nights;
-  assert.equal(numberAfter(/extras\.parqueadero\)\s*ex\s*\+=\s*(\d+)\s*\*\s*nights/),
-    EXTRAS_PRICES.parqueadero.price, 'parqueadero price drifted');
-  // if(extras.late)ex+=60000;
-  assert.equal(numberAfter(/extras\.late\)\s*ex\s*\+=\s*(\d+)/),
-    EXTRAS_PRICES.late.price, 'late price drifted');
-  // if(extras.early)ex+=50000;
-  assert.equal(numberAfter(/extras\.early\)\s*ex\s*\+=\s*(\d+)/),
-    EXTRAS_PRICES.early.price, 'early price drifted');
+  // late check-out = 15% of the base nightly
+  assert.equal(floatAfter(/extras\.late\)lines\.push\(\{key:'late',amount:Math\.round\(base\*([\d.]+)\)/),
+    EXTRAS_PRICES.late.pct, 'late pct drifted');
+  // early check-in = 25% of the base nightly
+  assert.equal(floatAfter(/extras\.early\)lines\.push\(\{key:'early',amount:Math\.round\(base\*([\d.]+)\)/),
+    EXTRAS_PRICES.early.pct, 'early pct drifted');
+  // mascota = flat charge (VAT included)
+  assert.equal(numberAfter(/extras\.mascota\?(\d+)/),
+    EXTRAS_PRICES.mascota.price, 'mascota price drifted');
 });
 
-test('reservar.html BE_EXTRAS catalogue prices match _pricing', () => {
+test('reservar.html BE_EXTRAS catalogue matches _pricing', () => {
   const beExtras = reservarHtml.match(/const BE_EXTRAS\s*=\s*\[([\s\S]*?)\];/);
   assert.ok(beExtras, 'BE_EXTRAS array not found');
   const block = beExtras[1];
-  const priceFor = (id) => {
-    const re = new RegExp(`id:'${id}'[\\s\\S]*?price:\\s*(\\d+)`);
+  const numFor = (id, field) => {
+    const re = new RegExp(`id:'${id}'[\\s\\S]*?${field}:\\s*([\\d.]+)`);
     const m = block.match(re);
-    assert.ok(m, `BE_EXTRAS entry for ${id} not found`);
-    return parseInt(m[1], 10);
+    assert.ok(m, `BE_EXTRAS entry for ${id} (${field}) not found`);
+    return parseFloat(m[1]);
   };
-  assert.equal(priceFor('desayuno'), EXTRAS_PRICES.desayuno.price);
-  assert.equal(priceFor('parqueadero'), EXTRAS_PRICES.parqueadero.price);
-  assert.equal(priceFor('late'), EXTRAS_PRICES.late.price);
-  assert.equal(priceFor('early'), EXTRAS_PRICES.early.price);
+  assert.equal(numFor('desayuno', 'price'), EXTRAS_PRICES.desayuno.price);
+  assert.equal(numFor('late', 'pct'), EXTRAS_PRICES.late.pct);
+  assert.equal(numFor('early', 'pct'), EXTRAS_PRICES.early.pct);
+  assert.equal(numFor('mascota', 'price'), EXTRAS_PRICES.mascota.price);
 });
 
 test('server modules consume the shared _pricing source', () => {

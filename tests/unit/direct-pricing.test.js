@@ -74,21 +74,26 @@ test('decodeDirectReference rejects non-base64 garbage', () => {
   assert.equal(decodeDirectReference(null), null);
 });
 
-test('computeExtrasTotal adds breakfast per guest per night, parking per night, late/early flat', () => {
+test('computeExtrasTotal: breakfast/parking fixed, late (15%) and early (25%) as % of base nightly', () => {
   const { computeExtrasTotal } = require('../../netlify/functions/_direct-pricing');
-  /* mask = desayuno+parqueadero+late+early, guests=2, nights=3 */
-  const total = computeExtrasTotal('111100', 2, 3);
+  /* mask = desayuno+parqueadero+late+early, guests=2, nights=3, base 200k */
+  const total = computeExtrasTotal('1111000', 2, 3, 200000);
   // desayuno: 20000 * 2 * 3 = 120000
   // parqueadero: 25000 * 3 = 75000
-  // late: 60000
-  // early: 50000
-  assert.equal(total, 120000 + 75000 + 60000 + 50000);
+  // late: 15% of 200000 = 30000
+  // early: 25% of 200000 = 50000
+  assert.equal(total, 120000 + 75000 + 30000 + 50000);
+});
+
+test('computeExtrasTotal: mascota is a flat $200k charge regardless of nights', () => {
+  const { computeExtrasTotal } = require('../../netlify/functions/_direct-pricing');
+  assert.equal(computeExtrasTotal('0000001', 1, 5, 300000), 200000);
 });
 
 test('computeExtrasTotal is zero when mask is all zeros or missing', () => {
   const { computeExtrasTotal } = require('../../netlify/functions/_direct-pricing');
-  assert.equal(computeExtrasTotal('000000', 2, 3), 0);
-  assert.equal(computeExtrasTotal('', 2, 3), 0);
+  assert.equal(computeExtrasTotal('0000000', 2, 3, 200000), 0);
+  assert.equal(computeExtrasTotal('', 2, 3, 200000), 0);
 });
 
 test('verifyDirectBookingAmount accepts the Best Price (avgPrice) total', async () => {
@@ -219,6 +224,32 @@ test('verifyDirectBookingAmount accepts extras added correctly to room total', a
        Expected subtotal = 490000 -> 49000000 cents. */
     const verdict = await verifyDirectBookingAmount(decoded, 49000000);
     assert.equal(verdict.ok, true);
+  });
+});
+
+test('verifyDirectBookingAmount accepts late check-out (%) + mascota (flat)', async () => {
+  const otaResponse = {
+    rooms: [{
+      id_room_types: 31348,
+      avail: 3,
+      price: 0,
+      pricing_plans: [{ prices: [{ prices: { '2026-07-01': 200000, '2026-07-02': 200000 } }] }]
+    }]
+  };
+
+  await withMockedFetch(otaResponse, async () => {
+    const { verifyDirectBookingAmount } = require('../../netlify/functions/_direct-pricing');
+    const decoded = {
+      checkin: '2026-07-01', checkout: '2026-07-03', guestsCount: 1,
+      roomTypeId: '31348',
+      extrasMask: '0010001' /* late (idx2) + mascota (idx6) */
+    };
+    /* Base nightly 200k, 2 nights -> 400000.
+       Late check-out 15% of 200000 = 30000; mascota flat 200000.
+       Expected subtotal = 630000 -> 63000000 cents. */
+    const verdict = await verifyDirectBookingAmount(decoded, 63000000);
+    assert.equal(verdict.ok, true);
+    assert.equal(verdict.reason, 'match');
   });
 });
 
