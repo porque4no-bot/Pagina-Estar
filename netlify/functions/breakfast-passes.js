@@ -7,7 +7,7 @@
 
 const { json, corsHeaders, parseJsonBody } = require('./_guest-app');
 const { verifyPassToken } = require('./_breakfast-pass');
-const { resolveBreakfastStatus } = require('./_breakfast');
+const { resolveBreakfastStatus, BREAKFAST_SCHEDULE } = require('./_breakfast');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 
 exports.handler = async event => {
@@ -53,6 +53,7 @@ exports.handler = async event => {
       perDay: status.perDay,
       servedToday: status.servedToday,
       date: status.date,
+      schedule: BREAKFAST_SCHEDULE,
       passes
     });
   } catch (error) {

@@ -3,10 +3,11 @@
  * Agrega las redenciones registradas (_breakfast-store) en un rango de fechas:
  * total servidos (= base para liquidarle al proveedor), incluidos vs upgrades
  * vendidos (y su monto), y la distribución por día y por hora (horarios pico).
- * Default: mes en curso. Auth de equipo (Firebase + STAFF_EMAILS∪ADMIN_EMAILS). */
+ * Default: mes en curso. Auth SOLO admin (ADMIN_EMAILS) — es la "caja"
+ * (montos a liquidar, upgrades $); el comedor NO la ve. */
 
-const { json, corsHeaders, parseJsonBody } = require('./_guest-app');
-const { authenticateStaff } = require('./_staff-auth');
+const { json, corsHeaders, parseJsonBody, isDemoMode } = require('./_guest-app');
+const { authenticateAdmin } = require('./_firebase-auth');
 const { listRedemptions, todayBogota } = require('./_breakfast-store');
 const { SERVICES } = require('./_services-catalog');
 
@@ -25,7 +26,11 @@ exports.handler = async event => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders(), body: '' };
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
-  const auth = await authenticateStaff(event);
+  // Auth SOLO admin (ADMIN_EMAILS). El comedor (STAFF_EMAILS) no ve la caja; sus
+  // conteos van por otra vía. Bypass demo local (en Netlify isDemoMode() es false).
+  const auth = (isDemoMode() && !process.env.FIREBASE_PROJECT_ID)
+    ? { ok: true, email: 'demo@local' }
+    : await authenticateAdmin(event);
   if (!auth.ok) return json(auth.statusCode, { error: auth.error });
 
   try {

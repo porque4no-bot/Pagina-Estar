@@ -90,12 +90,15 @@
       } else {
         html += '<div class="banner no">Tu tarifa no incluye desayuno. Puedes agregarlo en el comedor.</div>';
       }
+      if (data.schedule) {
+        html += '<p class="sub" style="margin:-6px 0 16px;">Comedor: ' + esc(data.schedule) + ' · ¿antes? avísanos con antelación.</p>';
+      }
 
       (data.passes || []).forEach(function (p, idx) {
         html += '<div class="pass">' +
           '<h2>' + esc(p.label) + '</h2>' +
           '<div class="qrbox"><canvas id="qr' + idx + '"></canvas></div>' +
-          '<p class="meta">Desayuno</p>' +
+          '<p class="meta">Desayuno' + (data.schedule ? ' · ' + esc(data.schedule) : '') + '</p>' +
           (p.served ? '<span class="served">Servido hoy ✓</span>' : '') +
           '<p class="code">' + esc(p.code) + '</p>' +
           '</div>';

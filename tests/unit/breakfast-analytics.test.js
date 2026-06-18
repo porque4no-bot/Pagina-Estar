@@ -70,3 +70,14 @@ test('analytics: respeta el rango de fechas', async () => {
   assert.equal(d.upgrades, 1);
   assert.equal(d.included, 0);
 });
+
+test('analytics: es solo-admin — fuera de demo, sin token => 401 (el comedor no ve la caja)', async () => {
+  // Con FIREBASE_PROJECT_ID se apaga el bypass demo y rige authenticateAdmin.
+  process.env.FIREBASE_PROJECT_ID = 'test-project';
+  try {
+    const res = await analytics({ httpMethod: 'POST', headers: {}, body: '{}' });
+    assert.equal(res.statusCode, 401);
+  } finally {
+    delete process.env.FIREBASE_PROJECT_ID;
+  }
+});
