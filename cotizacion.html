@@ -361,10 +361,13 @@
       <!-- CTAs (hidden in print) -->
       <div class="quote-ctas no-print">
         <div class="quote-ctas-inner">
-          <button id="acceptPayBtn" type="button" class="btn btn-primary">Aceptar y reservar <span aria-hidden="true">→</span></button>
+          <button id="payWompiBtn" type="button" class="btn btn-primary">Pagar con Wompi <span aria-hidden="true">→</span></button>
+          <button id="payMpBtn" type="button" class="btn btn-primary">Pagar con Mercado Pago <span aria-hidden="true">→</span></button>
+          <button id="acceptPayBtn" type="button" class="btn btn-primary" style="display:none">Copiar link de pago <span aria-hidden="true">→</span></button>
           <a id="quoteWaLink" href="https://api.whatsapp.com/send/?phone=573102490414&text=Hola%2C+quisiera+proceder+con+la+cotizaci%C3%B3n" target="_blank" rel="noopener noreferrer" class="btn btn-ghost-dark">Contactar por WhatsApp</a>
           <button id="downloadPdfBtn" type="button" class="btn btn-ghost-dark">Descargar PDF</button>
         </div>
+        <p class="quote-pay-providers" style="font-size:12px;color:var(--ink-500);margin-top:8px;text-align:center;">Wompi: tarjetas colombianas, PSE, Nequi · Mercado Pago: tarjetas internacionales y cuenta MP</p>
         <p id="payMessage" class="quote-pay-msg" style="display:none"></p>
       </div>
 
@@ -469,22 +472,32 @@ function showPayMessage(text, kind) {
   el.style.color = kind === 'error' ? 'var(--terracotta-700)' : 'var(--olive-700)';
 }
 
-async function startQuotePayment() {
-  if (!QUOTE_PAY) return;
-  if (IS_PREVIEW) {
-    const payUrl = window.location.origin + window.location.pathname + '?id=' + encodeURIComponent(QUOTE_PAY.id) + (QUOTE_PAY.token ? '&t=' + encodeURIComponent(QUOTE_PAY.token) : '');
-    try {
-      await navigator.clipboard.writeText(payUrl);
-      showPayMessage('Link de pago copiado ✓ — envíaselo al cliente para que pague esta cotización.', 'ok');
-    } catch (e) {
-      showPayMessage('Link de pago: ' + payUrl, 'ok');
-    }
-    return;
-  }
-  const btn = document.getElementById('acceptPayBtn');
-  if (btn) btn.disabled = true;
+function setPayButtonsDisabled(disabled) {
+  ['payWompiBtn', 'payMpBtn'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.disabled = disabled;
+  });
+}
 
-  /* Re-check availability before charging */
+/* Admin preview: copy the client payment link instead of charging. */
+async function copyPayLink() {
+  if (!QUOTE_PAY) return;
+  const payUrl = window.location.origin + window.location.pathname + '?id=' + encodeURIComponent(QUOTE_PAY.id) + (QUOTE_PAY.token ? '&t=' + encodeURIComponent(QUOTE_PAY.token) : '');
+  try {
+    await navigator.clipboard.writeText(payUrl);
+    showPayMessage('Link de pago copiado ✓ — envíaselo al cliente para que pague esta cotización.', 'ok');
+  } catch (e) {
+    showPayMessage('Link de pago: ' + payUrl, 'ok');
+  }
+}
+
+/* Charge the quote. `method` is 'wompi' or 'mercadopago' — the client picks. */
+async function startQuotePayment(method) {
+  if (!QUOTE_PAY) return;
+  setPayButtonsDisabled(true);
+
+  /* Re-check availability before charging (skipped server-side for overbooking
+     quotes, which intentionally proceed to a reservationPending booking). */
   showPayMessage('Verificando disponibilidad…', 'ok');
   try {
     const r = await fetch('/api/quote-availability?id=' + encodeURIComponent(QUOTE_PAY.id) + (QUOTE_PAY.token ? '&t=' + encodeURIComponent(QUOTE_PAY.token) : ''));
@@ -501,22 +514,23 @@ async function startQuotePayment() {
           : 'La cotización ya no está disponible. Contáctanos para una nueva.';
       }
       showPayMessage(msg, 'error');
-      if (a.reason === 'aceptada' && btn) { btn.style.display = 'none'; } else if (btn) { btn.disabled = false; }
+      if (a.reason === 'aceptada') { setPayButtonsDisabled(true); ['payWompiBtn', 'payMpBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = 'none'; }); }
+      else { setPayButtonsDisabled(false); }
       return;
     }
   } catch (e) { /* fail open — webhook re-checks before booking */ }
   showPayMessage('', 'ok');
   document.getElementById('payMessage').style.display = 'none';
 
-  if (PAYMENT_PROVIDER === 'wompi') {
+  if (method === 'wompi') {
     if (typeof window.WidgetCheckout === 'undefined') {
       showPayMessage('La pasarela de pago Wompi no se cargó correctamente. Recarga la página e inténtalo de nuevo.', 'error');
-      if (btn) btn.disabled = false;
+      setPayButtonsDisabled(false);
       return;
     }
     if (!WOMPI_PUBLIC_KEY) {
-      showPayMessage('La llave pública de Wompi no está configurada. Contáctanos para completar el pago.', 'error');
-      if (btn) btn.disabled = false;
+      showPayMessage('La llave pública de Wompi no está configurada. Contáctanos o usa Mercado Pago.', 'error');
+      setPayButtonsDisabled(false);
       return;
     }
 
@@ -538,8 +552,8 @@ async function startQuotePayment() {
       }
       wompiSignature = sigData.signature;
     } catch (e) {
-      showPayMessage('No se pudo preparar la firma de seguridad de Wompi. Inténtalo de nuevo o contáctanos.', 'error');
-      if (btn) btn.disabled = false;
+      showPayMessage('No se pudo preparar la firma de seguridad de Wompi. Inténtalo de nuevo o usa Mercado Pago.', 'error');
+      setPayButtonsDisabled(false);
       return;
     }
 
@@ -558,12 +572,12 @@ async function startQuotePayment() {
     });
 
     checkout.open(function (result) {
-      if (btn) btn.disabled = false;
+      setPayButtonsDisabled(false);
       const tx = result && result.transaction;
       if (!tx) return;
       if (tx.status === 'APPROVED') {
         showPayMessage('¡Pago aprobado! Tu reserva se está confirmando. Recibirás la confirmación por correo.', 'ok');
-        if (btn) { btn.disabled = true; btn.textContent = 'Pago confirmado ✓'; }
+        setPayButtonsDisabled(true);
       } else if (tx.status === 'PENDING') {
         showPayMessage('Tu pago quedó pendiente de confirmación. Te avisaremos cuando se apruebe.', 'ok');
       } else if (tx.status === 'DECLINED') {
@@ -575,7 +589,7 @@ async function startQuotePayment() {
     return;
   }
 
-  /* Mercado Pago rollback path. */
+  /* Mercado Pago: redirect to Checkout Pro. */
   try {
     const pref = await fetch('/api/create-mercadopago-preference', {
       method: 'POST',
@@ -586,8 +600,8 @@ async function startQuotePayment() {
     if (!pref.ok || !data.init_point) throw new Error(data.message || data.error || 'No se pudo crear la preferencia de pago.');
     window.location.href = data.init_point;
   } catch (e) {
-    if (btn) btn.disabled = false;
-    showPayMessage(e.message || 'No se pudo iniciar la pasarela de pago. Inténtalo de nuevo o contáctanos.', 'error');
+    setPayButtonsDisabled(false);
+    showPayMessage(e.message || 'No se pudo iniciar Mercado Pago. Inténtalo de nuevo o usa Wompi.', 'error');
   }
 }
 
@@ -843,26 +857,26 @@ function renderQuote(q) {
   const waMsg = encodeURIComponent('Hola, quisiera proceder con la cotización ' + q.quoteId + ' de ' + q.empresa + '.');
   document.getElementById('quoteWaLink').href = 'https://api.whatsapp.com/send/?phone=573102490414&text=' + waMsg;
 
-  /* Already paid: hide the pay button and show a confirmation banner */
+  /* Already paid: hide all pay buttons and show a confirmation banner */
+  const hidePayButtons = () => ['payWompiBtn', 'payMpBtn', 'acceptPayBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = 'none'; });
   if (q.paid) {
-    const payBtn = document.getElementById('acceptPayBtn');
-    if (payBtn) payBtn.style.display = 'none';
+    hidePayButtons();
     showPayMessage(q.bookingCode
       ? 'Esta cotización ya fue pagada y reservada. Código de reserva: ' + q.bookingCode + '.'
       : 'Esta cotización ya fue pagada y reservada.', 'ok');
   } else if (IS_PREVIEW) {
-    /* Preview mode (admin): relabel the button to copy the client payment link */
-    const payBtn = document.getElementById('acceptPayBtn');
-    if (payBtn) payBtn.textContent = 'Copiar link de pago';
-    showPayMessage('Vista previa — el cliente verá aquí "Aceptar y reservar". Usa este botón para copiar y enviarle el link de pago.', 'ok');
+    /* Preview mode (admin): hide the client pay buttons, show the copy-link button */
+    ['payWompiBtn', 'payMpBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.style.display = 'none'; });
+    const copyBtn = document.getElementById('acceptPayBtn');
+    if (copyBtn) copyBtn.style.display = '';
+    showPayMessage('Vista previa — el cliente verá aquí los botones de pago (Wompi y Mercado Pago). Usa este botón para copiar y enviarle el link de pago.', 'ok');
   } else {
     const paymentStatus = new URLSearchParams(window.location.search).get('payment');
     if (paymentStatus === 'success') {
       showPayMessage('Pago recibido. Estamos confirmando tu reserva; recibirás la confirmación por correo.', 'ok');
-      const payBtn = document.getElementById('acceptPayBtn');
-      if (payBtn) payBtn.disabled = true;
+      setPayButtonsDisabled(true);
     } else if (paymentStatus === 'pending') {
-      showPayMessage('Tu pago quedó pendiente de aprobación. Te avisaremos cuando Wompi lo confirme.', 'ok');
+      showPayMessage('Tu pago quedó pendiente de aprobación. Te avisaremos cuando se confirme.', 'ok');
     } else if (paymentStatus === 'failure') {
       showPayMessage('No se completó el pago. Puedes intentarlo de nuevo o contactarnos.', 'error');
     }
@@ -923,10 +937,12 @@ async function downloadPDF() {
 }
 
 document.addEventListener('click', function(e) {
-  const t = e.target.closest ? e.target.closest('#downloadPdfBtn, #acceptPayBtn') : e.target;
+  const t = e.target.closest ? e.target.closest('#downloadPdfBtn, #acceptPayBtn, #payWompiBtn, #payMpBtn') : e.target;
   if (!t) return;
   if (t.id === 'downloadPdfBtn') downloadPDF();
-  else if (t.id === 'acceptPayBtn') startQuotePayment();
+  else if (t.id === 'acceptPayBtn') copyPayLink();
+  else if (t.id === 'payWompiBtn') startQuotePayment('wompi');
+  else if (t.id === 'payMpBtn') startQuotePayment('mercadopago');
 });
 
 loadQuote();
