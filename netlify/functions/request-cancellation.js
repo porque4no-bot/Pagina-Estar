@@ -19,6 +19,7 @@ const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const { sendEmail, adminEmail, esc, formatCOP, formatDateES } = require('./_email');
 const { helpers: bookingHelpers } = require('./get-booking');
 const { getSessionKey } = require('./_otasync');
+const { createRefundRequest, recoverPaymentInfo } = require('./_refunds-store');
 
 /* A repeated request for the same booking within this window is answered as
    success without re-alerting the hotel (guests double-click / retry). */
@@ -152,6 +153,20 @@ async function submitCancellationRequest({ bookingCode, providedFactor, clientIp
     } catch (e) {
       console.error('[request-cancellation] guest ack failed:', e.message);
     }
+  }
+
+  /* Fase 1 de reembolsos: registrar el reembolso (estado NEEDS_REVIEW) para que
+     un admin lo apruebe/deniegue desde el panel. Idempotente por bookingCode y
+     no-fatal — la solicitud de cancelación ya quedó registrada y notificada. */
+  try {
+    const paymentInfo = await recoverPaymentInfo(booking.bookingCode);
+    await createRefundRequest({
+      booking, paymentInfo, clientIp,
+      source: source || 'web',
+      reason: 'Cancelación solicitada por el huésped'
+    });
+  } catch (e) {
+    if (process.env.DEBUG) console.warn('[request-cancellation] refund record creation failed:', e.message);
   }
 
   return { ok: true, code: 'submitted', booking };
