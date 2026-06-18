@@ -460,9 +460,8 @@ function ExtrasPanel({ extras, setExtras, search, room, onContinue, lang }) {
   const base = room ? room.priceFlexible : 0; /* los % usan la noche base */
 
   function toggle(id) { setExtras(prev => ({ ...prev, [id]: !prev[id] })); }
-  function setEarly(tier) { setExtras(prev => ({ ...prev, early: prev.early === tier ? null : tier })); }
 
-  /* Monto resuelto de un extra simple (no early tiers). */
+  /* Monto resuelto de cada extra. */
   function lineAmount(ex) {
     if (ex.kind === 'perGuestNight') return ex.price * search.guests * nights;
     if (ex.kind === 'pct') return Math.round(base * ex.pct);
@@ -478,43 +477,7 @@ function ExtrasPanel({ extras, setExtras, search, room, onContinue, lang }) {
           const exName = t.extrasNames[ex.id] || ex.name;
           const exDesc = t.extrasDescs[ex.id] || ex.desc;
 
-          /* Early check-in: 3 tramos mutuamente excluyentes (radio). */
-          if (ex.kind === 'earlyTiers') {
-            const tiers = (t.extrasTiers && t.extrasTiers[ex.id]) || null;
-            return (
-              <div key={ex.id} className={`be-extra-row${extras.early ? ' checked' : ''}`} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Icon name={ex.icon} size={18} className="be-extra-icon" />
-                  <div className="be-extra-info">
-                    <span className="be-extra-name">{exName}</span>
-                    <span className="be-extra-desc">{exDesc}</span>
-                  </div>
-                </div>
-                <div className="be-extra-tiers" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
-                  {ex.tiers.map((tier, ti) => {
-                    const active = extras.early === tier.id;
-                    const tierLabel = (tiers && tiers[ti]) || tier.label;
-                    return (
-                      <label key={tier.id} className={`be-extra-tier${active ? ' checked' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                        <input type="radio" name="be-early-tier" checked={active} onChange={() => setEarly(tier.id)} />
-                        <span style={{ flex: 1 }}>{tierLabel}</span>
-                        <span className="be-extra-total">{formatCOP(Math.round(base * tier.pct))}</span>
-                      </label>
-                    );
-                  })}
-                  {extras.early && (
-                    <button type="button" className="be-extra-clear"
-                      style={{ alignSelf: 'flex-start', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', fontSize: 12, opacity: 0.7, padding: 0 }}
-                      onClick={() => setEarly(null)}>
-                      {lang === 'es' ? 'Quitar early check-in' : 'Remove early check-in'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          }
-
-          /* Extras simples (checkbox): desayuno, late, mascota. */
+          /* Extras (checkbox): desayuno, late, early, mascota. */
           const exUnit = t.extrasUnits[ex.unit] || ex.unit;
           const displayPrice = ex.kind === 'perGuestNight' ? ex.price : lineAmount(ex);
           return (
@@ -1153,12 +1116,6 @@ function BookingSummary({ booking, search, lang }) {
             let breakdown = '';
             if (line.key === 'desayuno') {
               breakdown = `${formatCOP(20000)} × ${search.guests} ${search.guests === 1 ? t.huesped : t.huespedes} × ${nights} ${nights === 1 ? t.noche : t.noches}`;
-            } else if (line.key === 'early' && line.tier) {
-              const tiers = t.extrasTiers && t.extrasTiers.early;
-              const earlyDef = BE_EXTRAS.find(e => e.id === 'early');
-              const ti = earlyDef && earlyDef.tiers ? earlyDef.tiers.findIndex(tt => tt.id === line.tier) : -1;
-              const tierLabel = (tiers && ti >= 0 && tiers[ti]) || (ti >= 0 ? earlyDef.tiers[ti].label : '');
-              if (tierLabel) label = `${exName} · ${tierLabel}`;
             }
             return (
               <div key={line.key + li} className="be-summary-line sm" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>

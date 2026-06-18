@@ -33,13 +33,9 @@ test('reservar.html calcTotal extras math matches _pricing', () => {
   // late check-out = 15% of the base nightly
   assert.equal(floatAfter(/extras\.late\)lines\.push\(\{key:'late',amount:Math\.round\(base\*([\d.]+)\)/),
     EXTRAS_PRICES.late.pct, 'late pct drifted');
-  // early check-in tiers = 15 / 35 / 50 % of the base nightly
-  assert.equal(floatAfter(/extras\.early==='t1'\)lines\.push\(\{key:'early',tier:'t1',amount:Math\.round\(base\*([\d.]+)\)/),
-    EXTRAS_PRICES.early.pct, 'early t1 pct drifted');
-  assert.equal(floatAfter(/extras\.early==='t2'\)lines\.push\(\{key:'early',tier:'t2',amount:Math\.round\(base\*([\d.]+)\)/),
-    EXTRAS_PRICES.early2.pct, 'early t2 pct drifted');
-  assert.equal(floatAfter(/extras\.early==='t3'\)lines\.push\(\{key:'early',tier:'t3',amount:Math\.round\(base\*([\d.]+)\)/),
-    EXTRAS_PRICES.early3.pct, 'early t3 pct drifted');
+  // early check-in = 25% of the base nightly
+  assert.equal(floatAfter(/extras\.early\)lines\.push\(\{key:'early',amount:Math\.round\(base\*([\d.]+)\)/),
+    EXTRAS_PRICES.early.pct, 'early pct drifted');
   // mascota = flat charge (VAT included)
   assert.equal(numberAfter(/extras\.mascota\?(\d+)/),
     EXTRAS_PRICES.mascota.price, 'mascota price drifted');
@@ -57,11 +53,8 @@ test('reservar.html BE_EXTRAS catalogue matches _pricing', () => {
   };
   assert.equal(numFor('desayuno', 'price'), EXTRAS_PRICES.desayuno.price);
   assert.equal(numFor('late', 'pct'), EXTRAS_PRICES.late.pct);
+  assert.equal(numFor('early', 'pct'), EXTRAS_PRICES.early.pct);
   assert.equal(numFor('mascota', 'price'), EXTRAS_PRICES.mascota.price);
-  // early check-in tiers
-  assert.equal(numFor('t1', 'pct'), EXTRAS_PRICES.early.pct);
-  assert.equal(numFor('t2', 'pct'), EXTRAS_PRICES.early2.pct);
-  assert.equal(numFor('t3', 'pct'), EXTRAS_PRICES.early3.pct);
 });
 
 test('server modules consume the shared _pricing source', () => {

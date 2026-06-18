@@ -74,31 +74,25 @@ test('decodeDirectReference rejects non-base64 garbage', () => {
   assert.equal(decodeDirectReference(null), null);
 });
 
-test('computeExtrasTotal: breakfast/parking fixed, late/early(t1) as % of the base nightly', () => {
+test('computeExtrasTotal: breakfast/parking fixed, late (15%) and early (25%) as % of base nightly', () => {
   const { computeExtrasTotal } = require('../../netlify/functions/_direct-pricing');
-  /* mask = desayuno+parqueadero+late+early(t1), guests=2, nights=3, base 200k */
-  const total = computeExtrasTotal('111100000', 2, 3, 200000);
+  /* mask = desayuno+parqueadero+late+early, guests=2, nights=3, base 200k */
+  const total = computeExtrasTotal('1111000', 2, 3, 200000);
   // desayuno: 20000 * 2 * 3 = 120000
   // parqueadero: 25000 * 3 = 75000
   // late: 15% of 200000 = 30000
-  // early t1: 15% of 200000 = 30000
-  assert.equal(total, 120000 + 75000 + 30000 + 30000);
-});
-
-test('computeExtrasTotal: early tier 2 (35%) and tier 3 (50%) of the base nightly', () => {
-  const { computeExtrasTotal } = require('../../netlify/functions/_direct-pricing');
-  assert.equal(computeExtrasTotal('000000100', 1, 2, 200000), 70000);   // early2 = 35%
-  assert.equal(computeExtrasTotal('000000010', 1, 2, 200000), 100000);  // early3 = 50%
+  // early: 25% of 200000 = 50000
+  assert.equal(total, 120000 + 75000 + 30000 + 50000);
 });
 
 test('computeExtrasTotal: mascota is a flat $200k charge regardless of nights', () => {
   const { computeExtrasTotal } = require('../../netlify/functions/_direct-pricing');
-  assert.equal(computeExtrasTotal('000000001', 1, 5, 300000), 200000);
+  assert.equal(computeExtrasTotal('0000001', 1, 5, 300000), 200000);
 });
 
 test('computeExtrasTotal is zero when mask is all zeros or missing', () => {
   const { computeExtrasTotal } = require('../../netlify/functions/_direct-pricing');
-  assert.equal(computeExtrasTotal('000000000', 2, 3, 200000), 0);
+  assert.equal(computeExtrasTotal('0000000', 2, 3, 200000), 0);
   assert.equal(computeExtrasTotal('', 2, 3, 200000), 0);
 });
 
@@ -248,7 +242,7 @@ test('verifyDirectBookingAmount accepts late check-out (%) + mascota (flat)', as
     const decoded = {
       checkin: '2026-07-01', checkout: '2026-07-03', guestsCount: 1,
       roomTypeId: '31348',
-      extrasMask: '001000001' /* late (idx2) + mascota (idx8) */
+      extrasMask: '0010001' /* late (idx2) + mascota (idx6) */
     };
     /* Base nightly 200k, 2 nights -> 400000.
        Late check-out 15% of 200000 = 30000; mascota flat 200000.

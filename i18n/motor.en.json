@@ -153,13 +153,10 @@
     "desayuno": "Coffee, fresh fruit, and eggs served every morning",
     "parqueadero": "Covered parking garage in the building",
     "late": "Late check-out until 2:00 pm (subject to availability)",
-    "early": "Check in earlier (subject to availability)",
+    "early": "Check in from 6:00 am (subject to availability)",
     "traslado": "To or from La Nubia Airport",
     "tour": "4 hours with a certified local guide",
     "mascota": "One pet per booking · VAT included"
-  },
-  "extrasTiers": {
-    "early": ["2 hours earlier", "From 10:00 am", "From 6:00 am"]
   },
   "extrasUnits": {
     "/persona/noche": "/person/night",
@@ -167,7 +164,8 @@
     "por reserva": "per booking",
     "por trayecto": "per way",
     "/persona": "/person",
-    "15% de la noche": "15% of the night"
+    "15% de la noche": "15% of the night",
+    "25% de la noche": "25% of the night"
   },
   "paymentNames": {
     "mercadopago": "Secure online payment (Mercado Pago)",

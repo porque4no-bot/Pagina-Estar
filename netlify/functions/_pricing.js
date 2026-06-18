@@ -25,16 +25,14 @@ const EXTRAS_PRICES = {
   desayuno:    { price: 20000,  multiplier: 'perGuestPerNight' },
   parqueadero: { price: 25000,  multiplier: 'perNight' },   /* reservado (fuera de UI) */
   late:        { pct: 0.15,     multiplier: 'pctOfNight' },  /* check-out hasta 2pm = 15% */
-  early:       { pct: 0.15,     multiplier: 'pctOfNight' },  /* early tramo 1 (2h antes) = 15% */
+  early:       { pct: 0.25,     multiplier: 'pctOfNight' },  /* early check-in desde 6am = 25% */
   traslado:    { price: 0,      multiplier: 'flat' },        /* reservado */
   tour:        { price: 0,      multiplier: 'flat' },        /* reservado */
-  early2:      { pct: 0.35,     multiplier: 'pctOfNight' },  /* early tramo 2 (desde 10am) = 35% */
-  early3:      { pct: 0.50,     multiplier: 'pctOfNight' },  /* early tramo 3 (desde 6am) = 50% */
   mascota:     { price: 200000, multiplier: 'flat' }         /* $200k por reserva (IVA incluido) */
 };
 
 /* Order matters: index == position in the extras mask string. APPEND ONLY. */
-const EXTRAS_KEYS = ['desayuno', 'parqueadero', 'late', 'early', 'traslado', 'tour', 'early2', 'early3', 'mascota'];
+const EXTRAS_KEYS = ['desayuno', 'parqueadero', 'late', 'early', 'traslado', 'tour', 'mascota'];
 
 module.exports = {
   EXTRA_GUEST_SURCHARGE,
