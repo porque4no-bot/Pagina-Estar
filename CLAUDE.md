@@ -186,7 +186,7 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 |---|---|
 | `guest-session` | Issues signed JWT session token (no OTASync credentials exposed to client) |
 | `guest-checkin` | Document upload handler; optional Azure Document Intelligence OCR; multi-occupant support |
-| `guest-action` | Guest requests: extras, modifications, cancellations |
+| `guest-action` | Guest requests: service orders (priced from `_services-catalog.js`), modifications, cancellations. Service orders can charge the reservation folio in OTASync/Kunas — `add_extra` on **"cargar a la cuenta"** (gated by `GUEST_SERVICE_FOLIO_ENABLED`), or a signed Wompi checkout on **"pagar en línea"** (`GUEST_SERVICE_PAYMENT_MODE=wompi`) settled by `wompi-webhook` (`add_extra`+`add_payment`). Both off by default. |
 | `guest-sync` | Receives guest events, stores AES-256-GCM encrypted in Blobs |
 | `guest-drive` | Forwards documents/data to Google Drive via Apps Script |
 | `upload-drive-credentials` | Service account credential upload (admin) |
@@ -222,7 +222,7 @@ See `docs/whatsapp-bot.md` for setup (credentials checklist, sandbox, flows, 24h
 | `_whatsapp-ai` | AI mode: Claude (`@anthropic-ai/sdk`, Messages API, manual tool-use loop) drives the conversation with tools `check_availability` / `lookup_booking` / `request_cancellation` / `notify_team`; text-only history in the session blob; falls back to the state machine on error. **Authorization is code, not prompt**: cancellation requires a second-factor-verified lookup in the same conversation (`verifiedBookings`), and the WhatsApp number is correlated against the booking phone for audit |
 | `_whatsapp-guard` | Security pre-filter (dual-model pipeline): a fast classifier screens every message for prompt injection / impersonation / data extraction BEFORE the concierge model; `malicious` ⇒ blocked with neutral reply, never enters AI history; 3 strikes ⇒ admin alert; fail-open on classifier errors |
 
-**OTASync/Kunas API reference:** `docs/kunas-api.md`. OTASync supports native webhooks (`reservation` insert/edit/cancel, `avail` edit, `prices`, `restrictions`) and a `reservation/delete/reservation` endpoint to release quote holds.
+**OTASync/Kunas API reference:** `docs/kunas-api.md` (project notes) and `docs/OTASync-Public-API.md` (the **complete** vendor API reference — auth, availability, prices, reservations, extras, invoices, webhooks, statistics, etc.). OTASync supports native webhooks (`reservation` insert/edit/cancel, `avail` edit, `prices`, `restrictions`) and a `reservation/delete/reservation` endpoint to release quote holds. Reservation folio endpoints (`reservation/edit/add_extra`, `add_payment`) back the guest-app service-order → folio integration (`_otasync.postOrderExtrasToFolio`, gated by `GUEST_SERVICE_FOLIO_ENABLED`).
 
 **Quote availability & holds:** Quotes can optionally place a tentative hold in OTASync (`bloquearHabitaciones`) via `_otasync.createHold`; held rooms are guaranteed so availability checks are skipped. Holds are released on cancel, on expiry (cron), and converted to a confirmed reservation on payment. Hold status is configurable via `OTASYNC_HOLD_STATUS` (default `tentative`).
 
@@ -315,8 +315,11 @@ GUEST_APP_SYNC_WEBHOOK_URL=
 GUEST_APP_SYNC_WEBHOOK_SECRET=
 GUEST_APP_DRIVE_WEBHOOK_URL=
 GUEST_APP_DRIVE_WEBHOOK_SECRET=
-GUEST_SERVICE_PAYMENT_MODE=
-GUEST_SERVICE_PAYMENT_URL=
+GUEST_SERVICE_PAYMENT_MODE=        # room_charge | payment_link | wompi (online charge → folio)
+GUEST_SERVICE_PAYMENT_URL=        # used when mode = payment_link
+GUEST_APP_BASE_URL=               # optional: site origin for the Wompi redirect-url
+GUEST_SERVICE_FOLIO_ENABLED=      # 'true' to post "cargar a la cuenta" orders to the Kunas folio
+OTASYNC_GUEST_SERVICE_EXTRA_ID=   # optional: id_extras for folio lines (else a generic one is auto-created)
 ```
 
 **Azure Document Intelligence (OCR):**

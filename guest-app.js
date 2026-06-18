@@ -1749,6 +1749,22 @@
     if (minorMotherInput) minorMotherInput.addEventListener('input', onMinorParentInput);
   }
 
+  /* After paying a service order online, Wompi redirects back to
+     guest.html?order=<ref>. Show a neutral confirmation (the charge lands on the
+     folio asynchronously via the webhook) and clean the URL. */
+  function handlePaymentReturn() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get('order') || !state.token) return;
+    openTab('services');
+    $('#guestCart').hidden = false;
+    setStatus($('#orderStatus'), 'Recibimos tu pago. El cargo se reflejará en tu cuenta en breve.', 'success');
+    if (window.history && window.history.replaceState) {
+      params.delete('order');
+      const q = params.toString();
+      window.history.replaceState({}, '', window.location.pathname + (q ? `?${q}` : ''));
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     bindEvents();
     applyGuestI18n();
@@ -1765,6 +1781,7 @@
     } else {
       showLogin();
     }
+    handlePaymentReturn();
     if (window.lucide) window.lucide.createIcons();
     window.addEventListener('load', () => {
       if (window.lucide) window.lucide.createIcons();
