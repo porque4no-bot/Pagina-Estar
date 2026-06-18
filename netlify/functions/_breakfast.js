@@ -14,6 +14,12 @@
 const { getReservationDetail } = require('./_guest-app');
 const { getBookingRedemptions, todayBogota } = require('./_breakfast-store');
 
+/* Horario del comedor (decisión del dueño, 2026-06-18): desayuno de 7:00 a 10:00
+   a. m., con posibilidad de servir antes si el huésped lo solicita con antelación.
+   Fuente única para el correo (send-confirmation) y la página de pases
+   (breakfast-passes → pase-desayuno.html). */
+const BREAKFAST_SCHEDULE = '7:00 a 10:00 a. m.';
+
 /* Extrae el derecho de desayuno del payload crudo de OTASync.
  * Estructura real (docs/OTASync-Public-API.md, detalle de reserva): el array de
  * habitaciones es `reservation_rooms` (NO `rooms` — eso es disponibilidad), con
@@ -123,6 +129,7 @@ function pickNextGuestIndex(status) {
 }
 
 module.exports = {
+  BREAKFAST_SCHEDULE,
   extractBreakfastEntitlement,
   demoEntitlement,
   withinStay,
