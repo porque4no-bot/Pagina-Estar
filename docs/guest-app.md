@@ -101,13 +101,17 @@ El ID de la carpeta raíz no se guarda en Netlify. Se configura como propiedad `
 
 ## Siguiente fase recomendada
 
-1. Confirmar los endpoints privados de OTASync para actualizar huésped, adjuntar documento, agregar extras y consultar facturas.
+> Ya implementado: archivo en Drive con carpetas por reserva
+> (`integrations/google-drive-apps-script/`); cobro de pedidos de servicios con
+> Wompi y cargo al folio de Kunas (Fases A/B/C, apagadas por defecto — ver
+> `configuracion-kunas.md` Flujo D y `pendientes.md` §0).
+
+1. Confirmar los endpoints privados de OTASync para actualizar huésped, adjuntar documento y consultar facturas (el folio de extras ya está cubierto por `postOrderExtrasToFolio`).
 2. Elegir proveedor de firma con evidencia legal si el contrato requiere una firma avanzada.
-3. Crear el servicio de archivo en Drive con carpetas y permisos restringidos.
-4. Conectar pagos de servicios con Wompi.
-5. Añadir enlaces únicos por reserva enviados por correo y WhatsApp.
-6. Mostrar llaves digitales o códigos de acceso solo después del check-in validado.
-7. Incorporar chat, estado de pedidos, encuestas durante la estancia y recuperación de objetos olvidados.
+3. Push de los datos de check-in (documento, nacionalidad) al PMS para cerrar el loop SIRE/TRA (ver `pendientes.md` §2).
+4. Añadir enlaces únicos por reserva enviados por correo y WhatsApp.
+5. Mostrar llaves digitales o códigos de acceso solo después del check-in validado.
+6. Incorporar chat, estado de pedidos, encuestas durante la estancia y recuperación de objetos olvidados.
 
 ## Referencias
 
