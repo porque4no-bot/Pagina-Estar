@@ -54,6 +54,7 @@ Root HTML pages (Spanish, canonical):
 | `faq.html` | FAQ |
 | `cotizacion.html` | Corporate quote viewer |
 | `cotizar-admin.html` | Admin: quote management (noindex) |
+| `desayuno.html` | Staff: breakfast-pass verifier — scan/lookup a reservation, mark breakfast served (noindex) |
 | `privacidad.html` / `aviso-legal.html` / `cancelacion.html` / `cookies.html` / `escnna.html` | Legal |
 | `404.html` | Error page |
 
@@ -187,6 +188,7 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | `guest-session` | Issues signed JWT session token (no OTASync credentials exposed to client) |
 | `guest-checkin` | Document upload handler; optional Azure Document Intelligence OCR; multi-occupant support |
 | `guest-action` | Guest requests: service orders (priced from `_services-catalog.js`), modifications, cancellations. Service orders can charge the reservation folio in OTASync/Kunas — `add_extra` on **"cargar a la cuenta"** (gated by `GUEST_SERVICE_FOLIO_ENABLED`), or a signed Wompi checkout on **"pagar en línea"** (`GUEST_SERVICE_PAYMENT_MODE=wompi`) settled by `wompi-webhook` (`add_extra`+`add_payment`). Both off by default. Emails the team a summary of every order via Resend (`notifyOrderTeam`). |
+| `breakfast-status` / `breakfast-redeem` | Breakfast pass (Fase 1): staff scans a guest QR (`bookingCode:guestIndex`) to check entitlement and mark a breakfast served. Auth via `_staff-auth` (Firebase + `STAFF_EMAILS`). Redemptions stored in Blobs (`breakfast-redemptions`), idempotent 1/person/day. Staff panel: `desayuno.html` |
 | `guest-sync` | Receives guest events, stores AES-256-GCM encrypted in Blobs |
 | `guest-drive` | Forwards documents/data to Google Drive via Apps Script |
 | `upload-drive-credentials` | Service account credential upload (admin) |

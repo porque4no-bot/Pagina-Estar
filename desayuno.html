@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Verificador de desayuno — Hotel Estar</title>
+  <link rel="icon" href="favicon.png">
+  <link rel="stylesheet" href="colors_and_type.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font-body, system-ui, sans-serif);
+      color: var(--ink, #2a2a28);
+      background: var(--paper, #f6f3ec);
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 520px; margin: 0 auto; padding: 16px; }
+
+    /* Login overlay */
+    .auth-overlay {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: var(--paper, #f6f3ec); padding: 24px; z-index: 50;
+    }
+    .auth-card {
+      background: var(--white, #fff); border: 1px solid var(--border, #e0dccf);
+      border-radius: 16px; padding: 32px 24px; max-width: 360px; width: 100%; text-align: center;
+    }
+    .auth-card img { height: 40px; margin-bottom: 16px; }
+    .auth-card h1 { font-size: 20px; margin: 0 0 8px; font-weight: 600; }
+    .auth-card p { font-size: 14px; color: var(--fg-muted, #6b6660); margin: 0 0 20px; line-height: 1.5; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      border: 1px solid var(--ink, #2a2a28); background: var(--ink, #2a2a28); color: var(--white, #fff);
+      border-radius: 12px; padding: 14px 20px; font-size: 16px; font-weight: 500;
+      cursor: pointer; width: 100%; font-family: inherit;
+    }
+    .btn:active { transform: scale(0.99); }
+    .btn-ghost { background: transparent; color: var(--ink, #2a2a28); border-color: var(--border, #cfc9bb); }
+    .btn[disabled] { opacity: .5; pointer-events: none; }
+
+    /* Header */
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border, #e0dccf); }
+    .topbar .title { font-size: 15px; font-weight: 600; }
+    .topbar .who { font-size: 12px; color: var(--fg-muted, #6b6660); }
+    .topbar button { background: none; border: none; color: var(--fg-muted, #6b6660); font-size: 13px; cursor: pointer; text-decoration: underline; }
+
+    /* Scanner + manual */
+    .panel { background: var(--white, #fff); border: 1px solid var(--border, #e0dccf); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--fg-muted, #6b6660); margin: 0 0 12px; font-weight: 600; }
+    #scanArea { display: none; margin-bottom: 12px; }
+    #scanArea video { width: 100%; border-radius: 12px; background: #000; aspect-ratio: 4/3; object-fit: cover; }
+    .hint { font-size: 12px; color: var(--fg-muted, #6b6660); margin-top: 8px; line-height: 1.5; }
+    .manual-row { display: flex; gap: 8px; }
+    .manual-row input {
+      flex: 1; border: 1px solid var(--border, #cfc9bb); border-radius: 12px; padding: 13px 14px;
+      font-size: 16px; font-family: inherit; background: var(--paper, #faf8f2); color: inherit;
+    }
+    .manual-row .btn { width: auto; padding: 13px 18px; }
+
+    /* Result card */
+    #result:empty { display: none; }
+    .res {
+      border-radius: 14px; padding: 18px; border: 1px solid var(--border, #e0dccf);
+      background: var(--white, #fff); overflow: hidden;
+    }
+    .res-banner { margin: -18px -18px 14px; padding: 16px 18px; display: flex; align-items: center; gap: 10px; }
+    .res-banner .big { font-size: 18px; font-weight: 600; }
+    .res-banner .sub { font-size: 12px; opacity: .85; }
+    .res--ok .res-banner { background: var(--olive-100, #e7ecd9); color: var(--olive-700, #4a5733); }
+    .res--no .res-banner { background: var(--terracotta-100, #f6ddd0); color: var(--terracotta-700, #8a4226); }
+    .res--done .res-banner { background: var(--sand-100, #efe7d6); color: var(--ink, #5a5446); }
+    .res-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+    .res-row .k { color: var(--fg-muted, #6b6660); }
+    .res-row .v { font-weight: 500; text-align: right; }
+    .res .count { font-size: 28px; font-weight: 700; margin: 6px 0 2px; }
+    .res .count small { font-size: 14px; font-weight: 400; color: var(--fg-muted, #6b6660); }
+    .res .actions { margin-top: 14px; }
+    .icon { width: 30px; height: 30px; flex: none; }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+      background: var(--ink, #2a2a28); color: #fff; padding: 12px 18px; border-radius: 12px;
+      font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 60; max-width: 90%;
+    }
+    .toast.show { opacity: 1; }
+    .err { color: var(--terracotta-700, #8a4226); font-size: 13px; margin-top: 10px; }
+    .demo-tag { display:inline-block; background: var(--sand-100, #efe7d6); color: var(--ink,#5a5446); font-size: 11px; padding: 2px 8px; border-radius: 8px; margin-left: 6px; }
+  </style>
+</head>
+<body>
+
+  <!-- Login -->
+  <div id="authOverlay" class="auth-overlay">
+    <div class="auth-card">
+      <img src="assets/logo.png" alt="estar">
+      <h1>Verificador de desayuno</h1>
+      <p>Acceso para el personal del comedor. Inicia sesión con tu cuenta de Google autorizada.</p>
+      <button id="loginBtn" class="btn">Iniciar sesión con Google</button>
+      <p id="authError" class="err" style="display:none;"></p>
+    </div>
+  </div>
+
+  <!-- App -->
+  <div id="appContent" style="display:none;">
+    <div class="topbar">
+      <div>
+        <div class="title">Verificador de desayuno</div>
+        <div class="who"><span id="userEmailDisplay"></span><span id="demoTag" class="demo-tag" style="display:none;">demo</span></div>
+      </div>
+      <button id="logoutBtn">Cerrar sesión</button>
+    </div>
+
+    <div class="wrap">
+      <div class="panel">
+        <h2>Escanear o buscar</h2>
+        <button id="scanBtn" class="btn btn-ghost">Escanear QR del huésped</button>
+        <div id="scanArea">
+          <video id="video" playsinline muted></video>
+          <button id="stopScanBtn" class="btn btn-ghost" style="margin-top:8px;">Detener cámara</button>
+        </div>
+        <p class="hint" id="scanHint"></p>
+        <div class="manual-row" style="margin-top:12px;">
+          <input id="manualCode" type="text" inputmode="text" autocapitalize="characters"
+                 placeholder="Código de reserva (ej. EST-12345)" autocomplete="off">
+          <button id="lookupBtn" class="btn">Buscar</button>
+        </div>
+      </div>
+
+      <div id="result"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+  /* Lógica del panel del restaurante. La autenticación (token de Firebase) la
+     resuelve el módulo de abajo, que expone window.getAuthToken(). */
+  (function () {
+    var lastQuery = null;       // { code, guestIndex } de la última consulta
+    var scanning = false, scanTimer = null, stream = null, detector = null;
+
+    function $(id) { return document.getElementById(id); }
+
+    function toast(msg) {
+      var t = $('toast'); t.textContent = msg; t.classList.add('show');
+      setTimeout(function () { t.classList.remove('show'); }, 2200);
+    }
+
+    async function api(path, payload) {
+      var headers = { 'Content-Type': 'application/json' };
+      try {
+        var token = await window.getAuthToken();
+        if (token) headers.Authorization = 'Bearer ' + token;
+      } catch (e) { /* sin token: en local el backend lo permite en modo demo */ }
+      var res = await fetch('/api/' + path, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
+      var data = {};
+      try { data = await res.json(); } catch (e) { /* respuesta no-JSON */ }
+      if (!res.ok) { var err = new Error(data.error || ('Error ' + res.status)); err.status = data.status; throw err; }
+      return data;
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
+    var ICON_OK = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-5"/></svg>';
+    var ICON_NO = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg>';
+
+    function render(status, outcome) {
+      lastQuery = { code: status.bookingCode, guestIndex: status.guestIndex };
+      var el = $('result');
+      var stayWarn = status.withinStay === false
+        ? '<div class="res-row"><span class="k">Atención</span><span class="v">Fuera de fechas de estadía</span></div>' : '';
+      var who = escapeHtml(status.guestName || '—');
+      var room = escapeHtml([status.roomNumber, status.roomName].filter(Boolean).join(' · ') || '—');
+
+      if (!status.hasBreakfast) {
+        el.innerHTML =
+          '<div class="res res--no">' +
+            '<div class="res-banner">' + ICON_NO +
+              '<div><div class="big">Sin desayuno incluido</div><div class="sub">Reserva ' + escapeHtml(status.bookingCode) + '</div></div>' +
+            '</div>' +
+            '<div class="res-row"><span class="k">Huésped</span><span class="v">' + who + '</span></div>' +
+            '<div class="res-row"><span class="k">Apartamento</span><span class="v">' + room + '</span></div>' +
+            stayWarn +
+            '<p class="hint">El upgrade en el momento (cobro al folio o en línea) llega en la Fase 3.</p>' +
+          '</div>';
+        return;
+      }
+
+      var allServed = status.remaining <= 0;
+      var personServed = status.thisPersonServed === true;
+      var cls = (allServed || personServed) ? 'res--done' : 'res--ok';
+      var bannerBig = personServed ? 'Esta persona ya desayunó hoy'
+        : allServed ? 'Todos servidos hoy' : 'Desayuno incluido';
+      var personLine = (status.guestIndex != null)
+        ? '<div class="res-row"><span class="k">Persona</span><span class="v">#' + (Number(status.guestIndex) + 1) +
+          (personServed ? ' · ya servida' : ' · pendiente') + '</span></div>'
+        : '';
+
+      var canServe = personServed ? false : status.remaining > 0;
+      var btnLabel = (status.guestIndex != null) ? 'Marcar servido' : 'Marcar 1 servido';
+      var actions = canServe
+        ? '<div class="actions"><button class="btn" id="serveBtn">' + btnLabel + '</button></div>'
+        : '';
+
+      el.innerHTML =
+        '<div class="res ' + cls + '">' +
+          '<div class="res-banner">' + ICON_OK +
+            '<div><div class="big">' + bannerBig + '</div><div class="sub">Reserva ' + escapeHtml(status.bookingCode) + '</div></div>' +
+          '</div>' +
+          '<div class="res-row"><span class="k">Huésped</span><span class="v">' + who + '</span></div>' +
+          '<div class="res-row"><span class="k">Apartamento</span><span class="v">' + room + '</span></div>' +
+          stayWarn +
+          '<div class="count">' + status.servedToday + ' <small>de ' + status.perDay + ' servidos hoy</small></div>' +
+          personLine +
+          actions +
+        '</div>';
+
+      if (canServe) {
+        $('serveBtn').addEventListener('click', function () {
+          serve(status.bookingCode, status.guestIndex);
+        });
+      }
+    }
+
+    function showError(msg) {
+      $('result').innerHTML = '<div class="res"><p class="err" style="margin:0;">' + escapeHtml(msg) + '</p></div>';
+    }
+
+    async function lookup(query) {
+      try {
+        var payload = (typeof query === 'string') ? { qr: query } : query;
+        var data = await api('breakfast-status', payload);
+        render(data.status);
+      } catch (e) { showError(e.message); }
+    }
+
+    async function serve(code, guestIndex) {
+      try {
+        var payload = { code: code };
+        if (guestIndex != null) payload.guestIndex = guestIndex;
+        var data = await api('breakfast-redeem', payload);
+        render(data.status);
+        toast(data.alreadyServed ? 'Ya estaba servido hoy' : 'Desayuno marcado ✓');
+      } catch (e) {
+        if (e.status) { render(e.status); }
+        toast(e.message);
+      }
+    }
+
+    /* ── Escáner QR (BarcodeDetector nativo) ── */
+    function scanSupported() { return ('BarcodeDetector' in window) && navigator.mediaDevices && navigator.mediaDevices.getUserMedia; }
+
+    async function startScan() {
+      if (!scanSupported()) { $('scanHint').textContent = 'Tu navegador no soporta el escaneo. Usa el código de reserva.'; return; }
+      try {
+        detector = detector || new window.BarcodeDetector({ formats: ['qr_code'] });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        var v = $('video'); v.srcObject = stream; await v.play();
+        $('scanArea').style.display = 'block';
+        $('scanBtn').style.display = 'none';
+        scanning = true;
+        scanTimer = setInterval(tick, 350);
+      } catch (e) {
+        $('scanHint').textContent = 'No se pudo abrir la cámara: ' + e.message;
+      }
+    }
+
+    async function tick() {
+      if (!scanning) return;
+      try {
+        var codes = await detector.detect($('video'));
+        if (codes && codes.length) {
+          var value = codes[0].rawValue;
+          stopScan();
+          toast('QR leído');
+          lookup(value);
+        }
+      } catch (e) { /* frame sin código */ }
+    }
+
+    function stopScan() {
+      scanning = false;
+      if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
+      if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+      $('scanArea').style.display = 'none';
+      $('scanBtn').style.display = '';
+    }
+
+    function init() {
+      $('scanBtn').addEventListener('click', startScan);
+      $('stopScanBtn').addEventListener('click', stopScan);
+      $('lookupBtn').addEventListener('click', function () {
+        var code = $('manualCode').value.trim();
+        if (code) lookup({ code: code });
+      });
+      $('manualCode').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { var code = this.value.trim(); if (code) lookup({ code: code }); }
+      });
+      if (!scanSupported()) {
+        $('scanBtn').style.display = 'none';
+        $('scanHint').textContent = 'Escaneo no disponible en este navegador — usa el código de reserva.';
+      }
+    }
+
+    window.__breakfastPanelInit = init;   // el módulo de auth lo llama al mostrar la app
+  })();
+  </script>
+
+  <!-- ── Firebase Google auth (igual patrón que cotizar-admin) ── -->
+  <script type="module">
+    var isLocal = ['localhost', '127.0.0.1', '0.0.0.0'].indexOf(location.hostname) !== -1;
+    var $ = function (id) { return document.getElementById(id); };
+
+    function showApp(email, demo) {
+      $('authOverlay').style.display = 'none';
+      $('appContent').style.display = 'block';
+      $('userEmailDisplay').textContent = email || '';
+      if (demo) $('demoTag').style.display = 'inline-block';
+      if (window.__breakfastPanelInit) window.__breakfastPanelInit();
+    }
+    function showLogin(message) {
+      $('authOverlay').style.display = 'flex';
+      $('appContent').style.display = 'none';
+      var err = $('authError');
+      if (message) { err.textContent = message; err.style.display = 'block'; } else { err.style.display = 'none'; }
+    }
+
+    if (isLocal) {
+      // Modo demo local: sin Firebase. El backend permite el acceso en modo demo.
+      window.getAuthToken = async function () { return ''; };
+      showApp('demo@local', true);
+    } else {
+      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js");
+      const { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } =
+        await import("https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js");
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyAwgKBDAsDb51tZor9vFWo8AnOho5HFPyU",
+        authDomain: "estar-4d0da.firebaseapp.com",
+        projectId: "estar-4d0da",
+        storageBucket: "estar-4d0da.firebasestorage.app",
+        messagingSenderId: "625515728348",
+        appId: "1:625515728348:web:a7cac6610f61e71018d319",
+        measurementId: "G-9LHX50PT8E"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+
+      window.getAuthToken = async function () {
+        const user = auth.currentUser;
+        if (!user) throw new Error('Sesión expirada. Inicia sesión de nuevo.');
+        return user.getIdToken();
+      };
+
+      setPersistence(auth, browserLocalPersistence).catch(function () {});
+      onAuthStateChanged(auth, function (user) { if (!user) { showLogin(); } else { showApp(user.email, false); } });
+
+      $('loginBtn').addEventListener('click', async function () {
+        $('authError').style.display = 'none';
+        try { await signInWithPopup(auth, provider); }
+        catch (err) {
+          if (err && err.code === 'auth/popup-closed-by-user') return;
+          showLogin('No se pudo iniciar sesión: ' + (err && err.message ? err.message : err));
+        }
+      });
+      $('logoutBtn').addEventListener('click', function () { signOut(auth); });
+    }
+  </script>
+</body>
+</html>

@@ -196,6 +196,24 @@ async function getReservation(bookingCode, accessKey) {
   throw error;
 }
 
+/* Like getReservation but also attaches the raw OTASync payload (`.raw`) so the
+   breakfast layer can read per-night / extras flags that the normalized shape
+   drops. Used only by the authenticated staff breakfast panel, so it skips the
+   guest second-factor (accessKey is optional, for demo naming only). */
+async function getReservationDetail(bookingCode, accessKey) {
+  if (hasOtasyncCreds()) {
+    const raw = await fetchOtasyncReservation(bookingCode);
+    if (!raw) return null;
+    const booking = normalizeReservation(raw);
+    booking.raw = raw;
+    return booking;
+  }
+  if (isDemoMode()) return demoReservation(bookingCode, accessKey);
+  const error = new Error('Guest app PMS credentials are not configured');
+  error.statusCode = 503;
+  throw error;
+}
+
 function normalizeComparable(value) {
   return String(value || '')
     .normalize('NFD')
@@ -381,6 +399,7 @@ module.exports = {
   cleanText,
   corsHeaders,
   getReservation,
+  getReservationDetail,
   guestStore,
   isDemoMode,
   json,
