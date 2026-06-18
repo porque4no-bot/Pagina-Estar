@@ -155,6 +155,13 @@ console.log('Generating room pages from template + rooms_db.json...');
 const { generateRoomPages } = require('./build-rooms');
 generateRoomPages({ rootDir, targetDir: distDir });
 
+// Guard: fail the build if the hand-written marketing pages (vivir.html and its
+// English twin) ever drift from rooms_db.json on prices/area/capacity. Keeps the
+// central DB authoritative for pages that still embed apartment data by hand.
+console.log('Validating marketing-page apartment data against rooms_db.json...');
+const { validateMarketingData } = require('./build-validate');
+validateMarketingData({ rootDir });
+
 // Inject GA4 (+ Consent Mode v2 + optional ad pixels) into all HTML files.
 // Ad pixels are emitted ONLY when their IDs are configured at build time, so
 // the markup is inert until META_PIXEL_ID / GOOGLE_ADS_ID are set in Netlify.

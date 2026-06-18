@@ -1,4 +1,8 @@
 {
+  "1": "1 guest",
+  "2": "2 guests",
+  "3": "3 guests",
+  "4": "4 guests or more",
   "modifySearch": "Modify search",
   "cancel": "Cancel",
   "checkin": "Arrival",
@@ -9,10 +13,6 @@
   "huespedes": "guests",
   "noche": "night",
   "noches": "nights",
-  "1": "1 guest",
-  "2": "2 guests",
-  "3": "3 guests",
-  "4": "4 guests or more",
   "stepRooms": "Accommodation",
   "stepExtras": "Extras",
   "stepGuest": "Details",
@@ -111,10 +111,7 @@
   "roomViews": {
     "Vista a la ciudad": "City view",
     "Vista interior": "Interior view",
-    "Vista ciudad": "City view",
-    "Cordillera + balcón": "Mountain view + balcony",
-    "Panorámica": "Panoramic view",
-    "Panorámica premium": "Premium panoramic view"
+    "Vista ciudad": "City view"
   },
   "roomAmenities": {
     "WiFi fibra": "WiFi (fiber)",
@@ -126,18 +123,8 @@
     "Vista a la ciudad": "City view",
     "Hasta 5 personas": "Up to 5 guests",
     "Hasta 3 personas": "Up to 3 guests",
-    "Smart TV 43\"": "Smart TV 43\"",
-    "Smart TV 55\"": "Smart TV 55\"",
-    "Smart TV 65\"": "Smart TV 65\"",
-    "Cocina premium": "Premium kitchen",
-    "Baño privado amplio": "Large private bathroom",
     "Aseo semanal": "Weekly cleaning",
-    "Balcón privado": "Private balcony",
-    "Ambientes separados": "Separate rooms",
     "Escritorio": "Ergonomic desk",
-    "Vista panorámica": "Panoramic view",
-    "Bañera": "Bathtub",
-    "Terraza privada": "Private terrace",
     "Hasta 4 personas": "Up to 4 guests"
   },
   "extrasNames": {
