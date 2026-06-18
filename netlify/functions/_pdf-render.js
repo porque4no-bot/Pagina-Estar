@@ -284,7 +284,7 @@ function renderContractPDF(record = {}) {
     clause(doc, 'CUARTA', 'Cuidado y daños',
       `El huésped es responsable del cuidado del apartaestudio, su mobiliario, enseres y dotación. Cualquier daño, pérdida o deterioro distinto al desgaste normal por uso será reportado al huésped y su valor podrá ser cobrado al momento del check-out o a través del medio de pago registrado.`);
     clause(doc, 'QUINTA', 'Horarios y entrega',
-      `El check-in se realiza a partir de las 3:00 p.m. y el check-out hasta las 12:00 m. del día de salida. Toda permanencia posterior sin acuerdo previo causará un cargo adicional. Hotel Estar podrá retener objetos olvidados hasta por 30 días, transcurridos los cuales se dispondrá de ellos según política interna.`);
+      `El check-in se realiza a partir de las 3:00 p.m. y el check-out hasta las 11:00 a. m. del día de salida. Toda permanencia posterior sin acuerdo previo causará un cargo adicional. Hotel Estar podrá retener objetos olvidados hasta por 30 días, transcurridos los cuales se dispondrá de ellos según política interna.`);
 
     /* ── CONSENTIMIENTO ──────────────────────────────────────────────────── */
     sectionHeading(doc, 'Consentimiento y firma electrónica');
