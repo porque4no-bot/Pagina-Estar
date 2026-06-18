@@ -92,10 +92,14 @@ test('guest check-in submit persists 3 guests and archives each document', async
 });
 
 test('calculateAge returns integer years for a valid birth date', () => {
+  // Build the YYYY-MM-DD from LOCAL components: calculateAge parses the string
+  // as local midnight, so using toISOString() (UTC) here would drift by a day
+  // and intermittently yield 9 instead of 10 depending on the runner's timezone.
   const today = new Date();
-  const tenYearsAgo = new Date(today);
-  tenYearsAgo.setFullYear(today.getFullYear() - 10);
-  const birthDate = tenYearsAgo.toISOString().slice(0, 10);
+  const y = today.getFullYear() - 10;
+  const mo = String(today.getMonth() + 1).padStart(2, '0');
+  const d = String(today.getDate()).padStart(2, '0');
+  const birthDate = `${y}-${mo}-${d}`;
   assert.equal(_test.calculateAge(birthDate), 10);
 });
 
