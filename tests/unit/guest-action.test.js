@@ -38,7 +38,11 @@ function makeEvent(payload, token) {
 }
 
 function validToken() {
-  return guestHelpers.signGuestToken({ bookingCode: 'EST-TEST-42', guestName: 'María López' }, 300);
+  // nights + totalAmount give a 320000 average-night base for %-of-night services.
+  return guestHelpers.signGuestToken(
+    { bookingCode: 'EST-TEST-42', guestName: 'María López', nights: 4, totalAmount: 1280000 },
+    300
+  );
 }
 
 test('guest-action rejects missing or invalid tokens', async () => {
@@ -88,14 +92,38 @@ test('guest-action order: persists event with sanitized items', async () => {
     type: 'order',
     items: [
       { id: 'breakfast', quantity: 2 },
-      { id: 'parking', quantity: 1 }
+      { id: 'laundry', quantity: 1 }
     ],
-    paymentPreference: 'room'
+    paymentPreference: 'account'
   }, token));
   assert.equal(res.statusCode, 201);
   const data = body(res);
   assert.equal(data.ok, true);
-  assert.equal(data.total, 2 * 20000 + 25000);
+  assert.equal(data.total, 2 * 20000 + 35000);
+});
+
+test('guest-action order: prices %-of-night services from the booking night base', async () => {
+  const token = validToken(); // night base = 1280000 / 4 = 320000
+  const res = await guestAction(makeEvent({
+    type: 'order',
+    items: [
+      { id: 'late_checkout', quantity: 1 }, // 15% × 320000 = 48000
+      { id: 'early_checkin', quantity: 1 }  // 25% × 320000 = 80000
+    ]
+  }, token));
+  assert.equal(res.statusCode, 201);
+  assert.equal(body(res).total, 48000 + 80000);
+});
+
+test('guest-action order: rejects %-of-night services when the token has no night base', async () => {
+  // Pre-deploy tokens lack nights/totalAmount, so the server can't price 15%-of-night.
+  const token = guestHelpers.signGuestToken({ bookingCode: 'EST-OLD-1', guestName: 'Old Token' }, 300);
+  const res = await guestAction(makeEvent({
+    type: 'order',
+    items: [{ id: 'late_checkout', quantity: 1 }]
+  }, token));
+  assert.equal(res.statusCode, 400);
+  assert.match(body(res).error, /iniciar sesión|precio/i);
 });
 
 test('guest-action order: 400 when items list is empty or all invalid', async () => {
@@ -103,6 +131,10 @@ test('guest-action order: 400 when items list is empty or all invalid', async ()
 
   const noItems = await guestAction(makeEvent({ type: 'order', items: [] }, token));
   assert.equal(noItems.statusCode, 400);
+
+  // parqueadero was retired — its id is no longer in the catalogue.
+  const retired = await guestAction(makeEvent({ type: 'order', items: [{ id: 'parking', quantity: 1 }] }, token));
+  assert.equal(retired.statusCode, 400);
 
   const badIds = await guestAction(makeEvent({ type: 'order', items: [{ id: 'rocket_fuel', quantity: 1 }] }, token));
   assert.equal(badIds.statusCode, 400);

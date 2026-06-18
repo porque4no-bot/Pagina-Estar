@@ -356,21 +356,32 @@
               </button>
             </div>
 
+            <!-- Prices mirror netlify/functions/_services-catalog.js (the single
+                 source of truth); the server re-prices every order from it, so the
+                 amounts here must match. tests/unit/services-catalog.test.js fails
+                 CI if they drift. Flat services carry data-service-price; late/early
+                 check-out carry data-service-pct and are priced per booking at
+                 runtime (15% / 25% of the average paid night) by guest-app.js. -->
             <div class="guest-service-grid">
-              <article class="guest-service-card" data-service-id="breakfast" data-service-price="28000">
+              <article class="guest-service-card" data-service-id="breakfast" data-service-price="20000">
                 <span class="guest-service-icon"><i data-lucide="coffee"></i></span>
                 <div><p class="eyebrow">Alimentos</p><h3>Desayuno local</h3><p>Fruta, huevos, pan artesanal, café y jugo.</p></div>
-                <footer><strong>$28.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+                <footer><strong>$20.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
               </article>
               <article class="guest-service-card" data-service-id="laundry" data-service-price="35000">
                 <span class="guest-service-icon"><i data-lucide="shirt"></i></span>
                 <div><p class="eyebrow">Comodidad</p><h3>Lavandería express</h3><p>Bolsa de hasta 3 kg, entrega en 24 horas.</p></div>
                 <footer><strong>$35.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
               </article>
-              <article class="guest-service-card" data-service-id="late_checkout" data-service-price="60000">
+              <article class="guest-service-card" data-service-id="late_checkout" data-service-pct="0.15">
                 <span class="guest-service-icon"><i data-lucide="clock-3"></i></span>
-                <div><p class="eyebrow">Tiempo</p><h3>Late check-out</h3><p>Extiende tu salida hasta las 5:00 p. m.</p></div>
-                <footer><strong>$60.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+                <div><p class="eyebrow">Tiempo</p><h3>Late check-out</h3><p>Extiende tu salida hasta las 2:00 p. m. (15% de la noche).</p></div>
+                <footer><strong data-service-price-display>15% de la noche</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+              </article>
+              <article class="guest-service-card" data-service-id="early_checkin" data-service-pct="0.25">
+                <span class="guest-service-icon"><i data-lucide="sunrise"></i></span>
+                <div><p class="eyebrow">Tiempo</p><h3>Early check-in</h3><p>Adelanta tu llegada desde las 6:00 a. m. (25% de la noche).</p></div>
+                <footer><strong data-service-price-display>25% de la noche</strong><button type="button" class="guest-add-service">Agregar</button></footer>
               </article>
               <article class="guest-service-card" data-service-id="airport_transfer" data-service-price="120000">
                 <span class="guest-service-icon"><i data-lucide="plane"></i></span>
@@ -381,6 +392,11 @@
                 <span class="guest-service-icon"><i data-lucide="mountain-snow"></i></span>
                 <div><p class="eyebrow">Experiencia</p><h3>Ruta cafetera</h3><p>Experiencia local coordinada por nuestro concierge.</p></div>
                 <footer><strong>$95.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+              </article>
+              <article class="guest-service-card" data-service-id="mascota" data-service-price="200000">
+                <span class="guest-service-icon"><i data-lucide="paw-print"></i></span>
+                <div><p class="eyebrow">Comodidad</p><h3>Mascota</h3><p>Trae a tu mascota durante tu estadía (IVA incluido).</p></div>
+                <footer><strong>$200.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
               </article>
             </div>
 
@@ -394,8 +410,7 @@
               <label class="guest-field"><span>Notas</span><textarea id="orderNotes" rows="3"></textarea></label>
               <label class="guest-field"><span>Forma de pago</span>
                 <select id="paymentPreference">
-                  <option value="room">Cargar a mi habitación</option>
-                  <option value="hotel">Pagar en el hotel</option>
+                  <option value="account">Cargar a mi cuenta</option>
                   <option value="online">Pagar en línea</option>
                 </select>
               </label>

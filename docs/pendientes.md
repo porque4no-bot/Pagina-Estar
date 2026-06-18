@@ -220,6 +220,25 @@ por Booking.com y definir el modelo de pago oficial del canal.
   recordatorio de cotización por vencer.
 - IVA en check-in: checklist operativo en guest app + reporte mensual de IVA
   diferido vs. cobrado.
+- **Pedidos de servicios del guest app → cobro y comunicación con Kunas.** Desde
+  2026-06-18 el guest app cobra todos los servicios desde el catálogo único
+  (`_services-catalog.js`) y guarda el pedido con el desglose (ítems, montos,
+  `paymentPreference` = `account` cargar a la cuenta / `online` pagar en línea).
+  **Falta** cerrar el loop que pidió el dueño ("que la comunicación con Kunas
+  sea clara"): (a) publicar el cargo en el folio de la reserva en OTASync/Kunas
+  cuando es `account` —confirmar primero si la API de OTASync soporta cargos de
+  extras sobre una reserva (`docs/kunas-api.md`)—; (b) activar el cobro `online`
+  de verdad (link Wompi con monto firmado server-side; hoy `guest-action` solo
+  arma el link si `GUEST_SERVICE_PAYMENT_MODE`/`GUEST_SERVICE_PAYMENT_URL` están
+  configurados, mismo principio que reservas); (c) notificar al equipo por correo
+  cada pedido (hoy solo viaja por `GUEST_APP_SYNC_WEBHOOK_URL` + Blob cifrado).
+  El monto del late/early check-out se calcula como 15%/25% del **promedio de
+  noche** (`totalAmount / nights`, IVA incl.) — aproxima la tarifa neta del motor;
+  si se quiere exacto, firmar la tarifa neta de la habitación en el token de
+  `guest-session` (hoy firma `nights` + `totalAmount`).
+- Early check-in en guest app quedó al **25% plano** (paridad con el catálogo y
+  el motor). El modelo escalonado 15/35/50 de §6.5 sigue pendiente y, cuando se
+  implemente, debe cambiarse en las tres superficies a la vez (no solo aquí).
 
 ---
 

@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const { renderContractHTML } = require('./_contract-template');
+const { SERVICES } = require('./_services-catalog');
 const {
   archiveGuestPayload: _archiveGuestPayload,
   cleanText,
@@ -61,26 +62,83 @@ exports._test = {
   CURRENT_CONTRACT_VERSION
 };
 
-const SERVICE_CATALOG = {
-  breakfast: { name: 'Desayuno local', price: 20000 },
-  parking: { name: 'Parqueadero por noche', price: 25000 },
-  laundry: { name: 'Lavandería express', price: 35000 },
-  late_checkout: { name: 'Late check-out', price: 80000 },
-  airport_transfer: { name: 'Traslado aeropuerto', price: 120000 },
-  city_experience: { name: 'Experiencia cafetera', price: 95000 }
+/* Guest-app service ids → canonical catalog keys (_services-catalog.js). The
+   guest app (and the order records / contracts it has always stored) use these
+   ids; the single catalog is keyed by the booking-engine names. We keep the ids
+   the front-end already sends and pull every price from the catalog so the three
+   surfaces (reservas / cotización / guest app) can't silently drift again.
+   Parqueadero is intentionally absent — it was retired from every surface. */
+const GUEST_SERVICE_KEYS = {
+  breakfast: 'desayuno',
+  laundry: 'laundry',
+  late_checkout: 'late',
+  early_checkin: 'early',
+  airport_transfer: 'airport_transfer',
+  city_experience: 'city_experience',
+  mascota: 'mascota'
 };
 
-function sanitizeItems(items) {
+/* Derived from the catalog, keeping only services offered on the 'guest'
+   surface. Flat services carry a fixed `price`; %-of-night services (late/early
+   check-out) carry `pct` and are priced per booking in sanitizeItems(). */
+const SERVICE_CATALOG = Object.fromEntries(
+  Object.entries(GUEST_SERVICE_KEYS)
+    .map(([guestId, catalogKey]) => {
+      const svc = SERVICES[catalogKey];
+      if (!svc || !Array.isArray(svc.surfaces) || !svc.surfaces.includes('guest')) return null;
+      const entry = { name: svc.es };
+      if (svc.multiplier === 'pctOfNight') entry.pct = svc.pct;
+      else entry.price = svc.price;
+      return [guestId, entry];
+    })
+    .filter(Boolean)
+);
+
+/* Exposed for the anti-drift guard test (services-catalog.test.js). */
+exports._test.SERVICE_CATALOG = SERVICE_CATALOG;
+exports._test.GUEST_SERVICE_KEYS = GUEST_SERVICE_KEYS;
+
+/* Average paid night for the booking (totalAmount / nights), used as the base
+   for %-of-night services. totalAmount already includes IVA, so the resulting
+   late/early fee is IVA-inclusive — internally consistent with what the guest
+   sees, even if it's an approximation of the booking engine's net-rate math
+   (the owner accepted this on 2026-06-18). Returns 0 when not computable. */
+function nightBaseFromSession(session) {
+  const nights = Number(session && session.nights) || 0;
+  const totalAmount = Number(session && session.totalAmount) || 0;
+  return nights > 0 && totalAmount > 0 ? totalAmount / nights : 0;
+}
+
+/* Authoritative unit price. Flat → catalog price. %-of-night → pct × nightBase,
+   rounded to the peso (the guest app mirrors this exact formula client-side).
+   Returns null when a %-of-night service can't be priced (token missing the
+   night base, e.g. an order placed on a pre-deploy session). */
+function priceForService(service, nightBase) {
+  if (typeof service.pct === 'number') {
+    return nightBase > 0 ? Math.round(service.pct * nightBase) : null;
+  }
+  return service.price;
+}
+
+function sanitizeItems(items, session) {
+  const nightBase = nightBaseFromSession(session);
   return (Array.isArray(items) ? items : []).slice(0, 20).map(item => {
     const service = SERVICE_CATALOG[item.id];
     if (!service) return null;
+    const unitPrice = priceForService(service, nightBase);
+    if (unitPrice == null) {
+      throw Object.assign(
+        new Error('No pudimos calcular el precio de ese servicio. Vuelve a iniciar sesión e inténtalo de nuevo.'),
+        { statusCode: 400 }
+      );
+    }
     const quantity = Math.max(1, Math.min(10, parseInt(item.quantity, 10) || 1));
     return {
       id: item.id,
       name: service.name,
       quantity,
-      unitPrice: service.price,
-      subtotal: service.price * quantity
+      unitPrice,
+      subtotal: unitPrice * quantity
     };
   }).filter(Boolean);
 }
@@ -119,17 +177,21 @@ function buildEvent(type, body, session, event) {
   };
 
   if (type === 'order') {
-    const items = sanitizeItems(body.items);
+    const items = sanitizeItems(body.items, session);
     if (!items.length) throw Object.assign(new Error('Selecciona al menos un servicio.'), { statusCode: 400 });
+    /* paymentPreference is recorded so the team knows how to settle each order
+       in Kunas: 'account' = charge to the guest folio at check-out, 'online' =
+       paid (or to be paid) online. The full amount breakdown above travels with
+       the event so the Kunas posting is unambiguous. */
     return {
       ...base,
       items,
       total: items.reduce((sum, item) => sum + item.subtotal, 0),
       deliveryTime: cleanText(body.deliveryTime, 60),
       notes: cleanText(body.notes, 500),
-      paymentPreference: ['room', 'hotel', 'online'].includes(body.paymentPreference)
+      paymentPreference: ['account', 'online'].includes(body.paymentPreference)
         ? body.paymentPreference
-        : 'room'
+        : 'account'
     };
   }
 
