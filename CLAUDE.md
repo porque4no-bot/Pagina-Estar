@@ -186,7 +186,7 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 |---|---|
 | `guest-session` | Issues signed JWT session token (no OTASync credentials exposed to client) |
 | `guest-checkin` | Document upload handler; optional Azure Document Intelligence OCR; multi-occupant support |
-| `guest-action` | Guest requests: service orders (priced from `_services-catalog.js`), modifications, cancellations. Service orders can charge the reservation folio in OTASync/Kunas — `add_extra` on **"cargar a la cuenta"** (gated by `GUEST_SERVICE_FOLIO_ENABLED`), or a signed Wompi checkout on **"pagar en línea"** (`GUEST_SERVICE_PAYMENT_MODE=wompi`) settled by `wompi-webhook` (`add_extra`+`add_payment`). Both off by default. |
+| `guest-action` | Guest requests: service orders (priced from `_services-catalog.js`), modifications, cancellations. Service orders can charge the reservation folio in OTASync/Kunas — `add_extra` on **"cargar a la cuenta"** (gated by `GUEST_SERVICE_FOLIO_ENABLED`), or a signed Wompi checkout on **"pagar en línea"** (`GUEST_SERVICE_PAYMENT_MODE=wompi`) settled by `wompi-webhook` (`add_extra`+`add_payment`). Both off by default. Emails the team a summary of every order via Resend (`notifyOrderTeam`). |
 | `guest-sync` | Receives guest events, stores AES-256-GCM encrypted in Blobs |
 | `guest-drive` | Forwards documents/data to Google Drive via Apps Script |
 | `upload-drive-credentials` | Service account credential upload (admin) |
