@@ -1754,7 +1754,7 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
 }
 .sub-hero.sand .star-bg { background-image: url("assets/icon-star-taupe.png"); opacity: 0.08; }
 .sub-hero .eyebrow { color: rgba(250,246,239,0.75); margin-bottom: 20px; }
-.sub-hero.sand .eyebrow { color: var(--ink-700); }
+.sub-hero.sand .eyebrow { color: var(--ink-800); }
 .sub-hero h1 {
   font-family: var(--font-heading);
   font-weight: 900;
@@ -4699,7 +4699,7 @@ html[lang="en"] .lang-es { display: none !important; }
   font-family: inherit;
 }
 .cookie-consent__btn--primary {
-  background: var(--olive, #9b9065);
+  background: var(--olive-700, #7d7350);
   color: var(--white, #fff);
 }
 .cookie-consent__btn--ghost {
@@ -4766,7 +4766,8 @@ textarea:focus-visible,
 .reviews-score-bar { display: flex; align-items: baseline; gap: 8px; }
 .rsb-num { font-size: 36px; font-family: var(--font-heading); font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
 .rsb-star { font-size: 20px; color: var(--terracotta); }
-.rsb-text { font-size: 14px; color: var(--ink-500); font-family: var(--font-body); }
+.rsb-text { font-size: 14px; color: var(--ink-800); font-family: var(--font-body); }
+.reviews-head .eyebrow { color: var(--ink-800); } /* terracotta-700 no pasa AA sobre --sand */
 .reviews-nav { display: flex; align-items: center; gap: 6px; margin-bottom: 24px; }
 .rvd { width: 8px; height: 8px; border-radius: 50%; background: var(--paper-400); transition: background 0.3s, transform 0.3s, width 0.3s; cursor: pointer; }
 .rvd.active { width: 24px; border-radius: 4px; background: var(--terracotta); }
@@ -4806,8 +4807,8 @@ textarea:focus-visible,
 .rc-score span { color: var(--terracotta); font-size: 14px; }
 .rc-text { font-family: var(--font-body); font-size: 15px; line-height: 1.65; color: var(--ink); margin: 0; flex: 1; }
 .rc-author { font-size: 13px; font-family: var(--font-label); color: var(--ink-500); letter-spacing: 0.01em; }
-.rc-profile { font-size: 11px; font-family: var(--font-label); color: var(--ink-300); letter-spacing: 0.01em; }
-.rc-date { font-size: 11px; font-family: var(--font-label); color: var(--ink-300); letter-spacing: 0.01em; }
+.rc-profile { font-size: 11px; font-family: var(--font-label); color: var(--ink-500); letter-spacing: 0.01em; }
+.rc-date { font-size: 11px; font-family: var(--font-label); color: var(--ink-500); letter-spacing: 0.01em; }
 .rc-source { font-size: 11px; font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.08em; color: var(--terracotta-700); }
 
 /* ── FOOTER NEWSLETTER ──────────────────────────────────────── */
@@ -4925,7 +4926,7 @@ textarea:focus-visible,
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--ink-500);
+  color: var(--ink-700);
   border-bottom: 2px solid var(--paper-400);
 }
 .comparador-table thead th:first-child { padding-left: 0; width: 120px; }
@@ -4939,7 +4940,7 @@ textarea:focus-visible,
   transition: color 0.2s;
 }
 .ct-room-link:hover { color: var(--terracotta); }
-.ct-num { font-size: 9px; letter-spacing: 0.1em; color: var(--ink-500); }
+.ct-num { font-size: 9px; letter-spacing: 0.1em; color: var(--ink-700); }
 .ct-name { font-size: 13px; font-weight: 700; font-family: var(--font-heading); color: var(--ink); }
 .ct-room-link.ct-featured .ct-name { color: var(--terracotta); }
 .comparador-table tbody tr {
@@ -4953,7 +4954,7 @@ textarea:focus-visible,
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ink-500);
+  color: var(--ink-700);
   white-space: nowrap;
   vertical-align: middle;
 }

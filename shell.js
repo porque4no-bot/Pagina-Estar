@@ -940,7 +940,6 @@
     document.addEventListener('DOMContentLoaded', () => {
       injectSkipLink();
       markMainContent();
-      setupCookieConsent();
       applyI18n();
       setupHeaderLangToggle();
       setupMobileBookingScroll();
@@ -956,7 +955,6 @@
   } else {
     injectSkipLink();
     markMainContent();
-    setupCookieConsent();
     applyI18n();
     setupHeaderLangToggle();
     setupMobileBookingScroll();
