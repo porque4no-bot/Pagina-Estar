@@ -64,10 +64,11 @@ atender. Tiene dos propósitos:
 
 ## 4. Política de cancelación y reembolsos
 
-- **Estricta:** gratis hasta 7 días antes; luego no reembolsable.
-- **Flexible:** gratis hasta las 6:00 PM del día anterior; luego penalidad.
-- **No-show / cancelación tardía:** se cobra la primera noche + impuestos +
-  3,5% del total de la reserva.
+- Dos planes (se eligen al reservar):
+  - **Estricta** (base): cancelación gratis con reembolso 100% hasta **7 días antes** del check-in.
+  - **Flexible** (+10%): cancelación gratis con reembolso 100% hasta **24 horas antes** del check-in.
+- **Fuera de plazo** (cualquier plan): se cobra **1ª noche + impuestos + 3,5%** del total; se reembolsa el resto.
+- **No-show:** si no cancela y pasan **24 horas desde el check-in**, pierde el reembolso (no se reembolsa nada).
 - **Tiempos de reembolso** (sujeto al proveedor): tarjeta Wompi ~10 días
   hábiles; Mercado Pago ~15 días hábiles; PSE/Nequi/efectivo → transferencia
   manual (⚠️ definir SLA). Para esos casos el equipo pide los datos de la

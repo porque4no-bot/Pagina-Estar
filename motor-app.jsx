@@ -427,7 +427,7 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
                   <span className="be-badge-save">{t.save10}</span>
                 </div>
                 <div className="be-rate-price">{formatCOP(priceBest)}<span>/{t.noche}</span></div>
-                <div className="be-rate-sub">{t.nonRefundable}</div>
+                <div className="be-rate-sub">{t.strictCancel}</div>
               </button>
             </div>
             <div className="be-room-total-row">
