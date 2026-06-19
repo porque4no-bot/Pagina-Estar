@@ -56,6 +56,38 @@
     reveals.forEach((el) => el.classList.add('is-visible'));
   }
 
+  /* ----- DEFERRED HERO VIDEO (keeps autoplay, off the critical path) ----- */
+  // The hero <video> ships with preload="none" and its sources in data-src so it
+  // never competes with the first paint. The preloaded poster shows instantly; we
+  // attach the sources and autoplay (muted) only after load + idle. Decorative
+  // (aria-hidden), so deferring it costs nothing in content or accessibility.
+  const heroVideo = document.querySelector('video[data-hero-video]');
+  if (heroVideo) {
+    const startHeroVideo = () => {
+      const sources = heroVideo.querySelectorAll('source[data-src]');
+      if (!sources.length) return;
+      sources.forEach((s) => {
+        s.src = s.dataset.src;
+        s.removeAttribute('data-src');
+      });
+      heroVideo.load();
+      const playback = heroVideo.play();
+      if (playback && typeof playback.catch === 'function') playback.catch(() => {});
+    };
+    const schedule = () => {
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(startHeroVideo, { timeout: 2000 });
+      } else {
+        setTimeout(startHeroVideo, 200);
+      }
+    };
+    if (document.readyState === 'complete') {
+      schedule();
+    } else {
+      window.addEventListener('load', schedule, { once: true });
+    }
+  }
+
   /* ----- STAR CURSOR (only on .has-star-cursor) ----- */
   const hasStarCursor = document.querySelector('.has-star-cursor, #poiGrid') !== null;
   if (hasStarCursor && window.matchMedia('(pointer:fine)').matches) {
