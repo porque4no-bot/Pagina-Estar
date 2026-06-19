@@ -247,14 +247,27 @@ function injectSkipLink(dir) {
     const label = isEn ? 'Skip to main content' : 'Saltar al contenido principal';
 
     // Resolve a valid in-page target. Prefer an existing #main-content, then
-    // tag the first <main>/<section>, then fall back to the React mount (#root)
+    // reuse the id of the first <main>/<section> if it already has one, then
+    // tag a bare <main>/<section>, then fall back to the React mount (#root)
     // used by reservar.html so the link is never a dead anchor.
+    //
+    // We must NOT blindly inject id="main-content" into an element that already
+    // carries an id (e.g. cotizar-admin's <main id="adminContent">): that yields
+    // a tag with two id attributes, and browsers keep only the first — silently
+    // dropping the original id and breaking any JS that looks it up by getElementById.
     let targetHref = '#main-content';
     if (!/id="main-content"/.test(content)) {
-      if (/<main\b[^>]*>/i.test(content)) {
-        content = content.replace(/<main\b/i, '<main id="main-content"');
-      } else if (/<section\b[^>]*>/i.test(content)) {
-        content = content.replace(/<section\b/i, '<section id="main-content"');
+      const firstMain = content.match(/<main\b[^>]*>/i);
+      const firstSection = content.match(/<section\b[^>]*>/i);
+      const tagName = firstMain ? 'main' : firstSection ? 'section' : null;
+      const openingTag = firstMain || firstSection;
+      if (openingTag) {
+        const existingId = openingTag[0].match(/\bid="([^"]+)"/i);
+        if (existingId) {
+          targetHref = `#${existingId[1]}`;
+        } else {
+          content = content.replace(new RegExp(`<${tagName}\\b`, 'i'), `<${tagName} id="main-content"`);
+        }
       } else if (/id="root"/.test(content)) {
         targetHref = '#root';
       }
