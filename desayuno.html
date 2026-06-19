@@ -88,6 +88,10 @@
     .toast.show { opacity: 1; }
     .err { color: var(--terracotta-700, #8a4226); font-size: 13px; margin-top: 10px; }
     .demo-tag { display:inline-block; background: var(--sand-100, #efe7d6); color: var(--ink,#5a5446); font-size: 11px; padding: 2px 8px; border-radius: 8px; margin-left: 6px; }
+    .counts-row { display: flex; gap: 12px; }
+    .counts-row > div { flex: 1; text-align: center; background: var(--paper, #faf8f2); border-radius: 10px; padding: 12px 8px; }
+    .cnum { font-size: 26px; font-weight: 700; }
+    .clbl { font-size: 11px; color: var(--fg-muted, #6b6660); margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -114,6 +118,13 @@
     </div>
 
     <div class="wrap">
+      <div class="panel" id="countsPanel" style="display:none;">
+        <h2>Conteo de desayunos</h2>
+        <div class="counts-row">
+          <div><div class="cnum" id="cntToday">—</div><div class="clbl">servidos hoy</div></div>
+          <div><div class="cnum" id="cntCycle">—</div><div class="clbl">en el ciclo (mes)</div></div>
+        </div>
+      </div>
       <div class="panel">
         <h2>Escanear o buscar</h2>
         <button id="scanBtn" class="btn btn-ghost">Escanear QR del huésped</button>
@@ -250,6 +261,7 @@
         if (guestIndex != null) payload.guestIndex = guestIndex;
         var data = await api('breakfast-redeem', payload);
         render(data.status);
+        if (!data.alreadyServed) loadCounts();
         toast(data.alreadyServed ? 'Ya estaba servido hoy' : 'Desayuno marcado ✓');
       } catch (e) {
         if (e.status) { render(e.status); }
@@ -271,6 +283,7 @@
             '<div class="res-row"><span class="k">' + (data.chargedToFolio ? 'Cargado a la cuenta' : 'Por cobrar') + '</span><span class="v">$' + Number(data.amount).toLocaleString('es-CO') + '</span></div>' +
           '</div>';
         toast('Desayuno agregado ✓');
+        loadCounts();
       } catch (e) {
         if (btn) { btn.disabled = false; btn.textContent = 'Agregar desayuno'; }
         toast(e.message);
@@ -316,6 +329,15 @@
       $('scanBtn').style.display = '';
     }
 
+    async function loadCounts() {
+      try {
+        var d = await api('breakfast-day', {});
+        $('cntToday').textContent = d.servedToday;
+        $('cntCycle').textContent = d.servedThisCycle;
+        $('countsPanel').style.display = '';
+      } catch (e) { /* informativo: si falla, no estorba el flujo de servir */ }
+    }
+
     function init() {
       $('scanBtn').addEventListener('click', startScan);
       $('stopScanBtn').addEventListener('click', stopScan);
@@ -330,6 +352,7 @@
         $('scanBtn').style.display = 'none';
         $('scanHint').textContent = 'Escaneo no disponible en este navegador — usa el código de reserva.';
       }
+      loadCounts();
     }
 
     window.__breakfastPanelInit = init;   // el módulo de auth lo llama al mostrar la app

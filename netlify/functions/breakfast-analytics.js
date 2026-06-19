@@ -43,10 +43,13 @@ exports.handler = async event => {
 
     let included = 0;
     let upgrades = 0;
+    let courtesies = 0;
     const byDay = {};
     const byHour = {};
     for (const r of reds) {
-      if (r.source === 'upgrade') upgrades++; else included++;
+      if (r.source === 'upgrade') upgrades++;
+      else if (r.source === 'courtesy') courtesies++;
+      else included++;
       if (r.date) byDay[r.date] = (byDay[r.date] || 0) + 1;
       const h = hourBogota(r.servedAt);
       if (h != null) byHour[h] = (byHour[h] || 0) + 1;
@@ -61,6 +64,7 @@ exports.handler = async event => {
       included,                     // desayunos incluidos en la tarifa (sin cobro extra)
       upgrades,                     // desayunos vendidos en el momento (OTA/Airbnb)
       upgradeAmount: upgrades * unitPrice,
+      courtesies,                   // desayunos de cortesía (gratis al huésped; cuentan para liquidar)
       unitPrice,
       byDay,                        // { 'YYYY-MM-DD': count }
       byHour                        // { hour(0-23): count }

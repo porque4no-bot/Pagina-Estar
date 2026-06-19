@@ -47,6 +47,11 @@
     .daytable td:last-child { text-align: right; font-weight: 500; }
     .state { text-align: center; padding: 36px 16px; color: var(--fg-muted, #6b6660); font-size: 14px; }
     .err { color: var(--terracotta-700, #8a4226); }
+    .src { font-size: 10px; padding: 1px 6px; border-radius: 6px; margin-left: 4px; white-space: nowrap; }
+    .src.in { background: var(--olive-100, #e7ecd9); color: var(--olive-700, #4a5733); }
+    .src.up { background: var(--sand-100, #f0e9d8); color: var(--ink, #2a2a28); }
+    .src.co { background: var(--terracotta-100, #f6ddd0); color: var(--terracotta-700, #8a4226); }
+    .lookup-input { flex: 1; min-width: 180px; border: 1px solid var(--border, #cfc9bb); border-radius: 10px; padding: 10px 12px; font-size: 14px; font-family: inherit; background: var(--white, #fff); color: inherit; }
   </style>
 </head>
 <body>
@@ -75,6 +80,23 @@
         <input type="month" id="monthPicker">
       </div>
       <div id="dashboard"><div class="state">Cargando…</div></div>
+
+      <div class="head-row" style="margin-top:34px;">
+        <h1>Día de desayunos</h1>
+        <input type="date" id="dayPicker">
+      </div>
+      <div id="dayboard"><div class="state">Cargando…</div></div>
+
+      <div class="head-row" style="margin-top:34px;">
+        <h1>Revisar reserva</h1>
+      </div>
+      <div class="panel">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <input id="lookupCode" class="lookup-input" placeholder="Código de reserva" autocomplete="off">
+          <button id="lookupBtn" class="btn">Buscar</button>
+        </div>
+        <div id="lookupResult" style="margin-top:14px;"></div>
+      </div>
     </div>
   </div>
 
@@ -85,14 +107,15 @@
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
     function stateMsg(m, cls) { $('dashboard').innerHTML = '<div class="state ' + (cls || '') + '">' + esc(m) + '</div>'; }
 
-    async function api(payload) {
+    async function authPost(path, payload) {
       var headers = { 'Content-Type': 'application/json' };
       try { var t = await window.getAuthToken(); if (t) headers.Authorization = 'Bearer ' + t; } catch (e) {}
-      var res = await fetch('/api/breakfast-analytics', { method: 'POST', headers: headers, body: JSON.stringify(payload || {}) });
+      var res = await fetch(path, { method: 'POST', headers: headers, body: JSON.stringify(payload || {}) });
       var data = {}; try { data = await res.json(); } catch (e) {}
       if (!res.ok) throw new Error(data.error || ('Error ' + res.status));
       return data;
     }
+    function api(payload) { return authPost('/api/breakfast-analytics', payload); }
 
     function render(d) {
       var conv = (d.included + d.upgrades) > 0 ? Math.round(100 * d.upgrades / (d.included + d.upgrades)) : 0;
@@ -148,13 +171,83 @@
       } catch (e) { stateMsg(e.message, 'err'); }
     }
 
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function srcTag(s) {
+      if (s === 'upgrade') return '<span class="src up">upgrade</span>';
+      if (s === 'courtesy') return '<span class="src co">cortesía</span>';
+      return '<span class="src in">incluido</span>';
+    }
+
+    // ── Día de desayunos (tablero, sin dinero) ──
+    function renderDay(d) {
+      var bs = d.bySource || { included: 0, upgrade: 0, courtesy: 0 };
+      var html = '<div class="cards">' +
+        '<div class="card"><p class="label">Servidos en la fecha</p><p class="value">' + fmt(d.servedToday) + '</p></div>' +
+        '<div class="card"><p class="label">Servidos del ciclo</p><p class="value">' + fmt(d.servedThisCycle) + '</p><p class="sub">mes en curso</p></div>' +
+        '<div class="card"><p class="label">Por fuente (fecha)</p><p class="value" style="font-size:14px;line-height:1.6;">incl. ' + fmt(bs.included) + ' · upg. ' + fmt(bs.upgrade) + ' · cort. ' + fmt(bs.courtesy) + '</p></div>' +
+        '</div>';
+      if (d.reservations && d.reservations.length) {
+        var rows = d.reservations.map(function (r) {
+          var tags = (r.served || []).map(function (s) { return srcTag(s.source); }).join('');
+          return '<tr><td>' + esc(r.guestName || r.bookingCode) + '<br><span class="sub" style="font-size:11px;">' + esc(r.bookingCode) + '</span></td><td style="text-align:right;">' + r.count + ' ' + tags + '</td></tr>';
+        }).join('');
+        html += '<div class="panel"><h2>Servidos por reserva</h2><table class="daytable">' + rows + '</table></div>';
+      } else {
+        html += '<div class="panel"><div class="state">Sin desayunos servidos en la fecha.</div></div>';
+      }
+      $('dayboard').innerHTML = html;
+    }
+    async function loadDay() {
+      $('dayboard').innerHTML = '<div class="state">Cargando…</div>';
+      try {
+        var date = $('dayPicker').value;
+        renderDay(await authPost('/api/breakfast-day', date ? { date: date } : {}));
+      } catch (e) { $('dayboard').innerHTML = '<div class="state err">' + esc(e.message) + '</div>'; }
+    }
+
+    // ── Revisar reserva + dar cortesía ──
+    function renderLookup(code, st) {
+      var html = '<p style="margin:0 0 6px;"><strong>' + esc(st.guestName || code) + '</strong> · ' + esc([st.roomNumber, st.roomName].filter(Boolean).join(' · ')) + '</p>';
+      if (st.hasBreakfast) {
+        html += '<p class="sub" style="margin:0 0 12px;">Desayuno incluido · ' + st.perDay + ' por día · servidos hoy ' + st.servedToday + ' · faltan ' + st.remaining + '</p>';
+      } else {
+        html += '<p class="sub" style="margin:0 0 12px;">Sin desayuno incluido · servidos hoy ' + st.servedToday + '</p>';
+      }
+      html += '<button class="btn" id="courtesyBtn">Dar cortesía (1 desayuno)</button>';
+      $('lookupResult').innerHTML = html;
+      $('courtesyBtn').addEventListener('click', function () { giveCourtesy(code, this); });
+    }
+    async function lookup() {
+      var code = $('lookupCode').value.trim();
+      if (!code) return;
+      $('lookupResult').innerHTML = '<div class="state">Buscando…</div>';
+      try {
+        var d = await authPost('/api/breakfast-status', { code: code });
+        renderLookup(code, d.status || {});
+      } catch (e) { $('lookupResult').innerHTML = '<div class="state err">' + esc(e.message) + '</div>'; }
+    }
+    async function giveCourtesy(code, btn) {
+      btn.disabled = true; btn.textContent = 'Registrando…';
+      try {
+        await authPost('/api/breakfast-courtesy', { code: code });
+        loadDay(); load();   // refresca tablero del día y la caja (dinero)
+        await lookup();      // refresca el estado de la reserva (servidos +1)
+      } catch (e) {
+        btn.disabled = false; btn.textContent = 'Dar cortesía (1 desayuno)';
+        $('lookupResult').insertAdjacentHTML('beforeend', '<p class="state err">' + esc(e.message) + '</p>');
+      }
+    }
+
     function init() {
-      // Default al mes actual (en hora local del navegador, suficiente para el selector).
       var now = new Date();
-      var ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-      $('monthPicker').value = ym;
+      $('monthPicker').value = now.getFullYear() + '-' + pad(now.getMonth() + 1);
       $('monthPicker').addEventListener('change', load);
+      $('dayPicker').value = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+      $('dayPicker').addEventListener('change', loadDay);
+      $('lookupBtn').addEventListener('click', lookup);
+      $('lookupCode').addEventListener('keydown', function (e) { if (e.key === 'Enter') lookup(); });
       load();
+      loadDay();
     }
     window.__breakfastAdminInit = init;
   })();
