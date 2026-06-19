@@ -4,6 +4,7 @@ require('./_env');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const { signPassToken } = require('./_breakfast-pass');
 const { BREAKFAST_SCHEDULE } = require('./_breakfast');
+const { getStore } = require('@netlify/blobs');
 
 /**
  * Formats a COP amount as "$ 660.000"
@@ -287,6 +288,144 @@ function buildEmailHtml({
 </html>`;
 }
 
+/* ── Idempotent confirmation sender ─────────────────────────────────────
+   Both the client (the HTTP handler below, after polling) and wompi-webhook
+   (server-side, right after the reservation is created) trigger the booking
+   confirmation. The webhook is the reliable path — it still fires when the
+   guest closes the tab after paying or the Wompi redirect never returns. To
+   keep the guest from getting two emails, the first successful send marks the
+   booking code in a Blobs store and any later trigger for the same booking is
+   a no-op. The key is marked AFTER a successful send, so a failed send stays
+   retryable by the other trigger (the client remains a fallback). Non-fatal:
+   if Blobs is unavailable we just send (a rare double beats no email). */
+function getConfirmationStore() {
+  try {
+    const opts = { name: 'confirmation-emails', consistency: 'strong' };
+    if (process.env.BLOBS_TOKEN && process.env.NETLIFY_SITE_ID) {
+      opts.token = process.env.BLOBS_TOKEN;
+      opts.siteID = process.env.NETLIFY_SITE_ID;
+    }
+    return getStore(opts);
+  } catch (e) {
+    if (process.env.DEBUG) console.warn('[send-confirmation] dedup store unavailable:', e.message);
+    return null;
+  }
+}
+
+/* Build + send the confirmation email, idempotently. Returns a structured
+   result ({ sent, reason?, resendId?, to? }) — not an HTTP response — so it can
+   be called both from the HTTP handler and in-process from wompi-webhook.
+   Deps (fetch, signPassToken, getStore, dedupe) are injectable for tests. */
+async function sendConfirmationEmail(params, deps = {}) {
+  const d = {
+    fetch,
+    signPassToken,
+    getStore: getConfirmationStore,
+    dedupe: true,
+    ...deps
+  };
+  const {
+    guestEmail, guestName, bookingCode, roomName,
+    checkIn, checkOut, nights, totalAmount, paidAmount, phone, breakfast
+  } = params;
+  const dedupeKey = String(params.dedupeKey || bookingCode || '').trim();
+
+  if (!guestEmail || !bookingCode) {
+    return { sent: false, reason: 'missing-fields' };
+  }
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) {
+    if (process.env.DEBUG) console.log('[send-confirmation] RESEND_API_KEY not configured. Skipping email send.');
+    return { sent: false, reason: 'no-key' };
+  }
+
+  // Idempotency: if a confirmation for this booking already went out, skip.
+  const store = d.dedupe ? d.getStore() : null;
+  if (store && dedupeKey) {
+    try {
+      if (await store.get(dedupeKey)) {
+        if (process.env.DEBUG) console.log(`[send-confirmation] duplicate suppressed for booking ${dedupeKey}`);
+        return { sent: false, reason: 'duplicate', duplicate: true };
+      }
+    } catch (e) {
+      if (process.env.DEBUG) console.warn('[send-confirmation] dedup read failed; sending anyway:', e.message);
+    }
+  }
+
+  // Pase de desayuno (Fase 2): si la reserva incluye desayuno, añade un link
+  // firmado a la página de pases (QR por persona). Sin el flag `breakfast`, el
+  // correo sale igual que antes.
+  let passUrl = '';
+  if (breakfast) {
+    try {
+      const base = (process.env.GUEST_APP_BASE_URL || process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
+      passUrl = `${base}/pase-desayuno?t=${d.signPassToken(bookingCode)}`;
+    } catch (e) {
+      if (process.env.DEBUG) console.warn('[send-confirmation] no se pudo firmar el pase:', e.message);
+    }
+  }
+
+  const emailHtml = buildEmailHtml({
+    guestName: guestName || 'Huésped',
+    bookingCode: bookingCode || 'N/A',
+    roomName: roomName || 'Apartaestudio',
+    checkIn: checkIn || '',
+    checkOut: checkOut || '',
+    nights: parseInt(nights) || 1,
+    totalAmount: parseFloat(totalAmount) || 0,
+    paidAmount: parseFloat(paidAmount) || parseFloat(totalAmount) || 0,
+    phone: phone || '',
+    passUrl
+  });
+
+  const resendController = new AbortController();
+  const resendTimeoutId = setTimeout(() => resendController.abort(), 10000);
+  let resendResponse;
+  try {
+    resendResponse = await d.fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        // TODO: Replace 'reservas@estar.com.co' with the verified sender domain in Resend
+        from: 'Estar Manizales <reservas@estar.com.co>',
+        to: guestEmail,
+        subject: `Confirmación de reserva ${bookingCode} — Estar Manizales`,
+        html: emailHtml
+      }),
+      signal: resendController.signal
+    });
+    clearTimeout(resendTimeoutId);
+  } catch (err) {
+    clearTimeout(resendTimeoutId);
+    if (err.name === 'AbortError') return { sent: false, reason: 'timeout' };
+    throw err;
+  }
+
+  const resendData = await resendResponse.json().catch(() => ({}));
+  if (!resendResponse.ok) {
+    console.error('[send-confirmation] Resend API error status:', resendResponse.status, (resendData && resendData.message) || '');
+    return { sent: false, reason: 'resend-error', status: resendResponse.status };
+  }
+
+  // Mark sent only AFTER success, so a failed send stays retryable.
+  if (store && dedupeKey) {
+    try {
+      await store.set(dedupeKey, JSON.stringify({
+        bookingCode, resendId: resendData.id, via: params.via || 'unknown', at: new Date().toISOString()
+      }), { ttl: 86400 * 30 });
+    } catch (e) {
+      if (process.env.DEBUG) console.warn('[send-confirmation] dedup mark failed:', e.message);
+    }
+  }
+
+  if (process.env.DEBUG) console.log(`[send-confirmation] Email sent to ${obfuscateEmail(guestEmail)} for booking ${bookingCode}. Resend ID: ${resendData.id}`);
+  return { sent: true, resendId: resendData.id, to: obfuscateEmail(guestEmail), bookingCode };
+}
+
 exports.handler = async (event, context) => {
   // CORS Headers
   const allowedOrigin = process.env.ALLOWED_ORIGIN;
@@ -360,112 +499,60 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Check for Resend API key
-  const resendApiKey = process.env.RESEND_API_KEY;
-  if (!resendApiKey) {
-    if (process.env.DEBUG) console.log('[send-confirmation] RESEND_API_KEY not configured. Skipping email send.');
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify({
-        sent: false,
-        reason: 'RESEND_API_KEY not configured'
-      })
-    };
-  }
-
-  // Build email HTML
-  // Pase de desayuno (Fase 2): si la reserva incluye desayuno, añade un link
-  // firmado a la página de pases (QR por persona). Retrocompatible: sin el flag
-  // `breakfast` en el body, el correo sale igual que antes.
-  let passUrl = '';
-  if (body.breakfast) {
-    try {
-      const base = (process.env.GUEST_APP_BASE_URL || process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
-      passUrl = `${base}/pase-desayuno?t=${signPassToken(bookingCode)}`;
-    } catch (e) {
-      if (process.env.DEBUG) console.warn('[send-confirmation] no se pudo firmar el pase:', e.message);
-    }
-  }
-
-  const emailHtml = buildEmailHtml({
-    guestName: guestName || 'Huésped',
-    bookingCode: bookingCode || 'N/A',
-    roomName: roomName || 'Apartaestudio',
-    checkIn: checkIn || '',
-    checkOut: checkOut || '',
-    nights: parseInt(nights) || 1,
-    totalAmount: parseFloat(totalAmount) || 0,
-    paidAmount: parseFloat(paidAmount) || parseFloat(totalAmount) || 0,
-    phone: phone || '',
-    passUrl
-  });
-
-  // Send via Resend API
+  // Delegate to the shared, idempotent sender. wompi-webhook calls this very
+  // same function in-process right after creating the reservation, so the dedup
+  // store (keyed by booking code) guarantees the guest gets exactly one email
+  // even when both the client (this endpoint) and the webhook fire.
+  let result;
   try {
-    const resendController = new AbortController();
-    const resendTimeoutId = setTimeout(() => resendController.abort(), 10000);
-    let resendResponse;
-    try {
-      resendResponse = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          // TODO: Replace 'reservas@estar.com.co' with the verified sender domain in Resend
-          from: 'Estar Manizales <reservas@estar.com.co>',
-          to: guestEmail,
-          subject: `Confirmación de reserva ${bookingCode} — Estar Manizales`,
-          html: emailHtml
-        }),
-        signal: resendController.signal
-      });
-      clearTimeout(resendTimeoutId);
-    } catch (err) {
-      clearTimeout(resendTimeoutId);
-      if (err.name === 'AbortError') {
-        return { statusCode: 504, body: JSON.stringify({ error: 'Request timeout' }) };
-      }
-      throw err;
-    }
-
-    const resendData = await resendResponse.json();
-
-    if (!resendResponse.ok) {
-      console.error('[send-confirmation] Resend API error status:', resendResponse.status, resendData?.message || '');
-      return {
-        statusCode: 502,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          sent: false,
-          error: 'Failed to send email'
-        })
-      };
-    }
-
-    if (process.env.DEBUG) console.log(`[send-confirmation] Email sent to ${obfuscateEmail(guestEmail)} for booking ${bookingCode}. Resend ID: ${resendData.id}`);
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: JSON.stringify({
-        sent: true,
-        resendId: resendData.id,
-        to: obfuscateEmail(guestEmail),
-        bookingCode
-      })
-    };
-
+    result = await sendConfirmationEmail({
+      guestEmail,
+      guestName,
+      bookingCode,
+      roomName,
+      checkIn,
+      checkOut,
+      nights,
+      totalAmount,
+      paidAmount,
+      phone,
+      breakfast: body.breakfast,
+      dedupeKey: body.dedupeKey,
+      via: 'client'
+    });
   } catch (err) {
     console.error('[send-confirmation] Unexpected error:', err.message);
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({
-        sent: false,
-        error: 'Internal server error while sending email'
-      })
+      body: JSON.stringify({ sent: false, error: 'Internal server error while sending email' })
     };
   }
+
+  if (result.sent) {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({ sent: true, resendId: result.resendId, to: result.to, bookingCode })
+    };
+  }
+  if (result.reason === 'timeout') {
+    return { statusCode: 504, body: JSON.stringify({ error: 'Request timeout' }) };
+  }
+  if (result.reason === 'resend-error') {
+    return {
+      statusCode: 502,
+      headers: corsHeaders,
+      body: JSON.stringify({ sent: false, error: 'Failed to send email' })
+    };
+  }
+  // no-key / duplicate / missing-fields → 200 with sent:false (the client only logs this)
+  return {
+    statusCode: 200,
+    headers: corsHeaders,
+    body: JSON.stringify({ sent: false, reason: result.reason, duplicate: result.duplicate })
+  };
 };
+
+exports.sendConfirmationEmail = sendConfirmationEmail;
+exports._test = { buildEmailHtml, sendConfirmationEmail, getConfirmationStore };
