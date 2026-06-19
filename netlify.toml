@@ -37,6 +37,13 @@
 [functions."send-stay-emails"]
   schedule = "0 12 * * *"
 
+# Daily backup of durable Netlify Blobs (A4): quotes, refunds, breakfast,
+# cancellations (+ opt-in encrypted PII). Snapshots to the isolated `backups`
+# store and optionally Google Drive. Gated by BACKUP_ENABLED (OFF by default).
+# Runs at 04:00 UTC (23:00 Colombia), apart from the purge cron.
+[functions."backup-blobs"]
+  schedule = "0 4 * * *"
+
 [build.environment]
   NODE_VERSION = "22"
   # The Firebase web apiKey is public by design (it ships in client-side HTML);
