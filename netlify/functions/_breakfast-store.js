@@ -14,7 +14,8 @@
 
 const { guestStore } = require('./_guest-app');
 
-const SOURCE = { INCLUDED: 'included', UPGRADE: 'upgrade' };
+const SOURCE = { INCLUDED: 'included', UPGRADE: 'upgrade', COURTESY: 'courtesy' };
+const VALID_SOURCES = [SOURCE.INCLUDED, SOURCE.UPGRADE, SOURCE.COURTESY];
 
 function nowIso() { return new Date().toISOString(); }
 
@@ -44,7 +45,7 @@ async function recordRedemption({ bookingCode, guestIndex, guestName, staffEmail
     date: day,
     servedAt: nowIso(),
     staffEmail: staffEmail || null,
-    source: source === SOURCE.UPGRADE ? SOURCE.UPGRADE : SOURCE.INCLUDED
+    source: VALID_SOURCES.includes(source) ? source : SOURCE.INCLUDED
   };
   const s = store();
   const res = await s.set(key, JSON.stringify(record), { onlyIfNew: true });
