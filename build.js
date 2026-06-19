@@ -133,7 +133,8 @@ const filesToCopy = [
   'datos_habitaciones_estar.csv',
   'manifest.json',
   'robots.txt',
-  'sitemap.xml'
+  'sitemap.xml',
+  'llms.txt'
 ];
 filesToCopy.forEach(file => {
   copyFileSync(path.join(rootDir, file), path.join(distDir, file));
