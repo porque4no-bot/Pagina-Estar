@@ -18,14 +18,14 @@
       text: 'Usamos cookies para analizar el tráfico y mejorar tu experiencia. Puedes aceptarlas o rechazarlas.',
       accept: 'Aceptar',
       reject: 'Rechazar',
-      more: 'Más información',
+      more: 'Política de cookies',
       moreHref: '/cookies.html'
     },
     en: {
       text: 'We use cookies to analyze traffic and improve your experience. You can accept or reject them.',
       accept: 'Accept',
       reject: 'Reject',
-      more: 'Learn more',
+      more: 'Cookie policy',
       moreHref: '/en/cookies.html'
     }
   };
