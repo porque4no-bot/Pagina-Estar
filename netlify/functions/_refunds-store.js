@@ -219,7 +219,7 @@ function verifyBankDetailsToken(token) {
 
 function sanitizeBankDetails(input) {
   input = input || {};
-  const clean = (v, max) => String(v == null ? '' : v).replace(/[ -]/g, '').trim().slice(0, max);
+  const clean = (v, max) => String(v == null ? '' : v).replace(/[<>\u0000-\u001F\u007F]/g, '').trim().slice(0, max);
   const accountType = ['ahorros', 'corriente'].includes(String(input.accountType)) ? String(input.accountType) : '';
   const docType = ['CC', 'CE', 'NIT', 'PAS'].includes(String(input.docType)) ? String(input.docType) : '';
   const accountNumber = String(input.accountNumber || '').replace(/\D/g, '').slice(0, 30);

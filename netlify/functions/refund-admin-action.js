@@ -125,10 +125,14 @@ exports.handler = async (event) => {
       try {
         const { sendEmail, bankDetailsRequestHtml } = require('./_email');
         const { REFUND_SLA_BUSINESS_DAYS } = require('./_refunds-store');
+        const lang = (res.refund && res.refund.lang) === 'en' ? 'en' : 'es';
+        const subject = lang === 'en'
+          ? `Refund ${bookingCode} — tell us your bank account`
+          : `Reembolso ${bookingCode} — indícanos tu cuenta bancaria`;
         await sendEmail({
           to: refund.guestEmail,
-          subject: `Reembolso ${bookingCode} — indícanos tu cuenta bancaria`,
-          html: bankDetailsRequestHtml({ refund: res.refund, formUrl: bankFormUrl, slaDays: REFUND_SLA_BUSINESS_DAYS })
+          subject,
+          html: bankDetailsRequestHtml({ refund: res.refund, formUrl: bankFormUrl, slaDays: REFUND_SLA_BUSINESS_DAYS, lang })
         });
       } catch (e) {
         console.error('[refund-admin-action] bank form email failed (non-fatal):', e.message);

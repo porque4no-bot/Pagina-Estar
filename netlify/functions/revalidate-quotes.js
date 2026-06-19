@@ -92,11 +92,15 @@ exports.handler = async () => {
     }
   }
 
-  // Remind clients whose active quote is about to expire (once per quote)
+  // Remind clients whose active quote is about to expire (once per quote).
+  // Client-facing email → opt-in by flag (OFF by default), consistent with the
+  // other new email features in this branch.
   const baseUrl = (process.env.URL || process.env.GUEST_APP_BASE_URL || '').replace(/\/$/, '');
   const nowMs = Date.now();
   let reminded = 0;
-  if (!baseUrl) {
+  if (process.env.QUOTE_EXPIRY_REMINDER_ENABLED !== 'true') {
+    /* disabled: skip reminders */
+  } else if (!baseUrl) {
     console.warn('[revalidate-quotes] no base URL (URL/GUEST_APP_BASE_URL); skipping expiry reminders');
   } else {
     for (const q of quotes) {

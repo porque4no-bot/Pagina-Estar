@@ -772,8 +772,10 @@ function normalizeReservation(r) {
     idReservations: String(r.id_reservations || ''),
     status: r.status || '',
     guestStatus: r.guest_status || '',
-    dateArrival: r.date_arrival || '',
-    dateDeparture: r.date_departure || '',
+    /* slice to YYYY-MM-DD in case OTASync ever returns a time component
+       (the date predicates in send-stay-emails compare exact strings) */
+    dateArrival: String(r.date_arrival || '').slice(0, 10),
+    dateDeparture: String(r.date_departure || '').slice(0, 10),
     firstName: r.first_name || '',
     lastName: r.last_name || '',
     email: String(r.email || '').trim(),

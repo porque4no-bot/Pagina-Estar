@@ -219,8 +219,21 @@ function postStayHtml({ resv, lang }) {
 }
 
 /* A9 — ask the guest for the bank account to receive a manual refund. */
-function bankDetailsRequestHtml({ refund, formUrl, slaDays }) {
+function bankDetailsRequestHtml({ refund, formUrl, slaDays, lang }) {
   const r = refund || {};
+  const days = slaDays || 15;
+  if (lang === 'en') {
+    return emailShell('#6E6A42', 'Refund approved', '', `
+      <p style="margin:0 0 14px;font-family:Georgia,serif;font-size:16px;color:#2C2C2C;">Hi <strong>${esc(r.guestName || '')}</strong>,</p>
+      <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:14px;color:#555;line-height:1.7;">
+        We approved the refund for booking <strong>${esc(r.bookingCode || '')}</strong>. As your payment method
+        can't be refunded automatically by the gateway, we'll do it by <strong>bank transfer</strong>. Please
+        tell us the account where you'd like to receive it:</p>
+      ${ctaButton(formUrl, 'Enter my bank account')}
+      <p style="margin:18px 0 0;font-family:Arial,sans-serif;font-size:12px;color:#9A9A8A;line-height:1.6;">
+        The link is personal and expires. Once we receive your details, we process the refund within
+        <strong>${days} business days</strong>. If you didn't request this, please ignore this message.</p>`);
+  }
   return emailShell('#6E6A42', 'Reembolso aprobado', '', `
     <p style="margin:0 0 14px;font-family:Georgia,serif;font-size:16px;color:#2C2C2C;">Hola <strong>${esc(r.guestName || '')}</strong>,</p>
     <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:14px;color:#555;line-height:1.7;">
@@ -230,7 +243,7 @@ function bankDetailsRequestHtml({ refund, formUrl, slaDays }) {
     ${ctaButton(formUrl, 'Indicar mi cuenta bancaria')}
     <p style="margin:18px 0 0;font-family:Arial,sans-serif;font-size:12px;color:#9A9A8A;line-height:1.6;">
       El enlace es personal y caduca. Una vez recibamos tus datos, tramitamos el reembolso en un máximo de
-      <strong>${slaDays || 15} días hábiles</strong>. Si no solicitaste esto, ignora este mensaje.</p>`);
+      <strong>${days} días hábiles</strong>. Si no solicitaste esto, ignora este mensaje.</p>`);
 }
 
 /* A9 — notify treasury that a guest submitted bank details to process a refund. */

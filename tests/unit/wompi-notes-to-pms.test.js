@@ -27,6 +27,11 @@ test('sanitizeIncomingNotes keeps ordinary punctuation (not stripped as a range)
   assert.equal(sanitizeIncomingNotes('Llego 11-12pm, piso #3 (gracias!)'), 'Llego 11-12pm, piso #3 (gracias!)');
 });
 
+test('sanitizeIncomingNotes strips angle brackets (defense-in-depth vs HTML)', () => {
+  const out = sanitizeIncomingNotes('hola <script>alert(1)</script> ok');
+  assert.ok(!out.includes('<') && !out.includes('>'), 'angle brackets removed');
+});
+
 test('notesToPmsEnabled reflects the GUEST_NOTES_TO_PMS_ENABLED flag', () => {
   const prev = process.env.GUEST_NOTES_TO_PMS_ENABLED;
   try {

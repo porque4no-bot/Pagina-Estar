@@ -60,6 +60,16 @@ test('sanitizeBankDetails rejects invalid account/doc types and missing fields',
   assert.equal(sanitizeBankDetails({}).valid, false);
 });
 
+test('sanitizeBankDetails strips angle brackets from text fields (defense-in-depth)', () => {
+  const { details } = sanitizeBankDetails({
+    bankName: '<b>Banco</b> de Bogotá', accountType: 'ahorros', accountNumber: '1',
+    holderName: 'Ana <script>x</script> Ruiz', docType: 'CC', docNumber: '1'
+  });
+  assert.ok(!details.bankName.includes('<') && !details.bankName.includes('>'));
+  assert.ok(!details.holderName.includes('<') && !details.holderName.includes('>'));
+  assert.ok(details.bankName.includes('Banco') && details.bankName.includes('Bogotá'), 'legit text preserved');
+});
+
 test('sanitizeBankDetails caps lengths', () => {
   const { details } = sanitizeBankDetails({
     bankName: 'b'.repeat(200), accountType: 'corriente', accountNumber: '9'.repeat(80),
