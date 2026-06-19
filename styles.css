@@ -788,6 +788,16 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .book-btn:hover {
   margin: 16px 0 48px;
   color: var(--ink);
 }
+.location-info-column h2:has(+ .loc-intro) { margin-bottom: 16px; }
+.loc-intro {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-700);
+  max-width: 48ch;
+  margin: 0 0 40px;
+}
+.loc-intro strong { color: var(--ink); font-weight: 700; }
 
 /* Estadísticas Minimalistas */
 .location-stats {
