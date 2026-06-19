@@ -52,10 +52,13 @@ function renderSlides(images, roomName, lang) {
     const alt = isEs
       ? `${roomName} - Vista ${i + 1}`
       : `${roomName} - View ${i + 1}`;
-    if (isEs) {
-      return `${indent}<div class="slider-slide"><img src="${fullSrc}" srcset="${fullSrc} 800w" sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 700px" alt="${alt}" loading="lazy" width="800" height="600"></div>`;
-    }
-    return `${indent}<div class="slider-slide"><img src="${fullSrc}" alt="${alt}" loading="lazy" width="800" height="600"></div>`;
+    // The first slide is the LCP element on the room page: load it eagerly with
+    // high fetch priority; keep the rest lazy. width/height match the real image
+    // (1400x934, 3:2) to reserve the correct box and avoid layout shift (CLS).
+    // Both languages get the same srcset/sizes for parity.
+    const loading = i === 0 ? 'eager' : 'lazy';
+    const priority = i === 0 ? ' fetchpriority="high"' : '';
+    return `${indent}<div class="slider-slide"><img src="${fullSrc}" srcset="${fullSrc} 1400w" sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 700px" alt="${alt}" loading="${loading}"${priority} decoding="async" width="1400" height="934"></div>`;
   });
 
   const indIndent = '            ';

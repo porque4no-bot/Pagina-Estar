@@ -12,7 +12,11 @@
 <meta property="og:description" content="{{seo.description.en}}">
 <meta property="og:image" content="{{seo.ogImage}}">
 <meta property="og:url" content="https://estar.com.co/en/{{slug}}.html">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="es_CO">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{seo.title.en}}">
+<meta name="twitter:description" content="{{seo.description.en}}">
 <meta name="twitter:image" content="{{seo.ogImage}}">
 <link rel="canonical" href="https://estar.com.co/en/{{slug}}.html">
 <link rel="alternate" hreflang="es" href="https://estar.com.co/{{slug}}.html">
@@ -44,7 +48,19 @@
   "image": "{{seo.ogImage}}",
   "floorSize": {"@type": "QuantitativeValue", "value": {{jsonLd.floorSize}}, "unitCode": "MTK"},
   "occupancy": {"@type": "QuantitativeValue", "minValue": 1, "maxValue": {{jsonLd.maxOccupancy}}},
-  "offers": {"@type": "Offer", "price": "{{jsonLd.price}}", "priceCurrency": "COP"}
+  "offers": {"@type": "Offer", "price": "{{jsonLd.price}}", "priceCurrency": "COP", "availability": "https://schema.org/InStock", "url": "https://estar.com.co/en/{{slug}}.html"},
+  "isPartOf": {"@type": "LodgingBusiness", "name": "Estar Manizales", "url": "https://estar.com.co/"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://estar.com.co/en/"},
+    {"@type": "ListItem", "position": 2, "name": "Studio apartments", "item": "https://estar.com.co/en/#habitaciones"},
+    {"@type": "ListItem", "position": 3, "name": "{{name}}", "item": "https://estar.com.co/en/{{slug}}.html"}
+  ]
 }
 </script>
 </head>
@@ -141,13 +157,16 @@
         </div>
 
         <div style="margin-top: 36px; display: flex; gap: 16px; flex-wrap: wrap;">
-          <a href="https://api.whatsapp.com/send/?phone=573102490414&text=Hello,%20I%20would%20like%20to%20book%20the%20{{nameUrlEncoded}}%20room%20at%20Estar." target="_blank" rel="noopener noreferrer" class="btn btn-ink">
+          <a href="reservar.html?room={{slug}}" class="btn btn-ink">
+            Book now <span aria-hidden="true">→</span>
+          </a>
+          <a href="https://api.whatsapp.com/send/?phone=573102490414&text=Hello,%20I%20would%20like%20to%20book%20the%20{{nameUrlEncoded}}%20room%20at%20Estar." target="_blank" rel="noopener noreferrer" class="btn btn-ghost-dark">
             Book via WhatsApp <span aria-hidden="true">→</span>
           </a>
           <a href="vivir.html#aplicar" class="btn btn-ghost-dark">
             Apply for long term
           </a>
-          <button class="btn-ghost share-btn" type="button" onclick="if(navigator.share){navigator.share({title:document.title,url:window.location.href}).catch(()=>{});}else{navigator.clipboard.writeText(window.location.href).then(()=>alert('Link copied'));}">
+          <button class="btn-ghost share-btn" type="button">
             ↑ Share
           </button>
         </div>

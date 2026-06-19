@@ -12,7 +12,11 @@
 <meta property="og:description" content="{{seo.description.es}}">
 <meta property="og:image" content="{{seo.ogImage}}">
 <meta property="og:url" content="https://estar.com.co/{{slug}}.html">
+<meta property="og:locale" content="es_CO">
+<meta property="og:locale:alternate" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{seo.title.es}}">
+<meta name="twitter:description" content="{{seo.description.es}}">
 <meta name="twitter:image" content="{{seo.ogImage}}">
 <link rel="canonical" href="https://estar.com.co/{{slug}}.html">
 <link rel="alternate" hreflang="es" href="https://estar.com.co/{{slug}}.html">
@@ -44,7 +48,19 @@
   "image": "{{seo.ogImage}}",
   "floorSize": {"@type": "QuantitativeValue", "value": {{jsonLd.floorSize}}, "unitCode": "MTK"},
   "occupancy": {"@type": "QuantitativeValue", "minValue": 1, "maxValue": {{jsonLd.maxOccupancy}}},
-  "offers": {"@type": "Offer", "price": "{{jsonLd.price}}", "priceCurrency": "COP"}
+  "offers": {"@type": "Offer", "price": "{{jsonLd.price}}", "priceCurrency": "COP", "availability": "https://schema.org/InStock", "url": "https://estar.com.co/{{slug}}.html"},
+  "isPartOf": {"@type": "LodgingBusiness", "name": "Estar Manizales", "url": "https://estar.com.co/"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://estar.com.co/"},
+    {"@type": "ListItem", "position": 2, "name": "Apartaestudios", "item": "https://estar.com.co/#habitaciones"},
+    {"@type": "ListItem", "position": 3, "name": "{{name}}", "item": "https://estar.com.co/{{slug}}.html"}
+  ]
 }
 </script>
 </head>
@@ -154,7 +170,11 @@
         </div>
 
         <div style="margin-top: 36px; display: flex; gap: 16px; flex-wrap: wrap;">
-          <a href="https://api.whatsapp.com/send/?phone=573102490414&text=Hola,%20me%20gustar%C3%ADa%20reservar%20la%20habitaci%C3%B3n%20{{nameUrlEncoded}}%20para%20vivir%20en%20Estar." target="_blank" rel="noopener noreferrer" class="btn btn-ink">
+          <a href="reservar.html?room={{slug}}" class="btn btn-ink">
+            <span class="lang-es" lang="es">Reservar ahora <span aria-hidden="true">→</span></span>
+            <span class="lang-en" lang="en">Book now <span aria-hidden="true">→</span></span>
+          </a>
+          <a href="https://api.whatsapp.com/send/?phone=573102490414&text=Hola,%20me%20gustar%C3%ADa%20reservar%20la%20habitaci%C3%B3n%20{{nameUrlEncoded}}%20para%20vivir%20en%20Estar." target="_blank" rel="noopener noreferrer" class="btn btn-ghost-dark">
             <span class="lang-es" lang="es">Reservar vía WhatsApp <span aria-hidden="true">→</span></span>
             <span class="lang-en" lang="en">Book via WhatsApp <span aria-hidden="true">→</span></span>
           </a>
@@ -162,7 +182,7 @@
             <span class="lang-es" lang="es">Aplicar a largo plazo</span>
             <span class="lang-en" lang="en">Apply for long term</span>
           </a>
-          <button class="btn-ghost share-btn" type="button" onclick="if(navigator.share){navigator.share({title:document.title,url:window.location.href}).catch(()=>{});}else{navigator.clipboard.writeText(window.location.href).then(()=>alert('Enlace copiado'));}">
+          <button class="btn-ghost share-btn" type="button">
             <span class="lang-es" lang="es">↑ Compartir</span>
             <span class="lang-en" lang="en">↑ Share</span>
           </button>
