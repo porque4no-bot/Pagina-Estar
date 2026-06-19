@@ -27,7 +27,7 @@ const MODULES = [
   'list-quotes', 'mercadopago-webhook', 'otasync-webhook', 'purge-guest-data',
   'quote-availability', 'read-quote-audit', 'reconcile-payments',
   'request-cancellation', 'request-quote', 'retry-quote-booking', 'revalidate-quotes',
-  'send-confirmation', 'send-quote-email', 'send-stay-emails', 'update-quote',
+  'send-confirmation', 'send-quote-email', 'send-stay-emails', 'submit-bank-details', 'update-quote',
   'upload-drive-credentials', 'whatsapp-probe', 'whatsapp-webhook', 'wompi-webhook'
 ];
 

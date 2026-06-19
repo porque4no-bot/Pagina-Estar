@@ -187,6 +187,20 @@
     Cache-Control = "no-store, no-cache, must-revalidate"
     Permissions-Policy = "camera=(self), microphone=(), geolocation=()"
 
+# Refund bank-details form (A9): guest types account/ID numbers here.
+# Keep it out of search and out of any cache.
+[[headers]]
+  for = "/datos-cuenta.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, no-cache, must-revalidate"
+
+[[headers]]
+  for = "/en/datos-cuenta.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, no-cache, must-revalidate"
+
 [[headers]]
   for = "/api/*"
   [headers.values]

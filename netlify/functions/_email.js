@@ -218,8 +218,45 @@ function postStayHtml({ resv, lang }) {
     ${ctaButton(reviewUrl, hasReview ? 'Dejar una reseña' : 'Enviarnos tu opinión')}`);
 }
 
+/* A9 — ask the guest for the bank account to receive a manual refund. */
+function bankDetailsRequestHtml({ refund, formUrl, slaDays }) {
+  const r = refund || {};
+  return emailShell('#6E6A42', 'Reembolso aprobado', '', `
+    <p style="margin:0 0 14px;font-family:Georgia,serif;font-size:16px;color:#2C2C2C;">Hola <strong>${esc(r.guestName || '')}</strong>,</p>
+    <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:14px;color:#555;line-height:1.7;">
+      Aprobamos el reembolso de tu reserva <strong>${esc(r.bookingCode || '')}</strong>. Como tu pago no admite
+      devolución automática por la pasarela, lo haremos por <strong>transferencia bancaria</strong>. Por favor
+      indícanos la cuenta donde quieres recibirlo:</p>
+    ${ctaButton(formUrl, 'Indicar mi cuenta bancaria')}
+    <p style="margin:18px 0 0;font-family:Arial,sans-serif;font-size:12px;color:#9A9A8A;line-height:1.6;">
+      El enlace es personal y caduca. Una vez recibamos tus datos, tramitamos el reembolso en un máximo de
+      <strong>${slaDays || 15} días hábiles</strong>. Si no solicitaste esto, ignora este mensaje.</p>`);
+}
+
+/* A9 — notify treasury that a guest submitted bank details to process a refund. */
+function treasuryBankDetailsHtml({ refund }) {
+  const r = refund || {};
+  const b = r.bankDetails || {};
+  const amount = r.refundAmountCents != null ? formatCOP(r.refundAmountCents / 100) : '(definir)';
+  return `<!DOCTYPE html><html lang="es"><body style="font-family:Arial,sans-serif;color:#2C2C2C;">
+    <h2 style="color:#6E6A42;">Datos bancarios para reembolso — ${esc(r.bookingCode || '')}</h2>
+    <p>El huésped envió la cuenta para el reembolso. Tramitar transferencia:</p>
+    <ul style="font-size:14px;line-height:1.7;">
+      <li><strong>Monto aprobado:</strong> ${esc(amount)}</li>
+      <li><strong>Banco:</strong> ${esc(b.bankName || '')}</li>
+      <li><strong>Tipo de cuenta:</strong> ${esc(b.accountType || '')}</li>
+      <li><strong>Número de cuenta:</strong> ${esc(b.accountNumber || '')}</li>
+      <li><strong>Titular:</strong> ${esc(b.holderName || '')}</li>
+      <li><strong>Documento:</strong> ${esc(b.docType || '')} ${esc(b.docNumber || '')}</li>
+      <li><strong>Huésped:</strong> ${esc(r.guestName || '')} · ${esc(r.guestEmail || '')}</li>
+    </ul>
+    <p style="font-size:12px;color:#9A9A8A;">Marca el reembolso como procesado en el panel admin cuando completes la transferencia.</p>
+  </body></html>`;
+}
+
 module.exports = {
   sendEmail, adminEmail, esc, formatCOP, formatDateES,
   paymentConfirmationHtml, adminPendingHtml, adminAvailabilityLostHtml,
-  quoteExpiringHtml, preArrivalHtml, postStayHtml
+  quoteExpiringHtml, preArrivalHtml, postStayHtml,
+  bankDetailsRequestHtml, treasuryBankDetailsHtml
 };

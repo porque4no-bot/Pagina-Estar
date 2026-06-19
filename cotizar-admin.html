@@ -2197,6 +2197,21 @@ function openRefund(code) {
 
   const howto = isTerminal ? '' : `<div class="rf-section"><div class="rf-note">${escHtml(REFUND_ROUTE_HOWTO[r.route] || '')} Plazo máximo: <strong>15 días hábiles</strong>. El monto se define según la política de la tarifa (Flexible: gratis hasta 48 h antes del check-in · Best Price: no reembolsable).</div></div>`;
 
+  /* A9: bank-details capture state for manual-transfer refunds. */
+  let bankBlock = '';
+  if (r.status === 'NEEDS_BANK_DETAILS') {
+    bankBlock = `<div class="rf-section"><h4>Datos bancarios del huésped</h4><div class="rf-note">Esperando que el huésped complete el formulario.${r.bankFormUrl ? '<br>Enlace para reenviarle:<br><code style="word-break:break-all">' + escHtml(r.bankFormUrl) + '</code>' : ' (Activa REFUND_BANK_FORM_ENABLED para enviar el enlace automáticamente.)'}</div></div>`;
+  } else if (r.status === 'BANK_DETAILS_READY' && r.bankDetails) {
+    const b = r.bankDetails;
+    bankBlock = `<div class="rf-section"><h4>Datos bancarios para la transferencia</h4><dl class="rf-grid">
+      <dt>Banco</dt><dd>${escHtml(b.bankName || '—')}</dd>
+      <dt>Tipo de cuenta</dt><dd>${escHtml(b.accountType || '—')}</dd>
+      <dt>Número</dt><dd>${escHtml(b.accountNumber || '—')}</dd>
+      <dt>Titular</dt><dd>${escHtml(b.holderName || '—')}</dd>
+      <dt>Documento</dt><dd>${escHtml(b.docType || '')} ${escHtml(b.docNumber || '')}</dd>
+    </dl></div>`;
+  }
+
   const taField = '<div class="field" style="margin-top:12px"><label for="rfNotes">Nota interna</label><textarea id="rfNotes" class="it-input" rows="2" style="min-width:unset; width:100%; resize:vertical; font-family:var(--font-body)"></textarea></div>';
   let actions;
   if (isReview) {
@@ -2228,7 +2243,7 @@ function openRefund(code) {
     log.map(e => `<li><div class="rf-ts">${fmtDateTime(e.ts)} · ${escHtml(e.actor || 'sistema')}</div>${escHtml(e.notes || '')}${e.oldStatus ? ` <span style="color:var(--ink-500)">(${escHtml(REFUND_STATUS_LABEL[e.oldStatus] || e.oldStatus)} → ${escHtml(REFUND_STATUS_LABEL[e.newStatus] || e.newStatus)})</span>` : ''}</li>`).join('') || '<li>Sin movimientos.</li>'
   }</ul></div>`;
 
-  body.innerHTML = info + howto + actions + timeline;
+  body.innerHTML = info + howto + bankBlock + actions + timeline;
   rfOpen();
 
   const approve = document.getElementById('rfApproveBtn');

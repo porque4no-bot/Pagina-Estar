@@ -11,6 +11,8 @@
  * (one record per bookingCode via onlyIfNew), append-only auditLog.
  */
 
+const crypto = require('crypto');
+
 const STATUS = {
   NEEDS_REVIEW: 'NEEDS_REVIEW',
   DENIED: 'DENIED',
@@ -177,8 +179,72 @@ async function transitionStatus(bookingCode, newStatus, actor, notes, patch) {
   return { ok: true, refund };
 }
 
+/* ── A9: bank-details capture for manual refunds ───────────────────────────
+   Signed link (HMAC) so a guest can submit the account to receive a manual
+   refund. PII NOTE: bankDetails (account/doc numbers) are stored in the refund
+   record in the `refunds` Blobs store, which is NOT encrypted at rest (the admin
+   needs to read them to wire the transfer). They never appear in logs and the
+   public link is a non-enumerable signed token. */
+function bankFormTokenSecret() {
+  const configured = process.env.REFUND_LINK_SECRET || process.env.GUEST_APP_TOKEN_SECRET || '';
+  if (configured) return configured;
+  if (process.env.NETLIFY !== 'true' && process.env.NODE_ENV !== 'production') return 'estar-refund-bank-local-dev-secret';
+  const error = new Error('REFUND_LINK_SECRET is not configured');
+  error.statusCode = 503;
+  throw error;
+}
+
+function signBankDetailsToken(bookingCode, ttlSeconds = 7 * 24 * 60 * 60) {
+  const payload = { sub: bookingCode, exp: Math.floor(Date.now() / 1000) + ttlSeconds };
+  const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', bankFormTokenSecret()).update(encoded).digest('base64url');
+  return `${encoded}.${sig}`;
+}
+
+function verifyBankDetailsToken(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 2) return null;
+  const [encoded, sig] = parts;
+  let expected;
+  try { expected = crypto.createHmac('sha256', bankFormTokenSecret()).update(encoded).digest('base64url'); }
+  catch (e) { return null; }
+  const a = Buffer.from(sig), b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  try {
+    const p = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    if (!p.sub || !p.exp || p.exp < Math.floor(Date.now() / 1000)) return null;
+    return p;
+  } catch (e) { return null; }
+}
+
+function sanitizeBankDetails(input) {
+  input = input || {};
+  const clean = (v, max) => String(v == null ? '' : v).replace(/[ -]/g, '').trim().slice(0, max);
+  const accountType = ['ahorros', 'corriente'].includes(String(input.accountType)) ? String(input.accountType) : '';
+  const docType = ['CC', 'CE', 'NIT', 'PAS'].includes(String(input.docType)) ? String(input.docType) : '';
+  const accountNumber = String(input.accountNumber || '').replace(/\D/g, '').slice(0, 30);
+  const docNumber = String(input.docNumber || '').replace(/[^0-9A-Za-z-]/g, '').slice(0, 30);
+  const bankName = clean(input.bankName, 60);
+  const holderName = clean(input.holderName, 100);
+  const valid = !!(bankName && accountType && accountNumber && holderName && docType && docNumber);
+  return { valid, details: { bankName, accountType, accountNumber, holderName, docType, docNumber } };
+}
+
+/* Stores the guest's bank details and moves the refund to BANK_DETAILS_READY.
+   Requires the record to be a MANUAL_BANK refund currently awaiting details. */
+async function saveBankDetails(bookingCode, details, actor) {
+  let refund;
+  try { refund = await getRefund(bookingCode); } catch (e) { return { ok: false, reason: 'store_unavailable' }; }
+  if (!refund) return { ok: false, reason: 'not_found' };
+  if (refund.route !== ROUTE.MANUAL_BANK) return { ok: false, reason: 'not_manual_bank' };
+  if (refund.status === STATUS.BANK_DETAILS_READY) return { ok: false, reason: 'already' };
+  if (refund.status !== STATUS.NEEDS_BANK_DETAILS) return { ok: false, reason: 'wrong_status' };
+  return transitionStatus(bookingCode, STATUS.BANK_DETAILS_READY, actor || 'guest', 'Datos bancarios recibidos del huésped', { bankDetails: { ...details, submittedAt: nowIso() } });
+}
+
 module.exports = {
   STATUS, ROUTE, REFUND_SLA_BUSINESS_DAYS, refundRoute,
   getRefundStore, recoverPaymentInfo,
-  createRefundRequest, getRefund, listRefunds, transitionStatus
+  createRefundRequest, getRefund, listRefunds, transitionStatus,
+  signBankDetailsToken, verifyBankDetailsToken, sanitizeBankDetails, saveBankDetails, bankFormTokenSecret
 };

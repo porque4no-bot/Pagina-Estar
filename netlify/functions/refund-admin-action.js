@@ -100,10 +100,41 @@ exports.handler = async (event) => {
        form in Fase 2); gateway refunds go straight to APPROVED for later
        execution behind the dry-run/second gate. No money moves here. */
     const target = refund.route === ROUTE.MANUAL_BANK ? STATUS.NEEDS_BANK_DETAILS : STATUS.APPROVED;
+    const patch = { refundAmountCents: amountCents, approvedAt: new Date().toISOString(), approvedBy: actor, approvalNotes: notes || null };
+
+    /* A9: for manual transfers, mint a signed link so the guest can submit the
+       account. Gated by REFUND_BANK_FORM_ENABLED. Best-effort (a sign/email
+       failure never blocks the approval). */
+    let bankFormUrl = null;
+    if (target === STATUS.NEEDS_BANK_DETAILS && process.env.REFUND_BANK_FORM_ENABLED === 'true') {
+      try {
+        const { signBankDetailsToken } = require('./_refunds-store');
+        const base = (process.env.GUEST_APP_BASE_URL || process.env.URL || '').replace(/\/$/, '');
+        const token = signBankDetailsToken(bookingCode);
+        bankFormUrl = `${base}/datos-cuenta.html?c=${encodeURIComponent(bookingCode)}&t=${encodeURIComponent(token)}`;
+        patch.bankFormUrl = bankFormUrl;
+      } catch (e) {
+        console.error('[refund-admin-action] bank link sign failed (non-fatal):', e.message);
+      }
+    }
+
     const res = await transitionStatus(bookingCode, target, actor,
-      notes || `Aprobado por ${actor} (${refund.route})`,
-      { refundAmountCents: amountCents, approvedAt: new Date().toISOString(), approvedBy: actor, approvalNotes: notes || null });
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, refund: res.refund }) };
+      notes || `Aprobado por ${actor} (${refund.route})`, patch);
+
+    if (bankFormUrl && refund.guestEmail) {
+      try {
+        const { sendEmail, bankDetailsRequestHtml } = require('./_email');
+        const { REFUND_SLA_BUSINESS_DAYS } = require('./_refunds-store');
+        await sendEmail({
+          to: refund.guestEmail,
+          subject: `Reembolso ${bookingCode} — indícanos tu cuenta bancaria`,
+          html: bankDetailsRequestHtml({ refund: res.refund, formUrl: bankFormUrl, slaDays: REFUND_SLA_BUSINESS_DAYS })
+        });
+      } catch (e) {
+        console.error('[refund-admin-action] bank form email failed (non-fatal):', e.message);
+      }
+    }
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, refund: res.refund, bankFormUrl }) };
   } catch (e) {
     console.error('[refund-admin-action]', e.message);
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'No se pudo actualizar el reembolso' }) };
