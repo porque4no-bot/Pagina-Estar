@@ -12,6 +12,7 @@ const { verifyDirectBookingAmount, EXTRAS_KEYS, EXTRAS_PRICES } = require('./_di
 const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
 const { acquireQuoteLock, releaseQuoteLock } = require('./_quote-lock');
 const { trackPurchase } = require('./_analytics');
+const { sendConfirmationEmail } = require('./send-confirmation');
 
 const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
 
@@ -243,6 +244,42 @@ function directBookingPricing(decoded, paidAmount) {
       : `EXENTO PRELIMINAR - validar documento y motivo; si no corresponde, cobrar IVA (${ivaAmount})`,
     roomPrice: mustPayIva ? Math.round(taxableBase * 1.19) + mascotaCharge : paidAmount
   };
+}
+
+/* Server-side confirmation email for a direct booking. The webhook is the
+   RELIABLE trigger: if the guest closes the tab after paying (or the Wompi
+   redirect never returns to the site), the client-side send in motor-app never
+   fires — but the reservation already exists. Idempotent with that client send
+   (sendConfirmationEmail dedups on the booking code), so the guest gets exactly
+   one email. `breakfast` is derived from the extras mask (position of 'desayuno'
+   in EXTRAS_KEYS) so the email carries the QR breakfast-pass link when due.
+   Never throws: the payment is captured and the reservation created, so an email
+   failure must not surface as a webhook error. */
+async function sendDirectBookingConfirmation(args, overrides = {}) {
+  const send = overrides.sendConfirmationEmail || sendConfirmationEmail;
+  const { decoded, displayBookingCode, roomName, nights, paidAmount, totalAmount } = args || {};
+  try {
+    if (!decoded || !decoded.email) return { sent: false, reason: 'no-email' };
+    const breakfastIdx = EXTRAS_KEYS.indexOf('desayuno');
+    const breakfast = breakfastIdx >= 0 && String(decoded.extrasMask || '')[breakfastIdx] === '1';
+    return await send({
+      guestEmail: decoded.email,
+      guestName: `${decoded.firstName || ''} ${decoded.lastName || ''}`.trim() || decoded.email,
+      bookingCode: displayBookingCode,
+      roomName,
+      checkIn: decoded.checkin,
+      checkOut: decoded.checkout,
+      nights,
+      totalAmount,
+      paidAmount,
+      phone: sanitizePhone(decoded.phone),
+      breakfast,
+      via: 'webhook'
+    });
+  } catch (e) {
+    console.error(`[wompi-webhook] confirmation email failed (non-fatal): ${e.message}. bookingCode=${displayBookingCode}`);
+    return { sent: false, reason: 'error', error: e.message };
+  }
 }
 
 // Helper to obfuscate base64 references for logs
@@ -1401,6 +1438,18 @@ exports.handler = async (event, context) => {
       } catch (e) { /* non-fatal */ }
     }
 
+    /* Reliable confirmation email (closed-tab / lost-redirect safety net).
+       The client-side send in motor-app is best-effort; this is the dependable
+       trigger. Idempotent with it (dedup on the booking code) and non-fatal. */
+    await sendDirectBookingConfirmation({
+      decoded,
+      displayBookingCode: finalBookingCode,
+      roomName,
+      nights,
+      paidAmount,
+      totalAmount: roomPrice
+    });
+
     /* Maestro de clientes (Fase 1): el huésped directo queda como partner
        (persona) en Odoo, deduplicado por email. No fatal. */
     try {
@@ -1475,5 +1524,6 @@ exports._test = {
   handleQuotePayment,
   handleGuestServicePayment,
   acquireQuoteLock,
-  notifyGuestPaymentOutcome
+  notifyGuestPaymentOutcome,
+  sendDirectBookingConfirmation
 };
