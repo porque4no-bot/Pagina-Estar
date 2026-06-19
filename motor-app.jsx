@@ -808,7 +808,10 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
           body: JSON.stringify({
             reference: encodedRef,
             amountInCents: Math.round(calc.subtotal * 100),
-            currency: 'COP'
+            currency: 'COP',
+            /* A8: free-text guest note (server persists it and the payment
+               webhook attaches it to the OTASync reservation). */
+            notes: ((booking.guest && booking.guest.notas) || '').trim().slice(0, 500)
           })
         });
         sigData = await sigRes.json();

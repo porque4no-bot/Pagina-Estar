@@ -119,6 +119,9 @@ function sanitizeNotes(raw) {
   return escapeHtml(raw).substring(0, 500);
 }
 
+/* A8: guest free-text note → PMS. Gated OFF by default. */
+function notesToPmsEnabled() { return process.env.GUEST_NOTES_TO_PMS_ENABLED === 'true'; }
+
 // Helper to decode the URL-safe base64 reference string
 function decodeReference(ref) {
   try {
@@ -1325,6 +1328,19 @@ exports.handler = async (event, context) => {
     }
     const extrasText = extrasList.length > 0 ? extrasList.join(', ') : 'Ninguno';
 
+    /* A8: pull the guest's free-text note persisted at signing time and attach
+       it to the reservation. Best-effort; absent blob or flag OFF => as today. */
+    let guestNote = '';
+    if (notesToPmsEnabled() && decoded.bookingCode) {
+      try {
+        const notesStore = getStore({ name: 'booking-notes', consistency: 'strong' });
+        const raw = await notesStore.get(`note-${decoded.bookingCode}`);
+        if (raw) { guestNote = sanitizeNotes((JSON.parse(raw) || {}).notes || ''); }
+      } catch (e) {
+        if (process.env.DEBUG) console.warn('[wompi-webhook] booking-notes read failed (non-fatal):', e.message);
+      }
+    }
+
     // Build Kunas / OTASync reservation payload
     const reservationPayload = {
       key: pkey,
@@ -1391,7 +1407,7 @@ exports.handler = async (event, context) => {
       guest_email: decoded.email,
       id_channels: channelId,
       channel: channelName,
-      note: `Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${ivaNote}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
+      note: `${guestNote ? 'Nota del huésped: ' + guestNote + '. ' : ''}Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${ivaNote}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
     };
 
     const insertController = new AbortController();
