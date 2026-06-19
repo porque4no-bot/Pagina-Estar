@@ -80,6 +80,23 @@ async function loginOtasync() {
   return data.pkey;
 }
 
+/* Wraps loginOtasync so a sustained OTASync auth outage raises ONE alert
+   (A3, deduped 5 min). Re-throws so callers still fall back / fail as today. */
+async function loginOtasyncAlerted() {
+  try {
+    return await loginOtasync();
+  } catch (err) {
+    try {
+      await require('./_alert').reportAlert({
+        kind: 'otasync_auth_down', severity: 'critical',
+        message: `No se pudo autenticar contra OTASync: ${err.message}`,
+        dedupeKey: 'otasync-auth-down', ttlSec: 300
+      });
+    } catch (_) { /* best-effort */ }
+    throw err;
+  }
+}
+
 function otasyncCreds() {
   return {
     token: process.env.OTASYNC_TOKEN || '',
@@ -116,7 +133,7 @@ async function getSessionKey({ force = false } = {}) {
   }
 
   inflightPromise = (async () => {
-    const pkey = await loginOtasync();
+    const pkey = await loginOtasyncAlerted();
     const expiresAt = Date.now() + PKEY_TTL_MS;
     hotCache = { pkey, fetchedAt: Date.now() };
     await writeSessionBlob(pkey, expiresAt);
@@ -403,29 +420,42 @@ async function insertReservation(payload) {
   };
 
   let lastErr = null;
-  for (let attempt = 1; attempt <= INSERT_MAX_ATTEMPTS; attempt++) {
-    let res;
+  try {
+    for (let attempt = 1; attempt <= INSERT_MAX_ATTEMPTS; attempt++) {
+      let res;
+      try {
+        res = await withSessionRetry(makeRequest);
+      } catch (err) {
+        /* fetch/network error or timeout — transient, retry with backoff */
+        lastErr = err;
+        if (attempt === INSERT_MAX_ATTEMPTS) throw lastErr;
+        console.warn(`[otasync] insert/reservation attempt ${attempt}/${INSERT_MAX_ATTEMPTS} failed (${err.message}); retrying in ${INSERT_BACKOFF_MS[attempt - 1]}ms`);
+        await sleep(INSERT_BACKOFF_MS[attempt - 1]);
+        continue;
+      }
+      if (res.ok) return res.json();
+      /* 5xx is a transient server-side failure; anything else (4xx) is final. */
+      if (res.status >= 500 && attempt < INSERT_MAX_ATTEMPTS) {
+        console.warn(`[otasync] insert/reservation attempt ${attempt}/${INSERT_MAX_ATTEMPTS} returned status ${res.status}; retrying in ${INSERT_BACKOFF_MS[attempt - 1]}ms`);
+        await sleep(INSERT_BACKOFF_MS[attempt - 1]);
+        continue;
+      }
+      throw new Error(`insert/reservation returned status ${res.status}`);
+    }
+    /* Unreachable (the last attempt always returns or throws) — kept for safety. */
+    throw lastErr || new Error('insert/reservation failed');
+  } catch (err) {
+    /* Pago cobrado pero la reserva no se pudo crear: alerta crítica (A3). */
     try {
-      res = await withSessionRetry(makeRequest);
-    } catch (err) {
-      /* fetch/network error or timeout — transient, retry with backoff */
-      lastErr = err;
-      if (attempt === INSERT_MAX_ATTEMPTS) throw lastErr;
-      console.warn(`[otasync] insert/reservation attempt ${attempt}/${INSERT_MAX_ATTEMPTS} failed (${err.message}); retrying in ${INSERT_BACKOFF_MS[attempt - 1]}ms`);
-      await sleep(INSERT_BACKOFF_MS[attempt - 1]);
-      continue;
-    }
-    if (res.ok) return res.json();
-    /* 5xx is a transient server-side failure; anything else (4xx) is final. */
-    if (res.status >= 500 && attempt < INSERT_MAX_ATTEMPTS) {
-      console.warn(`[otasync] insert/reservation attempt ${attempt}/${INSERT_MAX_ATTEMPTS} returned status ${res.status}; retrying in ${INSERT_BACKOFF_MS[attempt - 1]}ms`);
-      await sleep(INSERT_BACKOFF_MS[attempt - 1]);
-      continue;
-    }
-    throw new Error(`insert/reservation returned status ${res.status}`);
+      await require('./_alert').reportAlert({
+        kind: 'otasync_insert_failed', severity: 'critical',
+        message: `insert/reservation falló tras ${INSERT_MAX_ATTEMPTS} intentos: ${err.message}`,
+        context: { reference: payload && payload.reference, attempts: INSERT_MAX_ATTEMPTS },
+        dedupeKey: `otasync-insert-${(payload && payload.reference) || 'unknown'}`
+      });
+    } catch (_) { /* alerta best-effort */ }
+    throw err;
   }
-  /* Unreachable (the last attempt always returns or throws) — kept for safety. */
-  throw lastErr || new Error('insert/reservation failed');
 }
 
 /* Create a tentative reservation that holds the quoted rooms. Returns the
@@ -713,7 +743,95 @@ async function postOrderExtrasToFolio({ idReservations, items, payment }) {
   return { posted: true, count: items.length, idExtras, idReservationsRooms, paymentPosted };
 }
 
+/* ── Reservations by date (A10 stay emails / breakfast roster) ─────────────
+   Reads OTASync "Get reservations" (POST /api/reservation/data/reservations),
+   which supports filter_by=date_arrival/date_departure + dfrom/dto + arrivals/
+   departures flags. READ-ONLY: never inserts/edits a reservation, never touches
+   folio/pago/disponibilidad. Returns normalized rows. */
+
+function inferLang(country) {
+  const c = String(country || '').trim().toUpperCase();
+  if (!c || c === 'CO' || c === 'COL' || c === 'COLOMBIA') return 'es';
+  return 'en';
+}
+
+function reservaTieneDesayuno(r) {
+  const rooms = (r && Array.isArray(r.rooms)) ? r.rooms : [];
+  for (const room of rooms) {
+    const nights = Array.isArray(room && room.nights) ? room.nights : [];
+    for (const n of nights) {
+      if (Number(n && n.breakfast) > 0 || Number(n && n.breakfast_adults) > 0) return true;
+    }
+  }
+  return false;
+}
+
+function normalizeReservation(r) {
+  r = r || {};
+  return {
+    idReservations: String(r.id_reservations || ''),
+    status: r.status || '',
+    guestStatus: r.guest_status || '',
+    dateArrival: r.date_arrival || '',
+    dateDeparture: r.date_departure || '',
+    firstName: r.first_name || '',
+    lastName: r.last_name || '',
+    email: String(r.email || '').trim(),
+    phone: r.phone || '',
+    country: String(r.country || '').trim(),
+    nights: parseInt(r.nights, 10) || 0,
+    hasBreakfast: reservaTieneDesayuno(r),
+    roomName: (r.rooms && r.rooms[0] && r.rooms[0].name) || '',
+    lang: inferLang(r.country)
+  };
+}
+
+const RESERVATIONS_MAX_PAGES = 20;
+
+async function getReservationsByDate({ filterBy, dfrom, dto, arrivals = 0, departures = 0, status = '0' } = {}) {
+  if (!hasOtasyncCreds()) return { reservations: [], isMock: true };
+  const { token, propertyId } = otasyncCreds();
+  const out = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const pageNum = page;
+    const makeRequest = async (pkey) => {
+      const payload = {
+        key: pkey, token, id_properties: propertyId,
+        filter_by: filterBy, order_by: filterBy, order_type: 'desc',
+        dfrom, dto, arrivals, departures, status,
+        multiple_properties: '0', view_type: 'reservations',
+        show_rooms: 1, show_nights: 1, page: pageNum,
+        channels: [], countries: [], rooms: [], companies: [], contigents: [], pricing_plans: []
+      };
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 10000);
+      try {
+        const r = await fetch('https://app.otasync.me/api/reservation/data/reservations', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload), signal: ctrl.signal
+        });
+        clearTimeout(tid);
+        return r;
+      } catch (err) {
+        clearTimeout(tid);
+        throw err.name === 'AbortError' ? new Error('Request timeout during reservations lookup') : err;
+      }
+    };
+    const res = await withSessionRetry(makeRequest);
+    if (!res.ok) throw new Error(`reservations returned status ${res.status}`);
+    const data = await res.json();
+    const list = Array.isArray(data.reservations) ? data.reservations : [];
+    list.forEach(r => out.push(normalizeReservation(r)));
+    totalPages = Number(data.total_pages_number) || 1;
+    page++;
+  } while (page <= totalPages && page <= RESERVATIONS_MAX_PAGES);
+  return { reservations: out, isMock: false };
+}
+
 module.exports = {
+  getReservationsByDate, normalizeReservation, inferLang, reservaTieneDesayuno,
   otasyncCreds, hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
   buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, createConfirmedReservation,
   getDynamicPricing, EXTRA_GUEST_SURCHARGE,

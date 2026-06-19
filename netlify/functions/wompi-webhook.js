@@ -906,6 +906,13 @@ exports.handler = async (event, context) => {
 
   if (!WOMPI_WEBHOOK_SECRET) {
     console.error('CRITICAL: WOMPI_WEBHOOK_SECRET is not configured. Rejecting webhook.');
+    try {
+      await require('./_alert').reportAlert({
+        kind: 'wompi_webhook_misconfig', severity: 'critical',
+        message: 'WOMPI_WEBHOOK_SECRET no está configurado: el webhook rechaza TODOS los pagos (reservas no se crean).',
+        dedupeKey: 'wompi-secret-missing'
+      });
+    } catch (_) { /* alerta best-effort */ }
     return {
       statusCode: 500,
       headers: corsHeaders,

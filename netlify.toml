@@ -31,6 +31,12 @@
 [functions."purge-guest-data"]
   schedule = "30 3 * * *"
 
+# Pre-arrival + post-stay guest emails (A10). Reads OTASync reservations by
+# date (read-only) and emails arrivals/departures. Gated by STAY_EMAILS_ENABLED
+# (OFF by default). Runs daily at 12:00 UTC (07:00 Colombia).
+[functions."send-stay-emails"]
+  schedule = "0 12 * * *"
+
 [build.environment]
   NODE_VERSION = "22"
   # The Firebase web apiKey is public by design (it ships in client-side HTML);

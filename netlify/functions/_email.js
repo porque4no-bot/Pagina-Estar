@@ -151,8 +151,75 @@ function adminAvailabilityLostHtml({ quote, shortfalls }) {
   </body></html>`;
 }
 
+const WA_LINK = 'https://api.whatsapp.com/send/?phone=573102490414';
+
+function emailShell(bandColor, eyebrow, code, bodyHtml) {
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F5F3EE;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F3EE;padding:32px 0;"><tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:12px;overflow:hidden;">
+      <tr><td style="background:#2C2C2C;padding:32px 40px;text-align:center;">
+        <h1 style="margin:0;font-family:Georgia,serif;font-size:28px;color:#fff;letter-spacing:0.06em;">ESTAR</h1>
+        <p style="margin:6px 0 0;font-family:Arial,sans-serif;font-size:11px;letter-spacing:0.12em;color:#9A9A8A;text-transform:uppercase;">Manizales, Colombia</p>
+      </td></tr>
+      <tr><td style="background:${bandColor};padding:22px 40px;text-align:center;">
+        <p style="margin:0;font-family:Arial,sans-serif;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#fff;opacity:.95;">${esc(eyebrow)}</p>
+        ${code ? `<p style="margin:6px 0 0;font-family:'Courier New',monospace;font-size:20px;font-weight:700;color:#fff;">${esc(code)}</p>` : ''}
+      </td></tr>
+      <tr><td style="padding:30px 40px;">${bodyHtml}</td></tr>
+      <tr><td style="padding:0 40px 30px;text-align:center;font-family:Arial,sans-serif;font-size:11px;color:#9A9A8A;">
+        Hotel Estar · Cl. 61 #23-36, La Estrella · Manizales · reservas@estar.com.co · +57 310 249 0414
+      </td></tr>
+    </table>
+  </td></tr></table></body></html>`;
+}
+
+function ctaButton(href, label) {
+  return `<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:6px 0 4px;">
+    <a href="${esc(href)}" style="display:inline-block;padding:14px 32px;background:#9B9065;border-radius:8px;font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#fff;text-decoration:none;letter-spacing:0.06em;text-transform:uppercase;">${esc(label)}</a>
+  </td></tr></table>`;
+}
+
+/* A10 — pre-arrival reminder (sent by the send-stay-emails cron). Bilingual. */
+function preArrivalHtml({ resv, lang }) {
+  const r = resv || {};
+  const stay = `${formatDateES(r.dateArrival)} → ${formatDateES(r.dateDeparture)}`;
+  if (lang === 'en') {
+    const bf = r.hasBreakfast ? `<p style="margin:0 0 12px;font-family:Georgia,serif;font-size:14px;color:#555;">Your booking includes breakfast — we'll have it ready each morning.</p>` : '';
+    return emailShell('#B5713B', 'We look forward to your stay', '', `
+      <p style="margin:0 0 14px;font-family:Georgia,serif;font-size:16px;color:#2C2C2C;">Hi <strong>${esc(r.firstName || 'there')}</strong>,</p>
+      <p style="margin:0 0 14px;font-family:Georgia,serif;font-size:14px;color:#555;line-height:1.7;">Your stay at Estar is coming up: <strong>${stay}</strong>. Check-in is from <strong>3:00 pm</strong> and check-out until <strong>11:00 am</strong>. Check-in is 100% digital — the day before arrival you'll get a link with your access codes (no keys, no front desk).</p>
+      ${bf}
+      <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:14px;color:#555;line-height:1.7;">We're at Cl. 61 #23-36, La Estrella, Manizales. Need anything before you arrive?</p>
+      ${ctaButton(WA_LINK, 'Message us on WhatsApp')}`);
+  }
+  const bf = r.hasBreakfast ? `<p style="margin:0 0 12px;font-family:Georgia,serif;font-size:14px;color:#555;">Tu reserva incluye desayuno — lo tendremos listo cada mañana.</p>` : '';
+  return emailShell('#B5713B', 'Te esperamos pronto', '', `
+    <p style="margin:0 0 14px;font-family:Georgia,serif;font-size:16px;color:#2C2C2C;">Hola <strong>${esc(r.firstName || '')}</strong>,</p>
+    <p style="margin:0 0 14px;font-family:Georgia,serif;font-size:14px;color:#555;line-height:1.7;">Tu estadía en Estar está cerca: <strong>${stay}</strong>. El check-in es desde las <strong>3:00 p. m.</strong> y el check-out hasta las <strong>11:00 a. m.</strong> El check-in es 100% digital — un día antes de tu llegada recibirás un enlace con tus códigos de acceso (sin llaves ni recepción).</p>
+    ${bf}
+    <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:14px;color:#555;line-height:1.7;">Estamos en Cl. 61 #23-36, La Estrella, Manizales. ¿Necesitas algo antes de llegar?</p>
+    ${ctaButton(WA_LINK, 'Escríbenos por WhatsApp')}`);
+}
+
+/* A10 — post-stay thank you + review ask (sent by the send-stay-emails cron). */
+function postStayHtml({ resv, lang }) {
+  const r = resv || {};
+  const reviewUrl = process.env.REVIEW_LINK_URL || WA_LINK;
+  const hasReview = !!process.env.REVIEW_LINK_URL;
+  if (lang === 'en') {
+    return emailShell('#6E6A42', 'Thank you for staying with us', '', `
+      <p style="margin:0 0 14px;font-family:Georgia,serif;font-size:16px;color:#2C2C2C;">Hi <strong>${esc(r.firstName || 'there')}</strong>,</p>
+      <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:14px;color:#555;line-height:1.7;">Thank you for choosing Estar. We hope Manizales treated you well and that your studio felt like home. ${hasReview ? 'If you have a minute, a short review helps other travelers find us.' : 'We\'d love to hear how it went.'}</p>
+      ${ctaButton(reviewUrl, hasReview ? 'Leave a review' : 'Send us feedback')}`);
+  }
+  return emailShell('#6E6A42', 'Gracias por tu estadía', '', `
+    <p style="margin:0 0 14px;font-family:Georgia,serif;font-size:16px;color:#2C2C2C;">Hola <strong>${esc(r.firstName || '')}</strong>,</p>
+    <p style="margin:0 0 16px;font-family:Georgia,serif;font-size:14px;color:#555;line-height:1.7;">Gracias por elegir Estar. Esperamos que Manizales te haya tratado bien y que tu apartaestudio se sintiera como en casa. ${hasReview ? 'Si tienes un minuto, una reseña corta nos ayuda a que otros viajeros nos encuentren.' : 'Nos encantaría saber cómo te fue.'}</p>
+    ${ctaButton(reviewUrl, hasReview ? 'Dejar una reseña' : 'Enviarnos tu opinión')}`);
+}
+
 module.exports = {
   sendEmail, adminEmail, esc, formatCOP, formatDateES,
   paymentConfirmationHtml, adminPendingHtml, adminAvailabilityLostHtml,
-  quoteExpiringHtml
+  quoteExpiringHtml, preArrivalHtml, postStayHtml
 };

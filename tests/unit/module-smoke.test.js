@@ -17,7 +17,7 @@ const MODULES = [
   '_env', '_guest-app', '_quotes-store', '_otasync', '_email', '_rate-limit',
   '_google-drive', '_pdf-render', '_contract-template', '_quote-lock', '_direct-pricing',
   '_payments', '_firebase-auth', '_quote-audit', '_pricing', '_analytics',
-  '_whatsapp', '_whatsapp-bot', '_whatsapp-ai', '_whatsapp-guard', '_odoo',
+  '_whatsapp', '_whatsapp-bot', '_whatsapp-ai', '_whatsapp-guard', '_odoo', '_alert',
   /* handlers */
   'booking-status', 'check-availability', 'create-booking',
   'create-mercadopago-preference', 'create-quote', 'create-wompi-signature',
@@ -27,7 +27,7 @@ const MODULES = [
   'list-quotes', 'mercadopago-webhook', 'otasync-webhook', 'purge-guest-data',
   'quote-availability', 'read-quote-audit', 'reconcile-payments',
   'request-cancellation', 'request-quote', 'retry-quote-booking', 'revalidate-quotes',
-  'send-confirmation', 'send-quote-email', 'update-quote',
+  'send-confirmation', 'send-quote-email', 'send-stay-emails', 'update-quote',
   'upload-drive-credentials', 'whatsapp-probe', 'whatsapp-webhook', 'wompi-webhook'
 ];
 
