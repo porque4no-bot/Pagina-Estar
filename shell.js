@@ -562,8 +562,12 @@
     });
   }
 
-  /* ----- DYNAMIC RATING FETCH ----- */
+  /* ----- DYNAMIC RATING FETCH (deferred off the critical path) ----- */
+  // The badge already shows a build-time fallback (9.0 · 126 reseñas); the live
+  // value is a nice-to-have, so we fetch it only after load + idle. The
+  // serverless call can be slow on a cold start, so it must not block the page.
   function fetchDynamicRating() {
+    const run = () =>
     fetch('/api/get-booking-rating')
       .then(res => {
         if (!res.ok) throw new Error(`HTTP status ${res.status}`);
@@ -591,6 +595,11 @@
       .catch(err => {
         console.warn('Could not fetch dynamic rating, using fallback:', err);
       });
+    const start = () => ('requestIdleCallback' in window)
+      ? requestIdleCallback(run, { timeout: 3000 })
+      : setTimeout(run, 500);
+    if (document.readyState === 'complete') start();
+    else window.addEventListener('load', start, { once: true });
   }
 
 
