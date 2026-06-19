@@ -4831,11 +4831,21 @@ textarea:focus-visible,
 }
 .fn-form {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   flex: 1;
   min-width: 240px;
   max-width: 400px;
 }
+/* Habeas Data consent for the newsletter: drops to its own full-width row
+   below the email+button, with light text so it reads on the dark footer. */
+.fn-consent {
+  flex-basis: 100%;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(250, 246, 239, 0.7);
+}
+.fn-consent a { color: var(--terracotta-300); }
 .fn-form input[type="email"] {
   flex: 1;
   background: rgba(250,246,239,0.08);

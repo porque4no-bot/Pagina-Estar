@@ -267,6 +267,23 @@ function injectSkipLink(dir) {
 console.log('Injecting accessibility skip-links...');
 injectSkipLink(distDir);
 
+// Generate an English 404 before stripping: copy the still-bilingual root
+// 404.html into en/ (forcing <html lang="en">) so the en/ strip below leaves
+// only the English copy. Netlify serves the nearest 404; a /en/* redirect in
+// netlify.toml points unmatched English routes here so international visitors
+// recover in their own language instead of a Spanish-only error page.
+const distEnDir = path.join(distDir, 'en');
+if (!fs.existsSync(distEnDir)) fs.mkdirSync(distEnDir, { recursive: true });
+const root404 = path.join(distDir, '404.html');
+if (fs.existsSync(root404)) {
+  const en404 = fs.readFileSync(root404, 'utf8')
+    .replace('<html lang="es">', '<html lang="en">')
+    // Relative stylesheet hrefs must climb one level from /en/ (assets and
+    // nav links already use root-absolute paths, so only CSS needs this).
+    .replace(/href="(colors_and_type\.css|styles\.css)/g, 'href="../$1');
+  fs.writeFileSync(path.join(distEnDir, '404.html'), en404);
+}
+
 // Strip bilingual mash: remove .lang-en from root ES pages, .lang-es from en/ pages
 console.log('Stripping bilingual inline elements...');
 fs.readdirSync(distDir).forEach(file => {
@@ -275,7 +292,6 @@ fs.readdirSync(distDir).forEach(file => {
   const stripped = stripBilingualElements(fs.readFileSync(p, 'utf8'), 'lang-en');
   fs.writeFileSync(p, stripped);
 });
-const distEnDir = path.join(distDir, 'en');
 if (fs.existsSync(distEnDir)) {
   fs.readdirSync(distEnDir).forEach(file => {
     if (!file.endsWith('.html')) return;
