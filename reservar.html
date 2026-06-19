@@ -653,7 +653,7 @@
   const BE_EXTRAS = [
     { id:'desayuno', kind:'perGuestNight', name:'Desayuno', desc:'Café, fruta y huevos cada mañana', price:20000, unit:'/ persona / noche', icon:'coffee' },
     { id:'late', kind:'pct', pct:0.15, name:'Late check-out', desc:'Salida hasta las 2:00 pm (sujeto a disponibilidad)', unit:'15% de la noche', icon:'clock' },
-    { id:'early', kind:'pct', pct:0.25, name:'Early check-in', desc:'Entrada desde las 6:00 am (sujeto a disponibilidad)', unit:'25% de la noche', icon:'sunrise' },
+    { id:'early', kind:'pct', pct:0.35, name:'Early check-in', desc:'Entrada desde las 6:00 am (sujeto a disponibilidad)', unit:'35% de la noche', icon:'sunrise' },
     { id:'mascota', kind:'flat', price:200000, name:'Mascota', desc:'Una mascota por reserva · IVA incluido', unit:'por reserva', icon:'paw-print' }
   ];
   /* Posición de cada flag en el extrasMask de la referencia Wompi. APPEND ONLY:
@@ -693,7 +693,7 @@
     const lines=[];
     if(extras.desayuno)lines.push({key:'desayuno',amount:20000*search.guests*nights});
     if(extras.late)lines.push({key:'late',amount:Math.round(base*0.15)});
-    if(extras.early)lines.push({key:'early',amount:Math.round(base*0.25)});
+    if(extras.early)lines.push({key:'early',amount:Math.round(base*0.35)});
     const exTaxable=lines.reduce((s,l)=>s+l.amount,0);
     /* mascota: $200k IVA incluido → entra al cobro online pero no a la base de IVA */
     const mascotaSub=extras.mascota?200000:0;

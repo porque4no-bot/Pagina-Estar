@@ -80,7 +80,7 @@ test('booking flow reaches the Wompi payment step', async ({ page }) => {
 });
 
 test('extras: late check-out, early check-in and a pet update the summary', async ({ page }) => {
-  // Mock room avgPrice = 250.000 → late 15% = 37.500, early 25% = 62.500, pet = 200.000 (flat).
+  // Mock room avgPrice = 250.000 → late 15% = 37.500, early 35% = 87.500, pet = 200.000 (flat).
   await page.goto('/reservar.html?checkin=2026-08-10&checkout=2026-08-13&guests=2');
   await expect(page.locator('.be-room-card')).toBeVisible();
   await page.locator('.be-room-select-btn').first().click();
@@ -96,6 +96,6 @@ test('extras: late check-out, early check-in and a pet update the summary', asyn
   await expect(summary).toContainText('Early check-in');
   await expect(summary).toContainText('Mascota');
   await expect(summary).toContainText('$ 37.500');   // late = 15% of 250.000
-  await expect(summary).toContainText('$ 62.500');   // early = 25% of 250.000
+  await expect(summary).toContainText('$ 87.500');   // early = 35% of 250.000
   await expect(summary).toContainText('$ 200.000');  // pet flat charge
 });

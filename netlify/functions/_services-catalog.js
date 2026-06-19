@@ -19,10 +19,11 @@
  *   surfaces:   where the service is offered today
  *
  * Owner decisions baked in (2026-06-18): desayuno = $20.000 (era 20/25/28k);
- * late check-out = 15% de la noche; early check-in = 25% de la noche; the
- * booking engine was already canonical, quotes + guest app were aligned to it.
+ * late check-out = 15% de la noche; early check-in = 35% de la noche (plano,
+ * decisión dueño 2026-06-19, antes 25%); the booking engine was already
+ * canonical, quotes + guest app were aligned to it.
  * Guest-app surface (owner decision 2026-06-18): offers desayuno, lavandería,
- * late check-out (15%), early check-in (25%), traslado, experiencia y mascota;
+ * late check-out (15%), early check-in (35%), traslado, experiencia y mascota;
  * el parqueadero quedó retirado (no figura en este catálogo).
  */
 
@@ -36,7 +37,7 @@ const SERVICES = {
      paid night (totalAmount / nights, IVA included). mascota is a flat surcharge
      offered in both the booking engine and the guest app. */
   late:    { es: 'Late check-out', en: 'Late check-out', pct: 0.15, tax: 'iva', multiplier: 'pctOfNight', surfaces: ['booking', 'guest'] },
-  early:   { es: 'Early check-in',  en: 'Early check-in',  pct: 0.25, tax: 'iva', multiplier: 'pctOfNight', surfaces: ['booking', 'guest'] },
+  early:   { es: 'Early check-in',  en: 'Early check-in',  pct: 0.35, tax: 'iva', multiplier: 'pctOfNight', surfaces: ['booking', 'guest'] },
   mascota: { es: 'Mascota', en: 'Pet', price: 200000, tax: 'included', multiplier: 'flat', surfaces: ['booking', 'guest'] },
 
   /* Corporate-quote services */

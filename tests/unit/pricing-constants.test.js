@@ -33,7 +33,7 @@ test('reservar.html calcTotal extras math matches _pricing', () => {
   // late check-out = 15% of the base nightly
   assert.equal(floatAfter(/extras\.late\)lines\.push\(\{key:'late',amount:Math\.round\(base\*([\d.]+)\)/),
     EXTRAS_PRICES.late.pct, 'late pct drifted');
-  // early check-in = 25% of the base nightly
+  // early check-in = 35% of the base nightly
   assert.equal(floatAfter(/extras\.early\)lines\.push\(\{key:'early',amount:Math\.round\(base\*([\d.]+)\)/),
     EXTRAS_PRICES.early.pct, 'early pct drifted');
   // mascota = flat charge (VAT included)

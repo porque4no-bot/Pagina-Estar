@@ -527,7 +527,7 @@
   const BE_EXTRAS = [
     { id:'desayuno', kind:'perGuestNight', name:'Breakfast', desc:'Coffee, fruit and eggs every morning', price:20000, unit:'/ person / night', icon:'coffee' },
     { id:'late', kind:'pct', pct:0.15, name:'Late check-out', desc:'Check out until 2:00 pm (subject to availability)', unit:'15% of the night', icon:'clock' },
-    { id:'early', kind:'pct', pct:0.25, name:'Early check-in', desc:'Check in from 6:00 am (subject to availability)', unit:'25% of the night', icon:'sunrise' },
+    { id:'early', kind:'pct', pct:0.35, name:'Early check-in', desc:'Check in from 6:00 am (subject to availability)', unit:'35% of the night', icon:'sunrise' },
     { id:'mascota', kind:'flat', price:200000, name:'Pet', desc:'One pet per booking · VAT included', unit:'per booking', icon:'paw-print' }
   ];
   /* Position of each flag in the Wompi reference extrasMask. APPEND ONLY:
@@ -567,7 +567,7 @@
     const lines=[];
     if(extras.desayuno)lines.push({key:'desayuno',amount:20000*search.guests*nights});
     if(extras.late)lines.push({key:'late',amount:Math.round(base*0.15)});
-    if(extras.early)lines.push({key:'early',amount:Math.round(base*0.25)});
+    if(extras.early)lines.push({key:'early',amount:Math.round(base*0.35)});
     const exTaxable=lines.reduce((s,l)=>s+l.amount,0);
     /* pet: $200k VAT-included → counts toward the online charge but not the VAT base */
     const mascotaSub=extras.mascota?200000:0;
