@@ -608,6 +608,7 @@
         <button type="button" class="admin-tab is-active" data-view="nueva">Nueva cotización</button>
         <button type="button" class="admin-tab" data-view="lista">Cotizaciones</button>
         <button type="button" class="admin-tab" data-view="reembolsos">Reembolsos</button>
+        <button type="button" class="admin-tab" data-view="desayunos">Desayunos</button>
       </div>
     </div>
 
@@ -896,7 +897,7 @@
       <div class="rf-note" style="margin-bottom:20px">
         Por ahora <strong>todos los reembolsos se tramitan manualmente</strong> (Wompi y Mercado Pago no permiten reembolso automático en esta cuenta).
         El monto se define <strong>según la política de cancelación de la tarifa</strong>
-        (Flexible: gratis hasta 48 h antes del check-in · Best Price: no reembolsable)
+        (Estricta: gratis hasta 7 días antes · Flexible: gratis hasta 24 h antes; fuera de plazo se cobra 1ª noche + impuestos + 3,5%)
         y se procesa por el mismo medio de pago en un <strong>máximo de 15 días hábiles</strong>.
       </div>
 
@@ -932,6 +933,12 @@
           <tbody id="rfBody"></tbody>
         </table>
       </div>
+    </div>
+
+    <!-- ══════════════ VIEW: Desayunos ══════════════ -->
+    <div id="viewDesayunos" style="display:none">
+      <iframe id="desayunoFrame" title="Administración de desayunos" data-src="desayuno-admin.html"
+        style="width:100%; height:80vh; border:1px solid var(--border); border-radius:12px; background:var(--white);"></iframe>
     </div>
 
   </div>
@@ -1567,12 +1574,20 @@ function switchView(view) {
   document.getElementById('viewNueva').style.display = view === 'nueva' ? 'block' : 'none';
   document.getElementById('viewLista').style.display = view === 'lista' ? 'block' : 'none';
   document.getElementById('viewReembolsos').style.display = view === 'reembolsos' ? 'block' : 'none';
+  document.getElementById('viewDesayunos').style.display = view === 'desayunos' ? 'block' : 'none';
   const titleEl = document.getElementById('pageTitle');
   if (view === 'nueva') titleEl.textContent = editingQuoteId ? 'Editar cotización' : 'Nueva cotización';
   else if (view === 'lista') titleEl.textContent = 'Cotizaciones';
   else if (view === 'reembolsos') titleEl.textContent = 'Reembolsos';
+  else if (view === 'desayunos') titleEl.textContent = 'Desayunos';
   if (view === 'lista') loadQuotesList();
   if (view === 'reembolsos') loadRefunds();
+  if (view === 'desayunos') {
+    /* Lazy-load the breakfast admin (embedded) only when first opened. It runs
+       its own Firebase auth, which shares this session (same origin/project). */
+    const frame = document.getElementById('desayunoFrame');
+    if (frame && !frame.src && frame.dataset.src) frame.src = frame.dataset.src;
+  }
 }
 document.querySelectorAll('.admin-tab').forEach(t => {
   t.addEventListener('click', () => switchView(t.dataset.view));
@@ -2195,7 +2210,7 @@ function openRefund(code) {
     ${r.payoutRef ? `<dt>Referencia</dt><dd>${escHtml(r.payoutRef)}</dd>` : ''}
   </dl>`;
 
-  const howto = isTerminal ? '' : `<div class="rf-section"><div class="rf-note">${escHtml(REFUND_ROUTE_HOWTO[r.route] || '')} Plazo máximo: <strong>15 días hábiles</strong>. El monto se define según la política de la tarifa (Flexible: gratis hasta 48 h antes del check-in · Best Price: no reembolsable).</div></div>`;
+  const howto = isTerminal ? '' : `<div class="rf-section"><div class="rf-note">${escHtml(REFUND_ROUTE_HOWTO[r.route] || '')} Plazo máximo: <strong>15 días hábiles</strong>. El monto se define según la política de la tarifa (Estricta: gratis hasta 7 días antes · Flexible: gratis hasta 24 h antes; fuera de plazo se cobra 1ª noche + impuestos + 3,5%).</div></div>`;
 
   /* A9: bank-details capture state for manual-transfer refunds. */
   let bankBlock = '';

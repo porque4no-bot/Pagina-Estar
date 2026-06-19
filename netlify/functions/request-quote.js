@@ -139,7 +139,7 @@ function buildNotificationEmailHtml(data) {
         <!-- CTA to admin -->
         <tr>
           <td style="padding:0 40px 32px 40px;text-align:center;">
-            <a href="https://estar.com.co/cotizar-admin.html" style="display:inline-block;padding:14px 28px;background-color:#28292B;border-radius:8px;font-size:12px;font-weight:700;color:#FFFFFF;text-decoration:none;letter-spacing:0.1em;text-transform:uppercase;">
+            <a href="https://estar.com.co/admin" style="display:inline-block;padding:14px 28px;background-color:#28292B;border-radius:8px;font-size:12px;font-weight:700;color:#FFFFFF;text-decoration:none;letter-spacing:0.1em;text-transform:uppercase;">
               Crear cotización en el portal →
             </a>
           </td>

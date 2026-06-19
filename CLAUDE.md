@@ -53,9 +53,9 @@ Root HTML pages (Spanish, canonical):
 | `trabaja.html` | Jobs |
 | `faq.html` | FAQ |
 | `cotizacion.html` | Corporate quote viewer |
-| `cotizar-admin.html` | Admin: quote management (noindex) |
+| `cotizar-admin.html` | Admin panel — served at **`/admin`** (rewrite). Tabs: quotes, refunds, and **breakfast** (embeds `desayuno-admin.html` in an iframe). noindex |
 | `desayuno.html` | Staff: breakfast-pass verifier — scan/lookup a reservation, mark breakfast served, + cycle/day served counts (noindex) |
-| `desayuno-admin.html` | Admin: breakfast money analytics + day board ("día de desayunos") + per-reservation lookup with courtesy action (noindex) |
+| `desayuno-admin.html` | Admin: breakfast money analytics + day board ("día de desayunos") + per-reservation lookup with courtesy action (noindex). Embedded as the **Desayunos** tab of `/admin`; `/desayuno-admin` redirects there |
 | `privacidad.html` / `aviso-legal.html` / `cancelacion.html` / `cookies.html` / `escnna.html` | Legal |
 | `404.html` | Error page |
 
@@ -124,7 +124,7 @@ Four-step flow on `reservar.html`:
 
 | Step | Key API calls | Notes |
 |---|---|---|
-| 1 — Room selection | `GET /api/check-availability` | 5 rooms, dual-rate picker (Flexible 10% refund vs Best Price 10% cheaper), image carousel, no-availability fallback |
+| 1 — Room selection | `GET /api/check-availability` | 5 rooms, dual-rate picker (Estricta = base, free cancel 7 days before · Flexible = +10%, free cancel 24h before), image carousel, no-availability fallback |
 | 2 — Extras | None | Breakfast ($20k/person/night), parking ($25k/night), late checkout ($60k), early check-in ($50k) |
 | 3 — Guest data | None | Name, email, phone, country, travel motive, notes, privacy & ESCNNA checkboxes |
 | 4 — Payment | `POST /api/create-wompi-signature`, `POST /api/booking-status` | IVA logic, Wompi widget, confirmation polling (up to 60s, 30 polls at 2s) |

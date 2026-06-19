@@ -103,9 +103,16 @@
   to = "/en/"
   status = 301
 
+# Admin panel: clean access URL is now /admin (serves the quotes+refunds+breakfast
+# panel via rewrite, URL stays /admin). Old paths redirect to it.
+[[redirects]]
+  from = "/admin"
+  to = "/cotizar-admin.html"
+  status = 200
+
 [[redirects]]
   from = "/cotizar-admin"
-  to = "/cotizar-admin.html"
+  to = "/admin"
   status = 301
 
 [[redirects]]
@@ -118,9 +125,11 @@
   to = "/pase-desayuno.html"
   status = 301
 
+# Breakfast admin is now a tab inside /admin; the pretty URL points there.
+# (desayuno-admin.html stays directly reachable — it's embedded by /admin.)
 [[redirects]]
   from = "/desayuno-admin"
-  to = "/desayuno-admin.html"
+  to = "/admin"
   status = 301
 
 [[redirects]]
@@ -148,6 +157,11 @@
     # so that inline <script> blocks can be allow-listed by SHA-256 hash and
     # `'unsafe-inline'` is no longer required on script-src.
     # See `writeCspHeaders` in build.js for the full directive.
+
+[[headers]]
+  for = "/admin"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
 
 [[headers]]
   for = "/cotizar-admin.html"

@@ -65,9 +65,9 @@ function adminCancellationHtml({ booking, clientIp }) {
     </ul>
     <p>Acciones pendientes del equipo:</p>
     <ol>
-      <li>Verificar la tarifa de la reserva (Flexible: cancelación gratuita hasta 48 h antes del check-in · Best Price: no reembolsable) en la nota de OTASync.</li>
+      <li>Verificar la tarifa de la reserva (Estricta: gratis hasta 7 días antes · Flexible: gratis hasta 24 h antes; fuera de plazo se cobra 1ª noche + impuestos + 3,5%; no-show 24 h tras el check-in sin reembolso) en la nota de OTASync.</li>
       <li>Cancelar la reserva en OTASync si la política lo permite.</li>
-      <li>Tramitar el reembolso por el canal de pago original (Wompi / Mercado Pago / datáfono / efectivo) <strong>dentro de ${REFUND_SLA_BUSINESS_DAYS} días hábiles</strong> y responder al huésped. Registrar el avance en el panel (cotizar-admin → Reembolsos).</li>
+      <li>Tramitar el reembolso por el canal de pago original (Wompi / Mercado Pago / datáfono / efectivo) <strong>dentro de ${REFUND_SLA_BUSINESS_DAYS} días hábiles</strong> y responder al huésped. Registrar el avance en el panel (/admin → Reembolsos).</li>
     </ol>`;
 }
 
