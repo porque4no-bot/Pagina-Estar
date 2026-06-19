@@ -549,6 +549,11 @@ async function build() {
 
   function optimizeHtmlDir(dir, prefix, keepCdn) {
     const cssBundleTag = `<link rel="stylesheet" href="${prefix}bundle.css?v=3">`;
+    // The Spanish homepage (root, primary SEO target) inlines the minified bundle
+    // so first paint never waits for a CSS round-trip (~300ms on slow mobile).
+    // Root only: bundle.css uses relative url()s (fonts/, assets/) that would
+    // break if inlined under /en/. Every other page keeps the cacheable <link>.
+    const bundleCss = fs.readFileSync(path.join(distDir, 'bundle.css'), 'utf8');
     const pre = escapeRegex(prefix);
     // Tolerant matchers: optional ?v=N version query, any leading indentation.
     // colors link is swapped in place for the bundle tag; styles link line is dropped.
@@ -561,9 +566,13 @@ async function build() {
       let content = fs.readFileSync(p, 'utf8');
 
       // Merge the two stylesheet links into the single bundle reference.
-      // Version-agnostic and indentation-agnostic.
+      // Version-agnostic and indentation-agnostic. The root homepage inlines it.
       if (colorsRe.test(content) && stylesRe.test(content)) {
-        content = content.replace(colorsRe, cssBundleTag).replace(stylesRe, '');
+        const inlineHome = prefix === '' && file === 'index.html';
+        const cssTag = inlineHome ? `<style>${bundleCss}</style>` : cssBundleTag;
+        // Function replacer: bundleCss may contain `$` sequences that String
+        // .replace would otherwise treat as special patterns.
+        content = content.replace(colorsRe, () => cssTag).replace(stylesRe, '');
       }
 
       // Always inline static <i data-lucide> tags

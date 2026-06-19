@@ -146,11 +146,11 @@
     "mascota": "One pet per booking · VAT included"
   },
   "extrasUnits": {
-    "/persona/noche": "/person/night",
-    "/noche": "/night",
+    "/ persona / noche": "/ person / night",
+    "/ noche": "/ night",
     "por reserva": "per booking",
     "por trayecto": "per way",
-    "/persona": "/person",
+    "/ persona": "/ person",
     "15% de la noche": "15% of the night",
     "25% de la noche": "25% of the night"
   },
