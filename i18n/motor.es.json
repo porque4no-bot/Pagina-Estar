@@ -146,11 +146,11 @@
     "mascota": "Una mascota por reserva · IVA incluido"
   },
   "extrasUnits": {
-    "/persona/noche": "/persona/noche",
-    "/noche": "/noche",
+    "/ persona / noche": "/ persona / noche",
+    "/ noche": "/ noche",
     "por reserva": "por reserva",
     "por trayecto": "por trayecto",
-    "/persona": "/persona",
+    "/ persona": "/ persona",
     "15% de la noche": "15% de la noche",
     "25% de la noche": "25% de la noche"
   },
