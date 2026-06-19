@@ -88,6 +88,42 @@ function paymentConfirmationHtml({ quote, bookingCode, total }) {
   </td></tr></table></body></html>`;
 }
 
+/* Client reminder: an active quote is about to expire (sent by the cron once
+   per quote). Brand-consistent with the confirmation email; CTA to the quote. */
+function quoteExpiringHtml({ quote, quoteUrl }) {
+  const stay = `${formatDateES(quote.checkin)} → ${formatDateES(quote.checkout)}`;
+  return `<!DOCTYPE html><html lang="es"><body style="margin:0;padding:0;background:#F5F3EE;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F3EE;padding:32px 0;"><tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:12px;overflow:hidden;">
+      <tr><td style="background:#2C2C2C;padding:32px 40px;text-align:center;">
+        <h1 style="margin:0;font-family:Georgia,serif;font-size:28px;color:#fff;letter-spacing:0.06em;">ESTAR</h1>
+        <p style="margin:6px 0 0;font-family:Arial,sans-serif;font-size:11px;letter-spacing:0.12em;color:#9A9A8A;text-transform:uppercase;">Manizales, Colombia</p>
+      </td></tr>
+      <tr><td style="background:#9A6A2E;padding:24px 40px;text-align:center;">
+        <p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#fff;opacity:.9;">Tu cotización vence pronto</p>
+        <p style="margin:0;font-family:'Courier New',monospace;font-size:22px;font-weight:700;color:#fff;">${esc(quote.quoteId)}</p>
+      </td></tr>
+      <tr><td style="padding:30px 40px;">
+        <p style="margin:0 0 14px;font-family:Georgia,serif;font-size:16px;color:#2C2C2C;">Estimado/a <strong>${esc(quote.contacto || quote.empresa)}</strong>,</p>
+        <p style="margin:0 0 18px;font-family:Georgia,serif;font-size:14px;color:#555;line-height:1.7;">
+          Tu cotización <strong>${esc(quote.quoteId)}</strong> para la estadía <strong>${stay}</strong> está por vencer
+          el <strong>${formatDateES(quote.expiresAt)}</strong>. Si deseas asegurar la tarifa y la disponibilidad,
+          revísala y completa tu reserva antes de esa fecha.
+        </p>
+        <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:6px 0 4px;">
+          <a href="${esc(quoteUrl)}" style="display:inline-block;padding:16px 36px;background:#9B9065;border-radius:8px;font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#fff;text-decoration:none;letter-spacing:0.08em;text-transform:uppercase;">Ver mi cotización →</a>
+        </td></tr></table>
+        <p style="margin:18px 0 0;font-family:Arial,sans-serif;font-size:12px;color:#9A9A8A;line-height:1.6;">
+          Si ya completaste tu reserva o no necesitas esta cotización, puedes ignorar este mensaje.
+        </p>
+      </td></tr>
+      <tr><td style="padding:0 40px 30px;text-align:center;font-family:Arial,sans-serif;font-size:11px;color:#9A9A8A;">
+        Hotel Estar · Cl. 61 #23-36, La Estrella · Manizales · reservas@estar.com.co · +57 310 249 0414
+      </td></tr>
+    </table>
+  </td></tr></table></body></html>`;
+}
+
 /* Admin alert: payment received but the reservation could not be created. */
 function adminPendingHtml({ quote, transactionId, shortfalls }) {
   const lines = (shortfalls || []).map(s => `<li>${esc(s.habitacion)}: pedidas ${s.requested}, disponibles ${s.available}</li>`).join('');
@@ -117,5 +153,6 @@ function adminAvailabilityLostHtml({ quote, shortfalls }) {
 
 module.exports = {
   sendEmail, adminEmail, esc, formatCOP, formatDateES,
-  paymentConfirmationHtml, adminPendingHtml, adminAvailabilityLostHtml
+  paymentConfirmationHtml, adminPendingHtml, adminAvailabilityLostHtml,
+  quoteExpiringHtml
 };

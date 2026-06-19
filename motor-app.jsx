@@ -43,7 +43,7 @@ function beTrack(eventName, params) {
 function gaItem(room, rate, search) {
   if (!room) return null;
   const nights = dateDiff(search.checkin, search.checkout);
-  const nightly = rate === 'best' ? room.priceFlexible : Math.round(room.priceFlexible / 0.9);
+  const nightly = rate === 'best' ? room.priceFlexible : Math.round(room.priceFlexible * 1.10);
   return {
     item_id: room.roomTypeId || room.id,
     item_name: room.name,
@@ -292,7 +292,7 @@ function StepWrapper({ num, title, state, summaryLine, onEdit, children, lang })
 function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) {
   const t = i18nEngine[lang];
   const priceBest = room.priceFlexible;
-  const priceFlex = Math.round(room.priceFlexible / 0.9);
+  const priceFlex = Math.round(room.priceFlexible * 1.10);
   const activePrice = rate === 'best' ? priceBest : priceFlex;
 
   // Translate details

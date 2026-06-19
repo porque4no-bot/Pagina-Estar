@@ -47,7 +47,7 @@ function decodeDirectReference(ref) {
    mirrored by reservar.html). */
 
 /* Accept up to 0.5% drift to absorb int rounding when the front-end derives
-   the flexible rate via `Math.round(best / 0.9)`. */
+   the flexible rate via `Math.round(best * 1.10)` (+10% exacto). */
 const PRICE_TOLERANCE_RATIO = 0.005;
 
 function computeExtrasTotal(extrasMask, guests, nights, baseNightly) {
@@ -90,10 +90,10 @@ async function computeDirectBookingTotals(decoded) {
 
   /* Front-end: priceFlexible = apiRoom.avgPrice (the value returned by OTA
      after the extra-guest surcharge is added). Best Price = priceFlexible,
-     Flexible rate = round(priceFlexible / 0.9). Percentage extras (late/early)
-     use the BASE nightly (avgPrice = Best Price). */
+     Flexible rate = round(priceFlexible * 1.10) (+10% exacto). Percentage
+     extras (late/early) use the BASE nightly (avgPrice = Best Price). */
   const bestNightly = roomData.avgPrice;
-  const flexibleNightly = Math.round(roomData.avgPrice / 0.9);
+  const flexibleNightly = Math.round(roomData.avgPrice * 1.10);
   const extrasTotal = computeExtrasTotal(decoded.extrasMask, guests, nights, bestNightly);
 
   const bestSubtotal = bestNightly * nights + extrasTotal;

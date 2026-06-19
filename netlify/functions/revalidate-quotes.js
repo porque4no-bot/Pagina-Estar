@@ -1,6 +1,9 @@
-const { getQuoteStore, listAllQuotes, saveQuote, effectiveStatus } = require('./_quotes-store');
+const { getQuoteStore, listAllQuotes, saveQuote, effectiveStatus, shouldRemindExpiry } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable, hasOtasyncCreds, releaseHold } = require('./_otasync');
-const { sendEmail, adminEmail, adminAvailabilityLostHtml } = require('./_email');
+const { sendEmail, adminEmail, adminAvailabilityLostHtml, quoteExpiringHtml } = require('./_email');
+
+/* Send the "expiring soon" reminder this many ms before a quote's expiry. */
+const REMINDER_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /* Scheduled job: re-checks availability for every active/viewed quote and
    flags the ones that lost availability (availabilityOk:false + unavailable[]).
@@ -89,6 +92,31 @@ exports.handler = async () => {
     }
   }
 
-  console.log(`[revalidate-quotes] checked ${active.length}, updated ${changed}, lost availability ${lost}, holds released ${released}`);
-  return { statusCode: 200, body: `checked ${active.length}, updated ${changed}, lost ${lost}, released ${released}` };
+  // Remind clients whose active quote is about to expire (once per quote)
+  const baseUrl = (process.env.URL || process.env.GUEST_APP_BASE_URL || '').replace(/\/$/, '');
+  const nowMs = Date.now();
+  let reminded = 0;
+  if (!baseUrl) {
+    console.warn('[revalidate-quotes] no base URL (URL/GUEST_APP_BASE_URL); skipping expiry reminders');
+  } else {
+    for (const q of quotes) {
+      if (!shouldRemindExpiry(q, nowMs, REMINDER_WINDOW_MS)) continue;
+      const quoteUrl = `${baseUrl}/cotizacion.html?id=${encodeURIComponent(q.quoteId)}`;
+      try {
+        await sendEmail({
+          to: q.email,
+          subject: `Tu cotización ${q.quoteId} vence pronto — Hotel Estar`,
+          html: quoteExpiringHtml({ quote: q, quoteUrl })
+        });
+        q.reminderSentAt = new Date().toISOString();
+        await saveQuote(store, q);
+        reminded++;
+      } catch (e) {
+        console.error(`[revalidate-quotes] reminder failed for ${q.quoteId}:`, e.message);
+      }
+    }
+  }
+
+  console.log(`[revalidate-quotes] checked ${active.length}, updated ${changed}, lost availability ${lost}, holds released ${released}, reminders ${reminded}`);
+  return { statusCode: 200, body: `checked ${active.length}, updated ${changed}, lost ${lost}, released ${released}, reminded ${reminded}` };
 };

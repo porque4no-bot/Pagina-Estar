@@ -129,7 +129,6 @@
   },
   "extrasNames": {
     "desayuno": "Breakfast",
-    "parqueadero": "Parking",
     "late": "Late check-out",
     "early": "Early check-in",
     "traslado": "Airport transfer",
@@ -138,7 +137,6 @@
   },
   "extrasDescs": {
     "desayuno": "Coffee, fresh fruit, and eggs served every morning",
-    "parqueadero": "Covered parking garage in the building",
     "late": "Late check-out until 2:00 pm (subject to availability)",
     "early": "Check in from 6:00 am (subject to availability)",
     "traslado": "To or from La Nubia Airport",
