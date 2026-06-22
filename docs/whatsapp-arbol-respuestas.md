@@ -201,7 +201,8 @@ Mensaje entra
 ### C. Durante la estadía
 
 **¿Cuál es el WiFi / la clave?** — 🟢 [FIJO]
-> El WiFi de tu apartaestudio aparece en el *enlace de check-in* que te enviamos un día antes. ¿No lo encuentras? Te ayudo a ubicarlo.
+> Cada apartaestudio tiene su propia red 📶 El *nombre* es *estar + el número de tu apartaestudio* y la *clave* es *el número + estar*. Ej.: apto 101 → red *estar101*, clave *101estar*. También viene en tu enlace de check-in.
+- _Datos:_ patrón fijo (red `estar<#apto>` / clave `<#apto>estar`). Si el bot conoce el # de apto (vía `lookup_booking`), puede dar la red exacta.
 
 **¿Cómo funciona el check-in digital / mis códigos?** — 🟢 [FIJO] [WEB]
 > Todo es digital, sin recepción: *un día antes* te llega un enlace con tus *códigos de acceso*. Entras directo, sin llaves. Aquí tu portal: estar.com.co/guest.html
@@ -218,7 +219,8 @@ Mensaje entra
 - _Acción:_ `notify_team` con el pedido (o el huésped lo pide desde el guest app).
 
 **Recomendaciones de Manizales (qué hacer / comer)** — 🔵 [FIJO/IA]
-> En la zona te recomiendo *[2-3 lugares cercanos]*. ¿Buscas café, comida típica o algo de naturaleza? Te afino la recomendación.
+> ¡Tenemos una guía curada! ☕ A pasos: café en *Differente* o *Caferatto*, comer en *Lyara* o *KOMO*. ¿Buscas café, comida, naturaleza o avistamiento de aves? Te afino 2-3 según tu plan.
+- _Datos:_ guía curada de §8 de `bot-conocimiento.md` (34 lugares de `explora.html` por categoría/distancia). El bot sugiere 2-3, no la lista entera.
 
 **Problema en el apartaestudio (daño, ruido)** — 🔴 [HUMANO]
 > Lamento eso 🙏 Te paso de una con el equipo para resolverlo. ¿Me describes brevemente qué pasa y tu apartaestudio?
@@ -229,7 +231,8 @@ Mensaje entra
 > Te ayudamos a recuperarlo. Te paso con el equipo. ¿Qué olvidaste y en qué apartaestudio/fechas te alojaste?
 
 **¿Dónde dejo una reseña?** — 🟢 [FIJO] [WEB]
-> ¡Nos encantaría leerte! 🙏 Déjanos tu reseña aquí: *[enlace de reseña]*. ¡Gracias por elegir Estar!
+> ¡Nos encantaría leerte! 🙏 Déjanos tu reseña en Google aquí: https://share.google/0RcHkOyTWXTNrj8oH ¡Gracias por elegir Estar!
+- _Datos:_ enlace del perfil de Google de Hotel Estar. _(Pendiente: cambiarlo por el enlace directo `g.page/r/.../review` para que abra el cuadro de reseña de un clic — ver `bot-conocimiento.md`.)_
 
 **Estado de mi reembolso** — 🔵 [OTASYNC/PIDE] → 🔴 gestión
 > Lo reviso. ¿Tu *código de reserva* y *email/apellido*? El estado y el giro del reembolso los gestiona el equipo dentro del plazo de la política.

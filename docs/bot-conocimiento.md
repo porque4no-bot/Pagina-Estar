@@ -90,8 +90,14 @@ atender. Tiene dos propósitos:
   En larga estadía es semanal).
 - **Lavandería / otros servicios:** ⚠️ POR CONFIRMAR (el guest app menciona
   lavandería).
-- **Wifi, cocina, electrodomésticos:** incluidos. ⚠️ Detalle de equipamiento
-  por tipología si se quiere precisión.
+- **Wifi (una red por apartaestudio):** cada apartaestudio tiene su propia red.
+  El **nombre de la red es `estar` + el número del apartaestudio** y la **clave es
+  el número del apartaestudio + `estar`**. Ejemplo: apto **101** → red `estar101`,
+  clave `101estar`. El dato también llega en el enlace de check-in. _(Nota: el
+  esquema es predecible a partir del número de apto; si en algún momento quieren
+  claves más fuertes, se cambia el patrón.)_
+- **Cocina y electrodomésticos:** incluidos. ⚠️ Detalle de equipamiento por
+  tipología si se quiere precisión.
 
 ## 6. Estadías largas ("Vivir en Estar")
 
@@ -114,10 +120,47 @@ atender. Tiene dos propósitos:
 
 ## 8. Zona / recomendaciones (Manizales)
 
-- ⚠️ POR CONFIRMAR / AMPLIAR: qué hay cerca (restaurantes, supermercados,
-  Termales, Nevado, transporte, aeropuerto/distancias). Hoy el bot remite a
-  `explora.html`. Si quieres que responda con detalle, lista aquí los lugares
-  y datos clave.
+Guía curada por Estar (la versión con fotos y mapa vive en `explora.html`).
+Estar está en **Cl. 61 #23-36, La Estrella / Palogrande**, así que muchos
+lugares quedan a minutos a pie. Al recomendar, sugiere **2-3 según el interés
+del huésped** (café, comida, naturaleza, aves, deporte), no toda la lista.
+
+**A unos pasos (caminando):**
+- *Restaurantes:* Lyara (2 min), KOMO – sushi/asiática (2 min), Ednia
+  mediterránea (10 min), Vino y Pimienta – carnes y vinos (12 min)
+- *Cafés de especialidad:* Differente (1 min), Caferatto (3 min),
+  35mm Coffee Lab (8 min)
+- *Universidades:* U. de Caldas – Palogrande (3 min, al frente), U. Nacional –
+  Palogrande (3 min), U. Católica (4 min), U. de Caldas – Central (5 min)
+- *Deportivo:* Estadio Palogrande (1 min), Coliseos Ramón Marín y Jorge Arango
+  (2 min)
+- *Turismo:* Torre del Cable (4 min)
+
+**Escapadas y naturaleza (en carro):**
+- Recinto del Pensamiento – orquídeas, mariposas y bosque andino (15 min)
+- Hacienda Venecia – Paisaje Cultural Cafetero (30 min)
+- Viga Vieja – arquitectura colonial y café (40 min)
+- Finca Romelia – orquídeas y aves (45 min)
+- Hotel Termales del Ruiz – aguas termales en el páramo (1h 15)
+- Nevado del Ruiz – volcán y Parque Los Nevados (1h 30)
+
+**Avistamiento de aves (birding):**
+- Reserva Tinamú – colibríes (30 min), Reserva Río Blanco "Owls Watch"
+  (25 min), Hacienda El Bosque (40 min), Tominejo Ecolodge (35 min),
+  El Color de mis Rêves – glamping en bosque de niebla (35 min)
+
+**Otros planes (en carro):** 2.0 Cocina y Copas (15 min), Lobo Cantina Mex
+(8 min); Torre de Chipre – atardeceres (15 min), Catedral Basílica – la más alta
+de Colombia (12 min); deportivo: Patinódromo, Complejo Acuático, pistas de
+Downhill y BMX (10-15 min).
+
+- **Reseñas (Google):** invita a dejar reseña en el perfil de Google de Hotel
+  Estar → https://share.google/0RcHkOyTWXTNrj8oH _(idealmente reemplazar por el
+  enlace directo de "escribir reseña" `https://g.page/r/.../review` — ver nota al
+  pie del documento)._
+- **Aeropuerto / transporte / supermercados cercanos:** ⚠️ POR CONFIRMAR
+  (distancia al aeropuerto La Nubia, taxi/app recomendada, supermercado más
+  cercano).
 
 ## 9. Situaciones especiales (guiones)
 
@@ -155,5 +198,19 @@ Prioriza estas respuestas (son las que más pregunta un huésped):
 6. Aseo durante la estadía corta: ¿sí/no?
 7. Soporte fuera de horario: ¿hay un teléfono 24/7 para emergencias de acceso?
 8. Factura: ¿se emite a todos? ¿se pide en el chat o en la web?
-9. Recomendaciones de la zona que quieras que el bot maneje.
+9. ~~Recomendaciones de la zona.~~ ✅ Resuelto: guía curada en §8 (de `explora.html`).
 10. ¿El bot puede ofrecer algo ante una queja, o siempre escala sin prometer?
+
+---
+
+## Nota: enlace directo de reseñas de Google
+
+El enlace que tenemos (`https://share.google/0RcHkOyTWXTNrj8oH`) abre el perfil de
+**Hotel Estar** en Google y **funciona** como punto de entrada a reseñas. Para que
+el huésped caiga directo en el cuadro de "escribir reseña" (un clic), conviene el
+enlace corto `https://g.page/r/.../review`, que se obtiene así:
+
+1. Entra a tu **Perfil de Negocio de Google** (Google Business Profile).
+2. Busca **"Pedir reseñas" / "Get more reviews"** (en el panel del perfil).
+3. Copia el **enlace corto para reseñas** que te muestra (termina en `/review`).
+4. Pásamelo y lo reemplazo en §8 y en las respuestas del bot.
