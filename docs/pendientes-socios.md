@@ -165,6 +165,28 @@ prenden desde **/admin → Configuración** (sin tocar Netlify, sin redeploy).
   falta conectar las credenciales. Sin ellas, no rompe nada (queda inactivo).
 - **Quién:** tú cargas credenciales · yo dejo todo listo.
 
+### 3.5 — Redirección del dominio antiguo (hotelestar.com)
+- **Qué es:** que `hotelestar.com` (el dominio viejo) **redirija** al dominio
+  actual del sitio, para que quien entre por la dirección antigua —o por enlaces y
+  resultados de buscadores viejos— llegue al sitio nuevo.
+- **Por qué importa:** **SEO** (no perder el posicionamiento ni los enlaces que
+  apuntan al dominio viejo) y no perder clientes que tengan guardada la dirección
+  antigua. Sin redirección, `hotelestar.com` queda muerto o mostrando contenido
+  desactualizado.
+- **Qué decides (2 cosas):**
+  1. **¿Controlas el DNS de hotelestar.com?** Hay que apuntarlo a Netlify
+     (agregarlo como dominio en el proyecto). Si el dominio lo tiene otro proveedor,
+     necesito que me des acceso o que hagas el cambio de DNS.
+  2. **Tipo de redirección:** "todo a la home" (simple) o **mapear las URLs viejas
+     a sus equivalentes nuevas** (mejor para SEO si esas páginas estaban indexadas
+     en Google).
+- **A tener en cuenta:** se hace con **redirección 301 (permanente)** para que
+  Google transfiera el posicionamiento al dominio nuevo (parece ser
+  `estar.com.co`). Si quieres el mapeo de URLs, necesito la lista de las
+  direcciones viejas relevantes (o las reviso en Google Search Console).
+- **Quién:** tú das acceso/control del DNS de hotelestar.com · yo configuro la
+  redirección 301 en Netlify.
+
 ---
 
 ## 4. Confiabilidad y operación (recomendado antes de escalar)
@@ -225,7 +247,7 @@ No necesitan decisión tuya; los dejo anotados para que sepas que existen:
 4. **Prueba real de una reserva con plata** + verificar. *(§1.3)*
 5. **Prender funciones de a una** validando cada una. *(§2)*
 6. Ir resolviendo las **decisiones de negocio** (tarifas, WhatsApp, marketing,
-   cerraduras) a tu ritmo. *(§3)*
+   cerraduras, **redirección de hotelestar.com**) a tu ritmo. *(§3)*
 7. **Backup** y, cuando crezca el volumen, la **automatización v3**. *(§4)*
 
 Documentos de apoyo: [`auditoria-mesa-redonda.md`](auditoria-mesa-redonda.md)
