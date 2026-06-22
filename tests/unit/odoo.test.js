@@ -272,6 +272,94 @@ test('createLead sin credenciales es no-op mock', async () => {
   assert.deepEqual(r, { id: null, isMock: true });
 });
 
+test('createHelpdeskTicket sin credenciales es no-op mock', async () => {
+  clearEnv();
+  const odoo = require(ODOO);
+  const r = await odoo.createHelpdeskTicket({ name: 'Solicitud de servicio — EST-1' });
+  assert.deepEqual(r, { id: null, isMock: true });
+});
+
+test('createHelpdeskTicket crea el ticket con campos estándar y team_id default 3', async () => {
+  clearEnv();
+  setEnv();
+  delete process.env.HELPDESK_TEAM_ID;
+  const odoo = require(ODOO);
+  odoo._resetAuthCache();
+  let vals = null, kw = null;
+  const { transport } = fakeTransport({
+    'common.authenticate': 7,
+    'helpdesk.ticket.create': (posArgs, kwargs) => { vals = posArgs[0]; kw = kwargs; return 555; }
+  });
+  const r = await odoo.createHelpdeskTicket({
+    name: 'Solicitud de servicio — EST-42',
+    description: 'Desayuno × 2',
+    email: 'A@Guest.CO',
+    partnerName: 'María López',
+    partnerId: 9
+  }, { transport });
+  assert.equal(r.id, 555);
+  assert.equal(r.isMock, false);
+  assert.equal(vals.name, 'Solicitud de servicio — EST-42');
+  assert.equal(vals.description, 'Desayuno × 2');
+  assert.equal(vals.partner_email, 'a@guest.co');
+  assert.equal(vals.partner_name, 'María López');
+  assert.equal(vals.partner_id, 9);
+  assert.equal(vals.team_id, 3); // default de _settings (sin env)
+  clearEnv();
+});
+
+test('createHelpdeskTicket honra HELPDESK_TEAM_ID del entorno', async () => {
+  clearEnv();
+  setEnv();
+  process.env.HELPDESK_TEAM_ID = '7';
+  const odoo = require(ODOO);
+  odoo._resetAuthCache();
+  let vals = null;
+  const { transport } = fakeTransport({
+    'common.authenticate': 7,
+    'helpdesk.ticket.create': (posArgs) => { vals = posArgs[0]; return 1; }
+  });
+  await odoo.createHelpdeskTicket({ name: 'Cancelación — EST-9' }, { transport });
+  assert.equal(vals.team_id, 7);
+  delete process.env.HELPDESK_TEAM_ID;
+  clearEnv();
+});
+
+test('createHelpdeskTicket: teamId explícito gana sobre _settings', async () => {
+  clearEnv();
+  setEnv();
+  process.env.HELPDESK_TEAM_ID = '7';
+  const odoo = require(ODOO);
+  odoo._resetAuthCache();
+  let vals = null;
+  const { transport } = fakeTransport({
+    'common.authenticate': 7,
+    'helpdesk.ticket.create': (posArgs) => { vals = posArgs[0]; return 1; }
+  });
+  await odoo.createHelpdeskTicket({ name: 'X', teamId: 12 }, { transport });
+  assert.equal(vals.team_id, 12);
+  delete process.env.HELPDESK_TEAM_ID;
+  clearEnv();
+});
+
+test('createHelpdeskTicket asigna company_id y contexto con ODOO_COMPANY_ID', async () => {
+  clearEnv();
+  setEnv();
+  process.env.ODOO_COMPANY_ID = '5';
+  const odoo = require(ODOO);
+  odoo._resetAuthCache();
+  let vals = null, kw = null;
+  const { transport } = fakeTransport({
+    'common.authenticate': 7,
+    'helpdesk.ticket.create': (posArgs, kwargs) => { vals = posArgs[0]; kw = kwargs; return 1; }
+  });
+  await odoo.createHelpdeskTicket({ name: 'PQR' }, { transport });
+  assert.equal(vals.company_id, 5);
+  assert.deepEqual(kw.context, { allowed_company_ids: [5] });
+  delete process.env.ODOO_COMPANY_ID;
+  clearEnv();
+});
+
 test('jsonRpc lanza ante HTTP no-ok (5xx) en vez de devolver undefined (falso éxito)', async () => {
   setEnv();
   const odoo = require(ODOO);

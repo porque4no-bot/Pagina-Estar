@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 
 const stay = require('../../netlify/functions/send-stay-emails');
-const { ymd, targetDates, eligiblePreArrival, eligiblePostStay, PRE_ARRIVAL_DAYS, POST_DEPARTURE_LAG_DAYS } = stay._test;
+const { ymd, targetDates, eligiblePreArrival, eligiblePostStay, processBatch, PRE_ARRIVAL_DAYS, POST_DEPARTURE_LAG_DAYS, DEFAULT_NPS_SURVEY_URL } = stay._test;
 const { inferLang, reservaTieneDesayuno, normalizeReservation, getReservationsByDate } = require('../../netlify/functions/_otasync');
 const { preArrivalHtml, postStayHtml } = require('../../netlify/functions/_email');
 
@@ -107,6 +107,52 @@ test('postStayHtml uses REVIEW_LINK_URL when set, WhatsApp fallback otherwise', 
   } finally {
     if (prev === undefined) delete process.env.REVIEW_LINK_URL; else process.env.REVIEW_LINK_URL = prev;
   }
+});
+
+test('postStayHtml shows the NPS survey CTA only when npsUrl is provided (ES/EN, tú tone)', () => {
+  const resv = { firstName: 'Ana' };
+  const url = 'https://bpo-dici.odoo.com/survey/start/abc';
+  // ES with URL: branded button + "tú" copy linking to the survey
+  const esWith = postStayHtml({ resv, lang: 'es', npsUrl: url });
+  assert.ok(esWith.includes(url));
+  assert.match(esWith, /Cuéntanos cómo estuvo tu estadía/);
+  // EN with URL: parity copy
+  const enWith = postStayHtml({ resv, lang: 'en', npsUrl: url });
+  assert.ok(enWith.includes(url));
+  assert.match(enWith, /Tell us about your stay/);
+  // No URL → nothing rendered, in either language
+  const esNo = postStayHtml({ resv, lang: 'es' });
+  assert.ok(!esNo.includes('Cuéntanos cómo estuvo tu estadía'));
+  const enNo = postStayHtml({ resv, lang: 'en', npsUrl: '' });
+  assert.ok(!enNo.includes('Tell us about your stay'));
+});
+
+test('processBatch threads npsUrl into the post-stay email html (injected sendEmail)', async () => {
+  const url = DEFAULT_NPS_SURVEY_URL;
+  const sent = [];
+  const reservations = [
+    { idReservations: '1', email: 'a@b.co', dateDeparture: '2026-06-18', status: 'confirmed', lang: 'es' }
+  ];
+  const res = await processBatch(
+    false, reservations, 'post', eligiblePostStay, '2026-06-18',
+    { npsUrl: url, sendEmail: async (m) => { sent.push(m); return { sent: true }; } }
+  );
+  assert.equal(res.sent, 1);
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0].html.includes(url), 'post-stay html should embed the NPS survey link');
+});
+
+test('processBatch omits the NPS CTA when npsUrl is absent', async () => {
+  const sent = [];
+  const reservations = [
+    { idReservations: '2', email: 'c@d.co', dateDeparture: '2026-06-18', status: 'confirmed', lang: 'en' }
+  ];
+  await processBatch(
+    false, reservations, 'post', eligiblePostStay, '2026-06-18',
+    { sendEmail: async (m) => { sent.push(m); return { sent: true }; } }
+  );
+  assert.equal(sent.length, 1);
+  assert.ok(!sent[0].html.includes('Tell us about your stay'));
 });
 
 test('handler is a no-op when STAY_EMAILS_ENABLED is not true', async () => {
