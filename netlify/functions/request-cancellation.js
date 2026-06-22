@@ -16,7 +16,7 @@ require('./_env');
    endpoint replaces that dead end with a real, auditable request. */
 
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
-const { sendEmail, adminEmail, esc, formatCOP, formatDateES } = require('./_email');
+const { sendEmail, adminEmail, esc, formatCOP, formatDateES, cancellationAckHtml } = require('./_email');
 const { helpers: bookingHelpers } = require('./get-booking');
 const { getSessionKey } = require('./_otasync');
 const { createRefundRequest, recoverPaymentInfo, REFUND_SLA_BUSINESS_DAYS } = require('./_refunds-store');
@@ -71,18 +71,7 @@ function adminCancellationHtml({ booking, clientIp }) {
     </ol>`;
 }
 
-function guestAckHtml({ booking }) {
-  return `<p>Hola ${esc(booking.guestName || '')},</p>
-    <p>Recibimos tu solicitud de cancelación para la reserva <strong>${esc(booking.bookingCode)}</strong>
-    (${esc(formatDateES(booking.checkIn))} → ${esc(formatDateES(booking.checkOut))}).</p>
-    <p>Nuestro equipo la revisará según la política de tu tarifa
-    (Flexible: cancelación gratuita hasta 48 horas antes del check-in ·
-    Best Price: no reembolsable) y te confirmará por este medio en menos de 24 horas.</p>
-    <p>Cuando el reembolso aplique, se procesa por el mismo medio de pago en un
-    máximo de <strong>${REFUND_SLA_BUSINESS_DAYS} días hábiles</strong>.</p>
-    <p>Si necesitas ayuda inmediata escríbenos por WhatsApp: +57 310 249 0414.</p>
-    <p>— Equipo Estar, Manizales</p>`;
-}
+/* Guest cancellation acknowledgment is now the branded cancellationAckHtml() in _email.js. */
 
 /* Core flow shared by the HTTP handler and the WhatsApp bot
    (_whatsapp-bot.js). Returns a discriminated result:
@@ -149,7 +138,7 @@ async function submitCancellationRequest({ bookingCode, providedFactor, clientIp
       await sendEmail({
         to: booking.guestEmail,
         subject: `Recibimos tu solicitud de cancelación — ${booking.bookingCode}`,
-        html: guestAckHtml({ booking })
+        html: cancellationAckHtml({ booking, lang: booking.lang })
       });
     } catch (e) {
       console.error('[request-cancellation] guest ack failed:', e.message);

@@ -10,6 +10,7 @@ const {
   computeQuoteTotal
 } = require('./_quotes-store');
 const { verifyDirectBookingAmount } = require('./_direct-pricing');
+const { GUEST_ORDER_REF_RE } = require('./_guest-payments');
 
 function corsHeaders() {
   const headers = {
@@ -250,6 +251,16 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body || '{}'); }
   catch (e) { return json(400, { error: 'Invalid JSON request body' }); }
+
+  /* Guest-app service orders (GST-...) are NOT created here. Their amount is the
+     server-computed catalogue total of an authenticated guest order, so the
+     preference is built inside the authenticated guest-action flow
+     (_guest-payments.createGuestMercadoPagoCheckout). Reject any attempt to mint
+     one from this public, unauthenticated endpoint so a tampered request can't
+     charge a folio it never authorised. */
+  if (body.source === 'guest' || GUEST_ORDER_REF_RE.test(String(body.reference || body.quoteId || body.id || ''))) {
+    return json(400, { error: 'guest_orders_not_supported_here', message: 'Los pagos de servicios del huésped se generan desde la app del huésped.' });
+  }
 
   try {
     if (body.type === 'quote' || body.quoteId || body.id) return await preferenceForQuote(body, event);

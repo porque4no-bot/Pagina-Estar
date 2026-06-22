@@ -188,15 +188,14 @@
 
                 <fieldset class="guest-form-card">
                   <legend><span>2</span> Documento de identidad</legend>
-                  <label class="guest-upload" for="identityDocument">
-                    <input id="identityDocument" type="file" accept="image/jpeg,image/png,application/pdf">
-                    <span class="guest-upload-icon"><i data-lucide="scan-line"></i></span>
-                    <strong id="uploadTitle">Subir archivo</strong>
-                    <small id="uploadMeta">JPG, PNG o PDF. Máximo 4.5 MB.</small>
-                  </label>
+                  <p class="guest-muted" data-guest-i18n="cameraOnlyHint">Por seguridad, el documento se captura solo con la cámara.</p>
+                  <!-- Hidden fallback input kept in the DOM so guest-app.js binds
+                       without error; camera capture is the primary path. -->
+                  <input id="identityDocument" type="file" accept="image/jpeg,image/png,application/pdf" hidden>
                   <input id="cameraFileCapture" type="file" accept="image/*" capture="environment" hidden>
                   <div class="guest-inline-actions">
-                    <button class="btn btn-ghost-dark" id="openCamera" type="button">
+                    <button class="btn btn-ink" id="openCamera" type="button">
+                      <i data-lucide="camera"></i>
                       <span data-guest-i18n="cameraButton">Tomar foto</span>
                     </button>
                     <button class="btn btn-ghost-dark" id="analyzeDocument" type="button" disabled>
@@ -204,6 +203,9 @@
                     </button>
                     <span class="guest-ocr-status" id="ocrStatus"></span>
                   </div>
+                  <p class="guest-upload-name" id="uploadTitle"></p>
+                  <p class="guest-upload-meta guest-muted" id="uploadMeta"></p>
+                  <p class="guest-form-status" id="manualReviewNotice" role="status" hidden data-guest-i18n="ocrManualReviewNotice">No pudimos leer el documento automáticamente. Tus datos quedaron registrados y recepción los verificará al llegar.</p>
                 </fieldset>
 
                 <fieldset class="guest-form-card guest-minor-card" id="minorDocsCard" hidden>
@@ -258,10 +260,9 @@
                       <select name="documentType" required>
                         <option value="">Selecciona</option>
                         <option value="CC">CC</option>
+                        <option value="TI">TI</option>
                         <option value="CE">CE</option>
                         <option value="Pasaporte">Pasaporte</option>
-                        <option value="Licencia">Licencia</option>
-                        <option value="Otro">Otro</option>
                       </select>
                     </label>
                     <label class="guest-field"><span>Número de documento *</span><input name="documentNumber" autocomplete="off" required></label>
@@ -300,16 +301,49 @@
                       <option value="Cuba"></option>
                       <option value="China"></option>
                     </datalist>
+                    <label class="guest-field"><span data-guest-i18n="genderLabel">Género</span>
+                      <select name="sex">
+                        <option value="" data-guest-i18n="genderSelect">Selecciona</option>
+                        <option value="M" data-guest-i18n="genderMale">Masculino</option>
+                        <option value="F" data-guest-i18n="genderFemale">Femenino</option>
+                      </select>
+                    </label>
+                    <label class="guest-field"><span data-guest-i18n="occupationLabel">Ocupación</span><input name="occupation" autocomplete="off" placeholder="Ej. Ingeniera, estudiante, comerciante" data-guest-i18n-placeholder="occupationPlaceholder"></label>
+                    <label class="guest-field guest-field-wide"><span data-guest-i18n="birthPlaceLabel">Lugar de nacimiento</span><input name="birthPlace" autocomplete="off" placeholder="Ciudad y país de nacimiento" data-guest-i18n-placeholder="birthPlacePlaceholder"></label>
                     <label class="guest-field"><span>Hora aproximada de llegada</span><input name="arrivalTime" type="time"></label>
                     <label class="guest-field"><span>Correo *</span><input name="email" type="email" autocomplete="email" required></label>
                     <label class="guest-field"><span>WhatsApp *</span><input name="phone" type="tel" autocomplete="tel" required></label>
                     <label class="guest-field guest-field-wide"><span>Dirección de residencia</span><input name="address" autocomplete="street-address"></label>
+                  </div>
+
+                  <p class="eyebrow" data-guest-i18n="residenceSectionTitle">Lugar de residencia</p>
+                  <div class="guest-form-grid">
+                    <label class="guest-field"><span data-guest-i18n="residenceCountryLabel">País de residencia</span><input name="residenceCountry" list="nationalityOptions" autocomplete="off"></label>
+                    <label class="guest-field"><span data-guest-i18n="residenceStateLabel">Departamento / estado de residencia</span><input name="residenceState" autocomplete="off"></label>
+                    <label class="guest-field"><span data-guest-i18n="residenceCityLabel">Ciudad de residencia</span><input name="residenceCity" autocomplete="off"></label>
+                  </div>
+
+                  <p class="eyebrow" data-guest-i18n="originSectionTitle">Lugar de procedencia</p>
+                  <div class="guest-form-grid">
+                    <label class="guest-field"><span data-guest-i18n="originCountryLabel">País de procedencia</span><input name="originCountry" list="nationalityOptions" autocomplete="off"></label>
+                    <label class="guest-field"><span data-guest-i18n="originStateLabel">Departamento / estado de procedencia</span><input name="originState" autocomplete="off"></label>
+                    <label class="guest-field"><span data-guest-i18n="originCityLabel">Ciudad de procedencia</span><input name="originCity" autocomplete="off"></label>
+                  </div>
+
+                  <div class="guest-form-grid">
+                    <label class="guest-field guest-field-wide"><span data-guest-i18n="destinationLabel">Destino al salir (solo extranjeros)</span><input name="destination" autocomplete="off" placeholder="Ciudad y país al continuar tu viaje" data-guest-i18n-placeholder="destinationPlaceholder"></label>
                     <label class="guest-field guest-field-wide"><span>Notas para el equipo</span><textarea name="notes" rows="3" placeholder="Alergias, requerimientos de movilidad o información útil para tu llegada."></textarea></label>
                   </div>
+
                   <label class="guest-consent">
                     <input name="privacyAccepted" type="checkbox" required>
                     <span>Acepto el tratamiento de mis datos y documentos conforme a la <a href="privacidad.html" target="_blank">Política de Privacidad</a>.</span>
                   </label>
+                  <label class="guest-consent">
+                    <input name="marketingAccepted" type="checkbox">
+                    <span data-guest-i18n="marketingConsentLabel">Quiero recibir ofertas, novedades y recomendaciones de Estar por correo o WhatsApp.</span>
+                  </label>
+                  <small class="guest-muted" data-guest-i18n="marketingConsentHint">Opcional. Puedes darte de baja en cualquier momento.</small>
                 </fieldset>
 
                 <button class="btn btn-ink guest-submit" type="submit">
@@ -557,6 +591,10 @@
           <line class="guest-camera-scan" x1="82" x2="778" y1="270" y2="270"></line>
         </svg>
         <p class="guest-camera-instruction" data-guest-i18n="cameraInstruction">Encuadrá el documento dentro del marco</p>
+        <!-- Live quality guidance: updated in real time from frame analysis
+             (brightness/blur/glare/framing) while the camera is open, before the
+             photo is taken, to reduce OCR failures. -->
+        <p class="guest-camera-guide" id="cameraGuide" role="status" aria-live="polite" data-guest-i18n="cameraGuideAnalyzing">Revisando calidad de imagen…</p>
       </div>
       <p class="guest-camera-status" id="cameraStatus" role="status"></p>
       <canvas id="cameraCanvas" width="1600" height="1006" hidden></canvas>

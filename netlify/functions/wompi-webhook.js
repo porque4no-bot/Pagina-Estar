@@ -9,10 +9,12 @@ const {
 const { getAvailabilityByType, findUnavailable, releaseHold, buildExtrasFromQuote, postOrderExtrasToFolio } = require('./_otasync');
 const { loadIntent: loadGuestPaymentIntent, markIntentStatus: markGuestPaymentStatus, GUEST_ORDER_REF_RE } = require('./_guest-payments');
 const { verifyDirectBookingAmount, EXTRAS_KEYS, EXTRAS_PRICES } = require('./_direct-pricing');
-const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
+const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml, paymentPendingHtml, paymentRejectedHtml } = require('./_email');
 const { acquireQuoteLock, releaseQuoteLock } = require('./_quote-lock');
 const { trackPurchase } = require('./_analytics');
 const { sendConfirmationEmail } = require('./send-confirmation');
+const { savePaymentDetails } = require('./_payment-details');
+const { flag, get } = require('./_settings');
 
 const QUOTE_ID_RE = /^COT-\d{4}-[A-Z0-9]{5}$/;
 
@@ -119,8 +121,9 @@ function sanitizeNotes(raw) {
   return escapeHtml(raw).substring(0, 500);
 }
 
-/* A8: guest free-text note → PMS. Gated OFF by default. */
-function notesToPmsEnabled() { return process.env.GUEST_NOTES_TO_PMS_ENABLED === 'true'; }
+/* A8: guest free-text note → PMS. Gated OFF by default. Gestionable desde
+   /admin (override del panel → env). */
+async function notesToPmsEnabled() { return await flag('GUEST_NOTES_TO_PMS_ENABLED'); }
 
 // Helper to decode the URL-safe base64 reference string
 function decodeReference(ref) {
@@ -171,6 +174,12 @@ function decodeReference(ref) {
     if (parts[13]) {
       result.amountCents = parseInt(parts[13], 10) || 0;
     }
+    /* Plan tarifario elegido por el huésped (pos. 14). 'F' = Flexible
+       (reembolsable), 'B' = Best/Estricta (no reembolsable). Referencias
+       antiguas no lo traen → queda undefined (trazabilidad best-effort). */
+    if (parts[14]) {
+      result.ratePlan = parts[14] === 'F' ? 'flexible' : 'best';
+    }
     return result;
   } catch (err) {
     console.error("Error decoding reference:", err.message);
@@ -217,6 +226,23 @@ function verifyWompiSignature(body, receivedSignature, secret) {
     Buffer.from(expectedSignature, 'hex'),
     Buffer.from(receivedSignature, 'hex')
   );
+}
+
+/* Frente C — decide la salida a Odoo del huésped directo según el opt-in de
+   marketing (persistido por create-wompi-signature). Ley 1581: solo con opt-in
+   explícito se añade el tag 'Opt-in marketing' (además del tag de canal) y se
+   marca para Email Marketing. Sin opt-in → solo el partner, sin marketing.
+   Pura/testeable: no toca red ni Blobs. */
+function buildGuestMarketing(decoded, marketingOptIn) {
+  const optIn = Boolean(marketingOptIn && marketingOptIn.accepted === true);
+  const tags = ['Huésped directo'];
+  if (optIn) tags.push('Opt-in marketing');
+  return {
+    optIn,
+    tags,
+    /* addToMailingList solo con opt-in y email presente. */
+    addToMailing: Boolean(optIn && decoded && decoded.email)
+  };
 }
 
 function mustChargeDirectBookingIva(decoded) {
@@ -403,7 +429,7 @@ async function notifyGuestPaymentOutcome(transaction, kind, overrides = {}) {
       subject: kind === 'pending'
         ? 'Tu pago está en proceso — Hotel Estar'
         : 'Tu pago no pudo procesarse — Hotel Estar',
-      html: kind === 'pending' ? paymentPendingEmailHtml(contact) : paymentDeclinedEmailHtml(contact)
+      html: kind === 'pending' ? paymentPendingHtml({ contact }) : paymentRejectedHtml({ contact })
     });
   } catch (e) {
     console.error(`[wompi-webhook] guest ${kind} payment email failed:`, e.message);
@@ -833,6 +859,11 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
     }
   } catch (e) { console.error('[wompi-webhook] confirmation email failed:', e.message); }
 
+    /* Snapshot refund-relevant payment fields at payment time (durable), so a
+       later refund/ticket has auth code, date, last-4 and value without digging
+       in the Wompi panel. Best-effort — never blocks. */
+    await savePaymentDetails(bookingCode, transaction);
+
     /* A-6: server-side conversion for corporate quote payments. */
     try {
       await trackPurchase({ transactionId: String(bookingCode), value: paidAmount });
@@ -1029,7 +1060,7 @@ exports.handler = async (event, context) => {
   // Guest-app service order paid online: reference is the order eventId (GST-...).
   // Gated by GUEST_SERVICE_PAYMENT_MODE=wompi so it's inert until Phase B is enabled.
   if (GUEST_ORDER_REF_RE.test(transaction.reference || '') &&
-      process.env.GUEST_SERVICE_PAYMENT_MODE === 'wompi') {
+      (await get('GUEST_SERVICE_PAYMENT_MODE')) === 'wompi') {
     addProcessedTransaction(transaction.id);
     if (txStore) {
       try { await txStore.set(String(transaction.id), '1', { ttl: 86400 }); } catch (e) { /* non-fatal */ }
@@ -1109,6 +1140,23 @@ exports.handler = async (event, context) => {
     };
   }
 
+  /* Frente A: load any discount applied at signing time (persisted by
+     create-wompi-signature keyed by bookingCode). When present we MUST re-validate
+     the code here (not expired / not exhausted / fechas) BEFORE creating the
+     reservation, and recompute the expected DISCOUNTED amount from OTASync — this
+     overrides the reference's encoded amountCents so a tampered low amount cannot
+     slip through. The code never traveled in the reference. Gated OFF by default. */
+  let appliedDiscount = null;
+  if ((await flag('DISCOUNT_CODES_ENABLED')) && decoded.bookingCode) {
+    try {
+      const discStore = getStore({ name: 'booking-discounts', consistency: 'strong' });
+      const raw = await discStore.get(`disc-${decoded.bookingCode}`);
+      if (raw) appliedDiscount = JSON.parse(raw);
+    } catch (e) {
+      if (process.env.DEBUG) console.warn('[wompi-webhook] discount blob read failed (non-fatal):', e.message);
+    }
+  }
+
   /* Server-side price verification: if the reference encodes the price,
      compare the paid amount directly. Otherwise, fall back to recomputing
      from OTASync availability. This prevents post-payment rate changes
@@ -1116,8 +1164,31 @@ exports.handler = async (event, context) => {
   let priceVerifyOk = true;
   let priceReason = '';
   let expectedCentsForAlert = 0;
+  let discountVerdict = null;
 
-  if (decoded.amountCents !== undefined) {
+  if (appliedDiscount && appliedDiscount.code) {
+    /* Discounted booking: recompute authoritatively WITH the code re-validated.
+       verifyDirectBookingAmount returns ok only if paid matches a discounted
+       subtotal AND the code still validates (expiry/usage/blackout). */
+    try {
+      discountVerdict = await verifyDirectBookingAmount(decoded, transaction.amount_in_cents, {
+        discountCode: appliedDiscount.code,
+        email: appliedDiscount.email || decoded.email || ''
+      });
+      if (!discountVerdict.ok) {
+        priceVerifyOk = false;
+        priceReason = (discountVerdict.discount && discountVerdict.discount.applied === false && discountVerdict.discount.reason)
+          ? `discount_${discountVerdict.discount.reason}`
+          : discountVerdict.reason;
+        expectedCentsForAlert = discountVerdict.expectedCentsAll ? discountVerdict.expectedCentsAll[0] : discountVerdict.expectedCents;
+      }
+      if (discountVerdict.isMock) {
+        console.warn(`[wompi-webhook] OTASync mock fallback — skipping discounted price verification. bookingCode=${decoded.bookingCode}, tx=${transaction.id}`);
+      }
+    } catch (priceErr) {
+      console.error('[wompi-webhook] discounted price verification threw, proceeding:', priceErr.message);
+    }
+  } else if (decoded.amountCents !== undefined) {
     if (Math.abs(transaction.amount_in_cents - decoded.amountCents) > 100) {
       priceVerifyOk = false;
       priceReason = 'amount_mismatch_reference';
@@ -1285,7 +1356,24 @@ exports.handler = async (event, context) => {
 
     // pricing math: paidAmount = Wompi paid amount (subtotal without IVA)
     const paidAmount = transaction.amount_in_cents / 100;
-    
+
+    /* Plan tarifario AUTORITATIVO: se deriva del MONTO realmente pagado (best vs
+       flexible recomputados desde OTASync), NO del campo de la referencia que
+       controla el cliente — así nadie paga el precio Estricta y queda registrado
+       como Flexible/reembolsable. Best-effort: si no se puede recomputar
+       (mock/error) cae al de la referencia. */
+    let ratePlan = (discountVerdict && discountVerdict.matchedPlan) || null;
+    if (!ratePlan) {
+      try {
+        const planOpts = (appliedDiscount && appliedDiscount.code)
+          ? { discountCode: appliedDiscount.code, email: appliedDiscount.email || decoded.email || '' }
+          : {};
+        const planVerdict = await verifyDirectBookingAmount(decoded, transaction.amount_in_cents, planOpts);
+        if (planVerdict && planVerdict.matchedPlan) ratePlan = planVerdict.matchedPlan;
+      } catch (e) { /* best-effort: cae al de la referencia abajo */ }
+    }
+    if (!ratePlan) ratePlan = decoded.ratePlan || null;
+
     // Determine IVA: use flags encoded in reference first (set by front-end),
     // then fall back to phone heuristic to match front-end logic exactly.
     const { ivaAmount, ivaNote, roomPrice } = directBookingPricing(decoded, paidAmount);
@@ -1331,7 +1419,7 @@ exports.handler = async (event, context) => {
     /* A8: pull the guest's free-text note persisted at signing time and attach
        it to the reservation. Best-effort; absent blob or flag OFF => as today. */
     let guestNote = '';
-    if (notesToPmsEnabled() && decoded.bookingCode) {
+    if (await notesToPmsEnabled() && decoded.bookingCode) {
       try {
         const notesStore = getStore({ name: 'booking-notes', consistency: 'strong' });
         const raw = await notesStore.get(`note-${decoded.bookingCode}`);
@@ -1407,7 +1495,7 @@ exports.handler = async (event, context) => {
       guest_email: decoded.email,
       id_channels: channelId,
       channel: channelName,
-      note: `${guestNote ? 'Nota del huésped: ' + guestNote + '. ' : ''}Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${ivaNote}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
+      note: `${guestNote ? 'Nota del huésped: ' + guestNote + '. ' : ''}Plan: ${ratePlan === 'flexible' ? 'Flexible (reembolsable)' : ratePlan === 'best' ? 'Estricta (no reembolsable)' : 'N/D'}. Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${ivaNote}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
     };
 
     const insertController = new AbortController();
@@ -1448,6 +1536,7 @@ exports.handler = async (event, context) => {
           paymentMethod: transaction.payment_method_type,
           transactionId: transaction.id,
           amountInCents: transaction.amount_in_cents,
+          ratePlan: ratePlan || null,
           createdAt: new Date().toISOString()
         }), { ttl: 86400 * 7 });
       } catch (e) { /* non-fatal */ }
@@ -1473,18 +1562,73 @@ exports.handler = async (event, context) => {
       totalAmount: roomPrice
     });
 
+    /* Snapshot refund-relevant payment fields at payment time (durable), so a
+       later refund/ticket has auth code, date, last-4 and value without digging
+       in the Wompi panel. Best-effort — never blocks. */
+    await savePaymentDetails(finalBookingCode, transaction, { ratePlan: ratePlan || null });
+    if (decoded.bookingCode && decoded.bookingCode !== finalBookingCode) {
+      await savePaymentDetails(decoded.bookingCode, transaction, { ratePlan: ratePlan || null });
+    }
+
+    /* Frente A: increment discount usage ONLY after the reservation exists, and
+       idempotently keyed on the stable client bookingCode (so a webhook retry
+       does not double-count). consumeDiscountUse also records the email for the
+       one-use-per-email rule. Best-effort — the reservation is already created so
+       a usage-count failure must never surface as a webhook error. */
+    if (appliedDiscount && appliedDiscount.code && (discountVerdict ? discountVerdict.ok : true)) {
+      try {
+        const { consumeDiscountUse } = require('./_discount-store');
+        const def = discountVerdict && discountVerdict.discount && discountVerdict.discount.applied
+          ? discountVerdict.discount : null;
+        await consumeDiscountUse(appliedDiscount.code, {
+          email: appliedDiscount.email || decoded.email || '',
+          bookingCode: decoded.bookingCode,
+          maxUses: def && Number.isFinite(def.maxUses) ? def.maxUses : undefined
+        });
+      } catch (discErr) {
+        console.error(`[wompi-webhook] discount usage increment failed (non-fatal): ${discErr.message}. bookingCode=${decoded.bookingCode}, code=${appliedDiscount.code}`);
+      }
+    }
+
+    /* Frente C: opt-in de marketing del huésped (persistido por
+       create-wompi-signature, keyed por bookingCode). Ley 1581: solo entra a
+       marketing con opt-in explícito. Sin blob = NO opt-in. Best-effort. */
+    let marketingOptIn = null;
+    if (decoded.bookingCode) {
+      try {
+        const mktStore = getStore({ name: 'booking-marketing', consistency: 'strong' });
+        const raw = await mktStore.get(`mkt-${decoded.bookingCode}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.accepted === true) marketingOptIn = parsed;
+        }
+      } catch (e) {
+        if (process.env.DEBUG) console.warn('[wompi-webhook] booking-marketing read failed (non-fatal):', e.message);
+      }
+    }
+
     /* Maestro de clientes (Fase 1): el huésped directo queda como partner
-       (persona) en Odoo, deduplicado por email. No fatal. */
+       (persona) en Odoo, deduplicado por email. Con opt-in de marketing (Frente
+       C) se añade el tag 'Opt-in marketing' y se le agrega a la lista de Email
+       Marketing 'Newsletter'. Sin opt-in → solo el partner, sin marketing.
+       No fatal. */
     try {
-      const { upsertPartner } = require('./_odoo');
+      const { upsertPartner, addToMailingList } = require('./_odoo');
+      const guestName = `${decoded.firstName || ''} ${decoded.lastName || ''}`.trim() || decoded.email;
+      const mkt = buildGuestMarketing(decoded, marketingOptIn);
       await upsertPartner({
-        name: `${decoded.firstName || ''} ${decoded.lastName || ''}`.trim() || decoded.email,
+        name: guestName,
         email: decoded.email,
         phone: sanitizePhone(decoded.phone),
         isCompany: false,
-        tags: ['Huésped directo'],
-        comment: `Huésped de reserva directa ${finalBookingCode}.`
+        tags: mkt.tags,
+        comment: `Huésped de reserva directa ${finalBookingCode}.${mkt.optIn ? ' Opt-in de marketing (motor de reserva directa).' : ''}`
       });
+      /* Email Marketing: SOLO con opt-in (Ley 1581) y con email. Se intenta aun
+         en modo mock (no-op) para que el flujo sea idéntico con y sin Odoo. */
+      if (mkt.addToMailing) {
+        await addToMailingList({ email: decoded.email, name: guestName, listName: 'Newsletter' });
+      }
     } catch (odooErr) {
       console.error('[wompi-webhook] Odoo upsert (huésped) no fatal:', odooErr.message);
     }
@@ -1543,6 +1687,7 @@ exports._test = {
   computeWompiChecksum,
   verifyWompiSignature,
   mustChargeDirectBookingIva,
+  buildGuestMarketing,
   directBookingPricing,
   handleQuotePayment,
   handleGuestServicePayment,

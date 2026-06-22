@@ -1,6 +1,6 @@
 require('./_env');
 const crypto = require('crypto');
-const { authenticateAdmin } = require('./_firebase-auth');
+const { authorize } = require('./_authz');
 const { getQuoteStore, saveQuote, sanitizeQuoteInput } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable, createHold } = require('./_otasync');
 
@@ -30,7 +30,7 @@ exports.handler = async (event, context) => {
     if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
     if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-    const auth = await authenticateAdmin(event);
+    const auth = await authorize(event, 'quotes.edit');
     if (!auth.ok) return { statusCode: auth.statusCode, headers: corsHeaders, body: JSON.stringify({ error: auth.error }) };
 
     if (event.body && event.body.length > 20000) return { statusCode: 413, headers: corsHeaders, body: JSON.stringify({ error: 'Payload demasiado grande' }) };
@@ -106,6 +106,14 @@ exports.handler = async (event, context) => {
       await saveQuote(store, quoteData);
     } catch (e) {
       console.error('[create-quote] blob store unavailable:', e.message, e.stack);
+      try {
+        await require('./_alert').reportAlert({
+          kind: 'quote_save_failed', severity: 'error',
+          message: 'No se pudo guardar la cotización (almacenamiento no disponible) — el admin no pudo crearla.',
+          context: { quoteId, detail: String(e.message || '').slice(0, 200) },
+          dedupeKey: 'create-quote-store'
+        });
+      } catch (_) { /* alert best-effort */ }
       return { statusCode: 503, headers: corsHeaders, body: JSON.stringify({ error: 'Almacenamiento no disponible. Intenta de nuevo.' }) };
     }
 

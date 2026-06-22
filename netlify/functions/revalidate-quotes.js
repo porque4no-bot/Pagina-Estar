@@ -1,9 +1,47 @@
 const { getQuoteStore, listAllQuotes, saveQuote, effectiveStatus, shouldRemindExpiry } = require('./_quotes-store');
 const { getAvailabilityByType, findUnavailable, hasOtasyncCreds, releaseHold } = require('./_otasync');
 const { sendEmail, adminEmail, adminAvailabilityLostHtml, quoteExpiringHtml } = require('./_email');
+const { flag } = require('./_settings');
 
 /* Send the "expiring soon" reminder this many ms before a quote's expiry. */
 const REMINDER_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/* ── Sincroniza el ciclo de vida del lead CRM (Odoo) con el estado de las
+   cotizaciones ──
+   aceptada → lead "ganado"; cancelada/vencida → lead "perdido". Idempotente
+   (marca `leadLifecycle` en la cotización para no re-escribir cada corrida) y no
+   fatal (Odoo nunca debe tumbar el cron). Mock no-op sin credenciales de Odoo.
+   Inyectable (`deps.odoo`) para pruebas sin red. */
+async function syncLeadLifecycle(store, quotes, deps = {}) {
+  const odoo = deps.odoo || require('./_odoo');
+  if (!odoo.isConfigured()) return { won: 0, lost: 0 };
+  let won = 0, lost = 0;
+  for (const q of quotes) {
+    const st = effectiveStatus(q);
+    let target = null;        // 'won' | 'lost'
+    let reason = '';
+    if (st === 'aceptada') { target = 'won'; }
+    else if (st === 'cancelada') { target = 'lost'; reason = 'Cotización cancelada'; }
+    else if (st === 'vencida') { target = 'lost'; reason = 'Cotización vencida'; }
+    if (!target) continue;
+    /* Idempotencia: no re-sincronizar si ya quedó en el mismo desenlace. */
+    if (q.leadLifecycle === target) continue;
+    try {
+      const res = target === 'won'
+        ? await odoo.markLeadWonByQuote(q)
+        : await odoo.markLeadLost(q, reason);
+      if (res && res.isMock) continue;            // sin credenciales: no marcar
+      q.leadLifecycle = target;
+      q.leadLifecycleAt = new Date().toISOString();
+      if (res && res.id) q.leadId = res.id;
+      try { await saveQuote(store, q); } catch (e) { /* persistencia no fatal */ }
+      if (target === 'won') won++; else lost++;
+    } catch (e) {
+      console.error(`[revalidate-quotes] lead lifecycle (${target}) falló para ${q.quoteId}:`, e.message);
+    }
+  }
+  return { won, lost };
+}
 
 /* Scheduled job: re-checks availability for every active/viewed quote and
    flags the ones that lost availability (availabilityOk:false + unavailable[]).
@@ -92,13 +130,22 @@ exports.handler = async () => {
     }
   }
 
+  // Sync CRM lead lifecycle with quote status (Odoo). Non-fatal, mock-safe.
+  let leadWon = 0, leadLost = 0;
+  try {
+    const r = await syncLeadLifecycle(store, quotes);
+    leadWon = r.won; leadLost = r.lost;
+  } catch (e) {
+    console.error('[revalidate-quotes] lead lifecycle sync no fatal:', e.message);
+  }
+
   // Remind clients whose active quote is about to expire (once per quote).
   // Client-facing email → opt-in by flag (OFF by default), consistent with the
   // other new email features in this branch.
   const baseUrl = (process.env.URL || process.env.GUEST_APP_BASE_URL || '').replace(/\/$/, '');
   const nowMs = Date.now();
   let reminded = 0;
-  if (process.env.QUOTE_EXPIRY_REMINDER_ENABLED !== 'true') {
+  if (!(await flag('QUOTE_EXPIRY_REMINDER_ENABLED'))) {
     /* disabled: skip reminders */
   } else if (!baseUrl) {
     console.warn('[revalidate-quotes] no base URL (URL/GUEST_APP_BASE_URL); skipping expiry reminders');
@@ -121,6 +168,8 @@ exports.handler = async () => {
     }
   }
 
-  console.log(`[revalidate-quotes] checked ${active.length}, updated ${changed}, lost availability ${lost}, holds released ${released}, reminders ${reminded}`);
-  return { statusCode: 200, body: `checked ${active.length}, updated ${changed}, lost ${lost}, released ${released}, reminded ${reminded}` };
+  console.log(`[revalidate-quotes] checked ${active.length}, updated ${changed}, lost availability ${lost}, holds released ${released}, reminders ${reminded}, leads won ${leadWon}, leads lost ${leadLost}`);
+  return { statusCode: 200, body: `checked ${active.length}, updated ${changed}, lost ${lost}, released ${released}, reminded ${reminded}, leadsWon ${leadWon}, leadsLost ${leadLost}` };
 };
+
+exports._test = { syncLeadLifecycle };

@@ -530,6 +530,81 @@ async function releaseHold(idReservations) {
   if (!res.ok) throw new Error(`delete/reservation returned status ${res.status}`);
 }
 
+/* Cancel a CONFIRMED guest reservation (Mesa Redonda C3 — cerrar el lazo de
+   cancelación). Uses the documented reservation/delete/delete endpoint, which
+   SOFT-cancels: sets status→canceled + date_canceled and PRESERVES the record
+   (correcto para contabilidad/SIRE), a diferencia del delete/reservation que
+   usa releaseHold para holds tentativos. Mirrors insertReservation's resilience:
+   retries transient/timeout/5xx con backoff (4xx es final), y alerta crítica si
+   se agotan los intentos (cancelación pedida pero no aplicada). Idempotente: un
+   404 (ya no existe) se resuelve como { ok:true, alreadyGone:true }.
+   Returns { ok, status?, alreadyGone?, isMock? }. */
+const CANCEL_MAX_ATTEMPTS = 3;
+const CANCEL_BACKOFF_MS = [1000, 2000];
+
+async function cancelReservation(idReservations) {
+  if (!idReservations) return { ok: false, reason: 'no-id' };
+  if (!hasOtasyncCreds()) return { ok: true, isMock: true };
+  const { token, propertyId } = otasyncCreds();
+
+  const makeRequest = async (pkey) => {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    try {
+      const r = await fetch('https://app.otasync.me/api/reservation/delete/delete', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: pkey, token, id_properties: propertyId, id_reservations: idReservations }),
+        signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      return r;
+    } catch (err) {
+      clearTimeout(tid);
+      throw err.name === 'AbortError' ? new Error('Request timeout during reservation cancel') : err;
+    }
+  };
+
+  let lastErr = null;
+  try {
+    for (let attempt = 1; attempt <= CANCEL_MAX_ATTEMPTS; attempt++) {
+      let res;
+      try {
+        res = await withSessionRetry(makeRequest);
+      } catch (err) {
+        lastErr = err;
+        if (attempt === CANCEL_MAX_ATTEMPTS) throw lastErr;
+        console.warn(`[otasync] delete/delete attempt ${attempt}/${CANCEL_MAX_ATTEMPTS} failed (${err.message}); retrying in ${CANCEL_BACKOFF_MS[attempt - 1]}ms`);
+        await sleep(CANCEL_BACKOFF_MS[attempt - 1]);
+        continue;
+      }
+      if (res.status === 404) return { ok: true, alreadyGone: true }; /* idempotente */
+      if (res.ok) {
+        let data = {};
+        try { data = await res.json(); } catch (_) { /* tolera respuesta sin cuerpo */ }
+        const status = (data && data.reservation && data.reservation.status) || (data && data.status) || 'canceled';
+        return { ok: true, status };
+      }
+      if (res.status >= 500 && attempt < CANCEL_MAX_ATTEMPTS) {
+        console.warn(`[otasync] delete/delete attempt ${attempt}/${CANCEL_MAX_ATTEMPTS} returned status ${res.status}; retrying in ${CANCEL_BACKOFF_MS[attempt - 1]}ms`);
+        await sleep(CANCEL_BACKOFF_MS[attempt - 1]);
+        continue;
+      }
+      throw new Error(`delete/delete returned status ${res.status}`);
+    }
+    throw lastErr || new Error('delete/delete failed');
+  } catch (err) {
+    try {
+      await require('./_alert').reportAlert({
+        kind: 'otasync_cancel_failed', severity: 'critical',
+        message: `delete/delete (cancelación) falló tras ${CANCEL_MAX_ATTEMPTS} intentos: ${err.message}`,
+        context: { idReservations, attempts: CANCEL_MAX_ATTEMPTS },
+        dedupeKey: `otasync-cancel-${idReservations}`
+      });
+    } catch (_) { /* alerta best-effort */ }
+    throw err;
+  }
+}
+
 /* Create a CONFIRMED reservation for a paid quote. Returns the booking code.
    Shared by the Wompi webhook (on payment) and the admin retry endpoint. */
 async function createConfirmedReservation(quote, opts) {
@@ -835,7 +910,8 @@ async function getReservationsByDate({ filterBy, dfrom, dto, arrivals = 0, depar
 module.exports = {
   getReservationsByDate, normalizeReservation, inferLang, reservaTieneDesayuno,
   otasyncCreds, hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
-  buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, createConfirmedReservation,
+  buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, cancelReservation, createConfirmedReservation,
+  insertReservation,
   getDynamicPricing, EXTRA_GUEST_SURCHARGE,
   getExtras, insertExtra, ensureGuestServiceExtra, getReservationFirstRoom,
   addReservationExtra, addReservationPayment, postOrderExtrasToFolio

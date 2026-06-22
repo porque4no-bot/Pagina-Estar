@@ -63,10 +63,11 @@ async function listAllQuotes(store) {
 }
 
 /* ── Status ── */
-function effectiveStatus(quote) {
+function effectiveStatus(quote, nowMs) {
   if (!quote) return 'desconocida';
   if (quote.status === 'cancelada' || quote.status === 'aceptada') return quote.status;
-  if (quote.expiresAt && new Date(quote.expiresAt) < new Date()) return 'vencida';
+  const now = (typeof nowMs === 'number') ? nowMs : Date.now();
+  if (quote.expiresAt && new Date(quote.expiresAt).getTime() < now) return 'vencida';
   return quote.status || 'activa';
 }
 
@@ -78,7 +79,7 @@ function shouldRemindExpiry(quote, nowMs, windowMs) {
   if (!quote || !quote.expiresAt || !quote.email) return false;
   if (quote.reminderSentAt) return false;
   if (quote.availabilityOk === false) return false;
-  const st = effectiveStatus(quote);
+  const st = effectiveStatus(quote, nowMs);
   if (st !== 'activa' && st !== 'vista') return false;
   const exp = new Date(quote.expiresAt).getTime();
   if (isNaN(exp) || exp <= nowMs) return false;

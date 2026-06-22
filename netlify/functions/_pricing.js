@@ -34,9 +34,25 @@ const EXTRAS_PRICES = {
 /* Order matters: index == position in the extras mask string. APPEND ONLY. */
 const EXTRAS_KEYS = ['desayuno', 'parqueadero', 'late', 'early', 'traslado', 'tour', 'mascota'];
 
+/* ── Códigos de descuento (Frente A) ──────────────────────────────────────
+ * verifyDiscountCode es la puerta de entrada usada por validate-discount-code,
+ * create-wompi-signature y wompi-webhook. Delega en _discount-store (Blobs +
+ * conteo atómico). Se expone aquí para que el motor de precio tenga una sola
+ * superficie. SIEMPRE server-side: el cliente nunca fija el descuento.
+ *
+ * Firma: verifyDiscountCode({ code, email, nights, roomTypeId, checkin,
+ *   checkout, subtotalCents, now }, deps?) → { valid, reason, discountCents, def }
+ * (deps se inyecta en tests para evitar Blobs reales).
+ */
+function verifyDiscountCode(input, deps) {
+  const { verifyDiscountCode: impl } = require('./_discount-store');
+  return impl(input, deps);
+}
+
 module.exports = {
   EXTRA_GUEST_SURCHARGE,
   PRICE_FALLBACK,
   EXTRAS_PRICES,
-  EXTRAS_KEYS
+  EXTRAS_KEYS,
+  verifyDiscountCode
 };

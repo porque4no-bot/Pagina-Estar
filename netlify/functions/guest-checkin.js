@@ -9,8 +9,10 @@ const {
   parseJsonBody,
   protectRecord,
   requireGuest,
+  sealBinaryForStore,
   syncGuestEvent
 } = require('./_guest-app');
+const { flag } = require('./_settings');
 
 const MAX_RAW_FILE_BYTES = 4.5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
@@ -22,14 +24,91 @@ const ALLOWED_TYPES = new Set([
   'image/heif'
 ]);
 const MAX_GUESTS = 5;
+/* How many OCR (Azure) attempts a guest may make before we stop blocking the
+   check-in. After MAX_OCR_ATTEMPTS unsuccessful reads we accept the manually
+   typed data and flag the record for manual verification by reception, rather
+   than rejecting hard. The client tracks and sends the attempt count. */
+const MAX_OCR_ATTEMPTS = 3;
+/* Canonical document types the record must persist (SIRE/TRA admits a fixed
+   list). Anything Azure or the guest provides is mapped onto these. */
+const VALID_DOCUMENT_TYPES = ['CC', 'TI', 'CE', 'Pasaporte'];
 const defaultDeps = {
   archiveGuestPayload,
   guestStore,
   protectRecord,
   requireGuest,
+  sealBinaryForStore,
   syncGuestEvent
 };
 const deps = { ...defaultDeps };
+
+function normalizeAccentless(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function normalizeDocumentType(value) {
+  /* Maps any free-text / Azure document-type label onto one of
+     VALID_DOCUMENT_TYPES. Returns '' when there is no confident match so the
+     caller can surface it as a missing required field (SIRE/TRA needs a valid
+     type). Mirrors the alias table the client uses in guest-app.js. */
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  /* Exact canonical value passes straight through (case-insensitive). */
+  const exact = VALID_DOCUMENT_TYPES.find(t => t.toLowerCase() === raw.toLowerCase());
+  if (exact) return exact;
+  const aliases = {
+    cc: 'CC',
+    'cedula': 'CC',
+    'cedula ciudadania': 'CC',
+    'cedula de ciudadania': 'CC',
+    'cedula colombiana': 'CC',
+    'documento nacional': 'CC',
+    id: 'CC',
+    'id card': 'CC',
+    'identity card': 'CC',
+    'national id': 'CC',
+    'national identity card': 'CC',
+    'iddocument nationalidentitycard': 'CC',
+    ti: 'TI',
+    'tarjeta de identidad': 'TI',
+    'tarjeta identidad': 'TI',
+    ce: 'CE',
+    'cedula extranjeria': 'CE',
+    'cedula de extranjeria': 'CE',
+    'residence permit': 'CE',
+    'iddocument residencepermit': 'CE',
+    pasaporte: 'Pasaporte',
+    passport: 'Pasaporte',
+    'iddocument passport': 'Pasaporte'
+  };
+  const key = normalizeAccentless(raw);
+  if (aliases[key]) return aliases[key];
+  /* Fuzzy token match for noisy labels (e.g. "tipo de documento: pasaporte").
+     We match an alias only when it appears as a whole space-delimited token /
+     phrase, and we skip aliases shorter than 4 chars (cc, ti, ce, id) so a
+     stray substring like "cc" inside "conduccion" never triggers a false hit. */
+  const keyTokens = ` ${key} `;
+  for (const [alias, canonical] of Object.entries(aliases)) {
+    if (alias.length < 4) continue;
+    if (keyTokens.includes(` ${alias} `)) return canonical;
+  }
+  return '';
+}
+
+function normalizeSex(value) {
+  /* SIRE/TRA wants a single-letter gender. Maps common labels to M / F and
+     returns '' when unknown so the field stays optional but clean. */
+  const key = normalizeAccentless(value);
+  if (!key) return '';
+  if (['m', 'masculino', 'male', 'hombre', 'h'].includes(key)) return 'M';
+  if (['f', 'femenino', 'female', 'mujer'].includes(key)) return 'F';
+  return '';
+}
 
 function extensionForContentType(contentType) {
   /* Returns the canonical file extension (including the leading dot) for the
@@ -206,6 +285,7 @@ function parseAzureResult(result) {
   const nationality = pickField(fields, ['CountryRegion', 'Nationality']);
   const sex = pickField(fields, ['Sex', 'Gender']);
   const address = pickField(fields, ['Address']);
+  const birthPlace = pickField(fields, ['PlaceOfBirth', 'BirthPlace']);
   const inferredDocumentType = documentType.value || documentTypeFromDocType(document && document.docType);
   const inferredNationality = nationality.value ||
     (inferredDocumentType === 'CC' ? 'Colombia' : '');
@@ -225,11 +305,12 @@ function parseAzureResult(result) {
       firstName: inferredFirstName,
       lastName: lastName.value,
       documentNumber: documentNumber.value,
-      documentType: inferredDocumentType,
+      documentType: normalizeDocumentType(inferredDocumentType) || inferredDocumentType,
       birthDate: birthDate.value,
       expirationDate: expirationDate.value,
       nationality: inferredNationality,
-      sex: sex.value,
+      sex: normalizeSex(sex.value) || sex.value,
+      birthPlace: birthPlace.value,
       address: address.value
     },
     confidence: values.length
@@ -243,6 +324,17 @@ exports._test = {
   calculateAge: birthDate => calculateAge(birthDate),
   matchProgenitor: (name, adults) => matchProgenitor(name, adults),
   parseRegistroCivilResult,
+  normalizeGuest,
+  normalizeDocumentType,
+  normalizeSex,
+  validateGuest,
+  isForeignGuest,
+  normalizeMarketingConsent,
+  normalizeGuestEntry,
+  maybeIssueDoorCodes,
+  MAX_OCR_ATTEMPTS,
+  VALID_DOCUMENT_TYPES,
+  handler: event => exports.handler(event),
   setDeps(overrides = {}) {
     Object.assign(deps, overrides);
   },
@@ -430,21 +522,60 @@ function normalizeGuest(body, extracted) {
       source[key] = manual[key];
     }
   });
+  /* documentType is normalized onto the SIRE/TRA canonical list; keep the raw
+     value only when it can't be mapped so validateGuest can flag it. */
+  const documentType = normalizeDocumentType(source.documentType) ||
+    cleanText(source.documentType, 60);
   return {
     firstName: cleanText(source.firstName, 100),
     lastName: cleanText(source.lastName, 100),
-    documentType: cleanText(source.documentType, 60),
+    documentType,
     documentNumber: cleanText(source.documentNumber, 80),
     birthDate: cleanText(source.birthDate, 20),
     expirationDate: cleanText(source.expirationDate, 20),
     nationality: cleanText(source.nationality, 80),
-    sex: cleanText(source.sex, 30),
+    sex: normalizeSex(source.sex) || cleanText(source.sex, 30),
     address: cleanText(source.address, 220),
     email: cleanText(source.email, 254),
     phone: cleanText(source.phone, 50),
     arrivalTime: cleanText(source.arrivalTime, 20),
     notes: cleanText(source.notes, 1000),
+    /* SIRE/TRA capture — raw material only; we do not build the SIRE/TRA
+       submission yet, just persist these so it can be assembled later. */
+    occupation: cleanText(source.occupation, 120),
+    birthPlace: cleanText(source.birthPlace, 160),
+    residenceCountry: cleanText(source.residenceCountry, 80),
+    residenceState: cleanText(source.residenceState, 120),
+    residenceCity: cleanText(source.residenceCity, 120),
+    originCountry: cleanText(source.originCountry, 80),
+    originState: cleanText(source.originState, 120),
+    originCity: cleanText(source.originCity, 120),
+    destination: cleanText(source.destination, 160),
     privacyAccepted: Boolean(source.privacyAccepted)
+  };
+}
+
+function isForeignGuest(guest) {
+  /* A guest is foreign (extranjero) for SIRE/TRA purposes when their nationality
+     is anything other than Colombia. Used to gate the "destino" requirement. */
+  const nat = normalizeAccentless(guest && guest.nationality);
+  if (!nat) return false;
+  return !['colombia', 'colombiano', 'colombiana', 'co', 'col'].includes(nat);
+}
+
+function normalizeMarketingConsent(body) {
+  /* Separate, opt-in marketing consent (distinct from the operational privacy
+     acceptance). We persist whether it was accepted plus the timestamp and the
+     channel so we can prove the opt-in. Default OFF. */
+  const raw = (body && body.marketingConsent) || {};
+  const accepted = Boolean(
+    (body && body.marketingAccepted) || raw.accepted || raw === true
+  );
+  if (!accepted) return { accepted: false };
+  return {
+    accepted: true,
+    acceptedAt: new Date().toISOString(),
+    channel: cleanText((raw && raw.channel) || (body && body.marketingChannel) || 'guest-app', 40)
   };
 }
 
@@ -462,6 +593,15 @@ function validateGuest(guest, { isMinor = false } = {}) {
   ];
   const missing = required.filter(key => !guest[key]);
   const warnings = [];
+  /* documentType must be one of the SIRE/TRA canonical types. If present but not
+     recognized, treat it as missing so the guest re-selects a valid option. */
+  if (guest.documentType && !VALID_DOCUMENT_TYPES.includes(guest.documentType)) {
+    missing.push('documentType');
+  }
+  /* Foreign guests must declare their destination (destino) for TRA. */
+  if (isForeignGuest(guest) && !guest.destination) {
+    missing.push('destination');
+  }
   if (guest.documentType === 'Pasaporte' && !guest.expirationDate) {
     missing.push('expirationDate');
   }
@@ -501,17 +641,27 @@ async function normalizeGuestEntry(entry, index, session) {
     throw Object.assign(new Error(`Selecciona una foto o PDF del documento para el huésped ${index + 1}.`), { statusCode: 400 });
   }
   const guest = normalizeGuest({ guest: (entry && entry.guest) || {} }, {});
+  const analysisSource = cleanText(
+    (entry && (entry.analysisSource || entry.documentAnalysis)) ||
+    (entry && entry.file && entry.file.analysisSource) ||
+    'manual',
+    40
+  );
+  /* OCR attempt budget: the client increments ocrAttempts on each Azure read it
+     fires. When the document was never recognized by Azure ('azure' source) and
+     the guest has exhausted MAX_OCR_ATTEMPTS, we do NOT hard-reject: we accept
+     the typed data and flag the entry for manual verification by reception. */
+  const ocrAttempts = Math.max(0, Math.floor(Number((entry && entry.ocrAttempts) || 0)) || 0);
+  const ocrRecognized = analysisSource === 'azure';
+  const needsManualReview = !ocrRecognized && ocrAttempts >= MAX_OCR_ATTEMPTS;
   return {
     guest,
     file,
     isMinor: guest.birthDate ? calculateAge(guest.birthDate) < 18 : false,
     isPrimary: Boolean(entry && entry.isPrimary),
-    analysisSource: cleanText(
-      (entry && (entry.analysisSource || entry.documentAnalysis)) ||
-      (entry && entry.file && entry.file.analysisSource) ||
-      'manual',
-      40
-    ),
+    analysisSource,
+    ocrAttempts,
+    needsManualReview,
     confidence: Number((entry && entry.confidence) || 0),
     registroCivilDocumentRef: (entry && entry.registroCivilDocumentRef) || null,
     authorizationDocumentRef: (entry && entry.authorizationDocumentRef) || null,
@@ -646,6 +796,44 @@ function validateMinors(entries) {
   };
 }
 
+async function maybeIssueDoorCodes(record, session) {
+  /* On a completed check-in, optionally issue smart-lock access codes through
+     the TTLock module (created by another agent — _ttlock.js). Strictly gated:
+       - OFF unless TTLOCK_ENABLED === 'true'
+       - the module is required LAZILY inside the try so a missing file never
+         breaks the check-in locally or in CI
+       - any error is swallowed: door codes are a convenience, never a blocker.
+     Returns a small status object for the response; never throws.
+     Gestionable desde /admin (override del panel → env). */
+  if (!(await flag('TTLOCK_ENABLED'))) {
+    return { configured: false, issued: false };
+  }
+  try {
+    // eslint-disable-next-line global-require
+    const ttlock = require('./_ttlock');
+    if (!ttlock || typeof ttlock.issueAccessCodes !== 'function') {
+      return { configured: false, issued: false };
+    }
+    const result = (await ttlock.issueAccessCodes({
+      bookingCode: record.bookingCode,
+      checkinId: record.checkinId,
+      checkIn: record.reservation && record.reservation.checkIn,
+      checkOut: record.reservation && record.reservation.checkOut,
+      roomNumber: record.reservation && record.reservation.roomNumber,
+      guestName: record.guestName
+    })) || {};
+    /* The _ttlock module is mock-safe without credentials: it returns
+       { isMock: true, codes: [], errors: [] }. We consider codes "issued" only
+       when it is not a mock AND at least one code came back. */
+    const codes = Array.isArray(result.codes) ? result.codes : [];
+    const issued = !result.isMock && result.issued !== false && codes.length > 0;
+    return { configured: true, issued, isMock: Boolean(result.isMock), codes: codes.length };
+  } catch (error) {
+    console.warn('[guest-checkin] TTLock code issuance skipped:', error.message);
+    return { configured: true, issued: false, error: String(error.message || '').slice(0, 200) };
+  }
+}
+
 exports.handler = async event => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders(), body: '' };
@@ -688,6 +876,14 @@ exports.handler = async event => {
         analysis = await analyzeRegistroCivilWithAzure(file);
       } catch (azureErr) {
         console.warn('[guest-checkin] registro civil analysis failed, falling back to manual:', azureErr.message);
+        try {
+          await require('./_alert').reportAlert({
+            kind: 'ocr_failure', severity: 'warn',
+            message: 'Falló el OCR del registro civil (el huésped puede escribir los datos a mano).',
+            context: { doc: 'registro-civil', detail: String(azureErr.message || '').slice(0, 200) },
+            dedupeKey: 'ocr-registro-civil'
+          });
+        } catch (_) { /* alert best-effort */ }
         analysis = { configured: true, azureFailed: true, fields: { fatherName: '', motherName: '' }, confidence: 0 };
       }
       const analysisSource = !analysis.configured ? 'manual' : analysis.azureFailed ? 'azure-error' : 'azure';
@@ -746,12 +942,28 @@ exports.handler = async event => {
       const minorPayloadByIndex = new Map(
         minorPayloads.filter(Boolean).map(payload => [payload.index, payload])
       );
+      /* Reservation context comes from the SIGNED token, not the client body, so
+         the SIRE/TRA record stores values reception can trust. Pre-existing
+         tokens (issued before this change) simply carry empty strings. */
+      const reservation = {
+        checkIn: cleanText(session.checkIn, 20),
+        checkOut: cleanText(session.checkOut, 20),
+        roomNumber: cleanText(session.roomNumber, 40),
+        motive: cleanText(session.motive, 160)
+      };
+      const marketingConsent = normalizeMarketingConsent(body);
+      /* Any guest whose document never passed OCR after the attempt budget needs
+         a human to verify the typed data on arrival. */
+      const manualReview = entries.some(entry => entry.needsManualReview);
       const record = {
         type: 'guest_checkin',
         checkinId,
         bookingCode: session.sub,
         guestName: guestArchiveName(primaryEntry.guest),
         guest: primaryEntry.guest,
+        reservation,
+        marketingConsent,
+        manualReview,
         guests: entries.map((entry, index) => {
           const minorDetail = minorByIndex.get(index);
           const minorPayload = minorPayloadByIndex.get(index);
@@ -762,7 +974,9 @@ exports.handler = async event => {
               contentType: entry.file.contentType,
               size: entry.file.size,
               analysisSource: entry.analysisSource,
-              confidence: entry.confidence
+              confidence: entry.confidence,
+              ocrAttempts: entry.ocrAttempts,
+              needsManualReview: entry.needsManualReview
             },
             isPrimary: entry.isPrimary,
             guestIndex: index,
@@ -799,15 +1013,19 @@ exports.handler = async event => {
       await deps.guestStore('guest-checkins').setJSON(checkinId, deps.protectRecord(record));
 
       let stagedDocument = false;
-      if (process.env.GUEST_APP_STORE_DOCUMENTS === 'true') {
+      if (await flag('GUEST_APP_STORE_DOCUMENTS')) {
         await Promise.all(entries.map((entry, index) => {
           const safeName = entry.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-          return deps.guestStore('guest-documents').set(`${checkinId}/${index + 1}-${safeName}`, entry.file.buffer, {
+          /* PII en reposo: el documento de identidad se cifra con la bóveda antes
+             de tocar Blobs (antes se guardaba en CLARO). */
+          const sealed = deps.sealBinaryForStore(entry.file.buffer, `${session.sub}|guest-document`);
+          return deps.guestStore('guest-documents').set(`${checkinId}/${index + 1}-${safeName}`, sealed.value, {
             metadata: {
               bookingCode: session.sub,
               contentType: entry.file.contentType,
               uploadedAt: record.createdAt,
-              guestIndex: String(index)
+              guestIndex: String(index),
+              encrypted: String(sealed.encrypted)
             }
           });
         }));
@@ -839,22 +1057,28 @@ exports.handler = async event => {
           if (!payload) continue;
           const { index, rcnFile, authFile } = payload;
           const rcnExt = extensionForContentType(rcnFile.contentType);
-          await minorStore.set(`${checkinId}/${index}/registro-civil${rcnExt}`, rcnFile.buffer, {
+          /* PII sensible de MENOR en reposo: registro civil cifrado con la bóveda
+             (antes en CLARO). AAD distinta por tipo de documento. */
+          const sealedRcn = deps.sealBinaryForStore(rcnFile.buffer, `${session.sub}|minor-rcn`);
+          await minorStore.set(`${checkinId}/${index}/registro-civil${rcnExt}`, sealedRcn.value, {
             metadata: {
               bookingCode: session.sub,
               contentType: rcnFile.contentType,
               uploadedAt: createdAt,
-              guestIndex: String(index)
+              guestIndex: String(index),
+              encrypted: String(sealedRcn.encrypted)
             }
           });
           if (authFile) {
             const authExt = extensionForContentType(authFile.contentType);
-            await minorStore.set(`${checkinId}/${index}/autorizacion${authExt}`, authFile.buffer, {
+            const sealedAuth = deps.sealBinaryForStore(authFile.buffer, `${session.sub}|minor-authorization`);
+            await minorStore.set(`${checkinId}/${index}/autorizacion${authExt}`, sealedAuth.value, {
               metadata: {
                 bookingCode: session.sub,
                 contentType: authFile.contentType,
                 uploadedAt: createdAt,
-                guestIndex: String(index)
+                guestIndex: String(index),
+                encrypted: String(sealedAuth.encrypted)
               }
             });
           }
@@ -891,14 +1115,20 @@ exports.handler = async event => {
 
       const sync = await deps.syncGuestEvent(record);
 
+      /* Check-in completed: optionally emit smart-lock codes (gated + lazy). */
+      const doorCodes = await maybeIssueDoorCodes(record, session);
+
       return json(201, {
         ok: true,
         checkinId,
         status: 'received',
         validation,
+        manualReview,
+        marketingConsent: { accepted: marketingConsent.accepted },
         archive: archiveResults,
         minorArchive: minorArchiveResults,
         sync,
+        doorCodes,
         stagedDocument
       });
     }
@@ -911,6 +1141,14 @@ exports.handler = async event => {
       analysis = await analyzeWithAzure(file);
     } catch (azureErr) {
       console.warn('[guest-checkin] Azure analysis failed, falling back to manual:', azureErr.message);
+      try {
+        await require('./_alert').reportAlert({
+          kind: 'ocr_failure', severity: 'warn',
+          message: 'Falló el OCR del documento de identidad (el huésped puede escribir los datos a mano).',
+          context: { doc: 'id-document', detail: String(azureErr.message || '').slice(0, 200) },
+          dedupeKey: 'ocr-id-document'
+        });
+      } catch (_) { /* alert best-effort */ }
       analysis = { configured: true, azureFailed: true, fields: {}, confidence: 0 };
     }
 
@@ -934,6 +1172,18 @@ exports.handler = async event => {
     return json(400, { error: 'Modo no soportado.' });
   } catch (error) {
     console.error('[guest-checkin]', error.message);
+    /* Alert only on unexpected server errors (no statusCode = internal, e.g.
+       Blobs save / Drive archive failed). Client 4xx are expected and noisy. */
+    if (!error.statusCode) {
+      try {
+        await require('./_alert').reportAlert({
+          kind: 'guest_checkin_failed', severity: 'error',
+          message: 'Falló el guardado del check-in del huésped (no se persistió/archivó el registro).',
+          context: { detail: String(error.message || '').slice(0, 200) },
+          dedupeKey: 'guest-checkin-save'
+        });
+      } catch (_) { /* alert best-effort */ }
+    }
     return json(error.statusCode || 500, {
       error: error.statusCode ? error.message : 'No fue posible procesar el check-in.'
     });

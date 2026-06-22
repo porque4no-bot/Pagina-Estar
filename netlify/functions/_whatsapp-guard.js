@@ -31,8 +31,25 @@ function guardConfig() {
   };
 }
 
+/* Pre-gate SÍNCRONO (lo invoca _whatsapp-bot de forma síncrona). Lee solo env:
+   por defecto activo, se apaga con WHATSAPP_GUARD_ENABLED='false' explícito.
+   El override del panel (/admin) se aplica DENTRO de screenMessage —que es async—
+   vía guardDisabledByPanel(): así, aun pasando este pre-gate, un apagado desde el
+   panel cae a un veredicto seguro sin llamar al modelo (sin tocar este caller
+   síncrono que está fuera de este frente). */
 function isEnabled() {
   return Boolean(guardConfig().apiKey) && process.env.WHATSAPP_GUARD_ENABLED !== 'false';
+}
+
+/* Override gestionable desde /admin: true ⇒ apagado desde el panel. Mismo
+   criterio que isEnabled (solo un 'false' explícito apaga); panel → env. */
+async function guardDisabledByPanel() {
+  try {
+    const { get } = require('./_settings');
+    return String(await get('WHATSAPP_GUARD_ENABLED', '')).toLowerCase() === 'false';
+  } catch (e) {
+    return false; /* sin _settings/Blobs: rige env vía isEnabled (no apagar aquí) */
+  }
 }
 
 let cachedClient = null;
@@ -86,6 +103,12 @@ function blockReply(lang) {
 /* Returns { blocked, risk, categories, reason }. Never throws. */
 async function screenMessage(msg, session, deps) {
   const cfg = guardConfig();
+  /* Apagado desde el panel /admin ⇒ no se clasifica: veredicto seguro sin llamar
+     al modelo (mantiene mock-safe y honra el override aunque el pre-gate síncrono
+     del bot haya pasado). */
+  if (await guardDisabledByPanel()) {
+    return { blocked: false, risk: 'safe', categories: [], reason: 'guard_disabled_panel' };
+  }
   try {
     const client = (deps && deps.guardClient) || getClient();
     const response = await client.messages.create({
@@ -123,4 +146,4 @@ async function screenMessage(msg, session, deps) {
   }
 }
 
-module.exports = { isEnabled, screenMessage, blockReply, guardConfig, GUARD_SCHEMA, GUARD_SYSTEM };
+module.exports = { isEnabled, guardDisabledByPanel, screenMessage, blockReply, guardConfig, GUARD_SCHEMA, GUARD_SYSTEM };

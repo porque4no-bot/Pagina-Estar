@@ -85,8 +85,19 @@ async function reportAlert({ kind, severity = 'error', message, context = {}, de
     (severity === 'warn' ? logger.warn : logger.error).call(logger, line, context);
   } catch (e) { /* logging must never throw */ }
 
+  /* 1b. Cola de tareas (Staff App v2): toda alerta es también una TAREA accionable,
+     no solo un correo. Best-effort e INDEPENDIENTE de ALERT_ENABLED (queremos la
+     tarea aunque el correo esté apagado). Dedup por el mismo fingerprint. */
   try {
-    if (String(process.env.ALERT_ENABLED || 'true').toLowerCase() === 'false') {
+    const fp = dedupeKey || `${kind}:${stableHash(message + '|' + JSON.stringify(context))}`;
+    await require('./_ops-queue').enqueue({ kind, severity, title: message, context, dedupeKey: fp }, deps.opsDeps || {});
+  } catch (e) { /* la cola nunca debe tumbar la alerta */ }
+
+  try {
+    /* Gestionable desde /admin (override del panel → env). Por defecto activo:
+       solo se apaga con un 'false' explícito (igual que antes). */
+    const { get } = require('./_settings');
+    if (String(await get('ALERT_ENABLED', 'true')).toLowerCase() === 'false') {
       return { alerted: false, reason: 'disabled' };
     }
 

@@ -6,7 +6,7 @@
  * si la reserva no incluye desayuno se rechaza (el upgrade en vivo es Fase 3). */
 
 const { json, corsHeaders, parseJsonBody } = require('./_guest-app');
-const { authenticateStaff } = require('./_staff-auth');
+const { authorize } = require('./_authz');
 const { resolveBreakfastStatus, pickNextGuestIndex } = require('./_breakfast');
 const { recordRedemption, SOURCE } = require('./_breakfast-store');
 
@@ -21,7 +21,7 @@ exports.handler = async event => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders(), body: '' };
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
-  const auth = await authenticateStaff(event);
+  const auth = await authorize(event, 'breakfast.redeem');
   if (!auth.ok) return json(auth.statusCode, { error: auth.error });
 
   try {

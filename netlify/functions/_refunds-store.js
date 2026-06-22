@@ -68,6 +68,8 @@ function getRefundStore() {
    caller only has the OTASync id this returns {} and the record falls back to
    MANUAL_BANK with method unknown (the admin sets it in the panel). */
 async function recoverPaymentInfo(bookingCode) {
+  const out = {};
+  /* booking-results (7-day TTL): provider / method / txId / amount. */
   try {
     const { getStore } = require('@netlify/blobs');
     const opts = { name: 'booking-results', consistency: 'strong' };
@@ -75,19 +77,35 @@ async function recoverPaymentInfo(bookingCode) {
       opts.token = process.env.BLOBS_TOKEN;
       opts.siteID = process.env.NETLIFY_SITE_ID;
     }
-    const store = getStore(opts);
-    const raw = await store.get(`direct-${bookingCode}`);
-    if (!raw) return {};
-    const r = JSON.parse(raw);
-    return {
-      paymentProvider: r.provider || null,
-      paymentMethod: r.paymentMethod || null,
-      transactionId: r.transactionId || null,
-      originalAmountCents: r.amountInCents || null
-    };
-  } catch (e) {
-    return {};
-  }
+    const raw = await getStore(opts).get(`direct-${bookingCode}`);
+    if (raw) {
+      const r = JSON.parse(raw);
+      out.paymentProvider = r.provider || null;
+      out.paymentMethod = r.paymentMethod || null;
+      out.transactionId = r.transactionId || null;
+      out.originalAmountCents = r.amountInCents || null;
+      out.ratePlan = r.ratePlan || null;
+    }
+  } catch (e) { /* ignore — fall through to durable capture */ }
+  /* payment-details (durable, ~13 mo): the fields a refund/ticket actually needs
+     — auth code, payment date, card last-4 & brand — captured at payment time.
+     Fills gaps left by the short-lived booking-results blob. */
+  try {
+    const { getPaymentDetails } = require('./_payment-details');
+    const d = await getPaymentDetails(bookingCode);
+    if (d) {
+      out.paymentProvider = out.paymentProvider || d.provider || null;
+      out.paymentMethod = out.paymentMethod || d.method || null;
+      out.transactionId = out.transactionId || d.transactionId || null;
+      out.originalAmountCents = out.originalAmountCents || d.amountInCents || null;
+      out.cardBrand = d.cardBrand || null;
+      out.cardLast4 = d.cardLast4 || null;
+      out.authCode = d.authCode || null;
+      out.paymentDate = d.paymentDate || null;
+      out.ratePlan = out.ratePlan || d.ratePlan || null;
+    }
+  } catch (e) { /* ignore — durable capture optional */ }
+  return out;
 }
 
 function nowIso() { return new Date().toISOString(); }
@@ -115,6 +133,15 @@ async function createRefundRequest({ booking, paymentInfo, clientIp, source, rea
     paymentProvider: pay.paymentProvider || null,
     paymentMethod: pay.paymentMethod || null,
     transactionId: pay.transactionId || null,
+    /* Refund/ticket data captured at payment time (Wompi card refunds are filed
+       by support ticket; these are the fields they ask for). */
+    cardBrand: pay.cardBrand || null,
+    cardLast4: pay.cardLast4 || null,
+    authCode: pay.authCode || null,
+    paymentDate: pay.paymentDate || null,
+    /* Plan tarifario (flexible=reembolsable / best=Estricta no reembolsable) para
+       que el panel muestre la política aplicable al fijar el monto. */
+    ratePlan: pay.ratePlan || null,
     route,
     originalAmountCents: pay.originalAmountCents != null ? pay.originalAmountCents
       : (booking.totalAmount ? Math.round(booking.totalAmount * 100) : null),

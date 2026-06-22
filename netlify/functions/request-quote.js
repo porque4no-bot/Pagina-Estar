@@ -1,5 +1,14 @@
 require('./_env');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
+const { nightsBetween } = require('./_quotes-store');
+
+/* Etiqueta de motivo de viaje (para enriquecer la ficha del cliente en Odoo)
+   derivada del tipo de estadía del formulario corporativo. */
+const TIPO_MOTIVO = {
+  corta: 'Estadía corta corporativa',
+  larga: 'Larga estadía corporativa',
+  rotativa: 'Estadía rotativa corporativa'
+};
 
 function esc(str) {
   return String(str || '')
@@ -197,6 +206,16 @@ exports.handler = async (event, context) => {
     return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Email inválido' }) };
   }
 
+  /* Opt-in de marketing (Ley 1581): consentimiento SEPARADO de la aceptación de
+     la política de privacidad (que es obligatoria y NO implica marketing). El
+     checkbox público canónico es `marketingOptIn`; sin marcar = NO marketing. */
+  const marketingOptIn = (() => {
+    const v = body.marketingOptIn;
+    if (v === true) return true;
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    return s !== '' && s !== 'false' && s !== 'no' && s !== 'off' && s !== '0';
+  })();
+
   const sanitized = {
     empresa: String(empresa).slice(0, 200),
     contacto: String(contacto).slice(0, 200),
@@ -206,25 +225,45 @@ exports.handler = async (event, context) => {
     fechaCheckout: String(body.fechaCheckout || '').slice(0, 20),
     numHabitaciones: parseInt(body.numHabitaciones) || 1,
     tipoEstadia: ['corta', 'larga', 'rotativa'].includes(body.tipoEstadia) ? body.tipoEstadia : 'corta',
-    comentarios: String(body.comentarios || '').slice(0, 1000)
+    comentarios: String(body.comentarios || '').slice(0, 1000),
+    marketingOptIn
   };
 
   /* Maestro de clientes (Fase 1): empresa como partner en Odoo + oportunidad
      CRM. Va ANTES del envío de email para que la sincronización NO dependa de
      RESEND (si falta la key, igual entra el cliente). No fatal — nunca bloquea
      la solicitud. Mock sin credenciales de Odoo. */
+  let leadId = null;
   try {
-    const { upsertPartner, createLead } = require('./_odoo');
+    const { upsertPartner, createLead, addToMailingList } = require('./_odoo');
+    /* Etiquetas: 'Corporativo' siempre; 'Opt-in marketing' solo con opt-in
+       explícito. La nota deja constancia del consentimiento (aceptación + fecha
+       + canal) para evidencia (Ley 1581). */
+    const tags = sanitized.marketingOptIn ? ['Corporativo', 'Opt-in marketing'] : ['Corporativo'];
+    const optInNote = sanitized.marketingOptIn
+      ? ` Opt-in marketing aceptado (empresas.html) el ${new Date().toISOString().slice(0, 10)}.`
+      : '';
     const partner = await upsertPartner({
       name: sanitized.empresa,
       email: sanitized.email,
       phone: sanitized.whatsapp,
       isCompany: true,
-      tags: ['Corporativo'],
-      comment: `Contacto: ${sanitized.contacto}. Origen: formulario corporativo (empresas.html).`
+      tags,
+      comment: `Contacto: ${sanitized.contacto}. Origen: formulario corporativo (empresas.html).${optInNote}`,
+      /* Datos de estadía para enriquecer la ficha (campos estándar, sin x_). */
+      lastCheckout: sanitized.fechaCheckout || undefined,
+      nights: nightsBetween(sanitized.fechaCheckin, sanitized.fechaCheckout) || undefined,
+      motive: TIPO_MOTIVO[sanitized.tipoEstadia]
     });
+    /* Email Marketing: SOLO con opt-in (Ley 1581). Se intenta aun en modo mock
+       (no-op) para que el flujo sea idéntico con y sin credenciales. La empresa
+       no tiene "nombre de persona" propio: usamos el contacto como nombre. */
+    if (sanitized.marketingOptIn) {
+      await addToMailingList({ email: sanitized.email, name: sanitized.contacto, listName: 'Newsletter' });
+      if (process.env.DEBUG) console.log('[request-quote] Email Marketing opt-in:', sanitized.email, '→ Newsletter');
+    }
     if (partner && partner.id) {
-      await createLead({
+      const lead = await createLead({
         subject: `Cotización corporativa — ${sanitized.empresa}`,
         partnerId: partner.id,
         contactName: sanitized.contacto,
@@ -232,6 +271,15 @@ exports.handler = async (event, context) => {
         phone: sanitized.whatsapp,
         description: `Tipo de estadía: ${sanitized.tipoEstadia}. Habitaciones: ${sanitized.numHabitaciones}. Fechas: ${sanitized.fechaCheckin || '—'} → ${sanitized.fechaCheckout || '—'}. ${sanitized.comentarios || ''}`.trim()
       });
+      /* Guardamos el leadId para correlacionar el cierre del embudo más tarde.
+         La solicitud pública NO persiste una cotización (la crea el admin en
+         create-quote), así que el cron la correlaciona por correo; aquí solo lo
+         dejamos trazado. NO se devuelve al cliente: es un id interno de CRM y
+         este endpoint es público sin autenticación. */
+      if (lead && lead.id) {
+        leadId = lead.id;
+        if (process.env.DEBUG) console.log('[request-quote] lead CRM creado:', leadId, 'para', sanitized.email);
+      }
     }
   } catch (odooErr) {
     console.error('[request-quote] Odoo (cliente/lead) no fatal:', odooErr.message);

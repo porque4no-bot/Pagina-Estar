@@ -19,19 +19,27 @@
 require('./_env');
 const { getReservationsByDate, hasOtasyncCreds } = require('./_otasync');
 const { sendEmail, preArrivalHtml, postStayHtml, formatDateES } = require('./_email');
+const { flag, get } = require('./_settings');
 
+/* Valores por defecto (de Netlify). El panel puede sobreescribirlos en runtime
+   vía `get(...)` dentro del handler — estas constantes solo dan el fallback de
+   `targetDates` cuando se llama sin días explícitos (helper sync, tests). */
 const PRE_ARRIVAL_DAYS = parseInt(process.env.STAY_EMAILS_PRE_DAYS, 10) || 2;
 const POST_DEPARTURE_LAG_DAYS = parseInt(process.env.STAY_EMAILS_POST_DAYS, 10) || 1;
 const CANCELLED = new Set(['cancelled', 'canceled', 'no_show', 'noshow']);
+
+/* Encuesta NPS post-estadía (Odoo Fase 3). Default = encuesta pública por
+   defecto; configurable con NPS_SURVEY_URL. Solo se enlaza cuando NPS_ENABLED. */
+const DEFAULT_NPS_SURVEY_URL = 'https://bpo-dici.odoo.com/survey/start/d2c5a098-72b3-4865-aad8-864341dcab8b';
 
 /* ── Pure helpers (exported for tests) ── */
 function ymd(date) {
   return date.toISOString().split('T')[0];
 }
 
-function targetDates(now = new Date()) {
-  const pre = new Date(now); pre.setUTCDate(pre.getUTCDate() + PRE_ARRIVAL_DAYS);
-  const post = new Date(now); post.setUTCDate(post.getUTCDate() - POST_DEPARTURE_LAG_DAYS);
+function targetDates(now = new Date(), preDays = PRE_ARRIVAL_DAYS, postDays = POST_DEPARTURE_LAG_DAYS) {
+  const pre = new Date(now); pre.setUTCDate(pre.getUTCDate() + preDays);
+  const post = new Date(now); post.setUTCDate(post.getUTCDate() - postDays);
   return { preDate: ymd(pre), postDate: ymd(post) };
 }
 
@@ -67,7 +75,9 @@ async function markSent(store, key) {
   try { await store.set(key, JSON.stringify({ at: new Date().toISOString() })); } catch (e) { /* non-fatal */ }
 }
 
-async function processBatch(store, reservations, type, predicate, targetDate) {
+async function processBatch(store, reservations, type, predicate, targetDate, opts = {}) {
+  const npsUrl = opts.npsUrl;
+  const send = opts.sendEmail || sendEmail; /* inyectable para tests */
   let sent = 0, checked = 0;
   for (const r of reservations) {
     if (!predicate(r, targetDate)) continue;
@@ -75,11 +85,11 @@ async function processBatch(store, reservations, type, predicate, targetDate) {
     const key = `${r.idReservations}:${type}`;
     if (await alreadySent(store, key)) continue;
     try {
-      const html = type === 'pre' ? preArrivalHtml({ resv: r, lang: r.lang }) : postStayHtml({ resv: r, lang: r.lang });
+      const html = type === 'pre' ? preArrivalHtml({ resv: r, lang: r.lang }) : postStayHtml({ resv: r, lang: r.lang, npsUrl });
       const subject = type === 'pre'
         ? (r.lang === 'en' ? `Your stay at Estar — ${formatDateES(r.dateArrival)}` : `Tu llegada a Estar — ${formatDateES(r.dateArrival)}`)
         : (r.lang === 'en' ? 'Thank you for staying with us — Estar' : 'Gracias por tu estadía — Estar');
-      await sendEmail({ to: r.email, subject, html });
+      await send({ to: r.email, subject, html });
       await markSent(store, key);
       sent++;
     } catch (e) {
@@ -90,7 +100,7 @@ async function processBatch(store, reservations, type, predicate, targetDate) {
 }
 
 exports.handler = async () => {
-  if (process.env.STAY_EMAILS_ENABLED !== 'true') {
+  if (!(await flag('STAY_EMAILS_ENABLED'))) {
     return { statusCode: 200, body: 'disabled' };
   }
   if (!hasOtasyncCreds()) {
@@ -103,7 +113,15 @@ exports.handler = async () => {
   }
 
   const store = getStayStore();
-  const { preDate, postDate } = targetDates();
+  /* Días configurables desde /admin (override del panel → env → default). */
+  const preDays = parseInt(await get('STAY_EMAILS_PRE_DAYS', PRE_ARRIVAL_DAYS), 10) || PRE_ARRIVAL_DAYS;
+  const postDays = parseInt(await get('STAY_EMAILS_POST_DAYS', POST_DEPARTURE_LAG_DAYS), 10) || POST_DEPARTURE_LAG_DAYS;
+  const { preDate, postDate } = targetDates(new Date(), preDays, postDays);
+  /* NPS post-estadía (Odoo Fase 3): si está activo, enlaza la encuesta en el
+     correo post-estadía. No afecta el gating de STAY_EMAILS_ENABLED. */
+  const npsUrl = (await flag('NPS_ENABLED'))
+    ? await get('NPS_SURVEY_URL', DEFAULT_NPS_SURVEY_URL)
+    : null;
   let pre = { sent: 0, checked: 0 };
   let post = { sent: 0, checked: 0 };
 
@@ -112,17 +130,19 @@ exports.handler = async () => {
     if (!arrivals.isMock) pre = await processBatch(store, arrivals.reservations, 'pre', eligiblePreArrival, preDate);
   } catch (e) {
     console.error('[send-stay-emails] pre-arrival batch failed:', e.message);
+    try { await require('./_alert').reportAlert({ kind: 'cron_failed', severity: 'error', message: 'El cron de correos de pre-llegada falló (no se enviaron los avisos de hoy).', context: { fase: 'pre-arrival', detail: String(e.message || '').slice(0, 200) }, dedupeKey: 'stay-emails-pre' }); } catch (_) {}
   }
 
   try {
     const departures = await getReservationsByDate({ filterBy: 'date_departure', dfrom: postDate, dto: postDate, departures: 1 });
-    if (!departures.isMock) post = await processBatch(store, departures.reservations, 'post', eligiblePostStay, postDate);
+    if (!departures.isMock) post = await processBatch(store, departures.reservations, 'post', eligiblePostStay, postDate, { npsUrl });
   } catch (e) {
     console.error('[send-stay-emails] post-stay batch failed:', e.message);
+    try { await require('./_alert').reportAlert({ kind: 'cron_failed', severity: 'error', message: 'El cron de correos de post-estadía falló (no se enviaron los avisos de hoy).', context: { fase: 'post-stay', detail: String(e.message || '').slice(0, 200) }, dedupeKey: 'stay-emails-post' }); } catch (_) {}
   }
 
   console.log(`[send-stay-emails] preDate=${preDate} sent=${pre.sent}/${pre.checked}, postDate=${postDate} sent=${post.sent}/${post.checked}`);
   return { statusCode: 200, body: JSON.stringify({ preSent: pre.sent, postSent: post.sent, preChecked: pre.checked, postChecked: post.checked }) };
 };
 
-exports._test = { ymd, targetDates, eligiblePreArrival, eligiblePostStay, processBatch, PRE_ARRIVAL_DAYS, POST_DEPARTURE_LAG_DAYS };
+exports._test = { ymd, targetDates, eligiblePreArrival, eligiblePostStay, processBatch, PRE_ARRIVAL_DAYS, POST_DEPARTURE_LAG_DAYS, DEFAULT_NPS_SURVEY_URL };

@@ -5,7 +5,7 @@
    during setup to confirm Netlify env vars + Drive sharing without uploading
    anything. */
 
-const { authenticateAdmin } = require('./_firebase-auth');
+const { authorize } = require('./_authz');
 const { probe } = require('./_google-drive');
 
 exports.handler = async (event) => {
@@ -20,7 +20,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
   if (event.httpMethod !== 'GET') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-  const auth = await authenticateAdmin(event);
+  const auth = await authorize(event, 'integrations.probe');
   if (!auth.ok) return { statusCode: auth.statusCode, headers: corsHeaders, body: JSON.stringify({ error: auth.error }) };
 
   const result = await probe();

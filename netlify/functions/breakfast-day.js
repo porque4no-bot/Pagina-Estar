@@ -13,7 +13,7 @@
  * de UNA reserva, usar el lookup (breakfast-status). */
 
 const { json, corsHeaders, parseJsonBody } = require('./_guest-app');
-const { authenticateStaff } = require('./_staff-auth');
+const { authorize } = require('./_authz');
 const { listRedemptions, todayBogota } = require('./_breakfast-store');
 
 function firstOfMonth(day) { return String(day).slice(0, 8) + '01'; }
@@ -28,7 +28,7 @@ exports.handler = async event => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders(), body: '' };
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
-  const auth = await authenticateStaff(event);
+  const auth = await authorize(event, 'breakfast.day');
   if (!auth.ok) return json(auth.statusCode, { error: auth.error });
 
   try {

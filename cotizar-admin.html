@@ -567,6 +567,80 @@
 @media (max-width: 560px) {
   .audit-diff-row { grid-template-columns: 1fr; gap: 4px; }
 }
+
+/* ── Configuración (settings) ── */
+.cfg-intro {
+  font-family: var(--font-body); font-size: 13px; line-height: 1.6;
+  color: var(--ink-500); margin: -4px 0 14px;
+}
+.cfg-group + .cfg-group { margin-top: 24px; }
+.cfg-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; padding: 14px 0; border-bottom: 1px solid var(--paper-300);
+  flex-wrap: wrap;
+}
+.cfg-row:last-child { border-bottom: none; }
+.cfg-row-label {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 240px;
+}
+.cfg-row-label .cfg-name {
+  font-family: var(--font-body); font-size: 14px; color: var(--ink); font-weight: 600;
+}
+.cfg-row-label .cfg-key {
+  font-family: var(--font-label); font-size: 10px; letter-spacing: 0.06em;
+  color: var(--ink-400); text-transform: none;
+}
+.cfg-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cfg-info {
+  background: none; border: 1px solid var(--paper-400); color: var(--ink-500); cursor: pointer;
+  width: 18px; height: 18px; min-width: 18px; border-radius: 50%; padding: 0;
+  font-family: var(--font-display, Georgia, serif); font-size: 12px; font-weight: 700; font-style: italic;
+  line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.cfg-info:hover { background: var(--olive); color: var(--white); border-color: var(--olive); }
+.cfg-desc {
+  font-family: var(--font-body); font-size: 12.5px; line-height: 1.5;
+  color: var(--ink-500); margin: 6px 0 0; max-width: 64ch;
+}
+.cfg-row-control {
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+.cfg-source {
+  display: inline-block; font-family: var(--font-label); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; padding: 3px 8px; border-radius: 100px;
+  white-space: nowrap;
+}
+.cfg-source-panel   { background: #DCE7F0; color: #2E5A82; }
+.cfg-source-netlify { background: var(--paper-300); color: var(--ink-700); }
+.cfg-source-empty   { background: #EDE6D6; color: #8A6A2E; }
+.cfg-reset {
+  background: none; border: 1px solid var(--paper-400); border-radius: 4px;
+  color: var(--ink-500); cursor: pointer; font-family: var(--font-label);
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 5px 9px; transition: all var(--dur-fast) var(--ease-out); white-space: nowrap;
+}
+.cfg-reset:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.cfg-control-input { min-width: 130px; }
+/* Switch (bool) */
+.cfg-switch { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; }
+.cfg-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.cfg-slider {
+  position: absolute; inset: 0; cursor: pointer; background: var(--paper-400);
+  border-radius: 100px; transition: background var(--dur-fast) var(--ease-out);
+}
+.cfg-slider::before {
+  content: ''; position: absolute; height: 20px; width: 20px; left: 3px; top: 3px;
+  background: var(--white); border-radius: 50%; transition: transform var(--dur-fast) var(--ease-out);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.cfg-switch input:checked + .cfg-slider { background: var(--olive); }
+.cfg-switch input:checked + .cfg-slider::before { transform: translateX(20px); }
+.cfg-switch input:disabled + .cfg-slider { opacity: 0.5; cursor: not-allowed; }
+@media (max-width: 560px) {
+  .cfg-row { align-items: flex-start; }
+  .cfg-row-control { width: 100%; justify-content: space-between; }
+}
 </style>
 </head>
 <body>
@@ -605,10 +679,42 @@
         <h1 id="pageTitle">Nueva cotización</h1>
       </div>
       <div class="admin-tabs">
-        <button type="button" class="admin-tab is-active" data-view="nueva">Nueva cotización</button>
-        <button type="button" class="admin-tab" data-view="lista">Cotizaciones</button>
-        <button type="button" class="admin-tab" data-view="reembolsos">Reembolsos</button>
-        <button type="button" class="admin-tab" data-view="desayunos">Desayunos</button>
+        <button type="button" class="admin-tab" data-view="hoy" data-perm="guests.checkin.view" style="display:none">Hoy</button>
+        <button type="button" class="admin-tab is-active" data-view="nueva" data-perm="quotes.edit">Nueva cotización</button>
+        <button type="button" class="admin-tab" data-view="lista" data-perm="quotes.view">Cotizaciones</button>
+        <button type="button" class="admin-tab" data-view="reembolsos" data-perm="refunds.view">Reembolsos</button>
+        <button type="button" class="admin-tab" data-view="desayunos" data-perm="breakfast.day">Desayunos</button>
+        <button type="button" class="admin-tab" data-view="codigos" data-perm="quotes.edit">Códigos</button>
+        <button type="button" class="admin-tab" data-view="usuarios" data-perm="users.manage" style="display:none">Usuarios</button>
+        <button type="button" class="admin-tab" data-view="config" data-perm="settings.manage" style="display:none">Configuración</button>
+      </div>
+    </div>
+
+    <!-- ══════════════ VIEW: Hoy (operación del día) ══════════════ -->
+    <div id="viewHoy" style="display:none">
+      <div class="admin-card">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:space-between;">
+          <p class="admin-card-title" style="margin:0;">Operación del día</p>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input id="hoyDate" type="date" class="it-input" style="min-width:unset; width:auto;">
+            <button type="button" id="hoyRefresh" class="btn btn-ghost-dark" style="padding:8px 14px; font-size:11px;">Actualizar</button>
+          </div>
+        </div>
+        <p id="hoyStatus" style="font-size:12px; color:var(--fg-muted); margin-top:8px;"></p>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px;">
+        <div class="admin-card"><p class="admin-card-title">Llegadas hoy · <span id="hoyArrCount">0</span></p><div id="hoyArrivals"></div></div>
+        <div class="admin-card"><p class="admin-card-title">En casa · <span id="hoyInCount">0</span></p><div id="hoyInHouse"></div></div>
+        <div class="admin-card"><p class="admin-card-title">Salidas hoy · <span id="hoyDepCount">0</span></p><div id="hoyDepartures"></div></div>
+      </div>
+      <div id="hoyRefundsCard" class="admin-card" style="display:none;">
+        <p class="admin-card-title">Reembolsos pendientes · <span id="hoyRefCount">0</span></p>
+        <div id="hoyRefunds"></div>
+      </div>
+      <div id="hoyOpsCard" class="admin-card">
+        <p class="admin-card-title">Tareas pendientes · <span id="hoyOpsCount">0</span></p>
+        <p style="font-size:12px;color:var(--fg-muted);margin:0 0 8px;">Alertas y acciones del sistema (folio sin cargar, pagos sin reserva, fallos). Resuelve aquí en vez de revisar el correo.</p>
+        <div id="hoyOps"></div>
       </div>
     </div>
 
@@ -939,6 +1045,133 @@
     <div id="viewDesayunos" style="display:none">
       <iframe id="desayunoFrame" title="Administración de desayunos" data-src="desayuno-admin.html"
         style="width:100%; height:80vh; border:1px solid var(--border); border-radius:12px; background:var(--white);"></iframe>
+    </div>
+
+    <!-- ══════════════ VIEW: Códigos de descuento ══════════════ -->
+    <div id="viewCodigos" style="display:none">
+      <div class="admin-card">
+        <p class="admin-card-title" id="cFormTitle">Nuevo código de descuento</p>
+        <p style="font-size:13px;color:var(--ink-500);margin:-4px 0 14px">Los códigos solo aplican al motor de reserva directa (Wompi). La validación de monto y descuento es 100% server-side. Recuerda bloquear temporada alta con fechas excluidas.</p>
+        <div class="field-row">
+          <div class="field"><label for="cCode">Código</label><input id="cCode" type="text" class="it-input" style="min-width:unset;text-transform:uppercase" placeholder="BIENVENIDO15"></div>
+          <div class="field"><label for="cType">Tipo</label>
+            <select id="cType" class="it-input" style="min-width:unset">
+              <option value="percent">Porcentaje (%)</option>
+              <option value="fixed">Monto fijo (COP)</option>
+            </select>
+          </div>
+          <div class="field"><label for="cValue" id="cValueLabel">Valor (%)</label><input id="cValue" type="number" class="it-input" style="min-width:unset" min="1" placeholder="15"></div>
+        </div>
+        <div class="field-row" style="margin-top:16px">
+          <div class="field"><label for="cValidFrom">Válido desde</label><input id="cValidFrom" type="date" class="it-input" style="min-width:unset"></div>
+          <div class="field"><label for="cValidTo">Válido hasta</label><input id="cValidTo" type="date" class="it-input" style="min-width:unset"></div>
+          <div class="field"><label for="cMaxUses">Uso máximo (vacío = ilimitado)</label><input id="cMaxUses" type="number" class="it-input" style="min-width:unset" min="1" placeholder=""></div>
+        </div>
+        <div class="field-row" style="margin-top:16px">
+          <div class="field"><label for="cMinNights">Estadía mínima (noches)</label><input id="cMinNights" type="number" class="it-input" style="min-width:unset" min="1" placeholder=""></div>
+          <div class="field"><label for="cDesc">Descripción interna</label><input id="cDesc" type="text" class="it-input" style="min-width:unset" placeholder="Campaña de re-consentimiento"></div>
+        </div>
+        <div style="margin-top:16px">
+          <label style="font-family:var(--font-label);font-size:12px;letter-spacing:.06em;color:var(--ink)">Habitaciones (vacío = todas)</label>
+          <div id="cRooms" style="display:flex;flex-wrap:wrap;gap:14px;margin-top:8px">
+            <label style="font-size:13px"><input type="checkbox" class="croom" value="31348"> Clásica</label>
+            <label style="font-size:13px"><input type="checkbox" class="croom" value="31349"> Selección</label>
+            <label style="font-size:13px"><input type="checkbox" class="croom" value="31350"> Reserva</label>
+            <label style="font-size:13px"><input type="checkbox" class="croom" value="31351"> Origen</label>
+            <label style="font-size:13px"><input type="checkbox" class="croom" value="31352"> Especial</label>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <label style="font-family:var(--font-label);font-size:12px;letter-spacing:.06em;color:var(--ink)">Fechas excluidas (blackout temporada alta)</label>
+          <div style="display:flex;gap:8px;align-items:flex-end;margin-top:8px;flex-wrap:wrap">
+            <div class="field"><label for="cBlackFrom" style="font-size:11px">Desde</label><input id="cBlackFrom" type="date" class="it-input" style="min-width:unset"></div>
+            <div class="field"><label for="cBlackTo" style="font-size:11px">Hasta</label><input id="cBlackTo" type="date" class="it-input" style="min-width:unset"></div>
+            <button type="button" id="cAddBlackout" class="btn btn-ghost-dark" style="padding:9px 14px;font-size:12px">Añadir rango</button>
+          </div>
+          <div id="cBlackoutList" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:22px;flex-wrap:wrap">
+          <label style="font-size:13px"><input type="checkbox" id="cActive"> Activo</label>
+          <label style="font-size:13px"><input type="checkbox" id="cOnePerEmail" checked> Un uso por email</label>
+          <label style="font-size:13px"><input type="checkbox" id="cNotCombinable" checked> No acumulable</label>
+        </div>
+        <div style="margin-top:18px;display:flex;gap:10px;align-items:center">
+          <button type="button" id="cSaveBtn" class="btn btn-primary">Guardar código</button>
+          <button type="button" id="cClearBtn" class="btn btn-ghost-dark">Limpiar</button>
+          <span id="cMsg" style="font-size:13px"></span>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">Códigos</p>
+        <table class="lista-table">
+          <thead><tr><th>Código</th><th>Descuento</th><th>Vigencia</th><th>Usos</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="codigosTbody"><tr><td colspan="6" style="text-align:center;color:var(--ink-400);padding:18px">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════════ VIEW: Usuarios y roles ══════════════ -->
+    <div id="viewUsuarios" style="display:none">
+      <div class="admin-card">
+        <p class="admin-card-title">Invitar / editar usuario</p>
+        <p style="font-size:13px;color:var(--ink-500);margin:-4px 0 14px">El usuario inicia sesión con su cuenta de Google. Los correos en <strong>ADMIN_EMAILS</strong> (Netlify) son superadministradores de respaldo y no se editan aquí.</p>
+        <div class="field-row">
+          <div class="field"><label for="uEmail">Correo (Google)</label><input id="uEmail" type="email" class="it-input" style="min-width:unset" placeholder="persona@estar.com.co"></div>
+          <div class="field"><label for="uName">Nombre</label><input id="uName" type="text" class="it-input" style="min-width:unset" placeholder="Nombre y apellido"></div>
+        </div>
+        <div style="margin-top:16px"><label style="font-family:var(--font-label);font-size:12px;letter-spacing:.06em;color:var(--ink)">Roles</label>
+          <div id="uRoles" style="display:flex;flex-wrap:wrap;gap:14px;margin-top:8px"></div>
+        </div>
+        <details style="margin-top:14px"><summary style="cursor:pointer;font-size:13px;color:var(--olive-700)">Permisos extra / denegados (avanzado)</summary>
+          <div style="margin-top:10px;font-size:12px;color:var(--ink-500)">Marca permisos adicionales por encima de los roles. (Denegar quita un permiso, salvo que venga de ADMIN_EMAILS.)</div>
+          <div id="uExtra" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin-top:10px"></div>
+        </details>
+        <div style="margin-top:18px;display:flex;gap:10px;align-items:center">
+          <button type="button" id="uSaveBtn" class="btn btn-primary">Guardar usuario</button>
+          <button type="button" id="uClearBtn" class="btn btn-ghost-dark">Limpiar</button>
+          <span id="uMsg" style="font-size:13px"></span>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">Usuarios</p>
+        <table class="lista-table"><thead><tr><th>Correo</th><th>Nombre</th><th>Roles</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="usersTbody"><tr><td colspan="5" style="text-align:center;color:var(--ink-400);padding:18px">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">Roles y permisos</p>
+        <p style="font-size:13px;color:var(--ink-500);margin:-4px 0 14px">Los roles base no se borran (puedes ajustar sus permisos). También puedes crear roles personalizados.</p>
+        <div id="rolesList"></div>
+        <details style="margin-top:16px"><summary style="cursor:pointer;font-size:13px;color:var(--olive-700)">Crear rol personalizado</summary>
+          <div class="field-row" style="margin-top:12px">
+            <div class="field"><label for="rId">ID del rol</label><input id="rId" type="text" class="it-input" style="min-width:unset" placeholder="ej. auditor"></div>
+            <div class="field"><label for="rLabel">Nombre visible</label><input id="rLabel" type="text" class="it-input" style="min-width:unset" placeholder="Auditor"></div>
+          </div>
+          <div id="rPerms" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;margin-top:12px"></div>
+          <button type="button" id="rSaveBtn" class="btn btn-primary" style="margin-top:14px">Crear / actualizar rol</button>
+          <span id="rMsg" style="font-size:13px;margin-left:10px"></span>
+        </details>
+      </div>
+    </div>
+
+    <!-- ══════════════ VIEW: Configuración ══════════════ -->
+    <div id="viewConfig" style="display:none">
+      <div class="admin-card">
+        <p class="admin-card-title">Configuración del sitio</p>
+        <p class="cfg-intro">
+          Activa o desactiva funciones sin tocar Netlify. Lo que cambies aquí
+          manda sobre las variables de Netlify y surte efecto en menos de un minuto.
+          Pulsa <strong>Volver a Netlify</strong> para borrar el ajuste del panel y
+          que vuelva a regir lo configurado en el servidor. Los secretos (tokens,
+          llaves, contraseñas) <strong>no</strong> se gestionan aquí.
+        </p>
+        <div id="cfgLoading" style="padding:32px;text-align:center;font-family:var(--font-label);font-size:12px;color:var(--ink-500);letter-spacing:0.08em;">Cargando configuración…</div>
+        <div id="cfgError" style="display:none;padding:24px;text-align:center;font-family:var(--font-label);font-size:12px;color:var(--error-700);"></div>
+        <div id="cfgGroups"></div>
+      </div>
     </div>
 
   </div>
@@ -1571,17 +1804,33 @@ document.getElementById('cancelEditBtn').addEventListener('click', function() {
 /* ════════════════ Tabs ════════════════ */
 function switchView(view) {
   document.querySelectorAll('.admin-tab').forEach(t => t.classList.toggle('is-active', t.dataset.view === view));
+  const vh = document.getElementById('viewHoy');
+  if (vh) vh.style.display = view === 'hoy' ? 'block' : 'none';
   document.getElementById('viewNueva').style.display = view === 'nueva' ? 'block' : 'none';
   document.getElementById('viewLista').style.display = view === 'lista' ? 'block' : 'none';
   document.getElementById('viewReembolsos').style.display = view === 'reembolsos' ? 'block' : 'none';
   document.getElementById('viewDesayunos').style.display = view === 'desayunos' ? 'block' : 'none';
+  const vc = document.getElementById('viewCodigos');
+  if (vc) vc.style.display = view === 'codigos' ? 'block' : 'none';
+  const vu = document.getElementById('viewUsuarios');
+  if (vu) vu.style.display = view === 'usuarios' ? 'block' : 'none';
+  const vcfg = document.getElementById('viewConfig');
+  if (vcfg) vcfg.style.display = view === 'config' ? 'block' : 'none';
   const titleEl = document.getElementById('pageTitle');
-  if (view === 'nueva') titleEl.textContent = editingQuoteId ? 'Editar cotización' : 'Nueva cotización';
+  if (view === 'hoy') titleEl.textContent = 'Operación del día';
+  else if (view === 'nueva') titleEl.textContent = editingQuoteId ? 'Editar cotización' : 'Nueva cotización';
   else if (view === 'lista') titleEl.textContent = 'Cotizaciones';
   else if (view === 'reembolsos') titleEl.textContent = 'Reembolsos';
   else if (view === 'desayunos') titleEl.textContent = 'Desayunos';
+  else if (view === 'codigos') titleEl.textContent = 'Códigos de descuento';
+  else if (view === 'usuarios') titleEl.textContent = 'Usuarios y roles';
+  else if (view === 'config') titleEl.textContent = 'Configuración';
+  if (view === 'hoy') loadHoy();
   if (view === 'lista') loadQuotesList();
   if (view === 'reembolsos') loadRefunds();
+  if (view === 'codigos') loadCodigos();
+  if (view === 'usuarios') loadIam();
+  if (view === 'config') loadSettings();
   if (view === 'desayunos') {
     /* Lazy-load the breakfast admin (embedded) only when first opened. It runs
        its own Firebase auth, which shares this session (same origin/project). */
@@ -1591,6 +1840,416 @@ function switchView(view) {
 }
 document.querySelectorAll('.admin-tab').forEach(t => {
   t.addEventListener('click', () => switchView(t.dataset.view));
+});
+
+/* ════════════════ Hoy (operación del día — Staff App v1, read-only) ════════════════ */
+function hoyEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function hoyRow(r){
+  return '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">'
+    + '<strong>'+hoyEsc(r.guestName||'—')+'</strong> · '+hoyEsc(r.roomName||'')
+    + '<br><span style="color:var(--fg-muted);font-size:12px;">'+hoyEsc(r.checkIn)+' → '+hoyEsc(r.checkOut)+' · '+(r.nights||0)+'n'
+    + (r.hasBreakfast?' · 🍳':'')+' · '+hoyEsc(r.bookingCode)+'</span></div>';
+}
+function hoyRenderList(id, list){
+  const el = document.getElementById(id);
+  el.innerHTML = (list&&list.length) ? list.map(hoyRow).join('') : '<p style="color:var(--fg-muted);font-size:12px;">Nada para hoy.</p>';
+}
+async function loadHoy(){
+  const status = document.getElementById('hoyStatus');
+  if (!status) return;
+  status.textContent = 'Cargando…';
+  try {
+    const token = await window.getAuthToken();
+    const date = document.getElementById('hoyDate').value;
+    const r = await fetch('/api/staff-today' + (date?('?date='+encodeURIComponent(date)):''), { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) { status.textContent = 'No se pudo cargar (' + r.status + ').'; return; }
+    const d = await r.json();
+    document.getElementById('hoyArrCount').textContent = d.counts.arrivals;
+    document.getElementById('hoyInCount').textContent = d.counts.inHouse;
+    document.getElementById('hoyDepCount').textContent = d.counts.departures;
+    hoyRenderList('hoyArrivals', d.arrivals);
+    hoyRenderList('hoyInHouse', d.inHouse);
+    hoyRenderList('hoyDepartures', d.departures);
+    const refCard = document.getElementById('hoyRefundsCard');
+    if (d.refunds) {
+      refCard.style.display = '';
+      document.getElementById('hoyRefCount').textContent = d.refunds.count;
+      document.getElementById('hoyRefunds').innerHTML = (d.refunds.pending&&d.refunds.pending.length)
+        ? d.refunds.pending.map(x => '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">'
+            + hoyEsc(x.bookingCode)+' · '+hoyEsc(x.guestName||'')+' · <span style="color:var(--fg-muted);">'+hoyEsc(x.status)
+            + (x.reservationCanceled?' · ✓ cancelada en OTASync':'')+'</span></div>').join('')
+        : '<p style="color:var(--fg-muted);font-size:12px;">Sin pendientes.</p>';
+    } else {
+      refCard.style.display = 'none';
+    }
+    status.textContent = d.isMock ? 'Modo demo (sin credenciales OTASync).' : ('Actualizado · ' + d.date);
+  } catch(e) {
+    status.textContent = 'Error al cargar.';
+  }
+  loadOps();
+}
+
+/* ── Cola de tareas (Staff App v2) ── */
+function opsRow(it){
+  const ctx = it.context || {};
+  const sev = it.severity === 'critical' ? '🔴' : (it.severity === 'warn' ? '🟡' : '🟠');
+  const when = String(it.createdAt||'').slice(0,16).replace('T',' ');
+  let actions = '<button type="button" class="btn btn-ghost-dark hoy-op-resolve" data-id="'+hoyEsc(it.id)+'" style="padding:5px 10px;font-size:11px;">Resolver</button>';
+  if (it.kind === 'folio_post_failed' && ctx.eventId) {
+    actions = '<button type="button" class="btn btn-ghost-dark hoy-op-retry" data-event="'+hoyEsc(ctx.eventId)+'" data-id="'+hoyEsc(it.id)+'" style="padding:5px 10px;font-size:11px;margin-right:6px;">Reintentar folio</button>' + actions;
+  }
+  const detail = ctx.bookingCode ? (' · reserva '+hoyEsc(ctx.bookingCode)) : '';
+  return '<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">'
+    + '<div><strong>'+sev+' '+hoyEsc(it.kind)+'</strong>'+detail
+    + '<br><span style="color:var(--fg-muted);font-size:12px;">'+hoyEsc(it.title||'')+' · '+when+'</span></div>'
+    + '<div style="white-space:nowrap;">'+actions+'</div></div>';
+}
+async function loadOps(){
+  const el = document.getElementById('hoyOps');
+  if (!el) return;
+  try {
+    const token = await window.getAuthToken();
+    const r = await fetch('/api/staff-ops', { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) { el.innerHTML = '<p style="color:var(--fg-muted);font-size:12px;">No se pudo cargar ('+r.status+').</p>'; return; }
+    const d = await r.json();
+    document.getElementById('hoyOpsCount').textContent = d.count || 0;
+    el.innerHTML = (d.items && d.items.length) ? d.items.map(opsRow).join('') : '<p style="color:var(--fg-muted);font-size:12px;">Sin tareas pendientes. 🎉</p>';
+  } catch(e) {
+    el.innerHTML = '<p style="color:var(--fg-muted);font-size:12px;">Error al cargar tareas.</p>';
+  }
+}
+async function opsAction(payload){
+  const token = await window.getAuthToken();
+  const r = await fetch('/api/staff-ops', { method:'POST', headers: { Authorization:'Bearer '+token, 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
+  return { ok: r.ok, data: await r.json().catch(()=>({})) };
+}
+(function initHoy(){
+  const dateEl = document.getElementById('hoyDate');
+  if (dateEl && !dateEl.value) { try { dateEl.value = new Date(Date.now()-5*3600*1000).toISOString().slice(0,10); } catch(e){} }
+  const rb = document.getElementById('hoyRefresh');
+  if (rb) rb.addEventListener('click', loadHoy);
+  if (dateEl) dateEl.addEventListener('change', loadHoy);
+  const ops = document.getElementById('hoyOps');
+  if (ops) ops.addEventListener('click', async (ev) => {
+    const resolveBtn = ev.target.closest('.hoy-op-resolve');
+    const retryBtn = ev.target.closest('.hoy-op-retry');
+    if (resolveBtn) {
+      resolveBtn.disabled = true;
+      await opsAction({ action:'resolve', id: resolveBtn.dataset.id });
+      loadOps();
+    } else if (retryBtn) {
+      retryBtn.disabled = true; retryBtn.textContent = 'Reintentando…';
+      const res = await opsAction({ action:'retry-folio', eventId: retryBtn.dataset.event });
+      if (!(res.ok && (res.data.posted || res.data.ok))) {
+        retryBtn.disabled = false; retryBtn.textContent = 'Reintentar folio';
+        alert('No se pudo cargar al folio: ' + (res.data.reason || 'error') + '. Intenta de nuevo o cárgalo manual en Kunas.');
+      }
+      loadOps();
+    }
+  });
+})();
+
+/* ════════════════ Usuarios y roles (IAM) ════════════════ */
+window.MY = { perms: [], roles: [], isEnvAdmin: false };
+let IAM_USERS = [], IAM_ROLES = { builtins: {}, custom: [], catalog: [] };
+function hasPerm(p) { return window.MY.isEnvAdmin || window.MY.perms.includes(p); }
+
+/* Llamado por showAdmin (módulo Firebase) tras iniciar sesión. */
+window.afterLogin = async function () {
+  try {
+    const token = await window.getAuthToken();
+    const r = await fetch('/api/whoami', { headers: { Authorization: 'Bearer ' + token } });
+    if (r.ok) {
+      const d = await r.json();
+      window.MY = { perms: d.permissions || [], roles: d.roles || [], isEnvAdmin: !!d.isEnvAdmin };
+    }
+  } catch (e) { /* sin permisos extra: solo lo que den las env vars */ }
+  applyGating();
+};
+
+function applyGating() {
+  let firstVisible = null;
+  document.querySelectorAll('.admin-tab').forEach(t => {
+    const need = t.dataset.perm;
+    const ok = !need || hasPerm(need);
+    t.style.display = ok ? '' : 'none';
+    if (ok && !firstVisible) firstVisible = t.dataset.view;
+  });
+  const active = document.querySelector('.admin-tab.is-active');
+  if ((!active || active.style.display === 'none') && firstVisible) switchView(firstVisible);
+}
+
+async function apiIam(action, payload) {
+  const token = await window.getAuthToken();
+  const r = await fetch('/api/iam-admin', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify(Object.assign({ action }, payload || {}))
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || ('Error ' + r.status));
+  return d;
+}
+
+async function loadIam() { await loadRolesIam(); await loadUsersIam(); }
+
+/* ════════════════ Códigos de descuento (Frente A) ════════════════ */
+let COD_BLACKOUTS = [];
+
+async function apiCodigos(action, payload) {
+  const token = await window.getAuthToken();
+  const r = await fetch('/api/admin-discount-codes', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify(Object.assign({ action }, payload || {}))
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || ('Error ' + r.status));
+  return d;
+}
+
+function codValueLabelSync() {
+  const t = document.getElementById('cType').value;
+  document.getElementById('cValueLabel').textContent = t === 'fixed' ? 'Valor (COP)' : 'Valor (%)';
+}
+
+function renderBlackouts() {
+  const wrap = document.getElementById('cBlackoutList');
+  if (!wrap) return;
+  wrap.innerHTML = COD_BLACKOUTS.map((b, i) =>
+    '<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;background:var(--terracotta-100);border:1px solid var(--terracotta-300);font-size:12px">' +
+    escHtml(b.from) + (b.to && b.to !== b.from ? ' → ' + escHtml(b.to) : '') +
+    ' <button type="button" data-i="' + i + '" class="cBlackDel" style="border:0;background:none;cursor:pointer;color:var(--terracotta-700);font-size:14px;line-height:1">×</button></span>'
+  ).join('') || '<span style="font-size:12px;color:var(--ink-400)">Sin fechas excluidas.</span>';
+  wrap.querySelectorAll('.cBlackDel').forEach(b => b.addEventListener('click', () => {
+    COD_BLACKOUTS.splice(parseInt(b.dataset.i, 10), 1); renderBlackouts();
+  }));
+}
+
+function codFmtDiscount(c) {
+  return c.type === 'fixed' ? ('$' + Number(c.value).toLocaleString('es-CO')) : (c.value + '%');
+}
+function codFmtVigencia(c) {
+  const f = c.validFrom ? fmtShortDate(c.validFrom) : '—';
+  const t = c.validTo ? fmtShortDate(c.validTo) : '∞';
+  return f + ' → ' + t;
+}
+
+function clearCodForm() {
+  document.getElementById('cCode').value = '';
+  document.getElementById('cCode').disabled = false;
+  document.getElementById('cType').value = 'percent';
+  document.getElementById('cValue').value = '';
+  document.getElementById('cValidFrom').value = '';
+  document.getElementById('cValidTo').value = '';
+  document.getElementById('cMaxUses').value = '';
+  document.getElementById('cMinNights').value = '';
+  document.getElementById('cDesc').value = '';
+  document.querySelectorAll('.croom').forEach(c => { c.checked = false; });
+  document.getElementById('cActive').checked = false;
+  document.getElementById('cOnePerEmail').checked = true;
+  document.getElementById('cNotCombinable').checked = true;
+  COD_BLACKOUTS = []; renderBlackouts();
+  document.getElementById('cFormTitle').textContent = 'Nuevo código de descuento';
+  document.getElementById('cMsg').textContent = '';
+  codValueLabelSync();
+}
+
+function fillCodForm(c) {
+  document.getElementById('cCode').value = c.code || '';
+  document.getElementById('cCode').disabled = true; /* el código es la clave: no se renombra */
+  document.getElementById('cType').value = c.type || 'percent';
+  document.getElementById('cValue').value = c.value || '';
+  document.getElementById('cValidFrom').value = c.validFrom || '';
+  document.getElementById('cValidTo').value = c.validTo || '';
+  document.getElementById('cMaxUses').value = c.maxUses || '';
+  document.getElementById('cMinNights').value = c.minNights || '';
+  document.getElementById('cDesc').value = c.description || '';
+  const rooms = (c.roomTypeIds || []).map(String);
+  document.querySelectorAll('.croom').forEach(cb => { cb.checked = rooms.includes(cb.value); });
+  document.getElementById('cActive').checked = !!c.active;
+  document.getElementById('cOnePerEmail').checked = c.onePerEmail !== false;
+  document.getElementById('cNotCombinable').checked = c.notCombinable !== false;
+  COD_BLACKOUTS = (c.blackoutDates || []).map(b => typeof b === 'string' ? { from: b, to: b } : { from: b.from, to: b.to || b.from });
+  renderBlackouts();
+  document.getElementById('cFormTitle').textContent = 'Editar código ' + (c.code || '');
+  document.getElementById('cMsg').textContent = '';
+  codValueLabelSync();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function loadCodigos() {
+  const tb = document.getElementById('codigosTbody');
+  tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--ink-400);padding:18px">Cargando…</td></tr>';
+  let codes;
+  try { codes = (await apiCodigos('list')).codes || []; }
+  catch (e) { tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--terracotta-700);padding:18px">' + escHtml(e.message) + '</td></tr>'; return; }
+  if (!codes.length) { tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--ink-400);padding:18px">Aún no hay códigos.</td></tr>'; return; }
+  tb.innerHTML = codes.map(c =>
+    '<tr><td><strong>' + escHtml(c.code) + '</strong></td>' +
+    '<td>' + escHtml(codFmtDiscount(c)) + '</td>' +
+    '<td>' + escHtml(codFmtVigencia(c)) + '</td>' +
+    '<td>' + (c.usedCount || 0) + (c.maxUses ? ' / ' + c.maxUses : '') + '</td>' +
+    '<td>' + (c.active ? '<span class="badge">activo</span>' : '<span style="color:var(--ink-400)">inactivo</span>') + '</td>' +
+    '<td style="white-space:nowrap">' +
+      '<button type="button" class="btn btn-ghost-dark cEdit" data-code="' + escHtml(c.code) + '" style="padding:6px 10px;font-size:12px">Editar</button> ' +
+      '<button type="button" class="btn btn-ghost-dark cToggle" data-code="' + escHtml(c.code) + '" data-active="' + (c.active ? '1' : '0') + '" style="padding:6px 10px;font-size:12px">' + (c.active ? 'Desactivar' : 'Activar') + '</button>' +
+    '</td></tr>'
+  ).join('');
+  tb.querySelectorAll('.cEdit').forEach(b => b.addEventListener('click', async () => {
+    try { const d = await apiCodigos('get', { code: b.dataset.code }); fillCodForm(d.code); }
+    catch (e) { showToast(e.message); }
+  }));
+  tb.querySelectorAll('.cToggle').forEach(b => b.addEventListener('click', async () => {
+    try {
+      await apiCodigos(b.dataset.active === '1' ? 'deactivate' : 'activate', { code: b.dataset.code });
+      await loadCodigos();
+    } catch (e) { showToast(e.message); }
+  }));
+}
+
+function wireCodigos() {
+  const typeSel = document.getElementById('cType');
+  if (typeSel) typeSel.addEventListener('change', codValueLabelSync);
+  const addBlk = document.getElementById('cAddBlackout');
+  if (addBlk) addBlk.addEventListener('click', () => {
+    const from = document.getElementById('cBlackFrom').value;
+    const to = document.getElementById('cBlackTo').value || from;
+    if (!from) { showToast('Elige una fecha de inicio.'); return; }
+    if (to < from) { showToast('La fecha final no puede ser anterior.'); return; }
+    COD_BLACKOUTS.push({ from, to });
+    document.getElementById('cBlackFrom').value = '';
+    document.getElementById('cBlackTo').value = '';
+    renderBlackouts();
+  });
+  const clearBtn = document.getElementById('cClearBtn');
+  if (clearBtn) clearBtn.addEventListener('click', clearCodForm);
+  const saveBtn = document.getElementById('cSaveBtn');
+  if (saveBtn) saveBtn.addEventListener('click', saveCodigo);
+}
+
+async function saveCodigo() {
+  const msg = document.getElementById('cMsg');
+  msg.style.color = 'var(--terracotta-700)';
+  const code = document.getElementById('cCode').value.trim().toUpperCase();
+  if (!code) { msg.textContent = 'El código es obligatorio.'; return; }
+  const payload = {
+    code,
+    type: document.getElementById('cType').value,
+    value: parseFloat(document.getElementById('cValue').value),
+    validFrom: document.getElementById('cValidFrom').value || null,
+    validTo: document.getElementById('cValidTo').value || null,
+    maxUses: document.getElementById('cMaxUses').value || null,
+    minNights: document.getElementById('cMinNights').value || null,
+    roomTypeIds: [...document.querySelectorAll('.croom:checked')].map(c => c.value),
+    blackoutDates: COD_BLACKOUTS.slice(),
+    active: document.getElementById('cActive').checked,
+    onePerEmail: document.getElementById('cOnePerEmail').checked,
+    notCombinable: document.getElementById('cNotCombinable').checked,
+    description: document.getElementById('cDesc').value.trim()
+  };
+  /* update si el campo código está deshabilitado (edición), si no create. */
+  const editing = document.getElementById('cCode').disabled;
+  try {
+    await apiCodigos(editing ? 'update' : 'create', payload);
+    msg.style.color = 'var(--olive-700)';
+    msg.textContent = 'Guardado.';
+    await loadCodigos();
+    if (!editing) clearCodForm();
+  } catch (e) { msg.textContent = e.message; }
+}
+
+wireCodigos();
+
+function allRoleDefs() {
+  const out = [];
+  Object.keys(IAM_ROLES.builtins).forEach(id => out.push({ id, permissions: IAM_ROLES.builtins[id], builtin: true }));
+  (IAM_ROLES.custom || []).forEach(r => { if (!IAM_ROLES.builtins[r.id]) out.push({ id: r.id, label: r.label, permissions: r.permissions || [], builtin: false }); });
+  return out;
+}
+function permCheckbox(perm, cls) {
+  return '<label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" class="' + cls + '" value="' + escHtml(perm) + '"> ' + escHtml(perm) + '</label>';
+}
+async function loadRolesIam() {
+  try {
+    const d = await apiIam('list-roles');
+    IAM_ROLES = { builtins: d.builtins || {}, custom: d.custom || [], catalog: d.catalog || [] };
+  } catch (e) { document.getElementById('rolesList').textContent = e.message; return; }
+  document.getElementById('rolesList').innerHTML = allRoleDefs().map(r =>
+    '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px"><strong>' + escHtml(r.id) + '</strong>' +
+    (r.builtin ? ' <span style="font-size:11px;color:var(--ink-400)">(base)</span>' : '') +
+    '<div style="font-size:12px;color:var(--ink-500);margin-top:4px">' + (r.permissions || []).join(', ') + '</div></div>'
+  ).join('');
+  document.getElementById('rPerms').innerHTML = IAM_ROLES.catalog.map(p => permCheckbox(p, 'rperm')).join('');
+  document.getElementById('uRoles').innerHTML = allRoleDefs().map(r =>
+    '<label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" class="urole" value="' + escHtml(r.id) + '"> ' + escHtml(r.label && r.label.es ? r.label.es : r.id) + '</label>'
+  ).join('');
+  document.getElementById('uExtra').innerHTML = IAM_ROLES.catalog.map(p => permCheckbox(p, 'uextra')).join('');
+}
+async function loadUsersIam() {
+  const tb = document.getElementById('usersTbody');
+  try {
+    const d = await apiIam('list-users');
+    IAM_USERS = d.users || [];
+    let rows = (d.envAdmins || []).map(e =>
+      '<tr><td>' + escHtml(e) + '</td><td>—</td><td><span class="badge">superadmin (env)</span></td><td>activo</td><td><span style="color:var(--ink-400);font-size:12px">no editable</span></td></tr>'
+    ).join('');
+    rows += IAM_USERS.map(u =>
+      '<tr><td>' + escHtml(u.email) + '</td><td>' + escHtml(u.name || '') + '</td><td>' + (u.roles || []).join(', ') + '</td>' +
+      '<td>' + (u.status === 'suspended' ? '<span style="color:var(--terracotta-700)">suspendido</span>' : 'activo') + '</td>' +
+      '<td><button class="btn btn-ghost-dark iam-act" data-act="edit" data-email="' + escHtml(u.email) + '" style="padding:5px 10px;font-size:11px">Editar</button> ' +
+      '<button class="btn btn-ghost-dark iam-act" data-act="' + (u.status === 'suspended' ? 'reactivate' : 'suspend') + '" data-email="' + escHtml(u.email) + '" style="padding:5px 10px;font-size:11px">' + (u.status === 'suspended' ? 'Reactivar' : 'Suspender') + '</button> ' +
+      '<button class="btn btn-ghost-dark iam-act" data-act="delete" data-email="' + escHtml(u.email) + '" style="padding:5px 10px;font-size:11px">Eliminar</button></td></tr>'
+    ).join('');
+    tb.innerHTML = rows || '<tr><td colspan="5" style="text-align:center;color:var(--ink-400);padding:18px">Sin usuarios. Los de ADMIN_EMAILS entran por respaldo.</td></tr>';
+  } catch (e) { tb.innerHTML = '<tr><td colspan="5" style="color:var(--terracotta-700);padding:14px">' + escHtml(e.message) + '</td></tr>'; }
+}
+/* Delegación de acciones de la tabla. */
+document.getElementById('usersTbody').addEventListener('click', async function (ev) {
+  const btn = ev.target.closest('.iam-act'); if (!btn) return;
+  const email = btn.dataset.email, act = btn.dataset.act;
+  if (act === 'edit') {
+    const u = IAM_USERS.find(x => x.email === email); if (!u) return;
+    document.getElementById('uEmail').value = u.email;
+    document.getElementById('uName').value = u.name || '';
+    document.querySelectorAll('.urole').forEach(c => { c.checked = (u.roles || []).includes(c.value); });
+    document.querySelectorAll('.uextra').forEach(c => { c.checked = (u.extraPermissions || []).includes(c.value); });
+    document.getElementById('uMsg').textContent = 'Editando ' + email; document.getElementById('uMsg').style.color = 'var(--ink-500)';
+    window.scrollTo({ top: 0, behavior: 'smooth' }); return;
+  }
+  if (act === 'delete' && !confirm('¿Eliminar el acceso de ' + email + '?')) return;
+  try {
+    if (act === 'suspend') await apiIam('suspend-user', { email });
+    else if (act === 'delete') await apiIam('delete-user', { email });
+    else if (act === 'reactivate') { const u = IAM_USERS.find(x => x.email === email) || {}; await apiIam('upsert-user', { email, name: u.name, roles: u.roles || [], extraPermissions: u.extraPermissions || [], deniedPermissions: u.deniedPermissions || [], status: 'active' }); }
+    await loadUsersIam();
+  } catch (e) { alert(e.message); }
+});
+document.getElementById('uSaveBtn').addEventListener('click', async function () {
+  const email = document.getElementById('uEmail').value.trim();
+  const msg = document.getElementById('uMsg');
+  if (!email) { msg.textContent = 'Falta el correo'; msg.style.color = 'var(--terracotta-700)'; return; }
+  const roles = [...document.querySelectorAll('.urole:checked')].map(c => c.value);
+  const extraPermissions = [...document.querySelectorAll('.uextra:checked')].map(c => c.value);
+  try {
+    await apiIam('upsert-user', { email, name: document.getElementById('uName').value.trim(), roles, extraPermissions });
+    msg.textContent = 'Guardado ✓'; msg.style.color = 'var(--olive-700)';
+    await loadUsersIam();
+  } catch (e) { msg.textContent = e.message; msg.style.color = 'var(--terracotta-700)'; }
+});
+document.getElementById('uClearBtn').addEventListener('click', function () {
+  document.getElementById('uEmail').value = ''; document.getElementById('uName').value = '';
+  document.querySelectorAll('.urole,.uextra').forEach(c => { c.checked = false; });
+  document.getElementById('uMsg').textContent = '';
+});
+document.getElementById('rSaveBtn').addEventListener('click', async function () {
+  const id = document.getElementById('rId').value.trim();
+  const rmsg = document.getElementById('rMsg');
+  if (!id) { rmsg.textContent = 'Falta el ID'; rmsg.style.color = 'var(--terracotta-700)'; return; }
+  const permissions = [...document.querySelectorAll('.rperm:checked')].map(c => c.value);
+  try {
+    await apiIam('upsert-role', { id, label: { es: document.getElementById('rLabel').value.trim() || id, en: document.getElementById('rLabel').value.trim() || id }, permissions });
+    rmsg.textContent = 'Rol guardado ✓'; rmsg.style.color = 'var(--olive-700)';
+    await loadRolesIam();
+  } catch (e) { rmsg.textContent = e.message; rmsg.style.color = 'var(--terracotta-700)'; }
 });
 
 /* ════════════════ Quote list ════════════════ */
@@ -2204,6 +2863,7 @@ function openRefund(code) {
     <dt>Estadía</dt><dd>${stay}</dd>
     <dt>Pagado</dt><dd>${fmtCents(r.originalAmountCents)}</dd>
     <dt>Medio de pago</dt><dd>${escHtml(r.paymentProvider || '—')}${r.paymentMethod ? ' · ' + escHtml(r.paymentMethod) : ''}</dd>
+    ${r.ratePlan ? `<dt>Plan</dt><dd>${r.ratePlan === 'flexible' ? 'Flexible <span style="color:var(--olive)">(reembolsable)</span>' : 'Estricta <span style="color:var(--terracotta)">(no reembolsable)</span>'}</dd>` : ''}
     <dt>Ruta</dt><dd>${escHtml(REFUND_ROUTE_LABEL[r.route] || r.route || '—')}</dd>
     <dt>Motivo</dt><dd>${escHtml(r.refundReason || '—')}</dd>
     ${r.refundAmountCents != null ? `<dt>Reembolso</dt><dd><strong>${fmtCents(r.refundAmountCents)}</strong></dd>` : ''}
@@ -2225,6 +2885,18 @@ function openRefund(code) {
       <dt>Titular</dt><dd>${escHtml(b.holderName || '—')}</dd>
       <dt>Documento</dt><dd>${escHtml(b.docType || '')} ${escHtml(b.docNumber || '')}</dd>
     </dl></div>`;
+  }
+
+  /* Datos del pago capturados al cobrar (lo que pide soporte Wompi para revertir una tarjeta). */
+  let payBlock = '';
+  if (r.transactionId || r.cardLast4 || r.authCode || r.paymentDate) {
+    payBlock = `<div class="rf-section"><h4>Datos del pago (para el reembolso)</h4><dl class="rf-grid">
+      ${r.transactionId ? `<dt>ID transacción</dt><dd style="word-break:break-all">${escHtml(r.transactionId)}</dd>` : ''}
+      ${(r.cardBrand || r.cardLast4) ? `<dt>Tarjeta</dt><dd>${escHtml(r.cardBrand || '')}${r.cardLast4 ? ' ····' + escHtml(r.cardLast4) : ''}</dd>` : ''}
+      ${r.authCode ? `<dt>Cód. autorización</dt><dd>${escHtml(r.authCode)}</dd>` : ''}
+      ${r.paymentDate ? `<dt>Fecha del pago</dt><dd>${escHtml(r.paymentDate)}</dd>` : ''}
+      <dt>Valor</dt><dd>${fmtCents(r.originalAmountCents)}</dd>
+    </dl><div class="rf-note">Datos que pide el soporte de Wompi para revertir una tarjeta (capturados al momento del pago).</div></div>`;
   }
 
   const taField = '<div class="field" style="margin-top:12px"><label for="rfNotes">Nota interna</label><textarea id="rfNotes" class="it-input" rows="2" style="min-width:unset; width:100%; resize:vertical; font-family:var(--font-body)"></textarea></div>';
@@ -2258,7 +2930,7 @@ function openRefund(code) {
     log.map(e => `<li><div class="rf-ts">${fmtDateTime(e.ts)} · ${escHtml(e.actor || 'sistema')}</div>${escHtml(e.notes || '')}${e.oldStatus ? ` <span style="color:var(--ink-500)">(${escHtml(REFUND_STATUS_LABEL[e.oldStatus] || e.oldStatus)} → ${escHtml(REFUND_STATUS_LABEL[e.newStatus] || e.newStatus)})</span>` : ''}</li>`).join('') || '<li>Sin movimientos.</li>'
   }</ul></div>`;
 
-  body.innerHTML = info + howto + bankBlock + actions + timeline;
+  body.innerHTML = info + payBlock + howto + bankBlock + actions + timeline;
   rfOpen();
 
   const approve = document.getElementById('rfApproveBtn');
@@ -2302,6 +2974,179 @@ async function refundAction(code, action, extra) {
     alert('✗ ' + err.message);
   }
 }
+
+/* ════════════════ Configuración (settings) ════════════════ */
+let SETTINGS_CACHE = {};
+let _settingsBusy = false;
+
+/* Etiquetas amistosas para el origen del valor efectivo. */
+const CFG_SOURCE_LABEL = { panel: 'Panel', netlify: 'Netlify', 'sin definir': 'Sin definir' };
+const CFG_SOURCE_CLASS = { panel: 'cfg-source-panel', netlify: 'cfg-source-netlify', 'sin definir': 'cfg-source-empty' };
+
+async function loadSettings() {
+  const loading = document.getElementById('cfgLoading');
+  const errEl = document.getElementById('cfgError');
+  const groupsEl = document.getElementById('cfgGroups');
+  if (loading) loading.style.display = '';
+  if (errEl) errEl.style.display = 'none';
+  if (groupsEl) groupsEl.innerHTML = '';
+  try {
+    const token = await window.getAuthToken();
+    const res = await fetch('/api/admin-settings', { headers: { Authorization: 'Bearer ' + token } });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || ('Error ' + res.status));
+    SETTINGS_CACHE = json.settings || {};
+    if (loading) loading.style.display = 'none';
+    renderSettings();
+  } catch (err) {
+    if (loading) loading.style.display = 'none';
+    if (errEl) { errEl.textContent = '✗ ' + err.message; errEl.style.display = ''; }
+  }
+}
+
+function renderSettings() {
+  const groupsEl = document.getElementById('cfgGroups');
+  if (!groupsEl) return;
+  const keys = Object.keys(SETTINGS_CACHE);
+  if (!keys.length) {
+    groupsEl.innerHTML = '<p style="font-family:var(--font-body);font-size:14px;color:var(--ink-500);padding:16px 0;">No hay opciones gestionables.</p>';
+    return;
+  }
+  /* Agrupa por meta.group, preservando el orden de aparición. */
+  const groups = [];
+  const byGroup = {};
+  keys.forEach(key => {
+    const item = SETTINGS_CACHE[key] || {};
+    const meta = item.meta || {};
+    const g = meta.group || 'Otros';
+    if (!byGroup[g]) { byGroup[g] = []; groups.push(g); }
+    byGroup[g].push(key);
+  });
+  groupsEl.innerHTML = groups.map(g =>
+    '<div class="cfg-group">' +
+      '<p class="admin-card-title">' + escHtml(g) + '</p>' +
+      byGroup[g].map(renderSettingRow).join('') +
+    '</div>'
+  ).join('');
+}
+
+function renderSettingRow(key) {
+  const item = SETTINGS_CACHE[key] || {};
+  const meta = item.meta || {};
+  const type = meta.type || 'text';
+  const value = item.value == null ? '' : String(item.value);
+  const source = item.source || 'sin definir';
+  const srcCls = CFG_SOURCE_CLASS[source] || 'cfg-source-empty';
+  const srcLabel = CFG_SOURCE_LABEL[source] || source;
+
+  let control;
+  if (type === 'bool') {
+    const checked = value.toLowerCase() === 'true' ? ' checked' : '';
+    control = '<label class="cfg-switch"><input type="checkbox" data-cfg-key="' + escHtml(key) + '" data-cfg-type="bool"' + checked + '><span class="cfg-slider"></span></label>';
+  } else if (type === 'enum') {
+    const opts = (meta.options || []).map(o =>
+      '<option value="' + escHtml(o) + '"' + (String(o) === value ? ' selected' : '') + '>' + escHtml(o) + '</option>'
+    ).join('');
+    control = '<select class="it-select cfg-control-input" data-cfg-key="' + escHtml(key) + '" data-cfg-type="enum">' + opts + '</select>';
+  } else if (type === 'number') {
+    control = '<input type="number" class="it-input cfg-control-input" data-cfg-key="' + escHtml(key) + '" data-cfg-type="number" value="' + escHtml(value) + '">';
+  } else {
+    control = '<input type="text" class="it-input cfg-control-input" data-cfg-key="' + escHtml(key) + '" data-cfg-type="text" value="' + escHtml(value) + '">';
+  }
+
+  /* "Volver a Netlify" solo tiene sentido si hay override del panel. */
+  const resetBtn = source === 'panel'
+    ? '<button type="button" class="cfg-reset" data-cfg-reset="' + escHtml(key) + '">Volver a Netlify</button>'
+    : '';
+
+  const infoBtn = meta.desc
+    ? '<button type="button" class="cfg-info" data-cfg-info="' + escHtml(key) + '" aria-label="Qué hace este ajuste" aria-expanded="false">i</button>'
+    : '';
+  const descEl = meta.desc
+    ? '<p class="cfg-desc" data-cfg-desc="' + escHtml(key) + '" hidden>' + escHtml(meta.desc) + '</p>'
+    : '';
+
+  return '<div class="cfg-row">' +
+    '<div class="cfg-row-label">' +
+      '<span class="cfg-name-row"><span class="cfg-name">' + escHtml(meta.label || key) + '</span>' + infoBtn + '</span>' +
+      '<span class="cfg-key">' + escHtml(key) + '</span>' +
+      descEl +
+    '</div>' +
+    '<div class="cfg-row-control">' +
+      '<span class="cfg-source ' + srcCls + '" title="Origen del valor actual">' + escHtml(srcLabel) + '</span>' +
+      resetBtn +
+      control +
+    '</div>' +
+  '</div>';
+}
+
+async function saveSetting(key, value) {
+  if (_settingsBusy) return;
+  _settingsBusy = true;
+  try {
+    const token = await window.getAuthToken();
+    const res = await fetch('/api/admin-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ key, value })
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || ('Error ' + res.status));
+    SETTINGS_CACHE = json.settings || SETTINGS_CACHE;
+    showToast('Configuración guardada ✓');
+    renderSettings();
+  } catch (err) {
+    showToast('✗ ' + err.message);
+    renderSettings(); /* revierte el control al estado previo del cache */
+  } finally {
+    _settingsBusy = false;
+  }
+}
+
+/* Delegación (sin onclick inline por la CSP). */
+(function wireSettings() {
+  const groupsEl = document.getElementById('cfgGroups');
+  if (!groupsEl) return;
+  /* Cambios en interruptores y selects. */
+  groupsEl.addEventListener('change', function (e) {
+    const ctrl = e.target.closest('[data-cfg-key]');
+    if (!ctrl) return;
+    const key = ctrl.dataset.cfgKey;
+    const type = ctrl.dataset.cfgType;
+    let value;
+    if (type === 'bool') value = ctrl.checked ? 'true' : 'false';
+    else value = ctrl.value;
+    saveSetting(key, value);
+  });
+  /* Inputs de texto/número: guardar al perder foco. */
+  groupsEl.addEventListener('blur', function (e) {
+    const ctrl = e.target.closest('input[data-cfg-key]');
+    if (!ctrl) return;
+    const type = ctrl.dataset.cfgType;
+    if (type !== 'number' && type !== 'text') return;
+    const key = ctrl.dataset.cfgKey;
+    const item = SETTINGS_CACHE[key] || {};
+    const prev = item.value == null ? '' : String(item.value);
+    if (String(ctrl.value) === prev) return; /* sin cambios reales */
+    saveSetting(key, ctrl.value);
+  }, true);
+  /* Click: botón ℹ (muestra/oculta la descripción) o "Volver a Netlify". */
+  groupsEl.addEventListener('click', function (e) {
+    const info = e.target.closest('[data-cfg-info]');
+    if (info) {
+      const desc = groupsEl.querySelector('[data-cfg-desc="' + info.dataset.cfgInfo + '"]');
+      if (desc) {
+        const show = desc.hidden;
+        desc.hidden = !show;
+        info.setAttribute('aria-expanded', show ? 'true' : 'false');
+      }
+      return;
+    }
+    const btn = e.target.closest('[data-cfg-reset]');
+    if (!btn) return;
+    saveSetting(btn.dataset.cfgReset, '');
+  });
+})();
 
 /* ── Init ── */
 document.getElementById('qValidaHasta').value = defaultValidity();
@@ -2352,6 +3197,8 @@ function showAdmin(user) {
   $('adminContent').style.display = 'block';
   $('logoutBtn').style.display = 'inline-flex';
   $('userEmailDisplay').textContent = user.email || '';
+  /* Carga permisos efectivos y ajusta qué pestañas se ven según el rol. */
+  if (window.afterLogin) window.afterLogin(user);
 }
 
 function showLogin(message) {

@@ -1,5 +1,5 @@
 require('./_env');
-const { authenticateAdmin } = require('./_firebase-auth');
+const { authorize } = require('./_authz');
 const { listRefunds } = require('./_refunds-store');
 
 /* Admin-only: list refund records (optionally filtered by ?status=). Powers the
@@ -16,7 +16,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'GET') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-  const auth = await authenticateAdmin(event);
+  const auth = await authorize(event, 'refunds.view');
   if (!auth.ok) return { statusCode: auth.statusCode, headers, body: JSON.stringify({ error: auth.error }) };
 
   const status = (event.queryStringParameters || {}).status || null;

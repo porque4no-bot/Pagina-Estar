@@ -16,6 +16,7 @@ const {
   backupDateKey, snapshotStore, writeSnapshot, purgeOldBackups
 } = require('./_backup');
 const { sendEmail, adminEmail, esc } = require('./_email');
+const { flag } = require('./_settings');
 
 function fmtMB(bytes) { return (bytes / (1024 * 1024)).toFixed(2) + ' MB'; }
 
@@ -36,7 +37,7 @@ async function maybeCopyToDrive(dateKey, group, snap, results) {
 }
 
 exports.handler = async () => {
-  if (process.env.BACKUP_ENABLED !== 'true') {
+  if (!(await flag('BACKUP_ENABLED'))) {
     return { statusCode: 200, body: 'skipped: disabled' };
   }
   const backupStore = getBlobStore('backups');
