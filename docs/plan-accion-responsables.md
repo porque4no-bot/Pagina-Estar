@@ -21,6 +21,19 @@ Fecha: 2026-06-19.
 
 No esperan a nadie. La decisión ya está tomada o es técnica.
 
+> **Estado 2026-06-22 (resumen):** gran parte del Carril A ya está **construida**
+> (la mayoría apagada por toggle hasta validar). Hechos: **A1** (parqueadero
+> eliminado), **A4** (respaldo de Blobs — `backup-blobs`, `BACKUP_ENABLED`), **A7**
+> (`otasync-webhook` libera holds en cancelación), **A8** (nota → PMS,
+> `GUEST_NOTES_TO_PMS_ENABLED`), **A9** (formulario de cuenta `datos-cuenta.html` +
+> `_refunds-store` + panel Reembolsos, `REFUND_BANK_FORM_ENABLED`), **A10** (correos
+> pre-llegada / post-estadía / recordatorio cotización, `STAY_EMAILS_ENABLED` /
+> `QUOTE_EXPIRY_REMINDER_ENABLED`). Casi todos los toggles se prenden desde
+> **`/admin → Configuración`**. Siguen abiertos: **A2** (×1.10 — depende de §6.1
+> del dueño), **A3** (observabilidad), **A5** (pre-hold directo), **A6** (backoff
+> en `insertReservation`), **A11** (verificar CSP/headers en prod), **A12** (probar
+> folio/cobro online — necesita reserva real, B8). **Nada desplegado aún.**
+
 | # | Tarea | Archivos clave |
 |---|---|---|
 | A1 | **Quitar parqueadero** (servicio que hoy se cobra y no existe) | `_pricing.js`, `reservar.html`, `guest.html`, `cotizar-admin.html`, `faq.html`, prompt bot |
@@ -45,6 +58,10 @@ No esperan a nadie. La decisión ya está tomada o es técnica.
 
 **Responde aquí mismo (llena el espacio en blanco o marca la opción).** Cada
 respuesta desbloquea trabajo técnico.
+
+> **Resueltos al 2026-06-22:** **B1** (NIT con dígito de verificación → **Mirada
+> SAS · 902.032.515-0**, ya publicado en legales) y **B2** (check-out unificado a
+> **11:00**). El resto sigue abierto.
 
 ### B1 · NIT — dígito de verificación → desbloquea legales
 Razón social **Mirada SAS**, NIT **902.032.515-`___`**.

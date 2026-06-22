@@ -53,7 +53,7 @@ Root HTML pages (Spanish, canonical):
 | `trabaja.html` | Jobs |
 | `faq.html` | FAQ |
 | `cotizacion.html` | Corporate quote viewer |
-| `cotizar-admin.html` | Admin panel — served at **`/admin`** (rewrite). Tabs: quotes, refunds, and **breakfast** (embeds `desayuno-admin.html` in an iframe). noindex |
+| `cotizar-admin.html` | Admin panel — served at **`/admin`** (rewrite). Tabs: **Hoy** (day board, `staff-today`), quotes, refunds, and **breakfast** (embeds `desayuno-admin.html` in an iframe), códigos, usuarios, configuración. noindex |
 | `desayuno.html` | Staff: breakfast-pass verifier — scan/lookup a reservation, mark breakfast served, + cycle/day served counts (noindex) |
 | `desayuno-admin.html` | Admin: breakfast money analytics + day board ("día de desayunos") + per-reservation lookup with courtesy action (noindex). Embedded as the **Desayunos** tab of `/admin`; `/desayuno-admin` redirects there |
 | `privacidad.html` / `aviso-legal.html` / `cancelacion.html` / `cookies.html` / `escnna.html` | Legal |
@@ -155,7 +155,9 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | `booking-status` | Polls webhook confirmation status after payment (used by motor-app polling loop) |
 | `send-confirmation` | Sends email confirmation to guest via Resend |
 | `get-booking` | Retrieves a booking by reference code — **requires a second factor (email or surname)**; returns a uniform not-found on mismatch so an enumerated code alone discloses no PII |
-| `request-cancellation` | Records a guest cancellation request (same second-factor gate as `get-booking`), alerts the hotel team and acknowledges the guest by email. Does **not** auto-cancel in OTASync nor auto-refund — refund rails pending (see `docs/pendientes.md`) |
+| `request-cancellation` | Records a guest cancellation request (same second-factor gate as `get-booking`), alerts the hotel team and acknowledges the guest by email. Does not auto-cancel at request time — the cancellation loop closes at the admin gate (`refund-admin-action` approve/deny → `_otasync.cancelReservation`, gated `OTASYNC_AUTO_CANCEL_ENABLED`) |
+| `staff-today` | **Staff App v1 (read-only):** day board for reception — arrivals/departures/in-house roster (via `_otasync.getReservationsByDate`) + pending-refunds queue (only if the caller has `refunds.view`). Auth `guests.checkin.view`. Backs the **Hoy** tab in `/admin` |
+| `staff-ops` | **Staff App v2:** actionable ops-task queue (replaces the email inbox as the operational mechanism). GET lists open tasks (`guests.checkin.view`); POST `resolve`; POST `retry-folio` (reloads the encrypted guest-event, re-posts to the Kunas folio via `postOrderExtrasToFolio`, marks it `posted`, resolves the task — gated `GUEST_SERVICE_FOLIO_ENABLED` + `guests.register`). Backs the **Tareas pendientes** section of the Hoy tab |
 | `get-booking-rating` | Fetches Booking.com rating via `PROXY_URL`; returns hardcoded fallback if unconfigured |
 | `get-reviews` | Fetches property reviews |
 
@@ -163,11 +165,12 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 
 | Function | Purpose |
 |---|---|
-| `create-wompi-signature` | Generates HMAC integrity signature server-side for Wompi checkout |
-| `wompi-webhook` | **Active** payment handler: validates signature, creates OTASync reservation; for `COT-...` references loads the quote, verifies amount, marks it `aceptada` |
-| `reconcile-payments` | **Scheduled (every 30 min):** reconciles pending Wompi transactions, resolves stuck bookings |
+| `create-wompi-signature` | Generates HMAC integrity signature server-side for Wompi checkout; applies a validated discount code server-side when `DISCOUNT_CODES_ENABLED` |
+| `wompi-webhook` | **Active** payment handler: validates signature, creates OTASync reservation; for `COT-...` references loads the quote, verifies amount, marks it `aceptada`. Derives the rate plan (Estricta/Flexible) **server-side from the amount actually paid** (not the client-controlled reference field), records it on the reservation, and snapshots refund fields via `_payment-details` |
+| `reconcile-payments` | **Scheduled (every 30 min):** reconciles paid-but-no-reservation orphans for **both Wompi and Mercado Pago** (MP block gated by `PAYMENT_PROVIDER=mercadopago`/`MERCADOPAGO_ACCESS_TOKEN`; independent try/catch per provider). Crosses `booking-results` **even when the tx is already `processed`** so a mark-before-work insert failure (`reservationPending`) is still caught. Alert-only |
+| `validate-discount-code` | Public read-only validation of a discount code for the Step-4 UI; uniform `{valid:false}` on any failure (no enumeration). Gated by `DISCOUNT_CODES_ENABLED`. The authoritative amount check stays in `create-wompi-signature`/`wompi-webhook` |
 | `create-mercadopago-preference` | **Rollback** Mercado Pago Checkout Pro preference creator |
-| `mercadopago-webhook` | **Rollback** MP handler: validates signatures, creates/updates OTASync reservation via shared payment logic |
+| `mercadopago-webhook` | **Rollback** MP handler: validates signatures (with an **API-verification fallback** when `MERCADOPAGO_WEBHOOK_SECRET` is absent — re-fetches the payment from the MP API), creates/updates OTASync reservation via shared payment logic (`_payments`). With `MP_DIRECT_RESILIENT_ENABLED` the direct path matches Wompi: single-writer lock + per-stay idempotency + `insertReservation` (retry/backoff/alert) + mark-before-work + `recordPending`-always so a paid booking is never lost |
 
 **Corporate quotes (cotizaciones):**
 
@@ -180,7 +183,7 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | `request-quote` | Creates a quote from the public contact form |
 | `send-quote-email` | Sends quote email with payment link |
 | `read-quote-audit` | Audit log viewer for quote history |
-| `otasync-webhook` | Receives OTASync webhooks; on `avail` changes re-validates affected active quotes |
+| `otasync-webhook` | Receives OTASync webhooks; on `avail` changes re-validates affected active quotes. On **cancellation** events (`handleCancellations`): emails the (web-origin) guest a cancellation confirmation, alerts the team, releases any quote hold — deduped via a `cancellation-notified` blob |
 
 **Guest app:**
 
@@ -207,22 +210,43 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 
 See `docs/whatsapp-bot.md` for setup (credentials checklist, sandbox, flows, 24h window/templates).
 
+**Admin panel — roles, settings, discounts:**
+
+| Function | Purpose |
+|---|---|
+| `whoami` | Returns the authenticated user's **own** effective permissions + role labels so the `/admin` UI shows only the tabs/actions they may use. Read-only |
+| `iam-admin` | CRUD for users and roles (`users.manage` / `roles.manage`) with anti-escalation guards: an actor can't grant a permission it lacks, only env-superusers/full admins can mint admins, no self-lockout, the system never ends with zero admins; every mutation is appended to an audit. Backs the **Usuarios** tab |
+| `admin-settings` | Reads/writes the panel-managed toggles (`settings.manage`) — a whitelist that **deliberately excludes every secret**. Backs the **Configuración** tab |
+| `admin-discount-codes` | CRUD + activate/deactivate for discount codes (reuses `quotes.view`/`quotes.edit`). Backs the **Códigos** tab |
+
+Panel functions migrated to the new `authorize` layer (per-permission gate, env-vars = superuser): `list-quotes`, `create-quote`, `update-quote`, `send-quote-email`, `read-quote-audit`, `retry-quote-booking`, `get-pending-refunds`, `refund-admin-action`, the `breakfast-*` staff/admin functions, `upload-drive-credentials`, and the `*-probe` health checks.
+
 **Shared modules (prefixed `_`, not HTTP-callable):**
 
 | Module | Purpose |
 |---|---|
-| `_otasync` | OTASync auth + session caching, availability lookup, room holds (`createHold`), reservation CRUD |
+| `_otasync` | OTASync auth + session caching, availability lookup, room holds (`createHold`/`releaseHold`), reservation CRUD (`insertReservation`, `cancelReservation` = soft-cancel via `delete/delete`, retry+alert), `getReservationsByDate` |
 | `_quotes-store` | Quote persistence, tax math (IVA 19%, INC 8%), hold management |
 | `_payments` | Payment status tracking, webhook event logging |
-| `_email` | Email template rendering (Resend) |
-| `_guest-app` | Guest app utilities: token verification, data encryption/decryption |
+| `_email` | Email template rendering (Resend) — shared brand shell; includes `cancellationConfirmedHtml`/`adminCancellationHtml` (cancellations), `accessCodesHtml` (lock codes), `preArrivalHtml`/`postStayHtml` (with optional NPS link) |
+| `_permissions` | Authorization catalogue: 22 atomic `recurso.accion` permissions + default roles (`admin`/`recepcion`/`cocina`/`tesoreria`). Pure module (no I/O); single source of truth for what can be done |
+| `_iam-store` | Users/roles persistence in Netlify Blobs (`iam` store: `user/<email>`, `role/<id>`). Additive to env vars; empty (falls back to env) without Blobs |
+| `_authz` | `authorize(event, permission)` drop-in guard. Identity stays 100% Firebase; resolves email → effective permissions across env vars (`ADMIN_EMAILS`/`STAFF_EMAILS` = break-glass superusers) + the iam store. Demo grant only locally (never on a Netlify deploy) |
+| `_settings` | `flag(key)`/`get(key, fallback)` for panel-managed config: Blobs override (`app-settings` store) → `process.env` fallback, ~30s cache. **Whitelist (`MANAGEABLE`) that never admits secrets**; 17+ manageable toggles |
+| `_discount-store` | Discount-code definitions + atomic usage counting in Blobs (`discount-codes`/`discount-usage`); compare-and-set so concurrent payments never exceed the cap, one-use-per-email + idempotent per-reservation dedup. Server-side only |
+| `_mp-refund` | Mercado Pago refund executor (`POST /v1/payments/{id}/refunds`, idempotency key). Runs only after an admin approves a `GATEWAY_AUTO` refund **and** `REFUND_GATEWAY_AUTO_ENABLED` is set. Never throws |
+| `_payment-details` | Snapshots the fields a refund needs (auth code, date, card last-4, amount) into a durable Blobs store (`payment-details`, ~13-month TTL) at payment-confirmation time, since `booking-results` expires in 7 days. Best-effort |
+| `_ttlock` | TTLock Open Platform client (keyboard-PIN locks): generates per-reservation temporary codes via `keyboardPwd/get`. Mock-safe; gated by `TTLOCK_ENABLED` + `TTLOCK_*`. Never breaks check-in |
+| `_guest-app` | Guest app utilities: token verification, reservation lookup, and PII protection (`protectRecord`/`unprotectRecord` for records, `sealBinaryForStore`/`openBinaryFromStore` for raw document buffers) — all delegating to `_crypto-vault` |
+| `_ops-queue` | Append-only **operational task queue** (Blobs `ops-queue`): `enqueue`/`listOpen`/`resolve`/`getItem`. Idempotent by dedupeKey (an open task isn't duplicated; a resolved key re-opens on recurrence). `_alert.reportAlert` enqueues every alert as a task → the Staff App replaces the email inbox. Best-effort, never throws |
+| `_crypto-vault` | **Reversible** envelope encryption for guest PII (AES-256-GCM): `seal()`/`open()` with HKDF-derived, **versioned** keys (key ring → real rotation + crypto-shredding) and AAD binding ciphertext to `bookingCode\|type`. Reads legacy `version:1` envelopes for backward compat. Round-trip test gates the build. Config: `GUEST_APP_DATA_ENCRYPTION_KEY` (single key) + optional `GUEST_APP_KEY_RING`/`GUEST_APP_ACTIVE_KEY_ID` for rotation |
 | `_contract-template` | PDF contract template for guest check-in |
 | `_pdf-render` | PDFKit server-side PDF rendering |
 | `_quote-audit` | Audit log storage and retrieval |
 | `_google-drive` | Google Drive API integration (service account) |
 | `_firebase-auth` | Firebase authentication for admin pages |
 | `_rate-limit` | Request rate limiting |
-| `_odoo` | Odoo connector (ERP/CRM/contabilidad) — Fase 1 *maestro de clientes*: `upsertPartner` crea/encuentra un `res.partner` deduplicado por NIT/email vía JSON-RPC. Mock no-op sin credenciales. Hoy lo invoca `request-quote`. Plan: `docs/plan-integracion-odoo-otasync.md` |
+| `_odoo` | Odoo connector (ERP/CRM) — JSON-RPC, mock no-op sin credenciales. **Fase 1** *maestro de clientes*: `upsertPartner` crea/encuentra un `res.partner` deduplicado por NIT/email y lo enriquece (`country_id`/`lang`/`comment` + campos `x_estar_*`: canal, ultimo_checkout, noches_total, presupuesto, motivo_viaje, perfil, escritos solo si existen en la instancia) + `markLeadWonByQuote`/`markLeadLost` (desde `revalidate-quotes`). **Fase 2** captación: `addToMailingList` (Email Marketing) y leads de newsletter/contacto (vía `submission-created`). **Fase 4** PQR: `createHelpdeskTicket` (desde `guest-action`, team id 3). NPS post-estadía (Fase 3) va en el correo. Plan: `docs/plan-integracion-odoo-otasync.md` |
 | `_whatsapp` | WhatsApp Cloud API client: sendText/sendButtons/sendList/sendTemplate/markRead, webhook signature validation; mock no-op without credentials |
 | `_whatsapp-bot` | Bot conversation engine: state machine (Blobs sessions, 30-min TTL), ES/EN copy, date/guest parsers; calls `_otasync` for live availability and `request-cancellation` for cancellations. Routes to `_whatsapp-ai` first when `ANTHROPIC_API_KEY` is set |
 | `_whatsapp-ai` | AI mode: Claude (`@anthropic-ai/sdk`, Messages API, manual tool-use loop) drives the conversation with tools `check_availability` / `lookup_booking` / `request_cancellation` / `notify_team`; text-only history in the session blob; falls back to the state machine on error. **Authorization is code, not prompt**: cancellation requires a second-factor-verified lookup in the same conversation (`verifiedBookings`), and the WhatsApp number is correlated against the booking phone for audit |
@@ -239,18 +263,38 @@ Multi-phase check-in system with document upload, OCR, and service requests:
 - **Session:** Signed JWT from `guest-session`, no OTASync credentials exposed
 - **Document upload:** Optional Azure Document Intelligence OCR (`prebuilt-idDocument` model); graceful fallback when OCR is unavailable
 - **Multi-guest:** Supports N occupants per reservation, each with their own document
+- **SIRE/TRA capture:** Records the raw material the Colombian tourism registries need (gender, occupation, residence, origin/`procedencia`, destination for foreigners) alongside the document; foreign guests must declare `destino`
+- **Hardened check-in:** Guided live-camera capture; after `MAX_OCR_ATTEMPTS` failed OCR reads it accepts the manually typed data and flags the record for manual verification by reception (rather than blocking the guest)
+- **Marketing consent:** Separate, opt-in (Ley 1581) consent stored distinctly from the operational privacy acceptance, with timestamp/channel for proof; default OFF. Wired site-wide into `upsertPartner`/`addToMailingList`
+- **Online service payment:** Service-order online checkout supports Wompi **and** Mercado Pago (see `GUEST_SERVICE_PAYMENT_MODE`)
 - **Persistence:** Guest data stored AES-256-GCM encrypted in Netlify Blobs
 - **Archival:** Documents forwarded to Google Drive via Apps Script (`GOOGLE_DRIVE_APPS_SCRIPT_URL`)
 - **Demo mode:** Works without OTASync credentials when `GUEST_APP_DEMO_MODE` is unset in non-production
 
 See `docs/guest-app.md` for implementation details.
 
+### Access control & admin panel (`/admin`)
+
+The `/admin` panel adds an **authorization** layer on top of the existing Firebase **identity**:
+
+- **Roles/IAM:** `_permissions` defines 22 atomic permissions and four default roles (`admin`, `recepcion`, `cocina`, `tesoreria`); `_iam-store` persists users/roles in Blobs; `_authz.authorize(event, permission)` resolves an email → effective permissions. `ADMIN_EMAILS`/`STAFF_EMAILS` remain break-glass superusers (a permission granted by env vars can never be revoked, so the owner can't lock himself out). The **Usuarios** tab (`iam-admin`) does CRUD with anti-escalation guards; `whoami` drives which tabs the UI shows.
+- **Settings:** the **Configuración** tab (`admin-settings`, permission `settings.manage`) toggles 17+ manageable flags. `_settings.flag()`/`get()` read a Blobs override (`app-settings`) first and fall back to `process.env`. The whitelist **never** admits secrets — they live only in Netlify env. Carril-A flags are now manageable from here without a redeploy.
+- **Discount codes:** the **Códigos** tab (`admin-discount-codes`) manages server-side discount codes (`_discount-store`); applied in `_direct-pricing`/`create-wompi-signature`/`wompi-webhook` (Wompi path), gated by `DISCOUNT_CODES_ENABLED`.
+
+### Guest cancellations (OTASync)
+
+`request-cancellation` records the guest request and alerts the team. The cancellation loop **closes at the admin gate**: when an admin approves or denies the refund in `refund-admin-action`, the reservation is soft-cancelled in OTASync (`_otasync.cancelReservation`), **gated by `OTASYNC_AUTO_CANCEL_ENABLED`** (OFF until validated against a real reservation), idempotent per reservation, direct bookings only (COT- quotes use hold/release), best-effort + alert. When the cancellation is performed in OTASync, `otasync-webhook.handleCancellations` emails the (web-origin) guest a confirmation, alerts the team, and releases any quote hold (deduped via `cancellation-notified`). Templates: `cancellationConfirmedHtml`/`adminCancellationHtml` in `_email`.
+
+### Door locks (TTLock)
+
+`_ttlock` is a mock-safe TTLock Open Platform client (`TTLOCK_ENABLED` + `TTLOCK_*`) that can mint per-reservation temporary keyboard PINs; the email template (`accessCodesHtml`) already exists. Off by default; never breaks check-in.
+
 ### Scheduled functions
 
 | Function | Schedule | Purpose |
 |---|---|---|
 | `revalidate-quotes` | `0 */6 * * *` | Re-checks all active quote availability every 6 hours |
-| `reconcile-payments` | `*/30 * * * *` | Reconciles pending Wompi transactions every 30 minutes — covers **both** corporate quotes and direct bookings (missing `booking-results` entry ⇒ paid-but-no-reservation alert) |
+| `reconcile-payments` | `*/30 * * * *` | Reconciles paid-but-no-reservation orphans every 30 minutes — **both Wompi and Mercado Pago**, corporate quotes and direct bookings (missing or `reservationPending` `booking-results` entry ⇒ alert) |
 | `purge-guest-data` | `30 3 * * *` | Data-retention purge (Ley 1581): deletes guest PII (check-ins, documents, events) older than **5 years**, dated from the timestamp embedded in the blob key |
 
 ## CSS conventions
@@ -297,11 +341,17 @@ WOMPI_SANDBOX=
 **Mercado Pago (rollback — activate by setting `PAYMENT_PROVIDER=mercadopago`):**
 ```
 MERCADOPAGO_ACCESS_TOKEN=
-MERCADOPAGO_WEBHOOK_SECRET=
+MERCADOPAGO_WEBHOOK_SECRET=   # OPTIONAL: if unset, the webhook re-verifies each event against the MP API
 MERCADOPAGO_CHECKOUT_MODE=
 MERCADOPAGO_SUCCESS_URL=
 MERCADOPAGO_PENDING_URL=
 MERCADOPAGO_FAILURE_URL=
+```
+
+**Discounts & refunds:**
+```
+DISCOUNT_CODES_ENABLED=        # 'true' to show the discount field in the engine + validate codes
+REFUND_GATEWAY_AUTO_ENABLED=   # 'true' to execute the Mercado Pago refund when an admin approves it (Wompi stays manual)
 ```
 
 **Email (Resend):**
@@ -384,12 +434,35 @@ Without token/phone-number-id every send is a logged no-op (mock mode); the
 webhook rejects POSTs when `WHATSAPP_APP_SECRET` is unset. Setup guide:
 `docs/whatsapp-bot.md`.
 
+**TTLock (door locks — rollback/off by default; not in `.env.example`):**
+```
+TTLOCK_ENABLED=          # 'true' to activate (default OFF → mock no-op)
+TTLOCK_CLIENT_ID=        # Open Platform application id
+TTLOCK_CLIENT_SECRET=    # Open Platform application secret
+TTLOCK_USERNAME=         # TTLock user account (not the developer account)
+TTLOCK_PASSWORD_MD5=     # user password as MD5 (32 lowercase hex); TTLOCK_PASSWORD (plain) also accepted
+TTLOCK_LOCKS_JSON=       # apartment→lockId map, e.g. {"101":1234567,"main":7654321}
+TTLOCK_API_BASE=         # optional, default https://api.sciener.com
+TTLOCK_TIMEOUT_MS=       # optional, default 10000
+TTLOCK_PASSCODE_TYPE=    # optional keyboardPwd type, default 3 (period)
+```
+
+**Odoo (CRM — Helpdesk / NPS; the connector itself uses the existing OTASYNC/Odoo creds):**
+```
+HELPDESK_ENABLED=        # 'true' to open an Odoo Helpdesk ticket from guest service requests/cancellations
+HELPDESK_TEAM_ID=        # Helpdesk team id (default 3)
+NPS_ENABLED=             # 'true' to link the NPS survey in the post-stay email
+NPS_SURVEY_URL=          # optional override for the survey URL
+```
+
 **Misc:**
 ```
 ALLOWED_ORIGIN=http://localhost:8888
 PROXY_URL=
 DEBUG=
 ```
+
+Most Carril-A toggles above (e.g. `DISCOUNT_CODES_ENABLED`, `REFUND_GATEWAY_AUTO_ENABLED`, `STAY_EMAILS_*`, `HELPDESK_ENABLED`, `NPS_ENABLED`, `TTLOCK_ENABLED`, `WHATSAPP_BOT_ENABLED`) are also manageable from the **Configuración** tab in `/admin`, which overrides the env var at runtime (~30s, no redeploy). Secrets are never manageable from the panel.
 
 **Wompi configuration notes:**
 - Register Wompi events against `/api/wompi-webhook`; use the Wompi events secret as `WOMPI_WEBHOOK_SECRET`

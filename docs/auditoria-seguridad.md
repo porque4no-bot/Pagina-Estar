@@ -58,3 +58,27 @@ limiter compartido por Blobs que ya usan las demás funciones. Bajo concurrencia
 
 **Bajo.** Ninguno de los gaps toca la creación de reservas ni el movimiento de
 dinero. Las correcciones son hardening defensivo.
+
+## Addendum (2026-06-22) — IAM / autorización por permisos
+
+Posterior a esta auditoría se añadió un sistema de **roles y permisos** para el
+panel `/admin` (`_permissions.js` = catálogo de 22 permisos + roles admin /
+recepción / cocina / tesorería; `_iam-store.js` = usuarios/roles en Blobs;
+`_authz.js` = `authorize()` drop-in). Notas de seguridad:
+
+- **Las variables de entorno (`ADMIN_EMAILS`/`STAFF_EMAILS`) siguen siendo el
+  "maestro" de acceso:** quien esté en ellas es **superusuario** independiente de
+  los roles del panel. El IAM por Blobs **añade** granularidad, no reemplaza la
+  allowlist por env (que conserva el "no fail-open" de la auth admin/staff).
+- **Demo-mode de IAM solo en local** (sin `FIREBASE_PROJECT_ID`); nunca en Netlify.
+- **Anti-escalada** en `iam-admin.js` (un usuario no puede otorgarse permisos que
+  no tiene).
+- Funciones del panel migradas a `authorize` (list/create/update-quote,
+  send-quote-email, read-quote-audit, get-pending-refunds, refund-admin-action,
+  breakfast-*, probes, admin-settings, admin-discount-codes, iam-admin, whoami).
+- **Nueva superficie de configuración** (`_settings.js`): override de toggles en
+  Blobs `app-settings` con lista blanca `MANAGEABLE` — **nunca** gestiona secretos
+  (límite de diseño verificado en el módulo).
+
+GAP-1 (secreto del `otasync-webhook` por query string) sigue **abierto** a la
+espera de la confirmación de Kunas (ver `docs/mensajes-terceros.md` §1).

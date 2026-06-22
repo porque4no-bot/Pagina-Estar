@@ -66,6 +66,37 @@ de nuestra cuenta:
 
 Gracias.
 
+### Respuesta de Wompi (recibida 2026-06-19)
+
+1. **Anular desde el panel:** sí, **pero solo el mismo día** y si la red transaccional
+   lo permite. Detalle de la transacción → **"Anular transacción"** (hay que hacerlo
+   **inmediatamente** tras el pago para que quede en línea). Si ya está aprobada y la
+   red no permite anulación en línea → **escalar a soporte** para la reversión ante la red.
+2. **Tiempos al tarjetahabiente:** no hay un plazo fijo; **depende de la red y del banco
+   emisor**. Para un dato preciso, escalar a un asesor.
+3. **PSE, Nequi y Botón Bancolombia:** la anulación en línea **aplica solo a tarjetas**.
+   Para PSE/Nequi/Botón Bancolombia **no hay anulación por la pasarela** → en la práctica
+   esos se devuelven por **transferencia bancaria manual** (nuestro flujo
+   `datos-cuenta.html` + tesorería). El proceso manual exacto: confirmar con un asesor.
+4. **Datos para reversión de tarjeta por soporte:** código de autorización · fecha de la
+   transacción · últimos dígitos de la tarjeta · valor de la transacción.
+
+**Horario de soporte Wompi:** lunes a viernes, 8:00–17:00.
+
+**Implicaciones para nuestro sistema:**
+- El flujo de **reembolso por transferencia** que ya construimos (`datos-cuenta.html` +
+  correo a tesorería + panel /admin → Reembolsos) es el **correcto** para PSE/Nequi/
+  Bancolombia, porque esos **no** se pueden revertir por la pasarela.
+- Para **tarjeta**: si es el mismo día, anular en el panel de Wompi; si no, escalar a
+  soporte con los **4 datos** de arriba.
+- **IMPLEMENTADO (2026-06-19):** esos 4 datos ahora se **capturan al momento del pago**
+  (`_payment-details.js` → `savePaymentDetails`, llamado desde `wompi-webhook` en pago de
+  reserva directa y de cotización) y quedan en un store durable (~13 meses). El registro
+  de reembolso (`_refunds-store.recoverPaymentInfo` → `createRefundRequest`) los arrastra
+  (`cardLast4`, `cardBrand`, `authCode`, `paymentDate`, `transactionId`, monto), así el
+  equipo no tiene que buscarlos en el panel de Wompi semanas después. **Pendiente menor:**
+  mostrarlos en el panel `/admin → Reembolsos` (los datos ya están en el registro).
+
 ---
 
 ## 3. Booking.com — (lo gestiona el dueño)

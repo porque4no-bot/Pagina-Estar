@@ -24,17 +24,17 @@ Fecha de creación: 2026-06-19. Derivado del mapa de arquitectura.
 Cosas que hoy están **mal** o ausentes y exponen legal/dinero. Detalle en
 [`pendientes.md`](pendientes.md) donde aplique.
 
-- [ ] **P0 · 🛠️ Quitar parqueadero como servicio cobrado** (`pendientes.md` §6.3).
-      Hoy el motor cobra $25k por un servicio que **no existe** → riesgo de
-      reembolso/legal. Tocar `_pricing.js`, `reservar.html`, `guest.html`,
-      cotizaciones, FAQ y prompt del bot. Ojo con el orden de bits del
-      `extrasMask` (dejar slot reservado, no reindexar).
-- [ ] **P0 · 👤🛠️ Identidad legal en documentos** (`pendientes.md` §6.7).
-      Razón social **Mirada SAS** + **NIT 902032515** (confirmar dígito de
-      verificación) en `aviso-legal.html` y `privacidad.html` (ES/EN).
-- [ ] **P0 · 👤 Hora de check-out unificada** (`pendientes.md` §6.9).
-      `index.html` dice 12:00, `faq.html` dice 11:00, el bot dice 11:00.
-      Definir una sola y propagar (afecta late checkout).
+- [x] **P0 · 🛠️ Quitar parqueadero como servicio cobrado** (`pendientes.md` §6.3).
+      ✅ **HECHO (verificado 22-jun):** el parqueadero **ya no se cobra** (FAQ +
+      slot reservado en el `extrasMask` del motor, sin reindexar). Ya no es
+      bloqueante.
+- [x] **P0 · 👤🛠️ Identidad legal en documentos** (`pendientes.md` §6.7).
+      ✅ **HECHO (verificado 22-jun):** **MIRADA S.A.S** + **NIT 902.032.515-0**
+      (+ RNT 276306) **presentes y correctos** en `aviso-legal.html` y
+      `privacidad.html` (ES/EN). Ya no es bloqueante.
+- [x] **P0 · 👤 Hora de check-out unificada** (`pendientes.md` §6.9).
+      ✅ **HECHO (verificado 22-jun):** el check-out **ya es 11:00** en todo el
+      sitio (index, FAQ y bot coinciden). Ya no es bloqueante.
 - [ ] **P0 · 👤🛠️ Política de cancelación + planes de tarifa reales**
       (`pendientes.md` §6.1). Estricta/Flexible como rate plans en OTASync,
       reescribir `cancelacion.html` (ES/EN) y etiquetas del motor.
@@ -193,13 +193,10 @@ que algo "falle en silencio" en producción.
       silencioso.
 - [ ] Tablero/alarma de los crons (que efectivamente corrieron).
 
-### 11.2 Entregabilidad de correo — 🔴 P0 · 🛠️🤝
-- [ ] **SPF / DKIM / DMARC** del dominio configurados en Resend. Los correos
-      (código de reserva, confirmación, reintento de pago, acuse de
-      cancelación) son el corazón del flujo; si caen en spam, el huésped cree
-      que "no funcionó".
-- [ ] Prueba real a Gmail/Outlook/Apple Mail → llega a bandeja, no a spam.
-- [ ] Remitente y dominio verificados; enlaces no marcados como sospechosos.
+### 11.2 Entregabilidad de correo — ✅ HECHO (confirmado por el dueño 22-jun)
+- [x] **SPF / DKIM / DMARC** del dominio configurados y verificados en Resend.
+- [x] Prueba real a Gmail/Outlook/Apple Mail → llega a bandeja, no a spam.
+- [x] Remitente y dominio verificados; enlaces no marcados como sospechosos.
 
 ### 11.3 Respaldo / recuperación de Netlify Blobs — 🔴 P1 · 🛠️
 - [ ] Estrategia de backup/export de Blobs: cotizaciones, **reembolsos**,

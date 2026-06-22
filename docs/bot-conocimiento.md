@@ -37,8 +37,7 @@ atender. Tiene dos propósitos:
 
 - **Check-in:** desde las 3:00 PM. 100% digital — un día antes llega un enlace
   con los códigos de acceso (sin llaves físicas).
-- **Check-out:** ⚠️ POR CONFIRMAR — el sitio dice 11:00 AM (FAQ) y 12:00 (home).
-  Definir una sola hora.
+- **Check-out:** **11:00 AM** (unificado 2026-06-22 en todo el sitio).
 - **Early check-in** (entrada anticipada, sujeto a disponibilidad), % del valor
   de la noche estándar:
   - 2 h antes (≈1:00 PM): 15%
@@ -60,7 +59,8 @@ atender. Tiene dos propósitos:
   (vía Wompi). ⚠️ CONFIRMAR si se quiere mencionar efectivo/transferencia.
 - **Anticipo / pago parcial:** ⚠️ POR CONFIRMAR (¿se cobra el total o un %?).
 - **Factura electrónica:** ⚠️ POR CONFIRMAR (¿se emite a todos? ¿cómo se pide?
-  Razón social: Mirada SAS, NIT 902032515).
+  La facturación la lleva otro equipo. Razón social: **Mirada SAS, NIT
+  902.032.515-0**).
 
 ## 4. Política de cancelación y reembolsos
 
@@ -146,7 +146,7 @@ atender. Tiene dos propósitos:
 
 Prioriza estas respuestas (son las que más pregunta un huésped):
 
-1. Hora de check-out definitiva.
+1. ~~Hora de check-out definitiva.~~ ✅ Resuelto: **11:00 AM**.
 2. ¿Se puede compartir la dirección por chat o solo tras reservar? Dirección y
    punto de referencia.
 3. Nombre y distancia del parqueadero público cercano.

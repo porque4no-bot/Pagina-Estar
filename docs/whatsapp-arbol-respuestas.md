@@ -36,7 +36,7 @@ es código, no confianza en el modelo.
 | ¿Qué tipos de apartaestudio hay? / fotos | 🟢 | 5 tipologías; enlace al sitio |
 | ¿Cuánto cuesta del X al Y para N personas? | 🔵 | **Disponibilidad + precio en vivo (OTASync)**; devuelve enlace de reserva |
 | ¿Tienen disponibilidad para [fechas]? | 🔵 | Igual que arriba |
-| ¿Aceptan mascotas? ¿cuánto? | 🟢 | Sí; $200k aseo (corta) / +$500k depósito (larga) |
+| ¿Aceptan mascotas? ¿cuánto? | 🟢 | Sí; **$200k fijos por reserva** (corta). Larga estadía: por confirmar (ver `bot-conocimiento.md` §5/§6) |
 | ¿Tienen parqueadero? | 🟢 | No propio; parqueadero público cercano |
 | ¿Métodos de pago? | 🟢 | Tarjeta, PSE, Nequi, Bancolombia (Wompi) |
 | ¿Política de cancelación? | 🟢 | 2 planes (Estricta/Flexible); enlace a `cancelacion.html` |
