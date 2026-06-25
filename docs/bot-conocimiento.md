@@ -27,12 +27,12 @@ atender. Tiene dos propósitos:
   Colombia. Cada uno con cocina equipada, baño privado, WiFi de fibra, TV cable
   y zona de trabajo.
 - **Tipologías** (fuente: `rooms_db.json` — tamaño, camas y amenidades por tipo):
-  - **Clásica** — 29 m² · hasta 2 personas · 1 cama doble · vista interior · WiFi fibra, TV cable, cocina equipada (estufa, microondas, cafetera), baño privado con ducha, secador.
-  - **Reserva** — 24 m² · hasta 2 personas · 1 cama doble · vista a la ciudad · WiFi fibra, TV cable, cocina equipada, baño privado, secador.
-  - **Especial** — 27 m² · hasta 2 personas · 1 cama doble · vista a la ciudad · cocina equipada, baño privado con ducha, secador y plancha.
-  - **Origen** — 29 m² · hasta 3 personas · 1 cama doble + 1 sencilla · vista a la ciudad · cocina completa, baño privado, secador.
-  - **Selección** — 36 m² · hasta 5 personas · 1 king + 1 doble + 1 sencilla · vista a la ciudad · cocina completa, baño privado, secador y plancha.
-  - **Cantidad de unidades por tipología:** ⚠️ POR CONFIRMAR (cuántos apartaestudios hay de cada tipo).
+  - **Clásica** — 2 unidades · 29 m² · hasta 2 personas · 1 cama doble · vista interior · WiFi fibra, TV cable, cocina equipada (estufa, microondas, cafetera), baño privado con ducha, secador.
+  - **Selección** — 3 unidades · 36 m² · hasta 5 personas · 1 king + 1 doble + 1 sencilla · vista a la ciudad · cocina completa, baño privado, secador y plancha.
+  - **Reserva** — 3 unidades · 24 m² · hasta 2 personas · 1 cama doble · vista a la ciudad · WiFi fibra, TV cable, cocina equipada, baño privado, secador.
+  - **Origen** — 3 unidades · 29 m² · hasta 3 personas · 1 cama doble + 1 sencilla · vista a la ciudad · cocina completa, baño privado, secador.
+  - **Especial** — 2 unidades · 27 m² · hasta 2 personas · 1 cama doble · vista a la ciudad · cocina equipada, baño privado con ducha, secador y plancha.
+  - **Total: 13 apartaestudios.**
 - **Dirección (se puede compartir libremente):** **Cl. 61 #23-36**, barrio **La
   Estrella**, sector **Palogrande**, Manizales, Caldas.
 - **Cómo llegar / referencias:** a **una cuadra de la Av. Santander**, cerca del
@@ -179,9 +179,15 @@ Downhill y BMX (10-15 min).
 
 - **Reseñas (Google):** invita a dejar reseña con el **enlace directo de
   "escribir reseña"** → https://g.page/r/CW6uBmyymSHlEBM/review
-- **Aeropuerto / transporte / supermercados cercanos:** ⚠️ POR CONFIRMAR
-  (distancia al aeropuerto La Nubia, taxi/app recomendada, supermercado más
-  cercano).
+**Logística (aeropuerto, transporte, mercados):**
+- **Aeropuerto La Nubia:** a **6,5 km**, ~**15–20 min** en carro.
+- **Transporte:** en Manizales **Uber y Didi NO funcionan**; inDrive funciona pero
+  con pocos conductores. **Lo recomendado son los taxis**, que se piden por la app
+  de taxis o por **WhatsApp al +57 300 884 4444**.
+- **Supermercados cercanos:**
+  - D1 → https://maps.app.goo.gl/rQ3A9qttfaxQRC5B9
+  - Mercaldas → https://maps.app.goo.gl/kGAoAGndRbLj9JmW9
+  - Tienda Ara → https://maps.app.goo.gl/YpwRRhU8gpALLPdV6
 
 <!-- BOT-KNOWLEDGE:END -->
 
@@ -203,8 +209,10 @@ Downhill y BMX (10-15 min).
 - **No urgente / administrativo:** el bot envía los **horarios de atención** y
   avisa que **se atenderá tan pronto sea posible**.
 
-⚠️ POR DEFINIR para implementar: los **números** (primer responsable, recepción,
-dueños) y el proveedor de telefonía/llamadas.
+**Números de escalamiento:**
+- **Dueños:** +57 305 746 5544 · +57 316 329 2157.
+- ⚠️ POR DEFINIR: el **primer responsable / recepción** (a quién se llama primero
+  antes que a los dueños) y el **proveedor de telefonía** para las llamadas.
 
 ## 10. Límites del bot (lo que NO debe hacer)
 
@@ -231,7 +239,7 @@ Casi todo resuelto en esta ronda (2026-06-24). Lo que **sigue pendiente**:
 4. **Desayuno: menú PENDIENTE** — el dueño lo enviará para agregarlo (§5 / `pendientes.md`).
 5. ~~Reglas de mascotas.~~ ✅ Máx. 2, no dejarlas solas (§5); larga estadía 200k+500k (§6).
 6. ~~Aseo.~~ ✅ Corta: diario · larga: semanal (§5).
-7. **Escalamiento por llamada: faltan los NÚMEROS** (primer responsable, recepción, dueños) y el proveedor de telefonía (§9 / `pendientes.md`).
+7. **Escalamiento por llamada:** dueños ✅ (+57 305 746 5544 / +57 316 329 2157). Faltan el **primer responsable/recepción** y el **proveedor de telefonía** (§9 / `pendientes.md`).
 8. ~~Factura.~~ ✅ Al titular; formulario para empresa/tercero (§3).
 9. ~~Recomendaciones de la zona.~~ ✅ Guía curada en §8.
 10. ~~¿Algo ante una queja?~~ ✅ El bot escala; no urgente → manda horarios; urgente → llamada (§9-§10).

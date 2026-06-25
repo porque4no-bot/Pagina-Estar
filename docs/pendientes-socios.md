@@ -251,10 +251,11 @@ Surgieron al completar la base de conocimiento del bot ([`bot-conocimiento.md`](
 - **Qué es:** que el bot, fuera de horario o ante una alarma, **llame** a un
   responsable ("huésped requiere atención") y, si no contestan en ~10 min, **llame
   a los dueños**, con historial y resumen.
-- **Qué necesito:** los **números** (primer responsable, recepción, dueños) y luz
+- **Estado:** números de **dueños listos** (+57 305 746 5544 / +57 316 329 2157).
+  Faltan: el **primer responsable/recepción** (a quién se llama primero) y luz
   verde para integrar un **servicio de telefonía** (ej. Twilio). Hoy el bot solo
   manda correo.
-- **Quién:** tú das números + decisión · yo integro la telefonía.
+- **Quién:** tú das el número de recepción + decisión de telefonía · yo integro.
 
 ### 5.5.5 — Solicitud de cambio de facturación (build)
 - **Qué es:** un **formulario en la web** para pedir factura a nombre de empresa/
