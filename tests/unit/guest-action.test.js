@@ -108,11 +108,11 @@ test('guest-action order: prices %-of-night services from the booking night base
     type: 'order',
     items: [
       { id: 'late_checkout', quantity: 1 }, // 15% × 320000 = 48000
-      { id: 'early_checkin', quantity: 1 }  // 35% × 320000 = 112000
+      { id: 'early_checkin', quantity: 1 }  // 25% × 320000 = 80000
     ]
   }, token));
   assert.equal(res.statusCode, 201);
-  assert.equal(body(res).total, 48000 + 112000);
+  assert.equal(body(res).total, 48000 + 80000);
 });
 
 test('guest-action order: rejects %-of-night services when the token has no night base', async () => {

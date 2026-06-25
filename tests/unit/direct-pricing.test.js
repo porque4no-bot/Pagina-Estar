@@ -74,15 +74,15 @@ test('decodeDirectReference rejects non-base64 garbage', () => {
   assert.equal(decodeDirectReference(null), null);
 });
 
-test('computeExtrasTotal: breakfast/parking fixed, late (15%) and early (35%) as % of base nightly', () => {
+test('computeExtrasTotal: breakfast/parking fixed, late (15%) and early (25%) as % of base nightly', () => {
   const { computeExtrasTotal } = require('../../netlify/functions/_direct-pricing');
   /* mask = desayuno+parqueadero+late+early, guests=2, nights=3, base 200k */
   const total = computeExtrasTotal('1111000', 2, 3, 200000);
   // desayuno: 20000 * 2 * 3 = 120000
   // parqueadero: 25000 * 3 = 75000
   // late: 15% of 200000 = 30000
-  // early: 35% of 200000 = 70000
-  assert.equal(total, 120000 + 75000 + 30000 + 70000);
+  // early: 25% of 200000 = 50000
+  assert.equal(total, 120000 + 75000 + 30000 + 50000);
 });
 
 test('computeExtrasTotal: mascota is a flat $200k charge regardless of nights', () => {

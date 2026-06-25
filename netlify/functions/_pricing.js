@@ -25,7 +25,7 @@ const EXTRAS_PRICES = {
   desayuno:    { price: 20000,  multiplier: 'perGuestPerNight' },
   parqueadero: { price: 25000,  multiplier: 'perNight' },   /* reservado (fuera de UI) */
   late:        { pct: 0.15,     multiplier: 'pctOfNight' },  /* check-out hasta 2pm = 15% */
-  early:       { pct: 0.35,     multiplier: 'pctOfNight' },  /* early check-in desde 6am = 35% (plano) */
+  early:       { pct: 0.25,     multiplier: 'pctOfNight' },  /* early check-in desde 6am = 25% (plano, decisión dueño 2026-06-24) */
   traslado:    { price: 0,      multiplier: 'flat' },        /* reservado */
   tour:        { price: 0,      multiplier: 'flat' },        /* reservado */
   mascota:     { price: 200000, multiplier: 'flat' }         /* $200k por reserva (IVA incluido) */
