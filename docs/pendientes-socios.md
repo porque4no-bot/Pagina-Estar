@@ -226,6 +226,45 @@ Esto **no lo puedo hacer yo** — necesito que tú lo consigas o lo decidas.
 
 ---
 
+## 5.5 Pendientes nuevos — ronda del bot de WhatsApp (2026-06-24)
+
+Surgieron al completar la base de conocimiento del bot ([`bot-conocimiento.md`](bot-conocimiento.md)).
+
+### 5.5.1 — ⚠️ Decisión de plata: early check-in ¿25% o 35%?
+- **Qué pasa:** dijiste que el early check-in es **25%** de la tarifa, pero el
+  **código del motor y del guest app hoy cobra 35%** (`_services-catalog.js`,
+  `_pricing.js`). El bot diría 25% y el sitio cobraría 35% → descuadre.
+- **Qué decides:** confirmar el **25%**. Si es así, yo lo cambio en el motor,
+  el guest app, los textos y la verificación de monto (deben quedar iguales).
+- **A tener en cuenta:** es un cambio de precio; lo hago solo con tu confirmación.
+- **Quién:** tú confirmas el % · yo lo aplico en todo el sistema.
+
+### 5.5.2 — Menú de desayuno (contenido tuyo)
+- El bot/sitio necesitan el **menú y qué incluye** el desayuno. Me lo envías y lo
+  agrego a la base de conocimiento.
+
+### 5.5.3 — Servicio/amenidad faltante (contenido tuyo)
+- Mencionaste un punto del listado (§5.6) que te faltaba enviar. Cuando lo tengas,
+  lo agrego.
+
+### 5.5.4 — Escalamiento del bot por LLAMADA (build)
+- **Qué es:** que el bot, fuera de horario o ante una alarma, **llame** a un
+  responsable ("huésped requiere atención") y, si no contestan en ~10 min, **llame
+  a los dueños**, con historial y resumen.
+- **Qué necesito:** los **números** (primer responsable, recepción, dueños) y luz
+  verde para integrar un **servicio de telefonía** (ej. Twilio). Hoy el bot solo
+  manda correo.
+- **Quién:** tú das números + decisión · yo integro la telefonía.
+
+### 5.5.5 — Solicitud de cambio de facturación (build)
+- **Qué es:** un **formulario en la web** para pedir factura a nombre de empresa/
+  tercero o una **nota crédito** si ya se emitió al titular, con un **filtro de
+  seguridad** (no permitir pedir un cambio sobre la misma factura más de una vez
+  de forma autónoma).
+- **Quién:** lo construyo yo · tú confirmas la regla del filtro.
+
+---
+
 ## 6. Técnicos menores (informativo — los resuelvo yo)
 
 No necesitan decisión tuya; los dejo anotados para que sepas que existen:

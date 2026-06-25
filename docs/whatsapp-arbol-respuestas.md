@@ -36,9 +36,9 @@ es código, no confianza en el modelo.
 | ¿Qué tipos de apartaestudio hay? / fotos | 🟢 | 5 tipologías; enlace al sitio |
 | ¿Cuánto cuesta del X al Y para N personas? | 🔵 | **Disponibilidad + precio en vivo (OTASync)**; devuelve enlace de reserva |
 | ¿Tienen disponibilidad para [fechas]? | 🔵 | Igual que arriba |
-| ¿Aceptan mascotas? ¿cuánto? | 🟢 | Sí; **$200k fijos por reserva** (corta). Larga estadía: por confirmar (ver `bot-conocimiento.md` §5/§6) |
-| ¿Tienen parqueadero? | 🟢 | No propio; parqueadero público cercano |
-| ¿Métodos de pago? | 🟢 | Tarjeta, PSE, Nequi, Bancolombia (Wompi) |
+| ¿Aceptan mascotas? ¿cuánto? | 🟢 | Sí; **$200k por reserva** (corta), máx. 2, no dejarlas solas. Larga: 200k + depósito 500k reembolsable |
+| ¿Tienen parqueadero? | 🟢 | No propio; **zona azul al frente** + parqueadero cerrado a ~20 m |
+| ¿Métodos de pago? | 🟢 | **Solo en la web** (no detallar medios); todo por la pasarela |
 | ¿Política de cancelación? | 🟢 | 2 planes (Estricta/Flexible); enlace a `cancelacion.html` |
 | ¿Aire acondicionado / calefacción? | 🟢 | Clima templado; ventilador/calefactor a solicitud |
 | ¿Descuentos / promociones? | 🔴→🔵 | Si hay campaña definida, IA; si es negociación, humano |
@@ -156,10 +156,11 @@ Mensaje entra
 > ¡Sí, son bienvenidas! 🐾 En estadía corta hay un *cobro de aseo de $200.000* (no reembolsable). En larga estadía, además un *depósito reembolsable de $500.000*. ¿Para qué fechas viajas?
 
 **¿Tienen parqueadero?** — 🟢 [FIJO]
-> No tenemos parqueadero propio, pero hay un *parqueadero público muy cerca* (ajeno a la propiedad). ¿Te ayudo con algo más de tu reserva?
+> No tenemos parqueadero propio, pero justo *al frente hay zona azul* (parqueo en vía) y un *parqueadero público cerrado a unos 20 metros*. ¿Te ayudo con algo más?
 
 **¿Cómo puedo pagar?** — 🟢 [FIJO]
-> Puedes pagar con *tarjeta, PSE, Nequi o Bancolombia* a través de la pasarela segura en la web. El pago siempre es en la página, nunca por chat.
+> El pago es *en línea, en la web*, a través de nuestra pasarela segura. Para reservar se paga por la plataforma; nunca por chat. ¿Te paso el enlace con tus fechas?
+- _Nota:_ no detallar medios específicos (efectivo/transferencia); todo se dirige a la web.
 
 **¿Cuál es la política de cancelación?** — 🟢 [FIJO] [WEB]
 > Manejamos 2 planes: *Estricta* (más económica, cancelas gratis hasta 7 días antes) y *Flexible* (gratis hasta 24 h antes). Fuera de plazo se cobra la 1ª noche + impuestos + 3,5%. Detalle: estar.com.co/cancelacion.html
@@ -205,14 +206,18 @@ Mensaje entra
 - _Datos:_ patrón fijo (red `estar<#apto>` / clave `<#apto>estar`). Si el bot conoce el # de apto (vía `lookup_booking`), puede dar la red exacta.
 
 **¿Cómo funciona el check-in digital / mis códigos?** — 🟢 [FIJO] [WEB]
-> Todo es digital, sin recepción: *un día antes* te llega un enlace con tus *códigos de acceso*. Entras directo, sin llaves. Aquí tu portal: estar.com.co/guest.html
+> El ingreso es *autónomo y digital*: un día antes te llega un enlace con tus *códigos de acceso* (sin llaves). Igual contamos con *recepción de 6–10 am y 4–10 pm* para lo que necesites. Tu portal: estar.com.co/guest.html
+
+**¿A qué hora atiende recepción / hay alguien?** — 🟢 [FIJO]
+> El ingreso es autónomo, pero tenemos *recepción de 6:00–10:00 am y de 4:00–10:00 pm* para atenderte. En esos horarios también puedes *dejar equipaje* o pedir una *tarjeta de ingreso*.
 
 **No me llegaron los códigos / no entra la clave** — 🔴 [HUMANO — urgente]
 > Eso lo resolvemos ya. Te paso con el equipo de inmediato 🙏 ¿Tu código de reserva y a qué apartaestudio llegas?
 - _Acción:_ `notify_team` marcado urgente (acceso = nunca esperar al bot).
 
-**Quiero late check-out / early check-in** — 🔵 [FIJO precio] → 🔴/[WEB] para ejecutar
-> Claro: *late check-out* (hasta 2 pm) y *early check-in* (desde 6 am) tienen un costo según tu tarifa. Puedes solicitarlo desde tu *portal de huésped* (estar.com.co/guest.html) o te paso con el equipo. ¿Cuál prefieres?
+**Quiero late check-out / early check-in** — 🔵 [FIJO precio] → [WEB]/🔴 para ejecutar
+> Claro: *early check-in* desde las 6 am (25% de la tarifa, sujeto a disponibilidad) y *late check-out* hasta las 2 pm (15%). Lo gestionas desde tu *portal de huésped* (estar.com.co/guest.html) o te paso con recepción. ¿Cuál necesitas?
+- _Datos:_ early = **25%** desde 6 am (antes de las 6 am se cobra la noche previa); late = 15% hasta 2 pm (más tarde → reservar otra noche). ⚠️ Verificar que el motor cobre 25% (hoy el código dice 35% — ver `pendientes.md`).
 
 **Pedir toallas / aseo / algo a la habitación** — 🔵 [PIDE] → 🔴 ejecuta
 > ¡Anotado! ¿Qué necesitas y a qué apartaestudio? Lo paso al equipo para que te lo lleve.
@@ -231,8 +236,8 @@ Mensaje entra
 > Te ayudamos a recuperarlo. Te paso con el equipo. ¿Qué olvidaste y en qué apartaestudio/fechas te alojaste?
 
 **¿Dónde dejo una reseña?** — 🟢 [FIJO] [WEB]
-> ¡Nos encantaría leerte! 🙏 Déjanos tu reseña en Google aquí: https://share.google/0RcHkOyTWXTNrj8oH ¡Gracias por elegir Estar!
-- _Datos:_ enlace del perfil de Google de Hotel Estar. _(Pendiente: cambiarlo por el enlace directo `g.page/r/.../review` para que abra el cuadro de reseña de un clic — ver `bot-conocimiento.md`.)_
+> ¡Nos encantaría leerte! 🙏 Déjanos tu reseña en Google aquí: https://g.page/r/CW6uBmyymSHlEBM/review ¡Gracias por elegir Estar!
+- _Datos:_ enlace directo de "escribir reseña" del perfil de Google de Hotel Estar.
 
 **Estado de mi reembolso** — 🔵 [OTASYNC/PIDE] → 🔴 gestión
 > Lo reviso. ¿Tu *código de reserva* y *email/apellido*? El estado y el giro del reembolso los gestiona el equipo dentro del plazo de la política.
