@@ -27,6 +27,9 @@
      back to the deterministic state machine — same convention as every
      other credential-gated integration in this repo. */
 
+const fs = require('fs');
+const path = require('path');
+
 const SITE_URL = process.env.URL || 'https://estar.com.co';
 /* Haiku by default: this is a latency-sensitive chat surface running inside a
    Netlify function timeout, the job is well-scoped (short turns, 4 tools) and
@@ -146,22 +149,54 @@ function roomCatalog(roomMeta) {
     .join('\n');
 }
 
+/* Base de conocimiento editable (docs/bot-conocimiento.md). El bot la carga en
+   tiempo de ejecución (incluida en el bundle vía included_files en netlify.toml),
+   así el dueño edita el archivo y el bot se actualiza sin tocar código. Solo se
+   toma la zona entre los marcadores BOT-KNOWLEDGE:START/END y se filtran las
+   líneas internas (⚠️). Cacheado y a prueba de fallos: si no se puede leer,
+   buildSystemPrompt usa un bloque mínimo de respaldo. */
+let _knowledgeCache;
+function loadKnowledge() {
+  if (_knowledgeCache !== undefined) return _knowledgeCache;
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, '../../docs/bot-conocimiento.md'), 'utf8');
+    const m = raw.match(/<!--\s*BOT-KNOWLEDGE:START[\s\S]*?-->([\s\S]*?)<!--\s*BOT-KNOWLEDGE:END\s*-->/);
+    const body = (m ? m[1] : '').trim();
+    _knowledgeCache = body
+      ? body.split('\n').filter(line => !line.includes('⚠️')).join('\n').replace(/\n{3,}/g, '\n\n').trim()
+      : '';
+  } catch (e) {
+    _knowledgeCache = '';
+  }
+  return _knowledgeCache;
+}
+
+const FALLBACK_HOTEL = `# El hotel
+- Apartaestudios completos: cocina equipada, baño privado, WiFi de fibra, TV cable, zona de trabajo.
+- Check-in desde las 3:00 pm (ingreso autónomo digital; recepción 6–10 am y 4–10 pm) · Check-out 11:00 am.
+- No hay parqueadero propio (zona azul al frente). Mascotas bienvenidas ($200.000 por reserva).
+- Tarifas: "Estricta" (gratis hasta 7 días antes) y "Flexible" (+10%, hasta 24 h antes).
+- Larga estadía: ${SITE_URL}/vivir.html · Empresas/grupos: ${SITE_URL}/empresas.html (usa notify_team).
+- Teléfono del hotel: +57 310 249 0414.`;
+
 function buildSystemPrompt(roomMeta, todayIso) {
+  const knowledge = loadKnowledge();
+  const hotelBlock = knowledge
+    ? `# El hotel — base de conocimiento (fuente de verdad)
+Tipologías disponibles (capacidades, para validar):
+${roomCatalog(roomMeta)}
+
+${knowledge}`
+    : `${FALLBACK_HOTEL}
+- Tipologías:
+${roomCatalog(roomMeta)}`;
+
   return `Eres el asistente de Estar, un hotel boutique de apartaestudios en Manizales, Colombia. Atiendes huéspedes por WhatsApp.
 
 # Tu trabajo
 Resolver con calidez y eficiencia: disponibilidad y reservas, consultas sobre reservas existentes, cancelaciones, estadías largas, empresas, y preguntas generales del hotel. Responde en el idioma del huésped (español por defecto).
 
-# El hotel
-- Apartaestudios completos: cocina equipada, baño privado, WiFi de fibra, TV cable, zona de trabajo.
-- Tipologías:
-${roomCatalog(roomMeta)}
-- Check-in: desde las 3:00 pm · Check-out: hasta las 11:00 am. Check-in 100% digital: un día antes llega un enlace con códigos de acceso (sin llaves físicas ni recepción).
-- No ofrecemos parqueadero propio; hay un parqueadero público cercano (ajeno a la propiedad). Mascotas bienvenidas: cobro de aseo de $200.000 no reembolsable (en larga estadía, además un depósito reembolsable de $500.000).
-- Tarifas en el motor: "Estricta" (más económica, cancelación gratis hasta 7 días antes del check-in) y "Flexible" (cancelación gratis hasta 24 h antes). Fuera de ese plazo se cobra la 1ª noche + impuestos + 3,5%; si no cancelas y pasan 24 h del check-in, sin reembolso.
-- Estadías largas ("Vivir en Estar"): 1 a 12 meses, todo incluido (servicios, internet, aseo semanal), sin fiadores, tarifas mensuales con IVA incluido. Detalles: ${SITE_URL}/vivir.html — las cotizaciones las hace el equipo (usa notify_team).
-- Empresas y grupos: tarifas corporativas y cotizaciones formales, ${SITE_URL}/empresas.html — también vía notify_team.
-- Teléfono del hotel: +57 310 249 0414.
+${hotelBlock}
 
 # Reglas duras
 1. NUNCA inventes precios ni disponibilidad: usa check_availability. Si el huésped no da fechas o número de personas, pídelos.

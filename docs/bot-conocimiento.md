@@ -16,6 +16,11 @@ atender. Tiene dos propósitos:
 
 ---
 
+<!-- BOT-KNOWLEDGE:START — todo lo que está entre estos marcadores se carga en el
+     contexto del bot en tiempo de ejecución (_whatsapp-ai.js). Las líneas con ⚠️
+     se filtran automáticamente (no llegan al bot). NO muevas los marcadores sin
+     querer. -->
+
 ## 1. El alojamiento
 
 - **Qué es:** apartaestudios completos (no habitaciones de hotel) en Manizales,
@@ -177,6 +182,8 @@ Downhill y BMX (10-15 min).
 - **Aeropuerto / transporte / supermercados cercanos:** ⚠️ POR CONFIRMAR
   (distancia al aeropuerto La Nubia, taxi/app recomendada, supermercado más
   cercano).
+
+<!-- BOT-KNOWLEDGE:END -->
 
 ## 9. Situaciones especiales — protocolo de escalamiento
 

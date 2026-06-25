@@ -4,7 +4,7 @@
   functions = "netlify/functions"
 
 [functions]
-  included_files = ["rooms_db.json"]
+  included_files = ["rooms_db.json", "docs/bot-conocimiento.md"]
   node_bundler = "esbuild"
   # Kept external (copied into the bundle instead of esbuild-bundled) because
   # of dynamic requires. NOTE: externals and their dependency trees are copied
