@@ -35,7 +35,10 @@ const ALL_PERMISSIONS = [
   'invoices.request',              // solicitar factura de una reserva
   'integrations.probe',            // health checks (odoo/drive/whatsapp probe)
   'integrations.credentials.upload', // subir credenciales (drive service account)
-  'settings.manage'                // gestionar toggles/configuración no secreta del panel
+  'settings.manage',               // gestionar toggles/configuración no secreta del panel
+  'invoices.view',                 // ver los borradores de factura pendientes de emitir
+  'invoices.issue',                // emitir / anular / nota crédito (facturación electrónica DIAN)
+  'docs.view'                      // ver el registro de documentos legales de la empresa
 ];
 
 const PERMISSION_SET = new Set(ALL_PERMISSIONS);
@@ -53,14 +56,17 @@ const DEFAULT_ROLES = {
     'refunds.view',
     'breakfast.status', 'breakfast.redeem', 'breakfast.day',
     'guests.register', 'guests.checkin.view',
-    'invoices.request'
+    'invoices.request',
+    'docs.view'
   ],
   cocina: ['breakfast.status', 'breakfast.redeem', 'breakfast.day'],
   tesoreria: [
     'quotes.view', 'quotes.audit.read',
     'refunds.view', 'refunds.approve', 'refunds.deny', 'refunds.set_amount', 'refunds.mark_done',
     'breakfast.analytics',
-    'invoices.request'
+    'invoices.request',
+    'invoices.view', 'invoices.issue',
+    'docs.view'
   ]
 };
 
@@ -72,6 +78,16 @@ const ROLE_LABELS = {
   recepcion: { es: 'Recepción', en: 'Front desk' },
   cocina: { es: 'Cocina', en: 'Kitchen' },
   tesoreria: { es: 'Tesorería', en: 'Treasury' }
+};
+
+/* Etiquetas ES/EN de PERMISOS para la UI. Hasta ahora los permisos solo tenían
+   el comentario en línea; este mapa expone el nombre legible en ambos idiomas.
+   Es opcional para la UI (puede caer al id si un permiso no está aquí) y por eso
+   solo cubrimos los permisos nuevos de facturación/documentos legales. */
+const PERMISSION_LABELS = {
+  'invoices.view':  { es: 'Ver facturas pendientes', en: 'View pending invoices' },
+  'invoices.issue': { es: 'Emitir / anular / nota crédito', en: 'Issue / void / credit note' },
+  'docs.view':      { es: 'Ver documentos legales', en: 'View legal documents' }
 };
 
 /* Permisos que otorga estar en STAFF_EMAILS (comportamiento actual del panel de
@@ -99,6 +115,6 @@ function permissionsForRoles(roleIds, customRoles) {
 
 module.exports = {
   ALL_PERMISSIONS, PERMISSION_SET, isValidPermission,
-  DEFAULT_ROLES, BUILTIN_ROLE_IDS, ROLE_LABELS,
+  DEFAULT_ROLES, BUILTIN_ROLE_IDS, ROLE_LABELS, PERMISSION_LABELS,
   STAFF_ENV_PERMISSIONS, permissionsForRoles
 };

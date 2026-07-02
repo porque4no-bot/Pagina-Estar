@@ -372,20 +372,24 @@ Notas de implementación:
 - Reescribir `cancelacion.html` / `en/cancelacion.html` (secciones 1 y 2),
   etiquetas de tarifa en `motor-app.jsx` + `i18n/motor.*.json`, system prompt
   del bot, y la política que muestra `ManageBooking`.
+- **✅ DECIDIDO (1-jul, DEFINITIVO):** en el **detalle de la reserva en OTASync debe
+  quedar el PLAN COMPRADO** (Estricta/Flexible), legible por reserva. Y para las
+  reservas de **OTA hay que averiguar cómo EXTRAER el plan comprado desde Booking,
+  Airbnb y Expedia** (channel manager/OTASync o APIs de cada OTA) para reflejarlo.
+  Ver memoria `decisiones-tarifas-checkin`.
 
 ### 6.5 Reprecio de extras (late checkout / early check-in)
-Dejan de ser montos fijos; pasan a **% del precio estándar por noche** de la
-habitación (tarifa base/Estricta):
 - **Late checkout** hasta las **2:00 PM** → **15%** de la noche estándar.
   (Hoy: $60.000 fijo, "hasta las 3:00 pm" — cambia hora y modelo.)
-- **Early check-in** escalonado (entre más temprano, más caro):
-  - Entrada **2 h antes** del check-in (≈1:00 PM) → **15%**
-  - Entrada desde las **10:00 AM** → **35%**
-  - Entrada desde las **6:00 AM** (o antes) → **50%**
-  (Hoy: $50.000 fijo, "desde las 10:00 am".)
-- Impacto: `_pricing.js` (multiplicadores % en vez de `flat`), `reservar.html`
-  (`BE_EXTRAS` + cálculo), y el system prompt del bot. El early pasa de 1 a 3
-  opciones — revisar el `extrasMask` de la referencia Wompi.
+- **Early check-in — ✅ DECIDIDO (1-jul, DEFINITIVO · no re-litigar):** **fijo 25%**
+  de la noche, **redondeado a los $5.000 más próximos** (se DESCARTA el escalonado
+  15/35/50). **Sujeto a disponibilidad** (solo si no hay conflicto con otra reserva
+  en esa habitación) y **comprable SOLO al momento del check-in** (que se puede hacer
+  el día antes) — se ofrece/cobra desde la **guest app**, no al reservar. Detalle en
+  la memoria `decisiones-tarifas-checkin`.
+  - Falta implementar: redondeo a 5k, chequeo de no-conflicto en la habitación
+    (OTASync), y sacar el early como extra del momento de reservar. Hoy ya está al
+    25% plano en las 3 superficies.
 - Pendiente: ¿desayuno ($20k/persona/noche) se mantiene igual? (no se mencionó)
 
 ### 6.6 Métodos de pago en la web (PSE y Nequi)

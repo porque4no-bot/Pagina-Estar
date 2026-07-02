@@ -65,3 +65,32 @@ test('getAllEffective reporta el origen (panel vs netlify) y solo claves gestion
   assert.equal(eff.OTASYNC_TOKEN, undefined); // los secretos NO aparecen
   delete process.env.WHATSAPP_BOT_ENABLED;
 });
+
+test('getSync: override del panel (cache caliente) gana para clave gestionable', async () => {
+  await settings.loadOverrides({ store: storeWith({ ADMIN_NOTIFY_EMAIL: 'panel@estar.co' }) });
+  assert.equal(settings.getSync('ADMIN_NOTIFY_EMAIL', 'def@estar.co'), 'panel@estar.co');
+});
+
+test('getSync: clave gestionable sin override cae a env y luego a default', async () => {
+  await settings.loadOverrides({ store: storeWith({}) }); // cache caliente pero vacío
+  const prev = process.env.ADMIN_NOTIFY_EMAIL;
+  process.env.ADMIN_NOTIFY_EMAIL = 'env@estar.co';
+  try {
+    assert.equal(settings.getSync('ADMIN_NOTIFY_EMAIL', 'def@estar.co'), 'env@estar.co');
+    delete process.env.ADMIN_NOTIFY_EMAIL;
+    assert.equal(settings.getSync('ADMIN_NOTIFY_EMAIL', 'def@estar.co'), 'def@estar.co');
+  } finally {
+    if (prev === undefined) delete process.env.ADMIN_NOTIFY_EMAIL; else process.env.ADMIN_NOTIFY_EMAIL = prev;
+  }
+});
+
+test('getSync SEGURIDAD: una clave NO gestionable (secreto) IGNORA el cache, solo env', async () => {
+  await settings.loadOverrides({ store: storeWith({ OTASYNC_TOKEN: 'leak-del-store' }) });
+  const prev = process.env.OTASYNC_TOKEN;
+  delete process.env.OTASYNC_TOKEN;
+  try {
+    assert.equal(settings.getSync('OTASYNC_TOKEN', ''), ''); // jamás el valor del store
+  } finally {
+    if (prev === undefined) delete process.env.OTASYNC_TOKEN; else process.env.OTASYNC_TOKEN = prev;
+  }
+});

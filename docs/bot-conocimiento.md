@@ -193,9 +193,16 @@ Downhill y BMX (10-15 min).
 
 ## 9. Situaciones especiales — protocolo de escalamiento
 
-> El escalamiento deseado es por **llamada telefónica** (no solo correo). Eso
-> **requiere una integración de telefonía** (ej. Twilio): hoy el bot solo manda
-> correo (`notify_team`). El protocolo objetivo es el siguiente — ver `pendientes.md`.
+> El escalamiento prioritario es por **LLAMADA**; si la llamada está apagada o
+> falla, cae a una **alerta** (correo + tarea en /admin).
+>
+> **Decisión (2026-06-25):** la llamada se hace con un **número de VOZ de Twilio
+> APARTE** (PSTN), dedicado solo a alertas internas → **no se migra el WhatsApp del
+> hotel** y encaja con el stack serverless (la función dispara la llamada y Twilio
+> maneja el audio). **Backend YA construido y gated** (`_twilio-voice` +
+> `_escalation`, flag `ESCALATION_CALL_ENABLED`); el bot lo dispara cuando marca un
+> caso `urgent` en `notify_team`. **Falta solo:** cargar las credenciales de Twilio
+> y prender el flag (pruebas en pre-producción). Ver `pendientes.md` §5.5.4.
 
 - **Acceso / no llega el código (fuera del horario de recepción):** escalar con
   **llamada** a un **primer número responsable** con el aviso _"huésped requiere
@@ -207,12 +214,20 @@ Downhill y BMX (10-15 min).
 - **Señal de alarma / seguridad** (el guard marca 3 strikes): escalamiento a
   humano con **llamada + historial + resumen** de la conversación.
 - **No urgente / administrativo:** el bot envía los **horarios de atención** y
-  avisa que **se atenderá tan pronto sea posible**.
+  avisa que **se atenderá tan pronto sea posible** (sin llamada).
+- **Fallback de la llamada:** si la llamada falla (o `ESCALATION_CALL_ENABLED` está
+  apagado), cae a una **alerta** — correo + tarea en /admin — y, en su defecto, un
+  **mensaje de urgencia** por WhatsApp ("⚠️ Huésped requiere atención — [resumen]").
+  _(Twilio PSTN no tiene tope de 5/24h ni opt-in de Meta; eso era de la WhatsApp
+  Calling API, descartada.)_
 
 **Números de escalamiento:**
 - **Dueños:** +57 305 746 5544 · +57 316 329 2157.
-- ⚠️ POR DEFINIR: el **primer responsable / recepción** (a quién se llama primero
-  antes que a los dueños) y el **proveedor de telefonía** para las llamadas.
+- **Primer responsable / recepción** (a quién se llama **primero**, antes que a los
+  dueños): **+57 321 859 8686** (confirmado por el dueño, 2026-06-25).
+- **Medio de llamada:** **Twilio PSTN** — un número de voz aparte que marca al
+  celular real; no toca el WhatsApp del hotel (ver `pendientes.md` §5.5.4). Orden de
+  `ESCALATION_PHONE_NUMBERS`: recepción → dueños.
 
 ## 10. Límites del bot (lo que NO debe hacer)
 
@@ -239,7 +254,7 @@ Casi todo resuelto en esta ronda (2026-06-24). Lo que **sigue pendiente**:
 4. **Desayuno: menú PENDIENTE** — el dueño lo enviará para agregarlo (§5 / `pendientes.md`).
 5. ~~Reglas de mascotas.~~ ✅ Máx. 2, no dejarlas solas (§5); larga estadía 200k+500k (§6).
 6. ~~Aseo.~~ ✅ Corta: diario · larga: semanal (§5).
-7. **Escalamiento por llamada:** dueños ✅ (+57 305 746 5544 / +57 316 329 2157). Faltan el **primer responsable/recepción** y el **proveedor de telefonía** (§9 / `pendientes.md`).
+7. ~~Escalamiento por llamada.~~ ✅ Recepción +57 321 859 8686 (1ª llamada) → dueños +57 305 746 5544 / +57 316 329 2157. Proveedor: Twilio PSTN (§9 / `pendientes.md`).
 8. ~~Factura.~~ ✅ Al titular; formulario para empresa/tercero (§3).
 9. ~~Recomendaciones de la zona.~~ ✅ Guía curada en §8.
 10. ~~¿Algo ante una queja?~~ ✅ El bot escala; no urgente → manda horarios; urgente → llamada (§9-§10).

@@ -248,14 +248,51 @@ Surgieron al completar la base de conocimiento del bot ([`bot-conocimiento.md`](
   lo agrego.
 
 ### 5.5.4 — Escalamiento del bot por LLAMADA (build)
-- **Qué es:** que el bot, fuera de horario o ante una alarma, **llame** a un
-  responsable ("huésped requiere atención") y, si no contestan en ~10 min, **llame
-  a los dueños**, con historial y resumen.
-- **Estado:** números de **dueños listos** (+57 305 746 5544 / +57 316 329 2157).
-  Faltan: el **primer responsable/recepción** (a quién se llama primero) y luz
-  verde para integrar un **servicio de telefonía** (ej. Twilio). Hoy el bot solo
-  manda correo.
-- **Quién:** tú das el número de recepción + decisión de telefonía · yo integro.
+- **Qué es:** que el bot, ante un caso URGENTE, **llame** por teléfono al
+  responsable ("huésped requiere atención"). Si la llamada está **apagada o falla**,
+  cae a una **alerta** (correo + tarea en /admin).
+- **El verdadero esfuerzo del build NO es el tope, es el AUDIO.** Colocar una
+  llamada por la API de WhatsApp obliga a manejar el media de voz (WebRTC/SDP) en
+  el backend; una función serverless no sostiene bien una sesión de voz. Caminos:
+  - **(a) WhatsApp API directa:** mantienes todo como está, pero construyes tú el
+    stack de audio (WebRTC). Build alto.
+  - **(b) Proveedor que envuelve WhatsApp Calling (ej. Twilio):** Twilio maneja el
+    audio (solo escribes TwiML `<Say>`/`<Play>`), PERO exige **registrar el número
+    de WhatsApp EN Twilio** → migrar TODA la integración (mensajería + bot +
+    webhook) de la Cloud API directa a Twilio, y pagar por uso también la
+    mensajería. La llamada sigue siendo VoIP de WhatsApp (no se puede pasar a un
+    teléfono normal). Migración grande.
+  - **(c) Llamada telefónica normal (PSTN) vía Twilio** ⭐ — Twilio marca al
+    **celular** del responsable; **no toca el número de WhatsApp** (el bot sigue en
+    Cloud API). Suena como llamada normal (aunque no tenga WhatsApp abierto). Build
+    bajo. Es la más simple/confiable para "que suene y despierte a alguien".
+  - **Recomendación:** mensaje de urgencia ya; si se necesita timbre real, **(c)**;
+    (b) solo si algún día se migra toda la operación de WhatsApp a Twilio.
+- **DECISIÓN (2026-06-25, dueño):** ir por **(c) con un número de VOZ de Twilio
+  APARTE**, dedicado solo a las alertas internas. Así NO se migra nada de WhatsApp
+  (el bot/webhook siguen en la Cloud API directa) y encaja con el stack serverless:
+  la función de Netlify solo dispara una llamada a la API de Twilio y Twilio maneja
+  todo el audio + marca al celular real del responsable. Costo ~US$1–2/mes + minutos;
+  build bajo. (Un segundo número de WhatsApp en Twilio también evitaría migrar, pero
+  tiene más trámite y opt-in; el número de voz es mejor para alertas internas.)
+- **✅ BACKEND CONSTRUIDO (2026-06-25, gated, sin desplegar):** `_twilio-voice.js`
+  (cliente de voz mock-safe) + `_escalation.js` (llamada prioritaria → fallback a
+  alerta correo+tarea), cableado en el bot (`notify_team` con campo `urgent`). Flag
+  `ESCALATION_CALL_ENABLED` (OFF) gestionable desde /admin. Tests: twilio-voice (6)
+  + escalation (6). **Lo único que falta es tu parte:**
+  1. Crear la cuenta **Twilio** y comprar un **número de voz** (PSTN).
+  2. Cargar en Netlify: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+     `TWILIO_VOICE_NUMBER`, `ESCALATION_PHONE_NUMBERS` (a quién llama; ya los
+     tenemos todos → recepción **+57 321 859 8686** primero, luego dueños
+     +57 305 746 5544 / +57 316 329 2157) y prender `ESCALATION_CALL_ENABLED`.
+  3. Probar una llamada real (**pre-producción**).
+- _Los números (`ESCALATION_PHONE_NUMBERS`) y el flag `ESCALATION_CALL_ENABLED` se
+  **editan desde /admin → Configuración** sin redeploy (no son secretos); solo las
+  credenciales de Twilio (SID / Auth Token / número de voz) van en Netlify._
+- _Nota: como es PSTN, **no** aplica el opt-in de Meta ni el tope de 5/día (eso era
+  solo de la WhatsApp Calling API, que descartamos)._
+- **Mientras tanto:** el bot ya escala por **correo + tarea** (el fallback) sin nada
+  nuevo; la llamada se suma cuando cargues Twilio.
 
 ### 5.5.5 — Solicitud de cambio de facturación (build)
 - **Qué es:** un **formulario en la web** para pedir factura a nombre de empresa/
@@ -263,6 +300,23 @@ Surgieron al completar la base de conocimiento del bot ([`bot-conocimiento.md`](
   seguridad** (no permitir pedir un cambio sobre la misma factura más de una vez
   de forma autónoma).
 - **Quién:** lo construyo yo · tú confirmas la regla del filtro.
+
+### 5.5.6 — Andamiaje construido (1-jul) — solo faltan credenciales
+Se construyó, **apagado y probado** (build ✅, 789/796 tests, sin fallos nuevos), el
+andamiaje de: **facturación por API de Numera** (dry-run: arma y valida, no emite),
+**TRA** (API MinCIT), **SIRE** (generador de archivo plano) y el **registro de
+documentos legales** (alertas de vencimiento, lee la carpeta de Drive). Nada emite ni
+reporta hasta que tú lo enciendas. Lo ÚNICO que falta es **cargar credenciales (tu parte)**:
+- **Twilio (llamada de escalamiento):** crear cuenta + comprar número de voz + cargar
+  `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_VOICE_NUMBER` y prender
+  `ESCALATION_CALL_ENABLED`. **El backend ya está 100% listo** (solo faltan tus datos).
+- **Numera:** `NUMERA_USERNAME` / `NUMERA_PASSWORD` / `NUMERA_COMPANY_ID` (+ resolver los
+  TODO con Numera vía el ticket). Ya tenemos el NIT: 902032515-0.
+- **TRA:** el `TRA_TOKEN` del RNT (RNT 276306 y NIT ya quedaron cargados). Confirmar los
+  campos con el MinCIT.
+- **SIRE:** `SIRE_HOTEL_CODE` + `SIRE_CITY_CODE`. Confirmar el formato con el portal de
+  Migración.
+Todo gestionable/gated desde /admin; nada se activa solo.
 
 ---
 

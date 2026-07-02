@@ -21,6 +21,8 @@ const MANAGEABLE = {
   // Operación / correos
   ALERT_ENABLED:                 { type: 'bool', group: 'Operación', label: 'Alertas operativas',
                                    desc: 'Envía un correo al equipo cuando algo falla en el sistema (un pago que no cuadra, un correo que no salió, etc.). Recomendado dejarlo activo.' },
+  ADMIN_NOTIFY_EMAIL:            { type: 'text', group: 'Operación', label: 'Correo de avisos del equipo',
+                                   desc: 'Dirección donde llegan los correos operativos y de escalamiento (alertas, pedidos del huésped, cancelaciones, etc.). NO es un correo de acceso al panel — eso se gestiona en Usuarios.' },
   STAY_EMAILS_ENABLED:           { type: 'bool', group: 'Operación', label: 'Correos pre-llegada / post-estadía',
                                    desc: 'Envía automáticamente el correo de bienvenida antes del check-in y el de agradecimiento después del checkout.' },
   STAY_EMAILS_PRE_DAYS:          { type: 'number', group: 'Operación', label: 'Días antes (pre-llegada)',
@@ -33,6 +35,10 @@ const MANAGEABLE = {
                                    desc: 'La nota que el huésped escribe al reservar se copia a la reserva dentro de OTASync, para que recepción la vea.' },
   BACKUP_ENABLED:                { type: 'bool', group: 'Operación', label: 'Respaldo diario de datos',
                                    desc: 'Hace una copia de seguridad diaria de los datos (cotizaciones, reembolsos, check-ins).' },
+  ESCALATION_CALL_ENABLED:       { type: 'bool', group: 'Operación', label: 'Llamada de escalamiento del bot (Twilio)',
+                                   desc: 'Cuando el bot marca un caso como urgente, llama por teléfono al responsable (vía Twilio, número de voz aparte). Si está apagado o falla, cae a una alerta por correo. Requiere cargar las credenciales de Twilio.' },
+  ESCALATION_PHONE_NUMBERS:      { type: 'text', group: 'Operación', label: 'Números a llamar en escalamiento (en orden)',
+                                   desc: 'Teléfonos que el bot llama cuando un caso es urgente, en formato internacional y separados por coma. Ej: +573218598686,+573057465544,+573163292157. Recepción primero, luego dueños. (Los números NO son secretos; las credenciales de Twilio sí, y esas viven solo en Netlify.)' },
   // Pagos / reembolsos
   REFUND_GATEWAY_AUTO_ENABLED:   { type: 'bool', group: 'Pagos', label: 'Auto-reembolso Mercado Pago al aprobar',
                                    desc: 'Cuando apruebas un reembolso de Mercado Pago en el panel, se ejecuta solo. Wompi NO tiene API → sigue siendo ticket manual.' },
@@ -62,11 +68,30 @@ const MANAGEABLE = {
                                    desc: 'El bot contesta automáticamente los mensajes de WhatsApp. Apágalo para que nadie reciba respuestas automáticas.' },
   WHATSAPP_GUARD_ENABLED:        { type: 'bool', group: 'WhatsApp', label: 'Guardián de seguridad del bot',
                                    desc: 'Filtro que revisa cada mensaje antes de que el bot responda, para bloquear intentos de fraude o de engañar al bot.' },
+  WHATSAPP_AI_MODEL:             { type: 'enum', group: 'WhatsApp', label: 'Modelo de IA del bot',
+                                   options: ['claude-haiku-4-5', 'claude-sonnet-4-6', 'claude-opus-4-8'],
+                                   desc: 'Modelo que usa el bot: haiku = más rápido y económico (recomendado para chat) · sonnet = equilibrio · opus = máxima calidad (más lento y caro). El bot está afinado para haiku.' },
   // Odoo (CRM / operación)
   HELPDESK_ENABLED:              { type: 'bool', group: 'Odoo', label: 'Tickets de PQR en Odoo Helpdesk',
                                    desc: 'Las solicitudes de servicio y las cancelaciones del huésped crean un ticket en Odoo Helpdesk para hacerles seguimiento.' },
   NPS_ENABLED:                   { type: 'bool', group: 'Odoo', label: 'Encuesta NPS en el correo post-estadía',
-                                   desc: 'Agrega el enlace a la encuesta de satisfacción en el correo de post-estadía. Necesita que los correos post-estadía estén activos.' }
+                                   desc: 'Agrega el enlace a la encuesta de satisfacción en el correo de post-estadía. Necesita que los correos post-estadía estén activos.' },
+  NPS_SURVEY_URL:                { type: 'text', group: 'Odoo', label: 'URL de la encuesta NPS',
+                                   desc: 'Enlace de la encuesta de satisfacción que va en el correo post-estadía (cuando la NPS está activa). Si se deja vacío, se usa la encuesta por defecto.' },
+  HELPDESK_TEAM_ID:              { type: 'number', group: 'Odoo', label: 'Equipo de Helpdesk (Odoo)',
+                                   desc: 'Id del equipo de Odoo Helpdesk donde se abren los tickets de PQR. Por defecto 3 (Atención al cliente).' },
+  // Facturación
+  NUMERA_INVOICING_ENABLED:      { type: 'bool', group: 'Facturación', label: 'Emitir facturas electrónicas (Numera/DIAN)',
+                                   desc: 'Activa la emisión REAL de facturas electrónicas ante la DIAN vía Numera. Con esto apagado, todo queda en borrador (no se emite nada). Requiere cargar las credenciales de Numera en Netlify. Probar contra la respuesta del proveedor antes de encender.' },
+  // Recepción / Legal
+  TRA_ENABLED:                   { type: 'bool', group: 'Recepción/Legal', label: 'Reportar estadías al TRA (MinCIT)',
+                                   desc: 'Reporta cada estadía (todos los huéspedes) al Registro Nacional de Turismo vía la API del TRA. Requiere cargar el token del RNT en Netlify. Confirmar los campos con el MinCIT antes de encender.' },
+  SIRE_ENABLED:                  { type: 'bool', group: 'Recepción/Legal', label: 'Generar archivo SIRE (extranjeros)',
+                                   desc: 'Habilita la generación del archivo plano de SIRE (Migración Colombia) para huéspedes extranjeros. SIRE no tiene API: el archivo se sube a mano al portal. Confirmar el formato con el portal antes de encender.' },
+  LEGAL_DOCS_ENABLED:            { type: 'bool', group: 'Recepción/Legal', label: 'Registro de documentos legales',
+                                   desc: 'Muestra el registro de documentos legales de la empresa (RUT, RNT, Cámara de Comercio, certificaciones bancarias) con alertas de vigencia. Lee la carpeta de Google Drive configurada.' },
+  LEGAL_DOCS_REQUEST_CONTACT:    { type: 'text', group: 'Recepción/Legal', label: 'Contacto para solicitar documentos',
+                                   desc: 'Número o correo que aparece en la alerta cuando un documento está vencido o por vencer ("solicítalo a …"). Por ahora, el número de gerencia (primer número de escalamiento).' }
 };
 
 function isManageable(key) { return Object.prototype.hasOwnProperty.call(MANAGEABLE, String(key || '')); }
@@ -114,6 +139,25 @@ async function flag(key, deps = {}) {
   return String(await get(key, '', deps)).toLowerCase() === 'true';
 }
 
+/* Lectura SÍNCRONA del valor efectivo, para call sites que NO pueden ser async
+   (helpers compartidos ya usados en contexto sync, p.ej. adminEmail() de _email).
+   Usa el snapshot de overrides en memoria (_cache, si ya se cargó) → env → fallback.
+   "Eventualmente consistente": el snapshot se calienta con cualquier get()/flag()/
+   preload() async previo del MISMO proceso. En un cold start sin lectura async
+   previa, cae a env (nunca rompe). Claves NO gestionables: solo env → fallback. */
+function getSync(key, fallback) {
+  if (isManageable(key) && _cache.data) {
+    const ov = _cache.data[key];
+    if (ov !== undefined && ov !== null && String(ov) !== '') return ov;
+  }
+  const env = process.env[key];
+  return (env !== undefined && env !== '') ? env : fallback;
+}
+
+/* Calienta el snapshot de overrides (best-effort). Úsalo al inicio de un handler
+   cuyo call site síncrono downstream deba respetar el override del panel. */
+async function preload(deps = {}) { try { await loadOverrides(deps); } catch (e) { /* best-effort */ } }
+
 /* Escribe/limpia un override. SOLO claves de la lista blanca. value=null/'' borra
    el override (vuelve a regir Netlify). Nunca acepta secretos. */
 async function setSetting(key, value, deps = {}) {
@@ -143,4 +187,4 @@ async function getAllEffective(deps = {}) {
   return out;
 }
 
-module.exports = { MANAGEABLE, isManageable, get, flag, setSetting, getAllEffective, loadOverrides };
+module.exports = { MANAGEABLE, isManageable, get, flag, getSync, preload, setSetting, getAllEffective, loadOverrides };

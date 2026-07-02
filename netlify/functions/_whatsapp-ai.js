@@ -29,6 +29,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { getSync } = require('./_settings'); // modelo del bot gestionable desde /admin → env → default
 
 const SITE_URL = process.env.URL || 'https://estar.com.co';
 /* Haiku by default: this is a latency-sensitive chat surface running inside a
@@ -56,7 +57,7 @@ function modelParams(model, effort) {
 function aiConfig() {
   return {
     apiKey: process.env.ANTHROPIC_API_KEY || '',
-    model: process.env.WHATSAPP_AI_MODEL || DEFAULT_MODEL,
+    model: getSync('WHATSAPP_AI_MODEL', DEFAULT_MODEL),
     effort: process.env.WHATSAPP_AI_EFFORT || DEFAULT_EFFORT,
     maxTokens: parseInt(process.env.WHATSAPP_AI_MAX_TOKENS, 10) || DEFAULT_MAX_TOKENS,
     /* Debe quedar POR DEBAJO del límite de ejecución de la función Netlify
@@ -134,7 +135,8 @@ const TOOLS = [
           enum: ['guest_requested_human', 'long_stay_quote', 'corporate_quote', 'complaint', 'payment_issue', 'other'],
           description: 'Why the team is needed'
         },
-        summary: { type: 'string', description: 'Actionable summary for the team: what the guest needs, relevant dates/codes, urgency' }
+        summary: { type: 'string', description: 'Actionable summary for the team: what the guest needs, relevant dates/codes, urgency' },
+        urgent: { type: 'boolean', description: 'true ONLY if the guest needs IMMEDIATE human attention right now (door/access problem, safety issue, locked out, emergency). Triggers a phone-call escalation to the on-duty person, not just an email. Use sparingly.' }
       },
       required: ['reason', 'summary']
     }
@@ -316,7 +318,17 @@ async function executeTool(name, input, deps) {
                <p>${esc(input.summary || '')}</p>
                <p>Respóndele directamente desde la app de WhatsApp Business.</p>`
       });
-      return JSON.stringify({ notified: Boolean(result && result.sent !== false) });
+      /* Urgente → además del correo, escalamiento por LLAMADA (Twilio) con fallback
+         a alerta. Best-effort y gated (ESCALATION_CALL_ENABLED); nunca tumba el flujo. */
+      let escalated = false;
+      if (input.urgent) {
+        try {
+          const { escalate } = require('./_escalation');
+          const esc = await escalate({ reason: input.reason, summary: input.summary, lang: deps.lang, guestNumber: deps.guestNumber });
+          escalated = !!(esc && (esc.callOk || esc.fallback));
+        } catch (e) { /* best-effort */ }
+      }
+      return JSON.stringify({ notified: Boolean(result && result.sent !== false), escalated });
     }
     default:
       return JSON.stringify({ error: `unknown tool: ${name}` });

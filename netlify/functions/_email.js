@@ -8,6 +8,7 @@
 
 const FROM = 'Estar Manizales <reservas@estar.com.co>';
 const { LOGO_CID, logoAttachment } = require('./_logo');
+const { getSync } = require('./_settings'); // override del panel (/admin) → env → default, síncrono
 
 /* ── Brand tokens ───────────────────────────────────────────────────────── */
 const SITE = 'https://estar.com.co';
@@ -29,7 +30,7 @@ const SERIF = "'Libre Baskerville',Georgia,'Times New Roman',serif";
 const SANS = 'Arial,Helvetica,sans-serif';
 
 function adminEmail() {
-  return process.env.ADMIN_NOTIFY_EMAIL || 'reservas@estar.com.co';
+  return getSync('ADMIN_NOTIFY_EMAIL', 'reservas@estar.com.co');
 }
 
 function formatCOP(n) {
