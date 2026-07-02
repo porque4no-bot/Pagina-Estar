@@ -1,5 +1,5 @@
 require('./_env');
-const { authenticateAdmin } = require('./_firebase-auth');
+const { authorize } = require('./_authz');
 const { getQuoteStore, listAllQuotes, effectiveStatus } = require('./_quotes-store');
 
 exports.handler = async (event, context) => {
@@ -15,7 +15,7 @@ exports.handler = async (event, context) => {
     if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
     if (event.httpMethod !== 'GET') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-    const auth = await authenticateAdmin(event);
+    const auth = await authorize(event, 'quotes.view');
     if (!auth.ok) return { statusCode: auth.statusCode, headers: corsHeaders, body: JSON.stringify({ error: auth.error }) };
 
     let quotes;

@@ -340,6 +340,65 @@ test('guest-action order: a folio failure does not fail the order', async () => 
   }
 });
 
+test('guest-action order: a silent folio failure (posted:false) raises an alert and persists folioStatus=failed', async () => {
+  const token = validToken();
+  const alerts = [];
+  const persisted = [];
+  let notified = null;
+  guestActionModule._test.setDeps({
+    protectRecord: record => record,
+    guestStore: () => ({ setJSON: async (k, v) => { persisted.push(v); } }),
+    archiveGuestPayload: async () => ({ delivered: false, configured: false }),
+    syncGuestEvent: async () => ({ delivered: false }),
+    postOrderToFolio: async () => ({ posted: false, reason: 'no-room' }), // devuelve false SIN lanzar
+    reportAlert: async (a) => { alerts.push(a); },
+    notifyOrderTeam: async (r) => { notified = r; }
+  });
+  process.env.GUEST_SERVICE_FOLIO_ENABLED = 'true';
+  try {
+    const res = await guestAction(makeEvent({
+      type: 'order', items: [{ id: 'breakfast', quantity: 1 }], paymentPreference: 'account'
+    }, token));
+    assert.equal(res.statusCode, 201);
+    assert.equal(body(res).folio.posted, false);
+    assert.equal(alerts.length, 1, 'se levantó alerta por el folio no posteado');
+    assert.equal(alerts[0].kind, 'folio_post_failed');
+    assert.equal(alerts[0].context.reason, 'no-room');
+    assert.match(alerts[0].dedupeKey, /^folio_post_failed:GST-/);
+    const last = persisted[persisted.length - 1];
+    assert.equal(last.folioStatus, 'failed', 'el evento se re-selló con folioStatus=failed');
+    assert.equal(notified.folioStatus, 'failed', 'el correo al equipo refleja el estado real');
+  } finally {
+    delete process.env.GUEST_SERVICE_FOLIO_ENABLED;
+    guestActionModule._test.resetDeps();
+  }
+});
+
+test('guest-action order: a posted folio marks folioStatus=posted and raises no alert', async () => {
+  const token = validToken();
+  const alerts = [];
+  guestActionModule._test.setDeps({
+    protectRecord: record => record,
+    guestStore: () => ({ setJSON: async () => {} }),
+    archiveGuestPayload: async () => ({ delivered: false, configured: false }),
+    syncGuestEvent: async () => ({ delivered: false }),
+    postOrderToFolio: async () => ({ posted: true }),
+    reportAlert: async (a) => { alerts.push(a); }
+  });
+  process.env.GUEST_SERVICE_FOLIO_ENABLED = 'true';
+  try {
+    const res = await guestAction(makeEvent({
+      type: 'order', items: [{ id: 'breakfast', quantity: 1 }], paymentPreference: 'account'
+    }, token));
+    assert.equal(res.statusCode, 201);
+    assert.equal(body(res).folio.posted, true);
+    assert.equal(alerts.length, 0, 'sin alerta cuando el folio sí se posteó');
+  } finally {
+    delete process.env.GUEST_SERVICE_FOLIO_ENABLED;
+    guestActionModule._test.resetDeps();
+  }
+});
+
 test('guest-action order: does NOT post to the folio when off or for online orders', async () => {
   const token = validToken();
   let called = 0;

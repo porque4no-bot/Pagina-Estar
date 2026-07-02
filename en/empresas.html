@@ -217,6 +217,12 @@
             <label for="rqComentarios">Additional comments</label>
             <textarea id="rqComentarios" name="comentarios" rows="3" placeholder="e.g. Rotating medical residents, invoice to the company name..."></textarea>
           </div>
+          <div class="field checkbox-field">
+            <label class="checkbox-label">
+              <input type="checkbox" name="marketingOptIn">
+              <span>I'd like to receive offers, news and recommendations from Estar by email or WhatsApp. <span style="display:block;opacity:.75;">Optional. You can unsubscribe anytime.</span></span>
+            </label>
+          </div>
           <p id="rqError" style="color:var(--error-700);font-size:13px;font-family:var(--font-label);display:none;margin:0 0 12px;"></p>
           <button type="submit" id="rqSubmitBtn" class="btn btn-ink" style="width:100%;justify-content:center;">
             <span id="rqBtnText">Request quote</span>
@@ -283,6 +289,12 @@
           <label class="checkbox-label">
             <input type="checkbox" name="aceptar_politica" required>
             <span data-i18n-html="form_politica">I accept the <a href="privacidad.html" target="_blank">Privacy Policy</a> and corporate Habeas Data terms.</span>
+          </label>
+        </div>
+        <div class="field checkbox-field">
+          <label class="checkbox-label">
+            <input type="checkbox" name="marketingOptIn">
+            <span>I'd like to receive offers, news and recommendations from Estar by email or WhatsApp. <span style="display:block;opacity:.75;">Optional. You can unsubscribe anytime.</span></span>
           </label>
         </div>
         <button type="submit" class="btn btn-ink" style="justify-content: center;" data-i18n-html="form_enviar">Send request <span aria-hidden="true">→</span></button>

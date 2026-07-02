@@ -13,7 +13,11 @@
 const { getStore } = require('@netlify/blobs');
 const { getQuoteStore, loadQuote, effectiveStatus } = require('./_quotes-store');
 const { sendEmail, adminEmail } = require('./_email');
-const { decodeDirectReference } = require('./_direct-pricing');
+/* Las referencias directas tienen formato distinto por proveedor: Wompi codifica
+   "1|..." (decoder en _direct-pricing); Mercado Pago usa "MPDIR-..." (decoder en
+   _payments). Probamos ambos al cruzar. */
+const { decodeDirectReference: decodeWompiDirect } = require('./_direct-pricing');
+const { decodeDirectReference: decodeMpDirect } = require('./_payments');
 
 function getBookingResultsStore() {
   try {
@@ -103,6 +107,41 @@ async function fetchRecentApproved() {
   return { transactions: all };
 }
 
+/* Mercado Pago (ruta de rollback). Lista pagos approved recientes vía la Search
+   API. Paginación por offset/paging.total (semántica distinta a Wompi). Skip
+   limpio si no hay token. Devuelve los `payment` crudos de MP. */
+async function fetchRecentApprovedMP() {
+  const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!token) return { transactions: [], reason: 'MERCADOPAGO_ACCESS_TOKEN not configured' };
+  const cutoff = Date.now() - LOOKBACK_HOURS * 3600 * 1000;
+  const beginDate = new Date(cutoff).toISOString();
+  const endDate = new Date().toISOString();
+  const PAGE = 50;
+  const all = [];
+  let offset = 0;
+  while (all.length < MAX_TRANSACTIONS) {
+    const url = `https://api.mercadopago.com/v1/payments/search?status=approved&sort=date_created&criteria=desc&range=date_created&begin_date=${encodeURIComponent(beginDate)}&end_date=${encodeURIComponent(endDate)}&limit=${PAGE}&offset=${offset}`;
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 12000);
+    let res;
+    try {
+      res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` }, signal: ctrl.signal });
+      clearTimeout(tid);
+    } catch (err) {
+      clearTimeout(tid);
+      throw err.name === 'AbortError' ? new Error('Mercado Pago search timeout') : err;
+    }
+    if (!res.ok) throw new Error(`Mercado Pago search returned ${res.status}`);
+    const data = await res.json();
+    const results = Array.isArray(data.results) ? data.results : [];
+    for (const p of results) all.push(p);
+    const total = (data.paging && Number(data.paging.total)) || 0;
+    offset += PAGE;
+    if (!results.length || offset >= total) break;
+  }
+  return { transactions: all.slice(0, MAX_TRANSACTIONS) };
+}
+
 function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -110,6 +149,7 @@ function esc(s) {
 function orphanAlertHtml(orphans) {
   const rows = orphans.map(o => `
     <tr>
+      <td>${esc(o.provider || '?')}</td>
       <td>${esc(o.quoteId || '(none)')}</td>
       <td>${esc(o.transactionId)}</td>
       <td>${esc(o.reference || '(none)')}</td>
@@ -118,13 +158,13 @@ function orphanAlertHtml(orphans) {
       <td>${esc(o.reason)}</td>
     </tr>`).join('');
   return `
-    <h2>Pagos Wompi sin reserva en OTASync</h2>
+    <h2>Pagos sin reserva en OTASync</h2>
     <p>Encontramos ${orphans.length} transacción(es) APPROVED en las últimas
     ${LOOKBACK_HOURS} horas que no aparecen procesadas por el webhook. Cada una
-    necesita verificación manual: confirmar en Wompi, decidir si crear la
+    necesita verificación manual: confirmar en el proveedor, decidir si crear la
     reserva en OTASync o reembolsar al huésped.</p>
     <table border="1" cellpadding="6" cellspacing="0">
-      <tr><th>Quote ID</th><th>Wompi tx</th><th>Reference</th><th>Monto (COP)</th><th>Creada</th><th>Razón</th></tr>
+      <tr><th>Proveedor</th><th>Quote ID</th><th>Tx</th><th>Reference</th><th>Monto (COP)</th><th>Creada</th><th>Razón</th></tr>
       ${rows}
     </table>
   `;
@@ -132,19 +172,44 @@ function orphanAlertHtml(orphans) {
 
 exports.handler = async () => {
   const txStore = getProcessedStore();
-  let transactions, fetchReason;
+
+  /* Wompi (activo) y Mercado Pago (rollback) se consultan por SEPARADO con
+     try/catch independiente: un fallo en uno no debe enmascarar huérfanos del otro. */
+  let wompiRaw = [], mpRaw = [], wompiReason = null, mpReason = null;
   try {
-    const result = await fetchRecentApproved();
-    transactions = result.transactions;
-    fetchReason = result.reason;
+    const r = await fetchRecentApproved();
+    wompiRaw = r.transactions || [];
+    wompiReason = r.reason || null;
   } catch (e) {
-    console.error('[reconcile-payments] fetch failed:', e.message);
-    return { statusCode: 503, body: 'wompi fetch failed: ' + e.message };
+    console.error('[reconcile-payments] wompi fetch failed:', e.message);
+    wompiReason = 'wompi fetch error: ' + e.message;
+  }
+  /* MP solo si es el proveedor activo o si hay token (evita pegarle a la API de MP
+     en cada corrida cuando se cobra con Wompi y no hay token MP). */
+  if (process.env.PAYMENT_PROVIDER === 'mercadopago' || process.env.MERCADOPAGO_ACCESS_TOKEN) {
+    try {
+      const r = await fetchRecentApprovedMP();
+      mpRaw = r.transactions || [];
+      mpReason = r.reason || null;
+    } catch (e) {
+      console.error('[reconcile-payments] mercadopago fetch failed:', e.message);
+      mpReason = 'mp fetch error: ' + e.message;
+    }
   }
 
-  if (fetchReason) {
-    console.log('[reconcile-payments] skipped:', fetchReason);
-    return { statusCode: 200, body: 'skipped: ' + fetchReason };
+  /* Forma uniforme para el loop de cruce (agnóstica al proveedor). */
+  const transactions = [];
+  for (const tx of wompiRaw) {
+    transactions.push({ id: String(tx.id), reference: String(tx.reference || ''), amountCents: tx.amount_in_cents, createdAt: tx.created_at, provider: 'wompi' });
+  }
+  for (const p of mpRaw) {
+    transactions.push({ id: String(p.id), reference: String(p.external_reference || ''), amountCents: Math.round(Number(p.transaction_amount || 0) * 100), createdAt: p.date_created, provider: 'mercadopago' });
+  }
+
+  if (!transactions.length) {
+    const reason = [wompiReason, mpReason].filter(Boolean).join('; ') || 'no recent approved transactions';
+    console.log('[reconcile-payments] nothing to check:', reason);
+    return { statusCode: 200, body: 'skipped/empty: ' + reason };
   }
 
   const orphans = [];
@@ -154,13 +219,12 @@ exports.handler = async () => {
 
   for (const tx of transactions) {
     const ref = String(tx.reference || '');
-    const processed = await isProcessed(txStore, tx.id);
-    if (processed) continue;
-
     const isQuote = /^COT-\d{4}-[A-Z0-9]{5}$/.test(ref);
 
     if (isQuote) {
-      /* ── Corporate quote path ── */
+      /* ── Corporate quote path ── su lock/estado la protege: si ya está
+         procesada se omite. */
+      if (await isProcessed(txStore, tx.id)) continue;
       let quoteState = null;
       if (quoteStore) {
         try {
@@ -177,20 +241,23 @@ exports.handler = async () => {
 
       orphans.push({
         quoteId: ref,
+        provider: tx.provider,
         transactionId: tx.id,
         reference: ref,
-        amountCents: tx.amount_in_cents,
-        createdAt: tx.created_at,
+        amountCents: tx.amountCents,
+        createdAt: tx.createdAt,
         reason: quoteState ? `quote status: ${quoteState}` : 'quote not found / store unavailable'
       });
       continue;
     }
 
-    /* ── Direct booking path (C-3) ── the main consumer flow. The Wompi
-       reference is base64url-encoded (1|...). If we can decode it and the
-       webhook never wrote its booking-results entry, the guest paid but has
-       no reservation: report it for manual recovery. */
-    const decoded = decodeDirectReference(ref);
+    /* ── Direct booking path ── IMPORTANTE (Mesa Redonda C5): NO se omite por
+       estar 'processed'. Con mark-before-work un insert fallido queda marcado
+       processed pero deja reservationPending:true en booking-results; la señal
+       autoritativa es booking-results (directBookingReconciled trata pending como
+       NO reconciliado). Decodifica con el formato del proveedor (Wompi 1|… o MP
+       MPDIR-…). */
+    const decoded = decodeWompiDirect(ref) || decodeMpDirect(ref);
     if (!decoded || !decoded.bookingCode) continue; /* not a recognizable direct ref */
 
     const reconciled = await directBookingReconciled(resultsStore, decoded.bookingCode);
@@ -198,11 +265,12 @@ exports.handler = async () => {
 
     orphans.push({
       quoteId: null,
+      provider: tx.provider,
       transactionId: tx.id,
       reference: decoded.bookingCode,
-      amountCents: tx.amount_in_cents,
-      createdAt: tx.created_at,
-      reason: 'direct booking paid but no reservation in booking-results'
+      amountCents: tx.amountCents,
+      createdAt: tx.createdAt,
+      reason: 'direct booking paid but no reservation (missing or pending in booking-results)'
     });
   }
 
@@ -215,7 +283,7 @@ exports.handler = async () => {
   try {
     await sendEmail({
       to: adminEmail(),
-      subject: `Reconciliación Wompi — ${orphans.length} pago(s) sin reserva`,
+      subject: `Reconciliación de pagos — ${orphans.length} pago(s) sin reserva`,
       html: orphanAlertHtml(orphans)
     });
   } catch (e) {
@@ -227,3 +295,6 @@ exports.handler = async () => {
     body: JSON.stringify({ orphans: orphans.length, checked: transactions.length })
   };
 };
+
+/* Exportado para tests (mock de fetch/blobs). */
+exports._test = { fetchRecentApprovedMP, fetchRecentApproved, directBookingReconciled };

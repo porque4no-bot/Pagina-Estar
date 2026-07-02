@@ -7,13 +7,18 @@ La primera versión vive en `guest.html` y cubre:
 - Acceso con código de reserva + apellido del titular.
 - Sesión temporal firmada, sin exponer credenciales de OTASync/Kunas.
 - Consulta y resumen de la reserva.
-- Pre check-in con carga de documento.
+- Pre check-in con carga de documento (galería **o cámara guiada en vivo**) y
+  **gate de 3 intentos → verificación manual**.
 - Lectura opcional con Azure AI Document Intelligence.
 - Validación de campos requeridos y documento vencido.
-- Firma electrónica simple del contrato.
-- Catálogo y pedido de servicios adicionales.
+- **Captura de datos SIRE/TRA** (género, ocupación, residencia, procedencia,
+  destino) + **consentimiento de marketing** (opt-in Ley 1581).
+- Firma electrónica simple del contrato (ver `docs/firma-electronica-colombia.md`).
+- Catálogo y pedido de servicios adicionales, con **pago en línea** (Wompi o
+  Mercado Pago) o cargo a la cuenta (folio Kunas).
 - Concierge con recomendaciones, preguntas frecuentes y solicitudes.
-- Solicitudes de cambio, factura o cancelación.
+- Solicitudes de cambio, factura o cancelación (pueden abrir ticket en Odoo
+  Helpdesk, gateado por `HELPDESK_ENABLED`).
 - Persistencia cifrada de eventos en Netlify Blobs.
 - Adaptadores webhook para sincronizar con OTASync/Kunas y archivar en Google Drive.
 
@@ -101,12 +106,12 @@ El ID de la carpeta raíz no se guarda en Netlify. Se configura como propiedad `
 
 ## Siguiente fase recomendada
 
-1. Confirmar los endpoints privados de OTASync para actualizar huésped, adjuntar documento, agregar extras y consultar facturas.
+1. Confirmar los endpoints privados de OTASync para actualizar huésped, adjuntar documento y **empujar los datos SIRE/TRA** ya capturados (ver `docs/pendientes.md` §2). Para extras al folio ya existe `_otasync.postOrderExtrasToFolio` (gateado).
 2. Elegir proveedor de firma con evidencia legal si el contrato requiere una firma avanzada.
 3. Crear el servicio de archivo en Drive con carpetas y permisos restringidos.
-4. Conectar pagos de servicios con Wompi.
+4. ~~Conectar pagos de servicios con Wompi.~~ **Hecho** (Wompi + Mercado Pago en pedidos en línea; cargo al folio Kunas gateado por `GUEST_SERVICE_FOLIO_ENABLED`).
 5. Añadir enlaces únicos por reserva enviados por correo y WhatsApp.
-6. Mostrar llaves digitales o códigos de acceso solo después del check-in validado.
+6. Mostrar llaves digitales o códigos de acceso solo después del check-in validado — base construida con **TTLock** (`_ttlock.js`, `TTLOCK_*`, apagado).
 7. Incorporar chat, estado de pedidos, encuestas durante la estancia y recuperación de objetos olvidados.
 
 ## Referencias

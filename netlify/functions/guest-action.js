@@ -3,8 +3,13 @@ const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const { renderContractHTML } = require('./_contract-template');
 const { SERVICES } = require('./_services-catalog');
 const { postOrderExtrasToFolio: _postOrderExtrasToFolio } = require('./_otasync');
-const { createGuestWompiCheckout: _createGuestWompiCheckout } = require('./_guest-payments');
+const { upsertPartner: _upsertPartner, createHelpdeskTicket: _createHelpdeskTicket } = require('./_odoo');
+const {
+  createGuestWompiCheckout: _createGuestWompiCheckout,
+  createGuestMercadoPagoCheckout: _createGuestMercadoPagoCheckout
+} = require('./_guest-payments');
 const { sendEmail, adminEmail, esc, formatCOP } = require('./_email');
+const { reportAlert: _reportAlert } = require('./_alert');
 const {
   archiveGuestPayload: _archiveGuestPayload,
   cleanText,
@@ -16,6 +21,7 @@ const {
   requireGuest: _requireGuest,
   syncGuestEvent: _syncGuestEvent
 } = require('./_guest-app');
+const { flag, get } = require('./_settings');
 
 /* Pinned contract template version. Bump whenever the contract clause text
    in _contract-template.js or _pdf-render.js changes; the contractHash for
@@ -58,7 +64,14 @@ async function notifyOrderTeam(record) {
     `<tr><td style="${cell}">${esc(it.name)} × ${it.quantity}</td>` +
     `<td style="${cell}text-align:right;">${formatCOP(it.subtotal)}</td></tr>`
   ).join('');
-  const payLabel = record.paymentPreference === 'online' ? 'Pagar en línea' : 'Cargar a la cuenta';
+  let payLabel = record.paymentPreference === 'online' ? 'Pagar en línea' : 'Cargar a la cuenta';
+  /* Refleja el estado REAL del folio para que el equipo no asuma que el cargo
+     quedó cuando falló (Mesa Redonda — fuga de folio). */
+  if (record.paymentPreference !== 'online' && record.folioStatus === 'failed') {
+    payLabel = 'Cargar a la cuenta — ⚠️ NO se pudo cargar al folio, cobrar al check-out';
+  } else if (record.paymentPreference !== 'online' && record.folioStatus === 'posted') {
+    payLabel = 'Cargar a la cuenta — ✓ cargado al folio';
+  }
   const extras = [];
   if (record.deliveryTime) extras.push(`<p style="margin:4px 0;font-size:13px;">Cuándo: <strong>${esc(record.deliveryTime)}</strong></p>`);
   if (record.notes) extras.push(`<p style="margin:4px 0;font-size:13px;">Notas: ${esc(record.notes)}</p>`);
@@ -80,6 +93,131 @@ async function notifyOrderTeam(record) {
   });
 }
 
+/* Bilingual copy for the Odoo Helpdesk ticket (Fase 4 — PQR). The ticket is
+   internal (Atención al cliente), but new strings keep ES/EN parity in the "tú"
+   tone. The guest's language is honoured when the record carries it (contracts
+   do; order / reservation_change records default to ES). */
+const HELPDESK_COPY = {
+  es: {
+    order: 'Solicitud de servicio',
+    modification: 'Solicitud de modificación',
+    cancel: 'Cancelación',
+    reservation: 'Reserva',
+    guest: 'Huésped',
+    services: 'Servicios',
+    payment: 'Forma de pago',
+    when: 'Cuándo',
+    notes: 'Notas',
+    requestKind: 'Tipo de solicitud',
+    newCheckIn: 'Nueva entrada',
+    newCheckOut: 'Nueva salida',
+    message: 'Mensaje',
+    payAccount: 'Cargar a la cuenta',
+    payOnline: 'Pagar en línea',
+    eventRef: 'Solicitud',
+    kinds: { dates: 'Cambio de fechas', guests: 'Cambio de huéspedes', cancel: 'Cancelación', invoice: 'Factura', other: 'Otra' }
+  },
+  en: {
+    order: 'Service request',
+    modification: 'Change request',
+    cancel: 'Cancellation',
+    reservation: 'Booking',
+    guest: 'Guest',
+    services: 'Services',
+    payment: 'Payment method',
+    when: 'When',
+    notes: 'Notes',
+    requestKind: 'Request type',
+    newCheckIn: 'New check-in',
+    newCheckOut: 'New check-out',
+    message: 'Message',
+    payAccount: 'Charge to the room',
+    payOnline: 'Pay online',
+    eventRef: 'Request',
+    kinds: { dates: 'Date change', guests: 'Guest change', cancel: 'Cancellation', invoice: 'Invoice', other: 'Other' }
+  }
+};
+
+/* Decides whether a guest event should open a Helpdesk PQR ticket and builds its
+   subject + description. Service orders → 'order'; reservation cancellations →
+   'cancel'; any other reservation_change → 'modification'. Returns null for event
+   types that are not PQR (contract / contract_preview / support). */
+function buildHelpdeskTicket(record) {
+  if (!record) return null;
+  const lang = String(record.lang || 'es').slice(0, 2).toLowerCase() === 'en' ? 'en' : 'es';
+  const t = HELPDESK_COPY[lang];
+  const ref = record.bookingCode || '';
+
+  if (record.type === 'order') {
+    const lines = (record.items || []).map(it => `· ${it.name} × ${it.quantity} — ${formatCOP(it.subtotal)}`);
+    const payLabel = record.paymentPreference === 'online' ? t.payOnline : t.payAccount;
+    const desc = [
+      `${t.reservation}: ${ref}`,
+      record.guestName ? `${t.guest}: ${record.guestName}` : '',
+      `${t.services}:`,
+      ...lines,
+      `Total: ${formatCOP(record.total)}`,
+      `${t.payment}: ${payLabel}`,
+      record.deliveryTime ? `${t.when}: ${record.deliveryTime}` : '',
+      record.notes ? `${t.notes}: ${record.notes}` : '',
+      `${t.eventRef}: ${record.eventId}`
+    ].filter(Boolean).join('\n');
+    return { name: `${t.order} — ${ref}`, description: desc };
+  }
+
+  if (record.type === 'reservation_change') {
+    const isCancel = record.requestKind === 'cancel';
+    const heading = isCancel ? t.cancel : t.modification;
+    const desc = [
+      `${t.reservation}: ${ref}`,
+      record.guestName ? `${t.guest}: ${record.guestName}` : '',
+      `${t.requestKind}: ${(t.kinds[record.requestKind] || t.kinds.other)}`,
+      record.requestedCheckIn ? `${t.newCheckIn}: ${record.requestedCheckIn}` : '',
+      record.requestedCheckOut ? `${t.newCheckOut}: ${record.requestedCheckOut}` : '',
+      record.message ? `${t.message}: ${record.message}` : '',
+      `${t.eventRef}: ${record.eventId}`
+    ].filter(Boolean).join('\n');
+    return { name: `${heading} — ${ref}`, description: desc };
+  }
+
+  return null;
+}
+
+/* Fase 4 — opens a PQR ticket in Odoo Helpdesk for service orders and
+   reservation modifications/cancellations. Best-effort: gated by HELPDESK_ENABLED
+   and wrapped in try/catch by the caller, so a guest's request never fails when
+   Odoo is down or unconfigured (mock no-op without credentials). Reuses
+   upsertPartner to resolve/create the partner_id when the record carries an
+   email, so the ticket hangs off the same customer master record. */
+async function openHelpdeskTicket(record) {
+  const ticket = buildHelpdeskTicket(record);
+  if (!ticket) return { created: false, skipped: true };
+  let partnerId = null;
+  const email = record && record.email ? String(record.email).trim() : '';
+  if (email) {
+    try {
+      const partner = await deps.upsertPartner({
+        name: record.guestName || email,
+        email,
+        tags: ['Huésped'],
+        comment: `Origen: app del huésped (guest.html). Reserva ${record.bookingCode || ''}.`.trim()
+      });
+      if (partner && partner.id) partnerId = partner.id;
+    } catch (partnerErr) {
+      /* No fatal: the ticket is still created without partner_id. */
+      console.error('[guest-action] helpdesk partner upsert failed:', partnerErr.message);
+    }
+  }
+  const res = await deps.createHelpdeskTicket({
+    name: ticket.name,
+    description: ticket.description,
+    email: email || undefined,
+    partnerName: record.guestName || undefined,
+    partnerId: partnerId || undefined
+  });
+  return { created: Boolean(res && res.id), id: res && res.id, isMock: res && res.isMock };
+}
+
 const defaultDeps = {
   archiveGuestPayload: _archiveGuestPayload,
   guestStore: _guestStore,
@@ -88,11 +226,30 @@ const defaultDeps = {
   syncGuestEvent: _syncGuestEvent,
   postOrderToFolio: _postOrderExtrasToFolio,
   createGuestWompiCheckout: _createGuestWompiCheckout,
-  notifyOrderTeam
+  createGuestMercadoPagoCheckout: _createGuestMercadoPagoCheckout,
+  notifyOrderTeam,
+  upsertPartner: _upsertPartner,
+  createHelpdeskTicket: _createHelpdeskTicket,
+  reportAlert: _reportAlert
 };
 
-/* Site origin for the Wompi redirect-url, from the request (falls back to env
-   inside _guest-payments). */
+/* Decide which provider settles an online service order. The env mode is the
+   authoritative gate (defaults OFF — only 'wompi' or 'mercadopago' enable an
+   online charge). When mode === 'both', the front-end may pick either via
+   body.paymentProvider (default 'wompi'); any other request value is ignored.
+   For a single-provider mode the client choice can't widen it. Returns null
+   when online charging isn't enabled. */
+function resolveOnlineProvider(mode, requested) {
+  const m = String(mode || '').toLowerCase();
+  const req = String(requested || '').toLowerCase();
+  if (m === 'wompi') return 'wompi';
+  if (m === 'mercadopago') return 'mercadopago';
+  if (m === 'both') return req === 'mercadopago' ? 'mercadopago' : 'wompi';
+  return null;
+}
+
+/* Site origin for the provider redirect/back-url, from the request (falls back
+   to env inside _guest-payments). */
 function originFromEvent(event) {
   const h = (event && event.headers) || {};
   const proto = h['x-forwarded-proto'] || h['X-Forwarded-Proto'] || 'https';
@@ -107,6 +264,9 @@ exports._test = {
   extractClientIp,
   extractUserAgent,
   sha256Hex,
+  resolveOnlineProvider,
+  buildHelpdeskTicket,
+  openHelpdeskTicket,
   CURRENT_CONTRACT_VERSION
 };
 
@@ -239,7 +399,9 @@ function buildEvent(type, body, session, event) {
       notes: cleanText(body.notes, 500),
       paymentPreference: ['account', 'online'].includes(body.paymentPreference)
         ? body.paymentPreference
-        : 'account'
+        : 'account',
+      /* Guest language — drives the Helpdesk ticket copy (ES/EN). */
+      lang: cleanText(body.lang || 'es', 5)
     };
   }
 
@@ -313,7 +475,9 @@ function buildEvent(type, body, session, event) {
       requestKind,
       requestedCheckIn: cleanText(body.requestedCheckIn, 20),
       requestedCheckOut: cleanText(body.requestedCheckOut, 20),
-      message: cleanText(body.message, 1200)
+      message: cleanText(body.message, 1200),
+      /* Guest language — drives the Helpdesk ticket copy (ES/EN). */
+      lang: cleanText(body.lang || 'es', 5)
     };
   }
 
@@ -392,8 +556,15 @@ exports.handler = async event => {
     if (type === 'order') {
       response.total = record.total;
       response.paymentRequired = false;
-      const paymentMode = process.env.GUEST_SERVICE_PAYMENT_MODE;
-      if (record.paymentPreference === 'online' && paymentMode === 'wompi') {
+      /* Gestionable desde /admin (override del panel → env). */
+      const paymentMode = await get('GUEST_SERVICE_PAYMENT_MODE');
+      /* Provider for online charges. The env mode is the authoritative gate; the
+         front-end may *narrow* it (body.paymentProvider) only to a provider the
+         env already permits, so a tampered request can never enable an online
+         charge that wasn't configured. With mode='wompi' or 'mercadopago' that
+         single provider is used regardless of what the client asks for. */
+      const onlineProvider = resolveOnlineProvider(paymentMode, body.paymentProvider);
+      if (record.paymentPreference === 'online' && onlineProvider === 'wompi') {
         /* Signed Wompi checkout with a server-authoritative amount (Phase B).
            The charge + payment land on the reservation folio after Wompi
            approves, via wompi-webhook → handleGuestServicePayment. */
@@ -401,9 +572,23 @@ exports.handler = async event => {
           response.paymentUrl = await deps.createGuestWompiCheckout({
             record, bookingCode: session.sub, redirectBase: originFromEvent(event)
           });
+          response.paymentProvider = 'wompi';
           response.paymentRequired = true;
         } catch (payErr) {
           console.error('[guest-action] wompi checkout build failed:', payErr.message);
+        }
+      } else if (record.paymentPreference === 'online' && onlineProvider === 'mercadopago') {
+        /* Mercado Pago Checkout Pro with a server-authoritative amount. The
+           charge + payment land on the folio after MP approves, via
+           mercadopago-webhook → handleGuestServicePayment (mirror of Wompi). */
+        try {
+          response.paymentUrl = await deps.createGuestMercadoPagoCheckout({
+            record, bookingCode: session.sub, redirectBase: originFromEvent(event)
+          });
+          response.paymentProvider = 'mercadopago';
+          response.paymentRequired = true;
+        } catch (payErr) {
+          console.error('[guest-action] mercadopago checkout build failed:', payErr.message);
         }
       } else if (record.paymentPreference === 'online' &&
                  paymentMode === 'payment_link' && process.env.GUEST_SERVICE_PAYMENT_URL) {
@@ -419,12 +604,41 @@ exports.handler = async event => {
          ('online' orders post to the folio after payment, in the webhook — see
          Phase B in docs/pendientes.md §5.) */
       if (record.paymentPreference === 'account' &&
-          process.env.GUEST_SERVICE_FOLIO_ENABLED === 'true') {
+          (await flag('GUEST_SERVICE_FOLIO_ENABLED'))) {
         try {
           response.folio = await deps.postOrderToFolio({ idReservations: session.sub, items: record.items });
         } catch (folioErr) {
           console.error('[guest-action] folio posting failed:', folioErr.message);
           response.folio = { posted: false, error: folioErr.message };
+        }
+        /* Mesa Redonda (Hospitality, crítico — fuga de ingresos silenciosa): hasta
+           ahora postOrderExtrasToFolio podía devolver {posted:false} SIN lanzar
+           (no entraba al catch) y el equipo recibía "cargar a la cuenta" aunque el
+           cargo nunca llegó al folio de Kunas; con check-out automático el huésped
+           se iba sin pagar. Ahora un folio no posteado es un INCIDENTE: alerta +
+           estado persistido en el evento para que recepción/conciliación reintenten. */
+        const folioPosted = Boolean(response.folio && response.folio.posted === true);
+        record.folioStatus = folioPosted ? 'posted' : 'failed';
+        if (!folioPosted) {
+          await deps.reportAlert({
+            kind: 'folio_post_failed',
+            severity: 'error',
+            message: `Cargo a la cuenta NO posteado al folio — reserva ${record.bookingCode}`,
+            context: {
+              bookingCode: record.bookingCode,
+              eventId: record.eventId,
+              total: record.total,
+              reason: (response.folio && (response.folio.reason || response.folio.error)) || 'unknown'
+            },
+            dedupeKey: `folio_post_failed:${record.eventId}`
+          });
+        }
+        /* Re-sella el evento con el estado del cargo para reintento idempotente
+           por eventId (conciliación futura). Best-effort: nunca tumba el pedido. */
+        try {
+          await deps.guestStore('guest-events').setJSON(record.eventId, deps.protectRecord(record));
+        } catch (persistErr) {
+          console.error('[guest-action] folio status persist failed:', persistErr.message);
         }
       }
 
@@ -433,6 +647,19 @@ exports.handler = async event => {
         await deps.notifyOrderTeam(record);
       } catch (mailErr) {
         console.error('[guest-action] order team notification failed:', mailErr.message);
+      }
+    }
+
+    /* Fase 4 — Odoo Helpdesk (PQR): service orders and reservation
+       modifications/cancellations open a ticket for Atención al cliente. Gated by
+       HELPDESK_ENABLED and best-effort: a ticket failure never breaks the guest's
+       request (which is already stored above). Mock no-op without Odoo creds. */
+    if ((type === 'order' || type === 'reservation_change') && (await flag('HELPDESK_ENABLED'))) {
+      try {
+        response.helpdesk = await openHelpdeskTicket(record);
+      } catch (helpdeskErr) {
+        console.error('[guest-action] helpdesk ticket failed:', helpdeskErr.message);
+        response.helpdesk = { created: false, error: helpdeskErr.message };
       }
     }
 

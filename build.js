@@ -705,7 +705,9 @@ function writeCspHeaders() {
     "img-src 'self' https: data:",
     "font-src 'self'",
     "connect-src 'self' https://app.otasync.me https://production.wompi.co https://sandbox.wompi.co https://api.mercadopago.com https://api.resend.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://estar-4d0da.firebaseapp.com https://connect.facebook.net https://www.facebook.com https://googleads.g.doubleclick.net https://www.google.com",
-    "frame-src https://checkout.wompi.co https://www.mercadopago.com.co https://www.mercadopago.com https://estar-4d0da.firebaseapp.com https://accounts.google.com https://apis.google.com https://www.google.com https://maps.google.com",
+    // 'self' es necesario para embeber iframes del mismo origen (p.ej. el panel
+    // de desayunos desayuno-admin.html dentro de /admin → pestaña Desayunos).
+    "frame-src 'self' https://checkout.wompi.co https://www.mercadopago.com.co https://www.mercadopago.com https://estar-4d0da.firebaseapp.com https://accounts.google.com https://apis.google.com https://www.google.com https://maps.google.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self' https://checkout.wompi.co https://www.mercadopago.com.co https://www.mercadopago.com",

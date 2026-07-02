@@ -63,11 +63,27 @@ async function listAllQuotes(store) {
 }
 
 /* ── Status ── */
-function effectiveStatus(quote) {
+function effectiveStatus(quote, nowMs) {
   if (!quote) return 'desconocida';
   if (quote.status === 'cancelada' || quote.status === 'aceptada') return quote.status;
-  if (quote.expiresAt && new Date(quote.expiresAt) < new Date()) return 'vencida';
+  const now = (typeof nowMs === 'number') ? nowMs : Date.now();
+  if (quote.expiresAt && new Date(quote.expiresAt).getTime() < now) return 'vencida';
   return quote.status || 'activa';
+}
+
+/* Decide whether to send a "quote expiring soon" reminder. Pure + testable.
+   True only for an actionable quote (activa/vista) with a client email, an
+   expiry in the future but within `windowMs`, availability not lost, and no
+   reminder already sent (one nudge per quote). */
+function shouldRemindExpiry(quote, nowMs, windowMs) {
+  if (!quote || !quote.expiresAt || !quote.email) return false;
+  if (quote.reminderSentAt) return false;
+  if (quote.availabilityOk === false) return false;
+  const st = effectiveStatus(quote, nowMs);
+  if (st !== 'activa' && st !== 'vista') return false;
+  const exp = new Date(quote.expiresAt).getTime();
+  if (isNaN(exp) || exp <= nowMs) return false;
+  return (exp - nowMs) <= windowMs;
 }
 
 /* ── Helpers ── */
@@ -255,6 +271,6 @@ function toPublic(quote) {
 module.exports = {
   IVA_RATE, INC_RATE, ROOM_NAME_TO_ID, VALID_ROOM_IDS,
   getQuoteStore, loadQuote, saveQuote, listAllQuotes,
-  effectiveStatus, sanitizeQuoteInput, toPublic, nightsBetween, effectiveTarifa,
+  effectiveStatus, shouldRemindExpiry, sanitizeQuoteInput, toPublic, nightsBetween, effectiveTarifa,
   sanitizeService, computeQuoteTotal
 };

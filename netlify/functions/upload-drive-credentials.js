@@ -10,7 +10,7 @@
  *   Body: <the full service account JSON, as an object>
  */
 
-const { authenticateAdmin } = require('./_firebase-auth');
+const { authorize } = require('./_authz');
 const { writeBlobCredentials, probe } = require('./_google-drive');
 
 exports.handler = async (event) => {
@@ -27,7 +27,7 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
 
-  const auth = await authenticateAdmin(event);
+  const auth = await authorize(event, 'integrations.credentials.upload');
   if (!auth.ok) return { statusCode: auth.statusCode, headers: corsHeaders, body: JSON.stringify({ error: auth.error }) };
 
   if (!event.body || event.body.length > 8000) {

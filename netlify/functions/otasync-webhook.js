@@ -35,8 +35,25 @@ function extractGuest(resv) {
     email,
     phone,
     channel: resv.channel || resv.channel_name || 'OTA',
-    channelId: String(resv.id_channels || '')
+    channelId: String(resv.id_channels || ''),
+    /* Enriquecimiento de la ficha (campos estándar de res.partner). País e
+       idioma vienen del huésped o de la reserva según el canal; las fechas dan
+       el último checkout y las noches estimadas. Defensivo ante nombres de
+       campo distintos por OTA. */
+    country: String(g.country || g.country_name || g.country_code || resv.country || '').trim(),
+    lang: String(g.language || g.lang || resv.language || resv.lang || '').trim(),
+    checkin: String(resv.date_arrival || resv.checkin || '').trim(),
+    checkout: String(resv.date_departure || resv.checkout || '').trim()
   };
+}
+
+/* Noches entre dos fechas ISO (yyyy-mm-dd). 0 si faltan o son inválidas. */
+function nightsBetween(checkin, checkout) {
+  if (!checkin || !checkout) return 0;
+  const d1 = new Date(checkin), d2 = new Date(checkout);
+  if (isNaN(d1) || isNaN(d2)) return 0;
+  const n = Math.round((d2 - d1) / 86400000);
+  return n > 0 ? n : 0;
 }
 
 /* Para cada evento de reserva (insert/edit), crea/actualiza el huésped en Odoo,
@@ -62,6 +79,10 @@ async function syncReservationGuests(events) {
         phone: guest.phone,
         isCompany: false,
         tags: [String(guest.channel).slice(0, 40)],
+        country: guest.country || undefined,
+        lang: guest.lang || undefined,
+        lastCheckout: guest.checkout || undefined,
+        nights: nightsBetween(guest.checkin, guest.checkout) || undefined,
         comment: `Huésped de reserva OTASync (canal: ${guest.channel}).`
       });
       n++;
@@ -70,6 +91,98 @@ async function syncReservationGuests(events) {
     }
   }
   return n;
+}
+
+/* Blobs store helper (dedupe of cancellation notifications). */
+function cancelDedupeStore() {
+  const { getStore } = require('@netlify/blobs');
+  const opts = { name: 'cancellation-notified', consistency: 'strong' };
+  if (process.env.BLOBS_TOKEN && process.env.NETLIFY_SITE_ID) {
+    opts.token = process.env.BLOBS_TOKEN;
+    opts.siteID = process.env.NETLIFY_SITE_ID;
+  }
+  return getStore(opts);
+}
+
+/* True when a reservation event represents a cancellation. OTASync sends
+   data_type="reservation" with a cancel action; we also accept a cancelled
+   status on the reservation object as a fallback (field names vary by channel). */
+function isCancellationEvent(ev) {
+  if (!ev || ev.data_type !== 'reservation') return false;
+  if (/cancel/i.test(String(ev.action || ''))) return true;
+  const st = (ev.data && (ev.data.status || ev.data.reservation_status)) || '';
+  return /cancel/i.test(String(st));
+}
+
+/* Handles cancellation events: emails the guest a confirmation (ONLY for our own
+   web reservations — OTA guests already get the channel's email), alerts the
+   team, and is idempotent per reservation id. Skips holds (BLOQUEO). Best-effort:
+   a failure here never breaks the webhook. Returns the count handled. */
+async function handleCancellations(events, deps = {}) {
+  const cancels = events.filter(isCancellationEvent);
+  if (!cancels.length) return { handled: 0, canceledIds: [] };
+
+  const email = require('./_email');
+  const sendEmail = deps.sendEmail || email.sendEmail;
+  const adminEmail = deps.adminEmail || email.adminEmail;
+  const { cancellationConfirmedHtml, adminCancellationHtml } = email;
+  const webChannelId = String(process.env.OTASYNC_CHANNEL_ID || '66483');
+  let store = deps.store || null;
+  if (!store && deps.store !== false) { try { store = cancelDedupeStore(); } catch (_) { /* dev: no blobs */ } }
+
+  const canceledIds = [];
+  let handled = 0;
+  for (const ev of cancels) {
+    const resv = ev.data || {};
+    const resId = String(resv.id_reservations || resv.id || '');
+    if (resId) canceledIds.push(resId);
+
+    const guest = extractGuest(resv);
+    /* Skip our own tentative holds (BLOQUEO) — those are released elsewhere. */
+    const looksLikeHold = guest && /^bloqueo/i.test(String(guest.name || '')) ||
+      /^COT-/i.test(String(resv.reference || ''));
+    if (looksLikeHold) continue;
+
+    /* Idempotency: don't notify twice for the same reservation. */
+    if (resId && store) {
+      try { if (await store.get(resId)) continue; } catch (_) { /* ignore */ }
+    }
+
+    const lang = /^en/i.test(String(resv.language || resv.lang || '')) ? 'en' : 'es';
+    const booking = {
+      bookingCode: resv.reference || resId || 's/código',
+      guestName: (guest && guest.name) || '',
+      guestEmail: (guest && guest.email) || '',
+      checkIn: resv.date_arrival || resv.checkin || '',
+      checkOut: resv.date_departure || resv.checkout || '',
+      lang
+    };
+    const isWeb = !!(guest && guest.channelId && guest.channelId === webChannelId);
+
+    /* 1) Guest confirmation — only for our web reservations with a real email. */
+    if (isWeb && booking.guestEmail) {
+      try {
+        await sendEmail({
+          to: booking.guestEmail,
+          subject: lang === 'en' ? `Reservation cancelled — ${booking.bookingCode}` : `Reserva cancelada — ${booking.bookingCode}`,
+          html: cancellationConfirmedHtml({ booking, lang })
+        });
+      } catch (e) { console.error('[otasync-webhook] guest cancellation email failed:', e.message); }
+    }
+
+    /* 2) Team alert — always (awareness + refund follow-up). */
+    try {
+      await sendEmail({
+        to: adminEmail(),
+        subject: `Reserva cancelada — ${booking.bookingCode}`,
+        html: adminCancellationHtml({ booking, channel: (guest && guest.channel) || 'OTA', isWeb })
+      });
+    } catch (e) { console.error('[otasync-webhook] team cancellation alert failed:', e.message); }
+
+    if (resId && store) { try { await store.set(resId, '1', { ttl: 86400 * 30 }); } catch (_) { /* ignore */ } }
+    handled++;
+  }
+  return { handled, canceledIds };
 }
 
 exports.handler = async (event) => {
@@ -123,6 +236,17 @@ exports.handler = async (event) => {
     console.error('[otasync-webhook] guest sync no fatal:', e.message);
   }
 
+  /* Cancellation events: notify the guest (web reservations only) + the team.
+     Independent of the quote logic below; never breaks the webhook. */
+  let canceledIds = [];
+  try {
+    const res = await handleCancellations(events);
+    canceledIds = res.canceledIds || [];
+    if (res.handled) console.log(`[otasync-webhook] cancellations handled: ${res.handled}`);
+  } catch (e) {
+    console.error('[otasync-webhook] cancellation handling no fatal:', e.message);
+  }
+
   if (affectedTypes.size === 0 && !reservationEvent) {
     return { statusCode: 200, headers, body: JSON.stringify({ message: 'no actionable event' }) };
   }
@@ -134,6 +258,22 @@ exports.handler = async (event) => {
   } catch (e) {
     console.error('[otasync-webhook] store unavailable:', e.message);
     return { statusCode: 200, headers, body: JSON.stringify({ message: 'store unavailable' }) };
+  }
+
+  /* Free dead holds: if a cancelled reservation id matches a quote's hold, drop
+     it so the quote re-enters availability re-validation (a stuck hold would
+     otherwise keep it flagged "guaranteed" forever). Best-effort. */
+  if (canceledIds.length) {
+    const canceledSet = new Set(canceledIds.map(String));
+    for (const q of quotes) {
+      if (!Array.isArray(q.holdReservationIds) || !q.holdReservationIds.length) continue;
+      const kept = q.holdReservationIds.filter(id => !canceledSet.has(String(id)));
+      if (kept.length !== q.holdReservationIds.length) {
+        q.holdReservationIds = kept;
+        q.availabilityCheckedAt = null;
+        try { await saveQuote(store, q); } catch (e) { console.error('[otasync-webhook] hold cleanup save failed:', e.message); }
+      }
+    }
   }
 
   const datesArr = Array.from(affectedDates);
@@ -185,4 +325,4 @@ exports.handler = async (event) => {
   return { statusCode: 200, headers, body: JSON.stringify({ received: true, updated, lost }) };
 };
 
-exports._test = { extractGuest, syncReservationGuests };
+exports._test = { extractGuest, syncReservationGuests, isCancellationEvent, handleCancellations };

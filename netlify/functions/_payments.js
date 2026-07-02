@@ -5,8 +5,22 @@ const {
 } = require('./_quotes-store');
 const {
   hasOtasyncCreds, getAvailabilityByType, findUnavailable,
-  releaseHold, createConfirmedReservation
+  releaseHold, createConfirmedReservation, insertReservation
 } = require('./_otasync');
+
+/* Sprint 2 (Mesa Redonda C4/C5) — flag que activa el andamiaje de resiliencia de
+   la ruta DIRECTA de Mercado Pago para igualarla a Wompi: lock single-writer por
+   reserva + idempotencia POR ESTADÍA + insertReservation (reintentos/backoff/
+   alerta) + recordPending SIEMPRE ante fallo de inserción. OFF por defecto: con el
+   flag apagado, processDirectPayment mantiene el comportamiento actual (fetch
+   crudo). MP es la ruta de rollback (hoy activo = Wompi), así que es seguro
+   mergear apagado; se valida en sandbox MP antes de cualquier rollback. */
+function mpDirectResilient() {
+  return String(process.env.MP_DIRECT_RESILIENT_ENABLED || '').toLowerCase() === 'true';
+}
+/* Expiry por EDAD del registro de idempotencia por estadía (Blobs no tiene TTL en
+   get). Igual que Wompi (7 días). */
+const STAY_IDEM_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml } = require('./_email');
 const { acquireQuoteLock, releaseQuoteLock } = require('./_quote-lock');
 const { trackPurchase } = require('./_analytics');
@@ -364,6 +378,61 @@ async function processDirectPayment(transaction, corsHeaders) {
     };
   }
 
+  /* C4 — andamiaje de resiliencia (igualar MP a Wompi), detrás de
+     MP_DIRECT_RESILIENT_ENABLED. Lock single-writer por reserva + idempotencia por
+     estadía. Con el flag OFF, lock queda {acquired:true, blobsUnavailable:true}
+     (no-op) y el resto del cuerpo es idéntico al comportamiento actual. */
+  const resilient = mpDirectResilient();
+  let lock = { acquired: true, blobsUnavailable: true };
+  let stayIdemStore = null;
+  const stayIdemKey = `booking_${decoded.roomTypeId}_${decoded.checkin}_${decoded.checkout}_${String(decoded.email || '').toLowerCase().trim()}`;
+  if (resilient) {
+    lock = await acquireQuoteLock(decoded.bookingCode, transaction.id);
+    if (!lock.acquired) {
+      console.error(`[payments] direct booking ${decoded.bookingCode} already being processed by tx ${lock.ownerTx}. Refusing tx ${transaction.id}.`);
+      try {
+        await sendEmail({
+          to: adminEmail(),
+          subject: `Doble pago detectado (reserva directa) - ${decoded.bookingCode}`,
+          html: `<p>La reserva directa <strong>${escapeHtml(decoded.bookingCode)}</strong> recibió un segundo pago aprobado mientras procesábamos el primero.</p>
+                 <ul><li>En curso: ${escapeHtml(String(lock.ownerTx))}</li><li>Rechazada: ${escapeHtml(transaction.id)} (${escapeHtml(transaction.provider)})</li></ul>
+                 <p>Verifica con el proveedor y reembolsa el cargo duplicado.</p>`
+        });
+      } catch (e) { console.error('[payments] direct double-pay alert failed:', e.message); }
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, bookingCode: decoded.bookingCode, duplicate: true, ownerTx: lock.ownerTx }) };
+    }
+  }
+
+  try {
+
+  if (resilient) {
+    /* Idempotencia POR ESTADÍA (A-4): atrapa doble pago de la misma estadía con
+       txId distintos (que el lock por-tx/por-reserva no atrapa). Espejo de Wompi.
+       Fail-open si Blobs no está. */
+    try {
+      stayIdemStore = getStore({ name: 'booking-idempotency', consistency: 'strong' });
+      const prevRaw = await stayIdemStore.get(stayIdemKey);
+      if (prevRaw) {
+        const prev = JSON.parse(prevRaw);
+        if (prev.transactionId !== transaction.id && (Date.now() - (prev.createdAt || 0)) < STAY_IDEM_MAX_AGE_MS) {
+          console.error(`[payments] DUPLICATE STAY for ${decoded.bookingCode}: prev tx ${prev.transactionId}, new tx ${transaction.id}. NOT creating a second reservation.`);
+          try {
+            await sendEmail({
+              to: adminEmail(),
+              subject: `Doble pago de la misma estadía - ${decoded.bookingCode}`,
+              html: `<p>Se recibió un segundo pago para la MISMA estadía (habitación ${escapeHtml(String(decoded.roomTypeId))}, ${escapeHtml(decoded.checkin)} → ${escapeHtml(decoded.checkout)}).</p>
+                     <ul><li>Reserva existente: ${escapeHtml(String(prev.bookingCode))}</li><li>Pago duplicado: ${escapeHtml(transaction.id)}</li></ul>
+                     <p>Reembolsa el cargo duplicado.</p>`
+            });
+          } catch (e) { console.error('[payments] duplicate-stay alert failed:', e.message); }
+          return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, bookingCode: prev.bookingCode, duplicate: true }) };
+        }
+      }
+    } catch (e) {
+      stayIdemStore = null; /* fail-open: apoyo en lock + dedup por-tx */
+    }
+  }
+
   /* Availability gate (C-2). Payment already captured, so if the room type is
      sold out we must NOT overbook: persist a pending result, alert the admin
      and let the reconciler/portal handle it manually. Mirrors the Wompi direct
@@ -503,23 +572,54 @@ async function processDirectPayment(transaction, corsHeaders) {
     note: `Telefono del huesped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${mustPayIva ? 'POR COBRAR EN HOTEL (' + Math.round(paidAmount * 0.19) + ')' : 'EXENTO'}. Creado por Webhook ${transaction.provider}. ID Transaccion: ${transaction.id}`
   };
 
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 10000);
-  let response;
-  try {
-    response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: ctrl.signal
-    });
-    clearTimeout(tid);
-  } catch (err) {
-    clearTimeout(tid);
-    throw err.name === 'AbortError' ? new Error('Request timeout during reservation insert') : err;
+  let data;
+  if (resilient) {
+    /* C5 — insertReservation trae reintentos+backoff+alerta crítica A3. Si aun así
+       falla, recordPending SIEMPRE (booking-results, reason:'insert_failed') + alerta
+       y 200 (para que MP no reintente infinito). El reconciliador trata
+       reservationPending:true como NO reconciliado, así el pago no se pierde. */
+    try {
+      data = await insertReservation(payload);
+    } catch (insertErr) {
+      console.error(`[payments] direct insert failed for ${decoded.bookingCode} (tx ${transaction.id}): ${insertErr.message}`);
+      try {
+        const sj = getStore({ name: 'booking-results', consistency: 'strong' });
+        await sj.set(`direct-${decoded.bookingCode}`, JSON.stringify({
+          bookingCode: decoded.bookingCode, reservationPending: true, reason: 'insert_failed',
+          provider: transaction.provider, paymentMethod: transaction.paymentMethod,
+          transactionId: transaction.id, amountInCents: transaction.amountCents, createdAt: new Date().toISOString()
+        }), { ttl: 86400 * 7 });
+      } catch (e) { console.error('[payments] pending write failed:', e.message); }
+      try {
+        await sendEmail({
+          to: adminEmail(),
+          subject: `Pago sin reserva (error al crear) - ${decoded.bookingCode}`,
+          html: `<p>Pago ${escapeHtml(transaction.provider)} aprobado, pero la reserva NO se pudo crear en OTASync tras reintentos.</p>
+                 <ul><li>Código: ${escapeHtml(decoded.bookingCode)}</li><li>Transacción: ${escapeHtml(transaction.id)}</li></ul>
+                 <p>Crear manualmente o reembolsar. Queda registrada como PENDIENTE (la reconciliación la verá).</p>`
+        });
+      } catch (e) { console.error('[payments] insert-failed alert failed:', e.message); }
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, bookingCode: decoded.bookingCode, reservationPending: true }) };
+    }
+  } else {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    let response;
+    try {
+      response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: ctrl.signal
+      });
+      clearTimeout(tid);
+    } catch (err) {
+      clearTimeout(tid);
+      throw err.name === 'AbortError' ? new Error('Request timeout during reservation insert') : err;
+    }
+    if (!response.ok) throw new Error(`insert/reservation returned status ${response.status}`);
+    data = await response.json();
   }
-  if (!response.ok) throw new Error(`insert/reservation returned status ${response.status}`);
-  const data = await response.json();
   const finalBookingCode = data.id_reservations || decoded.bookingCode;
 
   /* Make the result visible to the cliente's /api/booking-status polling so
@@ -542,12 +642,21 @@ async function processDirectPayment(transaction, corsHeaders) {
         provider: transaction.provider,
         paymentMethod: transaction.paymentMethod,
         transactionId: transaction.id,
+        amountInCents: transaction.amountCents,
         createdAt: new Date().toISOString()
       }),
       { ttl: 86400 * 7 }  /* 7 days — covers any reasonable polling/manage window */
     );
   } catch (e) {
     console.warn('[_payments] booking-results write failed (non-fatal):', e.message);
+  }
+
+  /* Idempotencia por estadía: registrar SOLO tras inserción exitosa (espejo Wompi)
+     para que un segundo pago de la misma estadía se detecte. */
+  if (resilient && stayIdemStore) {
+    try {
+      await stayIdemStore.set(stayIdemKey, JSON.stringify({ bookingCode: finalBookingCode, transactionId: transaction.id, createdAt: Date.now() }));
+    } catch (e) { /* non-fatal */ }
   }
 
   /* A-6: server-side conversion (Measurement Protocol). */
@@ -564,6 +673,11 @@ async function processDirectPayment(transaction, corsHeaders) {
     headers: corsHeaders,
     body: JSON.stringify({ success: true, bookingCode: finalBookingCode })
   };
+
+  } finally {
+    /* Liberar el lock single-writer (solo si se adquirió de verdad, no en fail-open). */
+    if (resilient && !lock.blobsUnavailable) await releaseQuoteLock(decoded.bookingCode);
+  }
 }
 
 async function processApprovedPayment(transaction, corsHeaders) {
@@ -574,7 +688,17 @@ async function processApprovedPayment(transaction, corsHeaders) {
   if (await alreadyProcessed(transaction.id)) {
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ received: true, duplicate: true }) };
   }
-  const result = QUOTE_ID_RE.test(transaction.reference || '')
+  const isQuote = QUOTE_ID_RE.test(transaction.reference || '');
+  /* C4 — mark-before-work para la ruta DIRECTA resiliente de MP: una re-entrega
+     concurrente del MISMO tx debe ser no-op aunque el insert falle después (la red
+     de seguridad es recordPending dentro de processDirectPayment, que el
+     reconciliador cruza por booking-results, no por processed-transactions).
+     Solo cuando el flag está ON; las cotizaciones ya se protegen con su lock. */
+  if (mpDirectResilient() && !isQuote) {
+    await markProcessed(transaction.id);
+    return await processDirectPayment(transaction, corsHeaders);
+  }
+  const result = isQuote
     ? await processQuotePayment(transaction, corsHeaders)
     : await processDirectPayment(transaction, corsHeaders);
   if (result && result.statusCode >= 200 && result.statusCode < 300) {

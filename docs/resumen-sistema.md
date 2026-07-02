@@ -4,7 +4,32 @@ Mapa condensado de todo lo que hoy compone la plataforma: qué está **en
 producción**, qué está **construido y a la espera de credenciales/decisiones**,
 y qué está **pendiente**. Pensado para recorrer y validar punto por punto.
 
-Fecha de corte: 2026-06-13.
+Fecha de corte: 2026-06-22 (base 2026-06-13).
+
+> **Nuevo desde el corte original (resumen; detalle en `CLAUDE.md` y
+> `docs/pendientes.md`):**
+> - **Panel `/admin` unificado** con pestañas: Cotizaciones · Reembolsos ·
+>   Desayunos · **Códigos** (descuentos) · **Configuración** (17+ toggles) ·
+>   **Usuarios** (roles).
+> - **Roles / IAM** (`_permissions.js` / `_iam-store.js` / `_authz.js`): roles
+>   admin / recepción / cocina / tesorería; quien esté en `ADMIN_EMAILS`/
+>   `STAFF_EMAILS` es superusuario. Las funciones del panel ya exigen permiso.
+> - **Configuración por panel** (`_settings.js`): los interruptores de sí/no
+>   (correos, respaldo, descuentos, folio, desayuno, chapas, bot, Helpdesk, NPS…)
+>   se prenden desde el panel — override sobre la variable de Netlify; **nunca**
+>   gestiona secretos.
+> - **Códigos de descuento** (`_discount-store.js`), gateado por
+>   `DISCOUNT_CODES_ENABLED`, aplicado en el flujo Wompi.
+> - **Reembolsos:** ejecutor automático de Mercado Pago (`_mp-refund.js`,
+>   `REFUND_GATEWAY_AUTO_ENABLED`) + captura de datos de tarjeta al pagar
+>   (`_payment-details.js`).
+> - **Cancelaciones por OTASync** ya manejadas (correo huésped + aviso equipo +
+>   liberar hold).
+> - **Chapas inteligentes** (`_ttlock.js`, `TTLOCK_*`) — mock-safe, apagado.
+> - **Odoo** Fases 1-4 construidas (CRM, mailing, NPS, Helpdesk); facturación
+>   fuera de alcance (otro equipo). Ver `docs/continuacion-odoo.md`.
+> - **Consentimiento de marketing** (opt-in Ley 1581) cableado en todos los
+>   formularios.
 
 ---
 
@@ -23,9 +48,11 @@ Fecha de corte: 2026-06-13.
 - Páginas clave: home, reservar, tipologías (5), nosotros/contacto/explora,
   vivir (larga estadía), empresas, grupos, FAQ, legales, guest app.
 - **Reservas mensuales** publicadas con **IVA incluido** (ya aplicado).
-- 🔴 Pendientes de contenido: política de cancelación nueva (Estricta/Flexible),
-  cobro de mascota $200k, eliminar parqueadero, identidad legal (Mirada SAS /
-  NIT), hora de check-out unificada. Ver `pendientes.md` §6.
+- ✅ Bloqueantes de contenido **hechos** (2026-06-22): parqueadero eliminado,
+  identidad legal **Mirada SAS · NIT 902.032.515-0**, check-out unificado a 11:00.
+- 🔴 Pendientes de contenido (decisión del dueño): política de cancelación nueva
+  (Estricta/Flexible), cobro de mascota $200k, reprecio de extras. Ver
+  `pendientes.md` §6.
 
 ## 2. Motor de reserva directa (web) — 🟢
 
@@ -74,12 +101,16 @@ Flujo de 4 pasos en `reservar.html` (`motor-app.jsx`):
 
 ## 6. Guest app (`guest.html`) — 🟢 / 🟡
 
-- Acceso con código + apellido (JWT). Pre-check-in con OCR (Azure), firma
-  electrónica del contrato (Ley 527), pedidos de servicios, datos cifrados
-  (AES-256-GCM) en Blobs, archivado en Google Drive.
+- Acceso con código + apellido (JWT). Pre-check-in con OCR (Azure) + **cámara
+  guiada en vivo** + **gate de 3 intentos → verificación manual**, firma
+  electrónica del contrato (Ley 527), pedidos de servicios (pago en línea con
+  Wompi o Mercado Pago), datos cifrados (AES-256-GCM) en Blobs, archivado en
+  Google Drive. **Captura los campos SIRE/TRA** (género, ocupación, residencia,
+  procedencia, destino) + consentimiento de marketing.
 - Purga de datos a 5 años (Ley 1581, cron).
-- 🔴 Pendiente: cargos de servicios al folio del PMS, panel de staff de
-  check-ins, reporte SIRE/TRA.
+- 🟡 Cargo al folio del PMS: construido, apagado (`GUEST_SERVICE_FOLIO_ENABLED`).
+- 🔴 Pendiente: **empujar** los datos SIRE/TRA al PMS/Migración (los campos ya se
+  capturan; falta el envío — ver `pendientes.md` §2), panel de staff de check-ins.
 
 ## 7. Integraciones — estado
 
@@ -87,13 +118,14 @@ Flujo de 4 pasos en `reservar.html` (`motor-app.jsx`):
 |---|---|---|
 | OTASync / Kunas (PMS + channel manager) | 🟢 | Disponibilidad, precios, creación de reservas, holds. 🔴 Falta: rate plans reales, restricciones, webhooks de cancelación de OTAs, reintentos de hold. |
 | Wompi (pagos) | 🟢 | Activo. PSE/Nequi habilitados. |
-| Mercado Pago | 🟡 | Rollback configurable. |
+| Mercado Pago | 🟡 | Rollback configurable. API de reembolso construida (`_mp-refund.js`). `MERCADOPAGO_WEBHOOK_SECRET` ahora opcional (verifica por API si falta). |
 | Google Drive | 🟢 | Archivado de documentos. 🟡 Reusar para servir RUT/Cámara de Comercio. |
 | Azure Document Intelligence (OCR) | 🟢 | Pre-check-in. |
 | Resend (emails) | 🟢 | Transaccionales y alertas. |
 | SIRE / TRA (Migración / MinCIT) | 🔴 | Vía Kunas o directa — por evaluar (`pendientes.md` §2). |
 | Booking.com (cobros) | 🔴 | VCC vs cobro directo (`pendientes.md` §4). |
-| Odoo (ERP/contabilidad) | 🔴 | No existe; roadmap en `pendientes.md` §1. |
+| Odoo (CRM / contactos) | 🟢/🟡 | Maestro de clientes LIVE (`res.partner` upsert, empresa Mirada 5); CRM + mailing + Helpdesk + NPS construidos (Fases 1-4). Facturación (`account.move`/DIAN) = otro equipo, fuera de alcance. Ver `continuacion-odoo.md`. |
+| TTLock (chapas inteligentes) | 🟡 | Cliente construido (`_ttlock.js`), apagado; cierra el correo de códigos de acceso. |
 | WhatsApp Cloud API + IA (bot) | 🟡 | Construido; falta validación Meta + API key. Ver §8. |
 
 ## 8. Bot de WhatsApp — capacidades y operación — 🟡
@@ -208,7 +240,10 @@ mensaje → GUARDIÁN (seguridad) → CONCIERGE (IA + herramientas) → respuest
 ## 10. Documentos relacionados
 
 - `docs/pendientes.md` — decisiones y tareas pendientes (la lista viva).
+- `docs/variables-a-cargar.md` — env vars nuevas + qué se gestiona desde el panel.
+- `docs/plan-accion-responsables.md` — carriles A/B/C (técnico / dueño / terceros).
 - `docs/bot-conocimiento.md` — base de conocimiento/FAQ del bot.
 - `docs/whatsapp-bot.md` — arquitectura y setup del bot.
 - `docs/guest-app.md` — guest app.
+- `docs/continuacion-odoo.md` — estado y handoff de la integración Odoo.
 - `CLAUDE.md` — referencia técnica completa del repo.
