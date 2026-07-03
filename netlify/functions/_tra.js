@@ -1,4 +1,5 @@
 require('./_env');
+const { getSync } = require('./_settings'); // TRA_ENABLED gestionable desde /admin
 
 /*
  * _tra.js — cliente del reporte TRA (Tarjeta de Registro de Alojamiento, MinCIT /
@@ -43,7 +44,7 @@ require('./_env');
 
 function traConfig() {
   return {
-    enabled: String(process.env.TRA_ENABLED || '').toLowerCase() === 'true',
+    enabled: String(getSync('TRA_ENABLED', '') || '').toLowerCase() === 'true',
     token: process.env.TRA_TOKEN || '',
     rnt: process.env.TRA_RNT || '276306',
     nit: process.env.TRA_NIT || '',

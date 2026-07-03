@@ -1,4 +1,5 @@
 require('./_env');
+const { getSync } = require('./_settings'); // SIRE_ENABLED gestionable desde /admin
 
 /*
  * _sire.js — generador del ARCHIVO PLANO de SIRE (Sistema de Información y
@@ -54,7 +55,7 @@ function sireConfig() {
     /* Default TAB. Se lee crudo para poder aceptar '\t' escrito literalmente en
        una env var (Netlify guarda "\t" como texto, no como tabulación real). */
     delimiter: normalizeDelimiter(process.env.SIRE_DELIMITER),
-    enabled: flagOn(process.env.SIRE_ENABLED)
+    enabled: flagOn(getSync('SIRE_ENABLED', ''))
   };
 }
 

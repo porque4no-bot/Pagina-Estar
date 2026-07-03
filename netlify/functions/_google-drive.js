@@ -33,9 +33,11 @@ function getSecretsStore() {
     /* Explicit credentials are required when the Blobs auto-discovery doesn't
        kick in (e.g. esbuild-bundled functions on certain Netlify build paths).
        BLOBS_TOKEN + NETLIFY_SITE_ID are already configured in this project. */
-    if (process.env.BLOBS_TOKEN && process.env.NETLIFY_SITE_ID) {
-      opts.token = process.env.BLOBS_TOKEN;
-      opts.siteID = process.env.NETLIFY_SITE_ID;
+    const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+    const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_BLOBS_TOKEN;
+    if (siteID && token) {
+      opts.siteID = siteID;
+      opts.token = token;
     }
     return getStore(opts);
   } catch (e) {

@@ -197,6 +197,23 @@ exports.handler = async () => {
     }
   }
 
+  /* Si el fetch de un proveedor falló, la detección de huérfanos quedó CIEGA para
+     ese proveedor esa corrida. Un 200 silencioso haría que un fallo persistente
+     (token vencido, API caída) apague la red de seguridad sin que nadie se entere.
+     Alerta deduplicada (best-effort; nunca tumba la corrida). */
+  const fetchFailed = [wompiReason, mpReason].filter(r => r && /fetch error/i.test(r));
+  if (fetchFailed.length) {
+    try {
+      await require('./_alert').reportAlert({
+        kind: 'reconcile-fetch-failed',
+        severity: 'error',
+        message: 'reconcile-payments no pudo consultar un proveedor; detección de pagos huérfanos degradada esta corrida',
+        context: { reasons: fetchFailed },
+        dedupeKey: 'reconcile-fetch-failed'
+      });
+    } catch (e) { /* best-effort */ }
+  }
+
   /* Forma uniforme para el loop de cruce (agnóstica al proveedor). */
   const transactions = [];
   for (const tx of wompiRaw) {

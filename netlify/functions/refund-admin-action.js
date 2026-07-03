@@ -124,8 +124,8 @@ async function maybeCancelReservationInPms(refund, actor) {
      set-amount      → records a (possibly partial) refund amount per the policy.
      mark-processing → the team started the manual refund (PROCESSING).
      mark-done       → the refund was paid; records payoutRef and closes it (DONE).
-   The amount is decided by the admin SEGÚN LA POLÍTICA de la tarifa (Flexible
-   48 h / Best Price no reembolsable) — never auto-computed. */
+   The amount is decided by the admin SEGÚN LA POLÍTICA de la tarifa (Estricta
+   100% hasta 7 días / Flexible 100% hasta 24 h) — never auto-computed. */
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',

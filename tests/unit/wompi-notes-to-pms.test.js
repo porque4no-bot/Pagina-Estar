@@ -32,15 +32,17 @@ test('sanitizeIncomingNotes strips angle brackets (defense-in-depth vs HTML)', (
   assert.ok(!out.includes('<') && !out.includes('>'), 'angle brackets removed');
 });
 
-test('notesToPmsEnabled reflects the GUEST_NOTES_TO_PMS_ENABLED flag', () => {
+test('notesToPmsEnabled reflects the GUEST_NOTES_TO_PMS_ENABLED flag', async () => {
+  /* Ahora lee vía _settings.flag() (panel → env), y es async, para respetar el
+     override del panel /admin igual que el consumidor (wompi-webhook). */
   const prev = process.env.GUEST_NOTES_TO_PMS_ENABLED;
   try {
     process.env.GUEST_NOTES_TO_PMS_ENABLED = 'true';
-    assert.equal(notesToPmsEnabled(), true);
+    assert.equal(await notesToPmsEnabled(), true);
     process.env.GUEST_NOTES_TO_PMS_ENABLED = 'false';
-    assert.equal(notesToPmsEnabled(), false);
+    assert.equal(await notesToPmsEnabled(), false);
     delete process.env.GUEST_NOTES_TO_PMS_ENABLED;
-    assert.equal(notesToPmsEnabled(), false);
+    assert.equal(await notesToPmsEnabled(), false);
   } finally {
     if (prev === undefined) delete process.env.GUEST_NOTES_TO_PMS_ENABLED; else process.env.GUEST_NOTES_TO_PMS_ENABLED = prev;
   }

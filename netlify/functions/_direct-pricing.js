@@ -23,10 +23,15 @@ function decodeDirectReference(ref) {
     if (!decoded.startsWith('1|')) return null;
     const parts = decoded.split('|');
     if (parts.length < 11) return null;
-    const [, checkinYYMMDD, checkoutYYMMDD, guestsCount, roomTypeId, , , , , extrasMask, bookingCode] = parts;
+    const [, checkinYYMMDD, checkoutYYMMDD, guestsCount, roomTypeId, , , email, , extrasMask, bookingCode] = parts;
     if (!/^\d{6}$/.test(checkinYYMMDD) || !/^\d{6}$/.test(checkoutYYMMDD)) return null;
     const result = {
       bookingCode,
+      /* Email (parts[7]) — mirrors wompi-webhook.decodeReference so the
+         one-use-per-email discount gate validates with the SAME email at
+         signing time and at webhook time (else a onePerEmail code passes at
+         signing but is rejected at the webhook, stranding a captured payment). */
+      email: email || '',
       checkin: `20${checkinYYMMDD.substring(0, 2)}-${checkinYYMMDD.substring(2, 4)}-${checkinYYMMDD.substring(4, 6)}`,
       checkout: `20${checkoutYYMMDD.substring(0, 2)}-${checkoutYYMMDD.substring(2, 4)}-${checkoutYYMMDD.substring(4, 6)}`,
       guestsCount: parseInt(guestsCount) || 1,
@@ -199,7 +204,7 @@ async function verifyDirectBookingAmount(decoded, clientAmountInCents, opts = {}
     ? totals.finalSubtotals
     : totals.expectedSubtotals;
   const expectedCentsList = sourceSubtotals.map(s => Math.round(s * 100));
-  /* índice 0 = Best/Estricta (no reembolsable) · índice 1 = Flexible (+10%, reembolsable).
+  /* índice 0 = Best/Estricta (100% hasta 7 días) · índice 1 = Flexible (+10%, 100% hasta 24 h).
      El plan AUTORITATIVO se deriva de cuál subtotal coincidió, NO del campo de la
      referencia (controlado por el cliente) — así nadie paga Estricta y se registra
      Flexible. Si ambos colisionan (caso borde), se prefiere Best (conservador). */

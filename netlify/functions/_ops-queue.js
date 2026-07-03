@@ -59,19 +59,23 @@ async function listOpen(deps = {}) {
   const s = opsStore(deps);
   if (!s) return [];
   try {
+    /* Las tareas resueltas se mueven al prefijo `done/` (ver resolve()), así el
+       prefijo `ops/` contiene SOLO abiertas. Se filtra por status igual (defensa
+       ante blobs viejos) ANTES de cortar por MAX_LIST, para no perder tareas
+       abiertas cuando existan muchas. Los get() van en paralelo. */
     const res = await s.list({ prefix: 'ops/' });
     const blobs = (res && res.blobs) || [];
-    const items = [];
-    for (const b of blobs.slice(0, MAX_LIST)) {
+    const fetched = await Promise.all(blobs.map(async (b) => {
       try {
         const raw = await s.get(b.key);
-        if (!raw) continue;
+        if (!raw) return null;
         const it = JSON.parse(raw);
-        if (it && it.status === 'open') items.push(it);
-      } catch (e) { /* skip corrupt */ }
-    }
+        return it && it.status === 'open' ? it : null;
+      } catch (e) { return null; }
+    }));
+    const items = fetched.filter(Boolean);
     items.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-    return items;
+    return items.slice(0, MAX_LIST);
   } catch (e) {
     return [];
   }
@@ -97,7 +101,11 @@ async function resolve(id, by, deps = {}) {
     it.status = 'resolved';
     it.resolvedAt = new Date((deps.now || Date.now)()).toISOString();
     it.resolvedBy = by || 'staff';
-    await s.set(key, JSON.stringify(it));
+    /* Mueve la tarea al prefijo `done/` (historial) y libera la clave `ops/`,
+       para que el listado de abiertas no arrastre resueltas ni crezca sin
+       límite. Un fallo recurrente vuelve a crear una `ops/<id>` fresca. */
+    try { await s.set(`done/${String(id)}`, JSON.stringify(it)); } catch (e) { /* historial best-effort */ }
+    await s.delete(key);
     return { ok: true, item: it };
   } catch (e) {
     return { ok: false, reason: 'error' };

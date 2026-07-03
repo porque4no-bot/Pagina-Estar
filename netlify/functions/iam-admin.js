@@ -108,6 +108,19 @@ exports.handler = async (event) => {
         return forbidden(headers, 'No puedes asignar a un rol permisos que tú no tienes');
       }
       const existing = await iam.getRole(id);
+      /* Anti-escalada SIMÉTRICA: tampoco puedes QUITAR permisos que tú no tienes.
+         Sin esto, un actor con solo roles.manage podría sobrescribir el rol
+         integrado 'admin' con [] y dejar sin permisos a todos los admins del
+         store (lockout), o degradar 'tesoreria' quitándole refunds.approve. Los
+         permisos actuales del rol son los del registro custom o, si es integrado
+         y aún no se ha editado, su default. */
+      const currentPerms = (existing && Array.isArray(existing.permissions))
+        ? existing.permissions
+        : (DEFAULT_ROLES[id] || []);
+      const removed = new Set(currentPerms.filter(p => !permissions.includes(p)));
+      if (!canActorGrant(actorPerms, isEnvAdmin, removed)) {
+        return forbidden(headers, 'No puedes quitar de un rol permisos que tú no tienes');
+      }
       const record = Object.assign({ id, builtin: BUILTIN_ROLE_IDS.includes(id) }, existing || {}, {
         id, label: body.label || (existing && existing.label) || { es: id, en: id },
         permissions, updatedBy: actor, updatedAt: nowIso()
@@ -157,7 +170,12 @@ exports.handler = async (event) => {
       }, existing || {}, {
         name: body.name != null ? String(body.name).slice(0, 200) : (existing && existing.name) || '',
         roles, extraPermissions, deniedPermissions,
-        status: body.status === 'suspended' ? 'suspended' : 'active',
+        /* Preserva el estado existente cuando el body NO trae status: editar el
+           nombre/roles de un usuario suspendido NO debe reactivarlo. Solo un
+           status explícito ('active'/'suspended') lo cambia. */
+        status: body.status === 'suspended' ? 'suspended'
+              : body.status === 'active' ? 'active'
+              : (existing && existing.status) || 'active',
         updatedBy: actor
       });
       record.auditLog = Array.isArray(record.auditLog) ? record.auditLog : [];

@@ -611,9 +611,9 @@
   text-transform: uppercase; letter-spacing: 0.1em; padding: 3px 8px; border-radius: 100px;
   white-space: nowrap;
 }
-.cfg-source-panel   { background: #DCE7F0; color: #2E5A82; }
+.cfg-source-panel   { background: var(--olive-100); color: var(--olive-700); }
 .cfg-source-netlify { background: var(--paper-300); color: var(--ink-700); }
-.cfg-source-empty   { background: #EDE6D6; color: #8A6A2E; }
+.cfg-source-empty   { background: var(--sand-100); color: var(--sand-700); }
 .cfg-reset {
   background: none; border: 1px solid var(--paper-400); border-radius: 4px;
   color: var(--ink-500); cursor: pointer; font-family: var(--font-label);
@@ -2863,7 +2863,7 @@ function openRefund(code) {
     <dt>Estadía</dt><dd>${stay}</dd>
     <dt>Pagado</dt><dd>${fmtCents(r.originalAmountCents)}</dd>
     <dt>Medio de pago</dt><dd>${escHtml(r.paymentProvider || '—')}${r.paymentMethod ? ' · ' + escHtml(r.paymentMethod) : ''}</dd>
-    ${r.ratePlan ? `<dt>Plan</dt><dd>${r.ratePlan === 'flexible' ? 'Flexible <span style="color:var(--olive)">(reembolsable)</span>' : 'Estricta <span style="color:var(--terracotta)">(no reembolsable)</span>'}</dd>` : ''}
+    ${r.ratePlan ? `<dt>Plan</dt><dd>${r.ratePlan === 'flexible' ? 'Flexible <span style="color:var(--olive)">(100% hasta 24 h antes)</span>' : 'Estricta <span style="color:var(--olive)">(100% hasta 7 días antes)</span>'}</dd>` : ''}
     <dt>Ruta</dt><dd>${escHtml(REFUND_ROUTE_LABEL[r.route] || r.route || '—')}</dd>
     <dt>Motivo</dt><dd>${escHtml(r.refundReason || '—')}</dd>
     ${r.refundAmountCents != null ? `<dt>Reembolso</dt><dd><strong>${fmtCents(r.refundAmountCents)}</strong></dd>` : ''}

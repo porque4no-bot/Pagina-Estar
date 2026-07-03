@@ -11,6 +11,7 @@ function makeStore() {
     store: {
       async get(k) { return m.has(k) ? m.get(k) : null; },
       async set(k, v) { m.set(k, v); return { modified: true }; },
+      async delete(k) { m.delete(k); },
       async list({ prefix } = {}) { return { blobs: [...m.keys()].filter(k => !prefix || k.startsWith(prefix)).map(key => ({ key })) }; }
     },
     map: m

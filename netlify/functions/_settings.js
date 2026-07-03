@@ -99,9 +99,11 @@ function isManageable(key) { return Object.prototype.hasOwnProperty.call(MANAGEA
 function settingsStore() {
   const { getStore } = require('@netlify/blobs');
   const opts = { name: STORE, consistency: 'strong' };
-  if (process.env.BLOBS_TOKEN && process.env.NETLIFY_SITE_ID) {
-    opts.token = process.env.BLOBS_TOKEN;
-    opts.siteID = process.env.NETLIFY_SITE_ID;
+  const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_BLOBS_TOKEN;
+  if (siteID && token) {
+    opts.siteID = siteID;
+    opts.token = token;
   }
   return getStore(opts);
 }
@@ -111,8 +113,10 @@ let _cache = { data: null, at: 0 };
 /* Lee el blob de overrides (cacheado por proceso ~30s). Nunca lanza. */
 async function loadOverrides(deps = {}) {
   if (deps.store === false) return {}; /* tests: sin store */
-  const now = (deps.now || (() => 0))(); /* now inyectable; sin él, sin expiración por reloj */
-  if (_cache.data && deps.now && now - _cache.at < CACHE_TTL_MS) return _cache.data;
+  const now = (deps.now || Date.now)(); /* reloj inyectable; por defecto el real */
+  /* Con el store real (producción) cachea ~30s por proceso; con un store
+     inyectado (tests) siempre relee, para no arrastrar snapshots entre casos. */
+  if (!deps.store && _cache.data && now - _cache.at < CACHE_TTL_MS) return _cache.data;
   try {
     const store = deps.store || settingsStore();
     const raw = await store.get(STORE);

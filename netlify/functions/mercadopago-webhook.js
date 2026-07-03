@@ -309,6 +309,7 @@ async function handleWebhook(event, overrides = {}) {
     notifyGuestPaymentOutcome,
     alreadyProcessed,
     markProcessed,
+    settingsGet: require('./_settings').get,
     ...overrides
   };
   const env = deps.env;
@@ -342,20 +343,28 @@ async function handleWebhook(event, overrides = {}) {
     console.log(`[mercadopago-webhook] payment=${transaction.id} reference=${transaction.reference} status=${transaction.status} verified=${sig.verified}`);
   }
 
+  /* Los correos de cortesía al huésped (rechazo/pendiente) solo se envían desde
+     un webhook con FIRMA VERIFICADA. En modo sin secreto (verified=false) un
+     tercero que conozca un payment_id real podría disparar correos a ese huésped;
+     el camino del dinero (crear la reserva) sí procede porque se re-consulta la
+     API con nuestro token. Configurar MERCADOPAGO_WEBHOOK_SECRET reactiva estos
+     avisos. */
+  const canNotifyGuest = !!sig.verified;
+
   if (transaction.status === 'rejected' || transaction.status === 'failed') {
     console.error(`[mercadopago-webhook] payment ${transaction.id} ${transaction.rawStatus}; reference=${transaction.reference}`);
     /* Guest email only for genuine declines: normalizeStatus also maps
        refunds/chargebacks to 'failed', where "no se realizó ningún cobro"
        would be wrong. */
     const raw = String(transaction.rawStatus || '').toLowerCase();
-    if (raw === 'rejected' || raw === 'cancelled') {
+    if (canNotifyGuest && (raw === 'rejected' || raw === 'cancelled')) {
       await deps.notifyGuestPaymentOutcome(transaction, 'declined');
     }
     return response(200, { message: `Payment ${transaction.status}. Logged for manual follow-up.` });
   }
 
   if (transaction.status !== 'approved') {
-    if (transaction.status === 'pending') {
+    if (canNotifyGuest && transaction.status === 'pending') {
       /* "No vuelvas a pagar" solo aplica a tarjetas en proceso. En métodos
          offline (PSE/Efecty/ticket), 'pending' significa que el huésped AÚN debe
          pagar, así que ese mensaje sería engañoso → se omite. */
@@ -377,8 +386,9 @@ async function handleWebhook(event, overrides = {}) {
      until guest-app online payment is enabled for MP. Deduped by the shared
      processed-transactions store (markProcessed) before posting to the folio,
      since add_extra/add_payment are not idempotent. */
+  const guestSvcMode = String((await deps.settingsGet('GUEST_SERVICE_PAYMENT_MODE')) || '').toLowerCase();
   if (GUEST_ORDER_REF_RE.test(transaction.reference || '') &&
-      ['mercadopago', 'both'].includes(String(env.GUEST_SERVICE_PAYMENT_MODE || '').toLowerCase())) {
+      ['mercadopago', 'both'].includes(guestSvcMode)) {
     if (await deps.alreadyProcessed(transaction.id)) {
       return response(200, { received: true, duplicate: true });
     }

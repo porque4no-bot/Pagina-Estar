@@ -44,6 +44,7 @@
 */
 
 const crypto = require('crypto');
+const { getSync } = require('./_settings'); // TTLOCK_ENABLED gestionable desde /admin
 
 const DEFAULT_API_BASE = 'https://api.sciener.com';
 const KEYBOARD_PWD_VERSION = 4; // última versión soportada por la plataforma.
@@ -64,7 +65,7 @@ function resolvePasswordMd5() {
 
 function ttlockConfig() {
   return {
-    enabled: String(process.env.TTLOCK_ENABLED || '').toLowerCase() === 'true',
+    enabled: String(getSync('TTLOCK_ENABLED', '') || '').toLowerCase() === 'true',
     apiBase: (process.env.TTLOCK_API_BASE || DEFAULT_API_BASE).replace(/\/+$/, ''),
     clientId: process.env.TTLOCK_CLIENT_ID || '',
     clientSecret: process.env.TTLOCK_CLIENT_SECRET || '',
