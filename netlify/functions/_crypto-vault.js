@@ -139,8 +139,11 @@ function open(envelope, aad) {
     if (!secret) throw new Error('crypto-vault: unknown keyId "' + envelope.kid + '" (rotated out of the ring?)');
     key = deriveV2(secret, envelope.kid);
   } else {
-    /* legacy v1: single secret, sha256 directo, sin aad */
-    const secret = rawSecret() || keyRing()[activeKeyId()];
+    /* legacy v1: single secret, sha256 directo, sin aad. La v1 SIEMPRE se
+       escribió con el secreto único, que keyRing() conserva bajo DEFAULT_KID.
+       Usar DEFAULT_KID (no la clave ACTIVA) para que, tras rotar
+       (GUEST_APP_ACTIVE_KEY_ID=k2), los sobres viejos sigan derivando de k1. */
+    const secret = keyRing()[DEFAULT_KID] || rawSecret();
     if (!secret) throw new Error('crypto-vault: no key available for legacy envelope');
     key = deriveV1(secret);
   }

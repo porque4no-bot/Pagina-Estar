@@ -9,7 +9,7 @@ require('./_env');
         booking email or surname (same second-factor gate as get-booking).
      2. We record the request (Netlify Blobs, audit + idempotency).
      3. We alert the hotel team (admin email) to apply the rate-plan policy
-        (Flexible: free up to 48 h before check-in / Best Price: non-refundable)
+        (Estricta: 100% refund up to 7 days before / Flexible: 100% up to 24 h before)
         and process the refund through the original payment channel.
      4. We acknowledge to the guest by email.
    The previous UI pretended to cancel while calling no API at all; this

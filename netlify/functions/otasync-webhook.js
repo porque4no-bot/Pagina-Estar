@@ -97,9 +97,11 @@ async function syncReservationGuests(events) {
 function cancelDedupeStore() {
   const { getStore } = require('@netlify/blobs');
   const opts = { name: 'cancellation-notified', consistency: 'strong' };
-  if (process.env.BLOBS_TOKEN && process.env.NETLIFY_SITE_ID) {
-    opts.token = process.env.BLOBS_TOKEN;
-    opts.siteID = process.env.NETLIFY_SITE_ID;
+  const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_BLOBS_TOKEN;
+  if (siteID && token) {
+    opts.siteID = siteID;
+    opts.token = token;
   }
   return getStore(opts);
 }

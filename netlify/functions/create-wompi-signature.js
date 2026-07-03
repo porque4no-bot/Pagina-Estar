@@ -15,7 +15,9 @@ async function discountEnabled() { return await flag('DISCOUNT_CODES_ENABLED'); 
    reference (length/escapes/sensitivity); instead it is persisted server-side
    here at signing time and read by wompi-webhook when it creates the
    reservation. Gated OFF by default. */
-function notesToPmsEnabled() { return process.env.GUEST_NOTES_TO_PMS_ENABLED === 'true'; }
+/* Gestionable desde /admin: el consumidor (wompi-webhook) lee este flag vía
+   flag() (panel → env). Debe leerse igual aquí o la nota nunca se persiste. */
+async function notesToPmsEnabled() { return await flag('GUEST_NOTES_TO_PMS_ENABLED'); }
 function sanitizeIncomingNotes(raw) {
   if (!raw || typeof raw !== 'string') return '';
   return raw.replace(/[<>\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
@@ -181,7 +183,7 @@ exports.handler = async (event) => {
     /* A8: persist the guest's free-text note keyed by bookingCode so the webhook
        can attach it to the OTASync reservation. Best-effort; never blocks the
        signature. Gated OFF by default. */
-    if (notesToPmsEnabled() && guestNotes && decoded.bookingCode) {
+    if ((await notesToPmsEnabled()) && guestNotes && decoded.bookingCode) {
       try {
         const notesStore = getStore({ name: 'booking-notes', consistency: 'strong' });
         await notesStore.set(`note-${decoded.bookingCode}`, JSON.stringify({ notes: guestNotes, createdAt: new Date().toISOString() }));

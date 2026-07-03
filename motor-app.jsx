@@ -881,7 +881,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
         isColombian ? '1' : '0',
         isBusinessTrip ? '1' : '0',
         payableCents, // 14th field: price in cents (con descuento ya aplicado si lo hay)
-        booking.rate === 'flexible' ? 'F' : 'B' // 15th field: plan tarifario (F=Flexible reembolsable / B=Best=Estricta no reembolsable)
+        booking.rate === 'flexible' ? 'F' : 'B' // 15th field: plan tarifario (F=Flexible 100% hasta 24 h / B=Best=Estricta 100% hasta 7 días)
       ].join('|');
 
       const encodedRef = btoa(unescape(encodeURIComponent(serialized)))
@@ -1260,7 +1260,7 @@ function BookingSummary({ booking, search, lang }) {
       <p className="be-summary-rate-badge">
         {booking.rate === 'flexible'
           ? `✶ ${t.flexible} — ${t.refundable}`
-          : `✶ ${t.bestPrice} — ${t.nonRefundable}`}
+          : `✶ ${t.bestPrice} — ${t.strictCancel}`}
       </p>
       {calc && (
         <div className="be-summary-breakdown">
@@ -1309,7 +1309,7 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
   const reservationPending = !!(paymentDetails && paymentDetails.reservationPending);
 
   const roomName = t.roomNames[booking.room.id] || booking.room.name;
-  const rateLabel = booking.rate === 'flexible' ? `${t.flexible} — ${t.refundable}` : `${t.bestPrice} — ${t.nonRefundable}`;
+  const rateLabel = booking.rate === 'flexible' ? `${t.flexible} — ${t.refundable}` : `${t.bestPrice} — ${t.strictCancel}`;
 
   const isColombian = isColombianGuest(booking.guest);
   const isBusinessTrip = isBusinessGuest(booking.guest, lang);

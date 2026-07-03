@@ -8,6 +8,7 @@
 require('./_env');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const { verifyBankDetailsToken, sanitizeBankDetails, saveBankDetails, getRefund } = require('./_refunds-store');
+const { flag } = require('./_settings');
 
 function cors() {
   const h = {
@@ -26,7 +27,9 @@ exports.handler = async (event) => {
   const headers = cors();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method Not Allowed' }) };
-  if (process.env.REFUND_BANK_FORM_ENABLED !== 'true') return { statusCode: 404, headers, body: JSON.stringify({ error: 'Not found' }) };
+  /* Gestionable desde /admin: debe leer el mismo flag (panel → env) que usa
+     refund-admin-action al firmar y enviar el enlace, o el link daría 404. */
+  if (!(await flag('REFUND_BANK_FORM_ENABLED'))) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Not found' }) };
 
   const rl = await checkRateLimit(event, { name: 'submit-bank-details', limit: 10, windowMs: 10 * 60 * 1000 });
   if (!rl.ok) return rateLimitResponse(headers, rl.retryAfter);

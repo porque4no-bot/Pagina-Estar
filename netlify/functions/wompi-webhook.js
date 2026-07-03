@@ -175,7 +175,7 @@ function decodeReference(ref) {
       result.amountCents = parseInt(parts[13], 10) || 0;
     }
     /* Plan tarifario elegido por el huésped (pos. 14). 'F' = Flexible
-       (reembolsable), 'B' = Best/Estricta (no reembolsable). Referencias
+       (100% hasta 24 h), 'B' = Best/Estricta (100% hasta 7 días). Referencias
        antiguas no lo traen → queda undefined (trazabilidad best-effort). */
     if (parts[14]) {
       result.ratePlan = parts[14] === 'F' ? 'flexible' : 'best';
@@ -1058,9 +1058,12 @@ exports.handler = async (event, context) => {
   }
 
   // Guest-app service order paid online: reference is the order eventId (GST-...).
-  // Gated by GUEST_SERVICE_PAYMENT_MODE=wompi so it's inert until Phase B is enabled.
+  // guest-action builds a Wompi checkout when the mode is 'wompi' OR 'both'
+  // (both => guest chooses), so accept both here or a paid GST order in 'both'
+  // mode would fall through, never settle to the folio, and strand the payment.
+  const guestSvcMode = String(await get('GUEST_SERVICE_PAYMENT_MODE') || '').toLowerCase();
   if (GUEST_ORDER_REF_RE.test(transaction.reference || '') &&
-      (await get('GUEST_SERVICE_PAYMENT_MODE')) === 'wompi') {
+      (guestSvcMode === 'wompi' || guestSvcMode === 'both')) {
     addProcessedTransaction(transaction.id);
     if (txStore) {
       try { await txStore.set(String(transaction.id), '1', { ttl: 86400 }); } catch (e) { /* non-fatal */ }
@@ -1495,7 +1498,7 @@ exports.handler = async (event, context) => {
       guest_email: decoded.email,
       id_channels: channelId,
       channel: channelName,
-      note: `${guestNote ? 'Nota del huésped: ' + guestNote + '. ' : ''}Plan: ${ratePlan === 'flexible' ? 'Flexible (reembolsable)' : ratePlan === 'best' ? 'Estricta (no reembolsable)' : 'N/D'}. Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${ivaNote}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
+      note: `${guestNote ? 'Nota del huésped: ' + guestNote + '. ' : ''}Plan: ${ratePlan === 'flexible' ? 'Flexible (reembolso 100% hasta 24 h antes)' : ratePlan === 'best' ? 'Estricta (reembolso 100% hasta 7 días antes)' : 'N/D'}. Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${ivaNote}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
     };
 
     const insertController = new AbortController();

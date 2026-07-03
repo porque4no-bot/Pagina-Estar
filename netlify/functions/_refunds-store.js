@@ -56,9 +56,11 @@ function refundRoute(provider, paymentMethod) {
 function getRefundStore() {
   const { getStore } = require('@netlify/blobs');
   const opts = { name: 'refunds', consistency: 'strong' };
-  if (process.env.BLOBS_TOKEN && process.env.NETLIFY_SITE_ID) {
-    opts.token = process.env.BLOBS_TOKEN;
-    opts.siteID = process.env.NETLIFY_SITE_ID;
+  const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_BLOBS_TOKEN;
+  if (siteID && token) {
+    opts.siteID = siteID;
+    opts.token = token;
   }
   return getStore(opts);
 }
@@ -73,9 +75,11 @@ async function recoverPaymentInfo(bookingCode) {
   try {
     const { getStore } = require('@netlify/blobs');
     const opts = { name: 'booking-results', consistency: 'strong' };
-    if (process.env.BLOBS_TOKEN && process.env.NETLIFY_SITE_ID) {
-      opts.token = process.env.BLOBS_TOKEN;
-      opts.siteID = process.env.NETLIFY_SITE_ID;
+    const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+    const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_BLOBS_TOKEN;
+    if (siteID && token) {
+      opts.siteID = siteID;
+      opts.token = token;
     }
     const raw = await getStore(opts).get(`direct-${bookingCode}`);
     if (raw) {
@@ -139,7 +143,7 @@ async function createRefundRequest({ booking, paymentInfo, clientIp, source, rea
     cardLast4: pay.cardLast4 || null,
     authCode: pay.authCode || null,
     paymentDate: pay.paymentDate || null,
-    /* Plan tarifario (flexible=reembolsable / best=Estricta no reembolsable) para
+    /* Plan tarifario (flexible=100% hasta 24 h / best=Estricta 100% hasta 7 días) para
        que el panel muestre la política aplicable al fijar el monto. */
     ratePlan: pay.ratePlan || null,
     route,
