@@ -19,3 +19,13 @@ test-results/
 # Scraper output (generated locally, not checked in)
 scripts/booking_reviews_9plus.json
 scripts/debug_screenshot.png
+
+# Generated email preview (not for deploy)
+email-previews.html
+_previews/
+_render-emails.js
+_extract-correos.js
+_correos-extracted.html
+_correos-text.txt
+
+_gen-logo.js

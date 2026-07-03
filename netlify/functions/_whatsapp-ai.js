@@ -27,6 +27,10 @@
      back to the deterministic state machine — same convention as every
      other credential-gated integration in this repo. */
 
+const fs = require('fs');
+const path = require('path');
+const { getSync } = require('./_settings'); // modelo del bot gestionable desde /admin → env → default
+
 const SITE_URL = process.env.URL || 'https://estar.com.co';
 /* Haiku by default: this is a latency-sensitive chat surface running inside a
    Netlify function timeout, the job is well-scoped (short turns, 4 tools) and
@@ -53,7 +57,7 @@ function modelParams(model, effort) {
 function aiConfig() {
   return {
     apiKey: process.env.ANTHROPIC_API_KEY || '',
-    model: process.env.WHATSAPP_AI_MODEL || DEFAULT_MODEL,
+    model: getSync('WHATSAPP_AI_MODEL', DEFAULT_MODEL),
     effort: process.env.WHATSAPP_AI_EFFORT || DEFAULT_EFFORT,
     maxTokens: parseInt(process.env.WHATSAPP_AI_MAX_TOKENS, 10) || DEFAULT_MAX_TOKENS,
     /* Debe quedar POR DEBAJO del límite de ejecución de la función Netlify
@@ -131,7 +135,8 @@ const TOOLS = [
           enum: ['guest_requested_human', 'long_stay_quote', 'corporate_quote', 'complaint', 'payment_issue', 'other'],
           description: 'Why the team is needed'
         },
-        summary: { type: 'string', description: 'Actionable summary for the team: what the guest needs, relevant dates/codes, urgency' }
+        summary: { type: 'string', description: 'Actionable summary for the team: what the guest needs, relevant dates/codes, urgency' },
+        urgent: { type: 'boolean', description: 'true ONLY if the guest needs IMMEDIATE human attention right now (door/access problem, safety issue, locked out, emergency). Triggers a phone-call escalation to the on-duty person, not just an email. Use sparingly.' }
       },
       required: ['reason', 'summary']
     }
@@ -146,22 +151,54 @@ function roomCatalog(roomMeta) {
     .join('\n');
 }
 
+/* Base de conocimiento editable (docs/bot-conocimiento.md). El bot la carga en
+   tiempo de ejecución (incluida en el bundle vía included_files en netlify.toml),
+   así el dueño edita el archivo y el bot se actualiza sin tocar código. Solo se
+   toma la zona entre los marcadores BOT-KNOWLEDGE:START/END y se filtran las
+   líneas internas (⚠️). Cacheado y a prueba de fallos: si no se puede leer,
+   buildSystemPrompt usa un bloque mínimo de respaldo. */
+let _knowledgeCache;
+function loadKnowledge() {
+  if (_knowledgeCache !== undefined) return _knowledgeCache;
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, '../../docs/bot-conocimiento.md'), 'utf8');
+    const m = raw.match(/<!--\s*BOT-KNOWLEDGE:START[\s\S]*?-->([\s\S]*?)<!--\s*BOT-KNOWLEDGE:END\s*-->/);
+    const body = (m ? m[1] : '').trim();
+    _knowledgeCache = body
+      ? body.split('\n').filter(line => !line.includes('⚠️')).join('\n').replace(/\n{3,}/g, '\n\n').trim()
+      : '';
+  } catch (e) {
+    _knowledgeCache = '';
+  }
+  return _knowledgeCache;
+}
+
+const FALLBACK_HOTEL = `# El hotel
+- Apartaestudios completos: cocina equipada, baño privado, WiFi de fibra, TV cable, zona de trabajo.
+- Check-in desde las 3:00 pm (ingreso autónomo digital; recepción 6–10 am y 4–10 pm) · Check-out 11:00 am.
+- No hay parqueadero propio (zona azul al frente). Mascotas bienvenidas ($200.000 por reserva).
+- Tarifas: "Estricta" (gratis hasta 7 días antes) y "Flexible" (+10%, hasta 24 h antes).
+- Larga estadía: ${SITE_URL}/vivir.html · Empresas/grupos: ${SITE_URL}/empresas.html (usa notify_team).
+- Teléfono del hotel: +57 310 249 0414.`;
+
 function buildSystemPrompt(roomMeta, todayIso) {
+  const knowledge = loadKnowledge();
+  const hotelBlock = knowledge
+    ? `# El hotel — base de conocimiento (fuente de verdad)
+Tipologías disponibles (capacidades, para validar):
+${roomCatalog(roomMeta)}
+
+${knowledge}`
+    : `${FALLBACK_HOTEL}
+- Tipologías:
+${roomCatalog(roomMeta)}`;
+
   return `Eres el asistente de Estar, un hotel boutique de apartaestudios en Manizales, Colombia. Atiendes huéspedes por WhatsApp.
 
 # Tu trabajo
 Resolver con calidez y eficiencia: disponibilidad y reservas, consultas sobre reservas existentes, cancelaciones, estadías largas, empresas, y preguntas generales del hotel. Responde en el idioma del huésped (español por defecto).
 
-# El hotel
-- Apartaestudios completos: cocina equipada, baño privado, WiFi de fibra, TV cable, zona de trabajo.
-- Tipologías:
-${roomCatalog(roomMeta)}
-- Check-in: desde las 3:00 pm · Check-out: hasta las 11:00 am. Check-in 100% digital: un día antes llega un enlace con códigos de acceso (sin llaves físicas ni recepción).
-- No ofrecemos parqueadero propio; hay un parqueadero público cercano (ajeno a la propiedad). Mascotas bienvenidas con depósito.
-- Tarifas en el motor de reservas: "Best Price" (no reembolsable, más económica) y "Flexible" (cancelación gratuita hasta 48 h antes del check-in).
-- Estadías largas ("Vivir en Estar"): 1 a 12 meses, todo incluido (servicios, internet, aseo semanal), sin fiadores, tarifas mensuales con IVA incluido. Detalles: ${SITE_URL}/vivir.html — las cotizaciones las hace el equipo (usa notify_team).
-- Empresas y grupos: tarifas corporativas y cotizaciones formales, ${SITE_URL}/empresas.html — también vía notify_team.
-- Teléfono del hotel: +57 310 249 0414.
+${hotelBlock}
 
 # Reglas duras
 1. NUNCA inventes precios ni disponibilidad: usa check_availability. Si el huésped no da fechas o número de personas, pídelos.
@@ -281,7 +318,17 @@ async function executeTool(name, input, deps) {
                <p>${esc(input.summary || '')}</p>
                <p>Respóndele directamente desde la app de WhatsApp Business.</p>`
       });
-      return JSON.stringify({ notified: Boolean(result && result.sent !== false) });
+      /* Urgente → además del correo, escalamiento por LLAMADA (Twilio) con fallback
+         a alerta. Best-effort y gated (ESCALATION_CALL_ENABLED); nunca tumba el flujo. */
+      let escalated = false;
+      if (input.urgent) {
+        try {
+          const { escalate } = require('./_escalation');
+          const esc = await escalate({ reason: input.reason, summary: input.summary, lang: deps.lang, guestNumber: deps.guestNumber });
+          escalated = !!(esc && (esc.callOk || esc.fallback));
+        } catch (e) { /* best-effort */ }
+      }
+      return JSON.stringify({ notified: Boolean(result && result.sent !== false), escalated });
     }
     default:
       return JSON.stringify({ error: `unknown tool: ${name}` });

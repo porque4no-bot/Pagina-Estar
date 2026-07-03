@@ -18,6 +18,7 @@ require('./_env');
 
 const { verifySignature, markRead, waConfig } = require('./_whatsapp');
 const bot = require('./_whatsapp-bot');
+const { flag } = require('./_settings');
 
 /* Per-message dedupe: Meta retries webhooks, and a Netlify cold start may
    process a retry after the original succeeded. Blobs when available,
@@ -149,8 +150,9 @@ exports.handler = async (event) => {
   }
 
   /* Kill switch while onboarding: webhook stays subscribed and returns 200,
-     but the bot does not answer until WHATSAPP_BOT_ENABLED=true. */
-  const botEnabled = process.env.WHATSAPP_BOT_ENABLED === 'true';
+     but the bot does not answer until WHATSAPP_BOT_ENABLED=true.
+     Gestionable desde /admin (override del panel → env). */
+  const botEnabled = await flag('WHATSAPP_BOT_ENABLED');
 
   const messages = extractMessages(payload);
   for (const msg of messages) {

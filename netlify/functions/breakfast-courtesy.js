@@ -6,8 +6,8 @@
  * (idempotente 1/persona/día como el resto). Auth: SOLO admin (ADMIN_EMAILS) —
  * dar cortesías es una decisión de administración, no del comedor. */
 
-const { json, corsHeaders, parseJsonBody, isDemoMode } = require('./_guest-app');
-const { authenticateAdmin } = require('./_firebase-auth');
+const { json, corsHeaders, parseJsonBody } = require('./_guest-app');
+const { authorize } = require('./_authz');
 const { resolveBreakfastStatus } = require('./_breakfast');
 const { recordRedemption, SOURCE } = require('./_breakfast-store');
 
@@ -22,9 +22,10 @@ exports.handler = async event => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders(), body: '' };
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
-  const auth = (isDemoMode() && !process.env.FIREBASE_PROJECT_ID)
-    ? { ok: true, email: 'demo@local' }
-    : await authenticateAdmin(event);
+  // Dar cortesías es decisión de administración: requiere breakfast.courtesy, que
+  // el comedor (STAFF_EMAILS) NO tiene. authorize trae su propio bypass de demo
+  // local (en Netlify isDemoMode() es false).
+  const auth = await authorize(event, 'breakfast.courtesy');
   if (!auth.ok) return json(auth.statusCode, { error: auth.error });
 
   try {

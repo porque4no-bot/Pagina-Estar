@@ -5,7 +5,7 @@
  * Devuelve el derecho (incluido/cuántos), lo servido hoy y lo que falta. */
 
 const { json, corsHeaders, parseJsonBody } = require('./_guest-app');
-const { authenticateStaff } = require('./_staff-auth');
+const { authorize } = require('./_authz');
 const { resolveBreakfastStatus } = require('./_breakfast');
 
 /* "EST-123:2" → { code:"EST-123", guestIndex:2 }; "EST-123" → { code, guestIndex:undefined } */
@@ -20,7 +20,7 @@ exports.handler = async event => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders(), body: '' };
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
-  const auth = await authenticateStaff(event);
+  const auth = await authorize(event, 'breakfast.status');
   if (!auth.ok) return json(auth.statusCode, { error: auth.error });
 
   try {

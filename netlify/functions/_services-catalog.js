@@ -19,8 +19,9 @@
  *   surfaces:   where the service is offered today
  *
  * Owner decisions baked in (2026-06-18): desayuno = $20.000 (era 20/25/28k);
- * late check-out = 15% de la noche; early check-in = 25% de la noche; the
- * booking engine was already canonical, quotes + guest app were aligned to it.
+ * late check-out = 15% de la noche; early check-in = 25% de la noche (plano,
+ * decisión dueño 2026-06-24, antes 35%); the booking engine was already
+ * canonical, quotes + guest app were aligned to it.
  * Guest-app surface (owner decision 2026-06-18): offers desayuno, lavandería,
  * late check-out (15%), early check-in (25%), traslado, experiencia y mascota;
  * el parqueadero quedó retirado (no figura en este catálogo).

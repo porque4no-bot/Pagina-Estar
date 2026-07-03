@@ -4,6 +4,7 @@ require('./_env');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const { signPassToken } = require('./_breakfast-pass');
 const { BREAKFAST_SCHEDULE } = require('./_breakfast');
+const email = require('./_email');
 const { getStore } = require('@netlify/blobs');
 
 /**
@@ -78,38 +79,40 @@ function buildEmailHtml({
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light only" />
+  <meta name="supported-color-schemes" content="light only" />
   <title>Confirmación de reserva — Estar Manizales</title>
+  <style>@media only screen and (max-width:600px){.em-pwrap{padding:14px 0!important;}.em-card{border-radius:0!important;}.em-px{padding-left:20px!important;padding-right:20px!important;}}</style>
 </head>
-<body style="margin:0;padding:0;background-color:#F5F3EE;font-family:Georgia,'Times New Roman',serif;">
+<body style="margin:0;padding:0;background-color:#e7e1d4;font-family:'Libre Baskerville',Georgia,'Times New Roman',serif;">
 
   <!-- Outer wrapper -->
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F5F3EE;padding:32px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" class="em-pwrap" style="background-color:#e7e1d4;padding:40px 16px;">
     <tr>
       <td align="center">
 
         <!-- Email card -->
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.07);">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" class="em-card" style="max-width:600px;width:100%;background-color:#FFFFFF;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(40,41,43,.06),0 12px 32px rgba(40,41,43,.07);">
 
           <!-- Header -->
           <tr>
-            <td style="background-color:#2C2C2C;padding:36px 40px;text-align:center;">
-              <p style="margin:0 0 4px 0;font-family:Georgia,serif;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#C4956A;">Hotel Apartamento</p>
-              <h1 style="margin:0;font-family:Georgia,serif;font-size:32px;font-weight:400;letter-spacing:0.06em;color:#FFFFFF;">ESTAR</h1>
-              <p style="margin:6px 0 0 0;font-family:Georgia,serif;font-size:11px;letter-spacing:0.12em;color:#9A9A8A;text-transform:uppercase;">Manizales, Colombia</p>
+            <td class="em-px" style="background-color:#faf6ef;padding:32px 40px 24px;text-align:center;">
+              <img src="cid:estarlogo" alt="estar Apartaestudios" width="150" style="display:block;margin:0 auto;width:150px;max-width:62%;height:auto;" />
+              <p style="margin:14px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:700;letter-spacing:0.24em;color:#9b9065;text-transform:uppercase;">Manizales · Colombia</p>
             </td>
           </tr>
 
           <!-- Confirmation hero -->
           <tr>
-            <td style="background-color:#C4956A;padding:28px 40px;text-align:center;">
-              <p style="margin:0 0 8px 0;font-family:Georgia,serif;font-size:13px;letter-spacing:0.14em;text-transform:uppercase;color:#FFFFFF;opacity:0.85;">Reserva Confirmada</p>
-              <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:28px;font-weight:700;letter-spacing:0.08em;color:#FFFFFF;">${bookingCode}</p>
+            <td class="em-px" style="background-color:#9b9065;padding:22px 40px;text-align:center;">
+              <p style="margin:0 0 9px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#FFFFFF;opacity:0.92;">Reserva confirmada</p>
+              <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:23px;font-weight:700;letter-spacing:0.16em;color:#FFFFFF;">${bookingCode}</p>
             </td>
           </tr>
 
           <!-- Greeting -->
           <tr>
-            <td style="padding:32px 40px 0 40px;">
+            <td class="em-px" style="padding:32px 40px 0 40px;">
               <p style="margin:0;font-family:Georgia,serif;font-size:16px;color:#2C2C2C;line-height:1.6;">
                 Hola <strong>${guestName}</strong>,
               </p>
@@ -121,7 +124,7 @@ function buildEmailHtml({
 
           <!-- Booking details -->
           <tr>
-            <td style="padding:28px 40px;">
+            <td class="em-px" style="padding:28px 40px;">
               <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E8E4DC;border-radius:8px;overflow:hidden;">
 
                 <!-- Row: Habitación -->
@@ -164,7 +167,7 @@ function buildEmailHtml({
                 <tr>
                   <td style="padding:16px 20px;">
                     <p style="margin:0 0 4px 0;font-family:Arial,sans-serif;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#9A9A8A;">Total pagado (online)</p>
-                    <p style="margin:0;font-family:Georgia,serif;font-size:22px;font-weight:700;color:#C4956A;">${paidFormatted} COP</p>
+                    <p style="margin:0;font-family:Georgia,serif;font-size:22px;font-weight:700;color:#9b9065;">${paidFormatted} COP</p>
                     ${totalAmount !== paidAmount ? `<p style="margin:4px 0 0 0;font-family:Arial,sans-serif;font-size:11px;color:#9A9A8A;">Total reserva: ${totalFormatted} COP</p>` : ''}
                   </td>
                 </tr>
@@ -175,8 +178,8 @@ function buildEmailHtml({
 
           <!-- Check-in digital instructions -->
           <tr>
-            <td style="padding:0 40px 28px 40px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F0EDE6;border-radius:8px;padding:20px 24px;">
+            <td class="em-px" style="padding:0 40px 28px 40px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#faf6ef;border-radius:8px;padding:20px 24px;">
                 <tr>
                   <td>
                     <p style="margin:0 0 12px 0;font-family:Arial,sans-serif;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#7A7A6A;">Antes de llegar</p>
@@ -186,10 +189,10 @@ function buildEmailHtml({
                           <table cellpadding="0" cellspacing="0" border="0">
                             <tr>
                               <td style="padding-right:12px;vertical-align:top;">
-                                <span style="display:inline-block;width:20px;height:20px;background-color:#C4956A;border-radius:50%;text-align:center;line-height:20px;font-family:Arial,sans-serif;font-size:10px;font-weight:700;color:#FFFFFF;">1</span>
+                                <span style="display:inline-block;width:20px;height:20px;background-color:#9b9065;border-radius:50%;text-align:center;line-height:20px;font-family:Arial,sans-serif;font-size:10px;font-weight:700;color:#FFFFFF;">1</span>
                               </td>
                               <td>
-                                <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#2C2C2C;line-height:1.5;"><strong>Guarda tu código de reserva</strong><br/><span style="color:#555550;">${bookingCode} — lo necesitarás en la recepción.</span></p>
+                                <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#2C2C2C;line-height:1.5;"><strong>Haz tu check-in digital</strong><br/><span style="color:#555550;">Un día antes de tu llegada. Al completarlo recibirás los códigos de acceso (edificio y apartaestudio) — sin llaves ni recepción.</span></p>
                               </td>
                             </tr>
                           </table>
@@ -200,10 +203,10 @@ function buildEmailHtml({
                           <table cellpadding="0" cellspacing="0" border="0">
                             <tr>
                               <td style="padding-right:12px;vertical-align:top;">
-                                <span style="display:inline-block;width:20px;height:20px;background-color:#C4956A;border-radius:50%;text-align:center;line-height:20px;font-family:Arial,sans-serif;font-size:10px;font-weight:700;color:#FFFFFF;">2</span>
+                                <span style="display:inline-block;width:20px;height:20px;background-color:#9b9065;border-radius:50%;text-align:center;line-height:20px;font-family:Arial,sans-serif;font-size:10px;font-weight:700;color:#FFFFFF;">2</span>
                               </td>
                               <td>
-                                <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#2C2C2C;line-height:1.5;"><strong>Cómo llegar</strong><br/><span style="color:#555550;">Cl. 61 #23-36, La Estrella, Manizales.</span></p>
+                                <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#2C2C2C;line-height:1.5;"><strong>Ten tu documento a la mano</strong><br/><span style="color:#555550;">Requerido por la normatividad hotelera colombiana para el registro.</span></p>
                               </td>
                             </tr>
                           </table>
@@ -214,10 +217,10 @@ function buildEmailHtml({
                           <table cellpadding="0" cellspacing="0" border="0">
                             <tr>
                               <td style="padding-right:12px;vertical-align:top;">
-                                <span style="display:inline-block;width:20px;height:20px;background-color:#C4956A;border-radius:50%;text-align:center;line-height:20px;font-family:Arial,sans-serif;font-size:10px;font-weight:700;color:#FFFFFF;">3</span>
+                                <span style="display:inline-block;width:20px;height:20px;background-color:#9b9065;border-radius:50%;text-align:center;line-height:20px;font-family:Arial,sans-serif;font-size:10px;font-weight:700;color:#FFFFFF;">3</span>
                               </td>
                               <td>
-                                <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#2C2C2C;line-height:1.5;"><strong>Trae tu documento de identidad</strong><br/><span style="color:#555550;">Requerido por normatividad hotelera colombiana para el registro.</span></p>
+                                <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;color:#2C2C2C;line-height:1.5;"><strong>Cómo llegar</strong><br/><span style="color:#555550;">Cl. 61 #23-36, La Estrella, Manizales.</span><br/><a href="${email.WAZE_LINK}" style="color:#9b9065;font-weight:700;text-decoration:none;">Abrir en Waze</a> &nbsp;·&nbsp; <a href="${email.MAPS_LINK}" style="color:#9b9065;font-weight:700;text-decoration:none;">Google Maps</a></p>
                               </td>
                             </tr>
                           </table>
@@ -232,8 +235,8 @@ function buildEmailHtml({
 
           <!-- Breakfast passes (only when the reservation includes breakfast) -->
           ${passUrl ? `<tr>
-            <td style="padding:0 40px 28px 40px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F0EDE6;border-radius:8px;padding:20px 24px;">
+            <td class="em-px" style="padding:0 40px 28px 40px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#faf6ef;border-radius:8px;padding:20px 24px;">
                 <tr><td style="text-align:center;">
                   <p style="margin:0 0 6px 0;font-family:Arial,sans-serif;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#7A7A6A;">Desayuno incluido</p>
                   <p style="margin:0 0 16px 0;font-family:Georgia,serif;font-size:14px;color:#555550;line-height:1.6;">Muestra tu pase en el comedor (${BREAKFAST_SCHEDULE}; o antes, si lo solicitas con antelación). Ábrelo desde aquí — sin apps ni claves.</p>
@@ -245,7 +248,7 @@ function buildEmailHtml({
 
           <!-- WhatsApp contact -->
           <tr>
-            <td style="padding:0 40px 32px 40px;text-align:center;">
+            <td class="em-px" style="padding:0 40px 32px 40px;text-align:center;">
               <p style="margin:0 0 16px 0;font-family:Arial,sans-serif;font-size:13px;color:#555550;line-height:1.6;">
                 ¿Tienes alguna pregunta o petición especial? Escríbenos directamente por WhatsApp.
               </p>
@@ -257,23 +260,12 @@ function buildEmailHtml({
             </td>
           </tr>
 
-          <!-- Divider -->
-          <tr>
-            <td style="padding:0 40px;">
-              <hr style="border:none;border-top:1px solid #E8E4DC;margin:0;" />
-            </td>
-          </tr>
-
           <!-- Footer -->
           <tr>
-            <td style="padding:24px 40px;text-align:center;">
-              <p style="margin:0 0 6px 0;font-family:Arial,sans-serif;font-size:11px;color:#9A9A8A;">
-                <strong style="color:#555550;">Hotel Estar</strong> · Cl. 61 #23-36, La Estrella, Manizales, Caldas, Colombia
-              </p>
-              <p style="margin:0;font-family:Arial,sans-serif;font-size:10px;color:#BCBCB0;line-height:1.5;">
-                Este correo es una confirmación automática de tu reserva. Guárdalo como comprobante.<br/>
-                Para cancelaciones o modificaciones comunícate con nosotros antes de 48h del check-in.
-              </p>
+            <td class="em-px" style="background-color:#faf6ef;padding:22px 40px 26px;text-align:center;border-top:1px solid #ece5d6;">
+              <div style="margin-bottom:10px;"><span style="color:#9b9065;font-size:15px;line-height:1;">&#10022;</span></div>
+              <p style="margin:0 0 8px 0;font-family:Arial,sans-serif;font-size:11px;line-height:1.7;color:#9b9482;">Hotel estar · Cl. 61 #23-36, La Estrella · Manizales<br/>reservas@estar.com.co · +57 310 249 0414</p>
+              <p style="margin:0;font-family:Arial,sans-serif;font-size:10px;color:#b6ad97;line-height:1.5;">Guarda este correo como comprobante de tu reserva. La política de cancelación depende de tu tarifa (Estricta / Flexible) — consúltala en estar.com.co/cancelacion.html</p>
             </td>
           </tr>
 
@@ -301,9 +293,11 @@ function buildEmailHtml({
 function getConfirmationStore() {
   try {
     const opts = { name: 'confirmation-emails', consistency: 'strong' };
-    if (process.env.BLOBS_TOKEN && process.env.NETLIFY_SITE_ID) {
-      opts.token = process.env.BLOBS_TOKEN;
-      opts.siteID = process.env.NETLIFY_SITE_ID;
+    const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+    const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_BLOBS_TOKEN;
+    if (siteID && token) {
+      opts.siteID = siteID;
+      opts.token = token;
     }
     return getStore(opts);
   } catch (e) {
@@ -390,11 +384,12 @@ async function sendConfirmationEmail(params, deps = {}) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        // TODO: Replace 'reservas@estar.com.co' with the verified sender domain in Resend
         from: 'Estar Manizales <reservas@estar.com.co>',
         to: guestEmail,
         subject: `Confirmación de reserva ${bookingCode} — Estar Manizales`,
-        html: emailHtml
+        html: emailHtml,
+        text: email.htmlToText(emailHtml),
+        attachments: [require('./_logo').logoAttachment()]
       }),
       signal: resendController.signal
     });
@@ -408,6 +403,14 @@ async function sendConfirmationEmail(params, deps = {}) {
   const resendData = await resendResponse.json().catch(() => ({}));
   if (!resendResponse.ok) {
     console.error('[send-confirmation] Resend API error status:', resendResponse.status, (resendData && resendData.message) || '');
+    try {
+      await require('./_alert').reportAlert({
+        kind: 'confirmation_email_failed', severity: 'error',
+        message: 'No se pudo enviar el correo de confirmación de reserva al huésped (Resend rechazó el envío).',
+        context: { bookingCode: dedupeKey || bookingCode, status: resendResponse.status, detail: String((resendData && resendData.message) || '').slice(0, 200) },
+        dedupeKey: 'send-confirmation-resend'
+      });
+    } catch (_) { /* alert best-effort */ }
     return { sent: false, reason: 'resend-error', status: resendResponse.status };
   }
 

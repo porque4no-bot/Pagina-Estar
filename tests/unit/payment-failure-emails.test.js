@@ -101,7 +101,8 @@ test('declined quote payment emails the quote contact with its public link', asy
 
   assert.equal(box.sent.length, 1);
   assert.equal(box.sent[0].to, 'compras@example.com');
-  assert.match(box.sent[0].html, /cotizacion\.html\?id=COT-2026-AB12C&t=tok123/);
+  // The link is HTML-escaped in the href (& → &amp;), which is correct encoding.
+  assert.match(box.sent[0].html, /cotizacion\.html\?id=COT-2026-AB12C&(amp;)?t=tok123/);
   assert.match(box.sent[0].html, /María Gómez/);
 });
 

@@ -1,5 +1,5 @@
 require('./_env');
-const { authenticateAdmin } = require('./_firebase-auth');
+const { authorize } = require('./_authz');
 const { getQuoteStore, loadQuote } = require('./_quotes-store');
 
 function formatCOP(amount) {
@@ -276,7 +276,7 @@ exports.handler = async (event, context) => {
     if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
     if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-    const auth = await authenticateAdmin(event);
+    const auth = await authorize(event, 'quotes.send');
     if (!auth.ok) return { statusCode: auth.statusCode, headers: corsHeaders, body: JSON.stringify({ error: auth.error }) };
 
     let body;

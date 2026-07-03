@@ -11,11 +11,12 @@
  * registra el upgrade sin tocar folio, para poder probar el flujo. */
 
 const { json, corsHeaders, parseJsonBody } = require('./_guest-app');
-const { authenticateStaff } = require('./_staff-auth');
+const { authorize } = require('./_authz');
 const { resolveBreakfastStatus } = require('./_breakfast');
 const { recordRedemption, SOURCE } = require('./_breakfast-store');
 const { postOrderExtrasToFolio, hasOtasyncCreds } = require('./_otasync');
 const { SERVICES } = require('./_services-catalog');
+const { flag } = require('./_settings');
 
 function parseQr(input) {
   const s = String(input || '').trim();
@@ -27,7 +28,7 @@ exports.handler = async event => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders(), body: '' };
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
-  const auth = await authenticateStaff(event);
+  const auth = await authorize(event, 'breakfast.upgrade');
   if (!auth.ok) return json(auth.statusCode, { error: auth.error });
 
   try {
@@ -48,7 +49,8 @@ exports.handler = async event => {
     if (!Number.isFinite(persons) || persons < 1) persons = maxPersons;
     persons = Math.min(persons, maxPersons);
 
-    const enabled = process.env.BREAKFAST_UPGRADE_ENABLED === 'true';
+    /* Gestionable desde /admin (override del panel → env). */
+    const enabled = await flag('BREAKFAST_UPGRADE_ENABLED');
     const creds = hasOtasyncCreds();
 
     // Con credenciales reales, el upgrade DEBE estar habilitado para cobrar al

@@ -4,7 +4,7 @@
   functions = "netlify/functions"
 
 [functions]
-  included_files = ["rooms_db.json"]
+  included_files = ["rooms_db.json", "docs/bot-conocimiento.md"]
   node_bundler = "esbuild"
   # Kept external (copied into the bundle instead of esbuild-bundled) because
   # of dynamic requires. NOTE: externals and their dependency trees are copied
@@ -30,6 +30,19 @@
 # Runs daily at 03:30. See netlify/functions/purge-guest-data.js.
 [functions."purge-guest-data"]
   schedule = "30 3 * * *"
+
+# Pre-arrival + post-stay guest emails (A10). Reads OTASync reservations by
+# date (read-only) and emails arrivals/departures. Gated by STAY_EMAILS_ENABLED
+# (OFF by default). Runs daily at 12:00 UTC (07:00 Colombia).
+[functions."send-stay-emails"]
+  schedule = "0 12 * * *"
+
+# Daily backup of durable Netlify Blobs (A4): quotes, refunds, breakfast,
+# cancellations (+ opt-in encrypted PII). Snapshots to the isolated `backups`
+# store and optionally Google Drive. Gated by BACKUP_ENABLED (OFF by default).
+# Runs at 04:00 UTC (23:00 Colombia), apart from the purge cron.
+[functions."backup-blobs"]
+  schedule = "0 4 * * *"
 
 [build.environment]
   NODE_VERSION = "22"
@@ -90,9 +103,16 @@
   to = "/en/"
   status = 301
 
+# Admin panel: clean access URL is now /admin (serves the quotes+refunds+breakfast
+# panel via rewrite, URL stays /admin). Old paths redirect to it.
+[[redirects]]
+  from = "/admin"
+  to = "/cotizar-admin.html"
+  status = 200
+
 [[redirects]]
   from = "/cotizar-admin"
-  to = "/cotizar-admin.html"
+  to = "/admin"
   status = 301
 
 [[redirects]]
@@ -105,9 +125,11 @@
   to = "/pase-desayuno.html"
   status = 301
 
+# Breakfast admin is now a tab inside /admin; the pretty URL points there.
+# (desayuno-admin.html stays directly reachable — it's embedded by /admin.)
 [[redirects]]
   from = "/desayuno-admin"
-  to = "/desayuno-admin.html"
+  to = "/admin"
   status = 301
 
 [[redirects]]
@@ -135,6 +157,11 @@
     # so that inline <script> blocks can be allow-listed by SHA-256 hash and
     # `'unsafe-inline'` is no longer required on script-src.
     # See `writeCspHeaders` in build.js for the full directive.
+
+[[headers]]
+  for = "/admin"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
 
 [[headers]]
   for = "/cotizar-admin.html"
@@ -173,6 +200,20 @@
     X-Robots-Tag = "noindex, nofollow, noarchive"
     Cache-Control = "no-store, no-cache, must-revalidate"
     Permissions-Policy = "camera=(self), microphone=(), geolocation=()"
+
+# Refund bank-details form (A9): guest types account/ID numbers here.
+# Keep it out of search and out of any cache.
+[[headers]]
+  for = "/datos-cuenta.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, no-cache, must-revalidate"
+
+[[headers]]
+  for = "/en/datos-cuenta.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, no-cache, must-revalidate"
 
 [[headers]]
   for = "/api/*"

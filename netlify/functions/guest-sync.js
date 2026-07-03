@@ -125,7 +125,7 @@ exports.handler = async event => {
     let notified = false;
     try {
       const notification = await sendEmail({
-        to: process.env.ADMIN_NOTIFY_EMAIL || adminEmail(),
+        to: adminEmail(),
         subject: `Guest app: ${type} · reserva ${bookingCode}`,
         html: notificationHtml(record, syncId)
       });

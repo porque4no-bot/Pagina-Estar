@@ -1,6 +1,7 @@
 require('./_env');
 const crypto = require('crypto');
 const { getStore } = require('@netlify/blobs');
+const vault = require('./_crypto-vault');
 
 let sessionCache = { pkey: null, expiresAt: 0, promise: null };
 
@@ -142,6 +143,13 @@ function normalizeReservation(raw) {
   const checkIn = raw.date_arrival || raw.checkin || '';
   const checkOut = raw.date_departure || raw.checkout || '';
   const status = String(raw.status || 'confirmed').toLowerCase();
+  /* "motivo de viaje" is not a first-class OTASync reservation field: the booking
+     engine encodes the traveller's motive in the Wompi reference and, when stored
+     at all, OTASync surfaces it through a free-text custom field. We read the most
+     plausible candidates and leave it empty otherwise (SIRE/TRA fills it later). */
+  const motive = String(
+    raw.travel_purpose || raw.motive || raw.motivo || raw.purpose || ''
+  ).trim();
   return {
     bookingCode: String(raw.id_reservations || raw.reference || ''),
     status,
@@ -155,6 +163,7 @@ function normalizeReservation(raw) {
     checkOut,
     nights: calcNights(checkIn, checkOut),
     totalAmount: Number(raw.total_price || raw.rooms_price || 0),
+    motive,
     canCancel: ['confirmed', 'pending'].includes(status),
     canModify: ['confirmed', 'pending'].includes(status)
   };
@@ -179,6 +188,7 @@ function demoReservation(bookingCode, accessKey) {
     checkOut: iso(checkOutDate),
     nights: 4,
     totalAmount: 1280000,
+    motive: '',
     canCancel: true,
     canModify: true,
     demo: true
@@ -255,13 +265,22 @@ function signGuestToken(booking, ttlSeconds = 24 * 60 * 60) {
      %-of-night services (late/early check-out) server-side WITHOUT trusting a
      client-supplied amount. They are the booking's average paid night base
      (totalAmount / nights). Absent on pre-existing tokens; guest-action rejects
-     %-of-night orders when they are missing (tokens roll over within 24h). */
+     %-of-night orders when they are missing (tokens roll over within 24h).
+
+     checkIn / checkOut / roomNumber / motive are signed in too so guest-checkin
+     can persist the reservation context into the SIRE/TRA record from a trusted
+     source instead of a client-supplied value. Absent on pre-existing tokens
+     (tokens roll over within 24h); guest-checkin falls back to '' for each. */
   const payload = {
     sub: booking.bookingCode,
     guest: booking.guestName,
     capacity: booking.capacity,
     nights: Number(booking.nights) || 0,
     totalAmount: Number(booking.totalAmount) || 0,
+    checkIn: String(booking.checkIn || ''),
+    checkOut: String(booking.checkOut || ''),
+    roomNumber: String(booking.roomNumber || ''),
+    motive: String(booking.motive || ''),
     exp: Math.floor(Date.now() / 1000) + ttlSeconds
   };
   const encoded = base64url(JSON.stringify(payload));
@@ -320,35 +339,85 @@ function guestStore(name, consistency = 'strong') {
   return getStore(options);
 }
 
-function encryptionKey() {
-  const raw = process.env.GUEST_APP_DATA_ENCRYPTION_KEY || '';
-  if (raw) return crypto.createHash('sha256').update(raw).digest();
-  if (isDemoMode()) return null;
-  const error = new Error('GUEST_APP_DATA_ENCRYPTION_KEY is not configured');
-  error.statusCode = 503;
-  throw error;
+/* AAD ata el ciphertext a su reserva+tipo: un sobre cifrado de un check-in no
+   puede "moverse" para suplantar otro registro. Debe ser idéntico en seal/open. */
+function recordAad(record) {
+  return `${(record && record.bookingCode) || ''}|${(record && record.type) || ''}`;
 }
 
+/* Cifra un expediente de huésped con la bóveda (AES-256-GCM, clave versionada).
+   Los metadatos no sensibles (createdAt/bookingCode/type/id) quedan en claro para
+   poder indexar/listar sin descifrar. En demo sin clave devuelve el registro tal
+   cual (igual que antes). */
 function protectRecord(record) {
-  const key = encryptionKey();
-  if (!key) return { encrypted: false, ...record };
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const plaintext = Buffer.from(JSON.stringify(record), 'utf8');
-  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  const tag = cipher.getAuthTag();
+  if (!vault.isConfigured()) {
+    if (isDemoMode()) return { encrypted: false, ...record };
+    const error = new Error('GUEST_APP_DATA_ENCRYPTION_KEY is not configured');
+    error.statusCode = 503;
+    throw error;
+  }
+  const env = vault.sealJSON(record, recordAad(record));
   return {
     encrypted: true,
-    version: 1,
-    algorithm: 'aes-256-gcm',
+    v: 2,
+    kid: env.kid,
+    algorithm: env.alg,
     createdAt: record.createdAt,
     bookingCode: record.bookingCode,
     type: record.type,
     id: record.checkinId || record.eventId,
-    iv: iv.toString('base64url'),
-    tag: tag.toString('base64url'),
-    data: ciphertext.toString('base64url')
+    iv: env.iv,
+    tag: env.tag,
+    ct: env.ct
   };
+}
+
+/* Inverso de protectRecord. Lee tanto los sobres nuevos (v2, campo `ct`, con AAD)
+   como los antiguos (version:1, campo `data`, sin AAD). Devuelve el expediente
+   original. Lanza si la clave no está o el authTag no verifica. */
+function unprotectRecord(stored) {
+  if (!stored || typeof stored !== 'object') return stored;
+  if (!stored.encrypted) {
+    const { encrypted, ...rest } = stored;
+    return rest;
+  }
+  const env = {
+    v: stored.v || stored.version || 1,
+    kid: stored.kid,
+    iv: stored.iv,
+    tag: stored.tag,
+    ct: stored.ct,
+    data: stored.data
+  };
+  return vault.openJSON(env, recordAad(stored));
+}
+
+/* Cifra un BUFFER de documento crudo (imagen/PDF de cédula, registro civil de un
+   menor, etc.) para guardarlo en Blobs. Antes se escribían en CLARO. Cuando hay
+   clave, persiste el sobre como JSON; sin clave (demo) deja el buffer tal cual.
+   Devuelve { value, encrypted } para el store.set y la metadata. */
+function sealBinaryForStore(buffer, aad) {
+  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || '');
+  if (!vault.isConfigured()) return { value: buf, encrypted: false };
+  return { value: JSON.stringify(vault.seal(buf, aad)), encrypted: true };
+}
+
+/* Inverso de sealBinaryForStore: recupera el buffer original desde lo guardado.
+   Acepta el sobre JSON (cifrado) o un buffer/string legado en claro. */
+function openBinaryFromStore(stored, aad) {
+  if (stored == null) return null;
+  let text = Buffer.isBuffer(stored) ? stored.toString('utf8') : stored;
+  if (typeof text === 'string') {
+    const trimmed = text.trim();
+    if (trimmed.startsWith('{')) {
+      let env;
+      try { env = JSON.parse(trimmed); } catch (e) { env = null; }
+      if (env && (env.ct || env.data)) return vault.open(env, aad);
+    }
+    /* legacy raw (no envelope) */
+    return Buffer.isBuffer(stored) ? stored : Buffer.from(String(stored));
+  }
+  return Buffer.isBuffer(stored) ? stored : Buffer.from(String(stored));
 }
 
 function cleanText(value, max = 500) {
@@ -404,9 +473,12 @@ module.exports = {
   isDemoMode,
   json,
   matchesAccessKey,
+  openBinaryFromStore,
   parseJsonBody,
   protectRecord,
   requireGuest,
+  sealBinaryForStore,
   signGuestToken,
-  syncGuestEvent
+  syncGuestEvent,
+  unprotectRecord
 };

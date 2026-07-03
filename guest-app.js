@@ -271,6 +271,17 @@
       phone: '',
       address: '',
       notes: '',
+      /* SIRE/TRA: campos legales adicionales (capturados en el check-in). */
+      sex: '',
+      occupation: '',
+      birthPlace: '',
+      residenceCountry: '',
+      residenceState: '',
+      residenceCity: '',
+      originCountry: '',
+      originState: '',
+      originCity: '',
+      destination: '',
       privacyAccepted: false
     };
   }
@@ -282,6 +293,8 @@
       documentRef: null,
       analysisSource: '',
       confidence: 0,
+      ocrAttempts: 0,        /* intentos de lectura Azure (gate 3 → revisión manual) */
+      manualReview: false,   /* true tras 3 lecturas fallidas: se permite continuar a mano */
       isPrimary: index === 0,
       status: 'empty',
       isMinor: false,
@@ -372,7 +385,11 @@
   function formFields() {
     return [
       'firstName', 'lastName', 'documentType', 'documentNumber', 'birthDate',
-      'expirationDate', 'nationality', 'arrivalTime', 'email', 'phone', 'address', 'notes'
+      'expirationDate', 'nationality', 'arrivalTime', 'email', 'phone', 'address', 'notes',
+      /* SIRE/TRA */
+      'sex', 'occupation', 'birthPlace',
+      'residenceCountry', 'residenceState', 'residenceCity',
+      'originCountry', 'originState', 'originCity', 'destination'
     ];
   }
 
@@ -385,6 +402,9 @@
     });
     const privacy = $('[name="privacyAccepted"]');
     if (privacy) slot.guest.privacyAccepted = privacy.checked;
+    /* Consentimiento de marketing: uno solo para el check-in (no por huésped). */
+    const marketing = $('[name="marketingAccepted"]');
+    if (marketing) state.marketingAccepted = marketing.checked;
     slot.isMinor = calculateAgeClient(slot.guest.birthDate) < 18 && Boolean(slot.guest.birthDate);
     if (!slot.isMinor) {
       /* Clear any minor-only state if the guest turns out to be an adult so
@@ -412,6 +432,8 @@
     });
     const privacy = $('[name="privacyAccepted"]');
     if (privacy) privacy.checked = Boolean(slot.guest.privacyAccepted);
+    const marketing = $('[name="marketingAccepted"]');
+    if (marketing) marketing.checked = Boolean(state.marketingAccepted);
     state.document = slot.document;
     if (slot.document) {
       $('#uploadTitle').textContent = slot.document.name;
@@ -953,10 +975,57 @@
   }
 
   function closeCamera() {
+    stopCameraGuidance();
     stopCamera();
     $('#cameraModal').hidden = true;
     document.body.classList.remove('guest-camera-open');
     setCameraStatus('', '');
+  }
+
+  /* ── Guía de calidad EN VIVO mientras se escanea el documento ──────────────
+     Muestrea el <video> en vivo y actualiza #cameraGuide con avisos en tiempo
+     real (brillo/desenfoque/reflejos) ANTES de capturar, para reducir fallos
+     de lectura. Reusa photoMetrics() + un chequeo de destellos. */
+  function cameraGuidanceMetrics(video) {
+    const c = document.createElement('canvas');
+    c.width = 320; c.height = 200;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(video, 0, 0, c.width, c.height);
+    const m = photoMetrics(c);
+    const { data } = ctx.getImageData(0, 0, c.width, c.height);
+    let glare = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] > 245 && data[i + 1] > 245 && data[i + 2] > 245) glare += 1;
+    }
+    return { brightness: m.brightness, laplacianVariance: m.laplacianVariance, glareRatio: glare / (c.width * c.height) };
+  }
+
+  function updateCameraGuide() {
+    const preview = $('#cameraPreview');
+    const guide = $('#cameraGuide');
+    if (!guide || !preview || !preview.videoWidth) return;
+    let key = 'cameraGuideHold', ready = false;
+    try {
+      const m = cameraGuidanceMetrics(preview);
+      if (m.brightness < 55) key = 'cameraGuideTooDark';
+      else if (m.brightness > 205) key = 'cameraGuideTooBright';
+      else if (m.glareRatio > 0.04) key = 'cameraGuideGlare';
+      else if (m.laplacianVariance < 90) key = 'cameraGuideFocus';
+      else { key = 'cameraGuideReady'; ready = true; }
+    } catch (e) { key = 'cameraGuideHold'; }
+    guide.textContent = t(key);
+    guide.dataset.state = ready ? 'ready' : 'adjust';
+  }
+
+  function startCameraGuidance() {
+    stopCameraGuidance();
+    const guide = $('#cameraGuide');
+    if (guide) { guide.textContent = t('cameraGuideHold'); guide.dataset.state = 'adjust'; }
+    state.cameraGuideTimer = setInterval(updateCameraGuide, 450);
+  }
+
+  function stopCameraGuidance() {
+    if (state.cameraGuideTimer) { clearInterval(state.cameraGuideTimer); state.cameraGuideTimer = null; }
   }
 
   async function requestCamera(facingMode) {
@@ -994,6 +1063,7 @@
     setCameraStatus('', '');
     try {
       await startCamera();
+      startCameraGuidance();
     } catch (error) {
       closeCamera();
       if (isCoarsePointer()) {
@@ -1131,6 +1201,7 @@
           })
         });
       }
+      const MAX_OCR_ATTEMPTS = 3;
       const targetSlot = state.guestSlots[analysisGuestIndex];
       if (targetSlot) {
         applyExtractedToGuest(targetSlot.guest, data.extracted);
@@ -1138,18 +1209,35 @@
         targetSlot.analysisSource = data.source || '';
         targetSlot.confidence = Number(data.confidence || 0);
         targetSlot.status = data.source === 'azure' ? 'ocr' : 'pending';
+        /* Cuenta solo intentos REALES contra Azure (no demo ni OCR sin configurar). */
+        if (data.source === 'azure' || data.source === 'azure-error') {
+          targetSlot.ocrAttempts = (targetSlot.ocrAttempts || 0) + 1;
+        }
+        if (data.source === 'azure') targetSlot.manualReview = false;
+        else if (data.source === 'azure-error' && targetSlot.ocrAttempts >= MAX_OCR_ATTEMPTS) targetSlot.manualReview = true;
       }
       if (state.activeGuestIndex === analysisGuestIndex) {
         loadActiveGuestIntoForm();
       }
       renderGuestCards();
       const azureFailed = data.source === 'azure-error';
-      const text = data.source === 'azure'
-        ? `Documento leído con ${data.confidence || 0}% de confianza. Confirma los datos.`
-        : azureFailed
-          ? 'No fue posible leer el documento automáticamente. Completa los datos manualmente.'
-          : 'OCR no configurado en este entorno. Completa los datos manualmente.';
-      setStatus($('#ocrStatus'), text, data.source === 'azure' ? 'success' : azureFailed ? 'error' : '');
+      const manualReviewNow = Boolean(targetSlot && targetSlot.manualReview);
+      const notice = $('#manualReviewNotice');
+      if (notice) {
+        notice.hidden = !manualReviewNow;
+        if (manualReviewNow) notice.textContent = t('ocrManualReviewNotice');
+      }
+      if (manualReviewNow) {
+        /* Tras 3 fallos: no se bloquea — el huésped completa a mano y puede enviar. */
+        setStatus($('#ocrStatus'), t('ocrAttemptsExhausted'), '');
+      } else {
+        const text = data.source === 'azure'
+          ? `Documento leído con ${data.confidence || 0}% de confianza. Confirma los datos.`
+          : azureFailed
+            ? 'No fue posible leer el documento automáticamente. Completa los datos manualmente.'
+            : 'OCR no configurado en este entorno. Completa los datos manualmente.';
+        setStatus($('#ocrStatus'), text, data.source === 'azure' ? 'success' : azureFailed ? 'error' : '');
+      }
       $('#checkinProgress').textContent = 'Paso 2 de 3';
     } catch (error) {
       setStatus($('#ocrStatus'), error.message, 'error');
@@ -1190,7 +1278,9 @@
       'phone'
     ];
     const missingRequired = requiredFields.some(field => !String(guest[field] || '').trim());
-    const missingDocumentRef = slot && slot.document && !slot.documentRef;
+    /* Tras 3 lecturas fallidas (manualReview) ya no exigimos la referencia del OCR:
+       el huésped completa los datos a mano y recepción verifica luego. */
+    const missingDocumentRef = slot && slot.document && !slot.documentRef && !slot.manualReview;
     const missingPassportExpiry = guest.documentType === 'Pasaporte' && !guest.expirationDate;
     const expiredDocument = hasExpiredDocument(guest);
     const invalidEmail = guest.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email);
@@ -1253,6 +1343,8 @@
           method: 'POST',
           body: JSON.stringify({
             mode: 'submit',
+            /* Consentimiento de marketing del check-in (separado del operativo). */
+            marketingAccepted: state.marketingAccepted === true,
             guests: state.guestSlots.map(slot => ({
               guest: { ...slot.guest },
               file: slot.documentRef ? undefined : slot.document,
@@ -1260,6 +1352,8 @@
               isPrimary: slot.isPrimary,
               analysisSource: slot.analysisSource || 'manual',
               confidence: slot.confidence || 0,
+              ocrAttempts: slot.ocrAttempts || 0,
+              manualReview: slot.manualReview || false,
               registroCivilDocumentRef: slot.isMinor ? slot.registroCivilDocumentRef : undefined,
               authorizationDocumentRef: slot.isMinor ? slot.authorizationDocumentRef : undefined,
               fatherName: slot.isMinor ? slot.fatherName : undefined,
@@ -1268,7 +1362,8 @@
           })
         });
       }
-      setStatus($('#checkinStatus'), `Check-in recibido. Código ${data.checkinId}.`, 'success');
+      const reviewSuffix = data.manualReview ? ' ' + t('ocrManualReviewNotice') : '';
+      setStatus($('#checkinStatus'), `Check-in recibido. Código ${data.checkinId}.${reviewSuffix}`, 'success');
       $('#checkinProgress').textContent = 'Check-in completado';
       $('#bookingStatusBadge').textContent = 'Pre check-in listo';
     } catch (error) {

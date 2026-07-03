@@ -6,8 +6,8 @@
  * Default: mes en curso. Auth SOLO admin (ADMIN_EMAILS) — es la "caja"
  * (montos a liquidar, upgrades $); el comedor NO la ve. */
 
-const { json, corsHeaders, parseJsonBody, isDemoMode } = require('./_guest-app');
-const { authenticateAdmin } = require('./_firebase-auth');
+const { json, corsHeaders, parseJsonBody } = require('./_guest-app');
+const { authorize } = require('./_authz');
 const { listRedemptions, todayBogota } = require('./_breakfast-store');
 const { SERVICES } = require('./_services-catalog');
 
@@ -26,11 +26,10 @@ exports.handler = async event => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders(), body: '' };
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
-  // Auth SOLO admin (ADMIN_EMAILS). El comedor (STAFF_EMAILS) no ve la caja; sus
-  // conteos van por otra vía. Bypass demo local (en Netlify isDemoMode() es false).
-  const auth = (isDemoMode() && !process.env.FIREBASE_PROJECT_ID)
-    ? { ok: true, email: 'demo@local' }
-    : await authenticateAdmin(event);
+  // La caja de desayunos: requiere breakfast.analytics, que el comedor
+  // (STAFF_EMAILS) NO tiene — solo ADMIN_EMAILS (superadmin) o roles admin/tesorería.
+  // authorize trae su propio bypass de demo local (en Netlify isDemoMode() es false).
+  const auth = await authorize(event, 'breakfast.analytics');
   if (!auth.ok) return json(auth.statusCode, { error: auth.error });
 
   try {

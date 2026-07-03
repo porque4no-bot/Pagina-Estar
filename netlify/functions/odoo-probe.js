@@ -5,7 +5,7 @@
    contar los contactos para confirmar que la conexión y los permisos
    funcionan. Útil durante la configuración, antes de empezar a sincronizar. */
 
-const { authenticateAdmin } = require('./_firebase-auth');
+const { authorize } = require('./_authz');
 const { odooConfig, isConfigured, authenticate, executeKw, _resetAuthCache } = require('./_odoo');
 
 exports.handler = async (event) => {
@@ -20,7 +20,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
   if (event.httpMethod !== 'GET') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-  const auth = await authenticateAdmin(event);
+  const auth = await authorize(event, 'integrations.probe');
   if (!auth.ok) return { statusCode: auth.statusCode, headers: corsHeaders, body: JSON.stringify({ error: auth.error }) };
 
   const c = odooConfig();

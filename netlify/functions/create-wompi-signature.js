@@ -1,6 +1,34 @@
 const crypto = require('crypto');
+const { getStore } = require('@netlify/blobs');
+const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const { getQuoteStore, loadQuote, effectiveStatus, computeQuoteTotal } = require('./_quotes-store');
 const { decodeDirectReference, verifyDirectBookingAmount } = require('./_direct-pricing');
+const { normalizeCode } = require('./_discount-store');
+const { flag } = require('./_settings');
+
+/* Frente A — el motor de descuentos se enciende con DISCOUNT_CODES_ENABLED.
+   Apagado: el discountCode entrante se ignora por completo (firma sin descuento).
+   Gestionable desde /admin (override del panel → env). */
+async function discountEnabled() { return await flag('DISCOUNT_CODES_ENABLED'); }
+
+/* A8 — guest free-text notes to the PMS. The note never travels in the Wompi
+   reference (length/escapes/sensitivity); instead it is persisted server-side
+   here at signing time and read by wompi-webhook when it creates the
+   reservation. Gated OFF by default. */
+/* Gestionable desde /admin: el consumidor (wompi-webhook) lee este flag vía
+   flag() (panel → env). Debe leerse igual aquí o la nota nunca se persiste. */
+async function notesToPmsEnabled() { return await flag('GUEST_NOTES_TO_PMS_ENABLED'); }
+function sanitizeIncomingNotes(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw.replace(/[<>\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
+}
+
+/* Frente C: normaliza el opt-in de marketing entrante a booleano. Ley 1581:
+   solo TRUE explícito cuenta como opt-in; cualquier otra cosa (ausente, false,
+   string vacío, etc.) = NO marketing. */
+function parseMarketingOptIn(raw) {
+  return raw === true || raw === 'true' || raw === 1 || raw === '1';
+}
 
 function timingSafeEqual(a, b) {
   const ba = Buffer.from(String(a || ''));
@@ -49,7 +77,13 @@ exports.handler = async (event) => {
   const headers = corsHeaders();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed. Use POST.' });
-  if (event.body && event.body.length > 3000) return json(413, { error: 'Payload too large' });
+
+  /* A11 GAP-2: rate-limit so a direct reference can't be replayed to hammer the
+     OTASync price recompute (cost amplification / price probing). Best-effort. */
+  const limited = await checkRateLimit(event, { name: 'wompi-signature', limit: 30, windowMs: 5 * 60 * 1000 });
+  if (!limited.ok) return rateLimitResponse(headers, limited.retryAfter);
+
+  if (event.body && event.body.length > 3600) return json(413, { error: 'Payload too large' });
 
   const secret = cleanEnv(process.env.WOMPI_INTEGRITY_SECRET);
   if (!secret) {
@@ -72,6 +106,15 @@ exports.handler = async (event) => {
   const clientAmountInCents = parseInt(body.amountInCents, 10);
   const currency = String(body.currency || 'COP').trim().toUpperCase();
   const publicToken = String(body.publicToken || '').trim();
+  const guestNotes = sanitizeIncomingNotes(body.notes); /* A8: free-text guest note, optional */
+  /* Frente C: opt-in de marketing (Ley 1581). Booleano OPCIONAL; sin él/false =
+     NO marketing. Viaja en el body, NUNCA en la referencia firmable. Se persiste
+     server-side aquí y lo lee wompi-webhook tras crear la reserva. */
+  const marketingOptIn = parseMarketingOptIn(body.marketingOptIn);
+  /* Frente A: el código de descuento viaja APARTE de la referencia (límite de
+     255 chars + no debe ir en texto plano firmable por el cliente). Se revalida
+     server-side y, si aplica, se firma el monto YA con descuento. */
+  const discountCode = (await discountEnabled()) ? normalizeCode(body.discountCode) : '';
 
   if (!reference || reference.length > 255 || !Number.isFinite(clientAmountInCents) || clientAmountInCents <= 0 || currency !== 'COP') {
     return json(400, { error: 'Invalid Wompi signature payload' });
@@ -116,7 +159,10 @@ exports.handler = async (event) => {
 
     let verdict;
     try {
-      verdict = await verifyDirectBookingAmount(decoded, clientAmountInCents);
+      verdict = await verifyDirectBookingAmount(decoded, clientAmountInCents, {
+        discountCode,
+        email: decoded.email || ''
+      });
     } catch (e) {
       console.error('[create-wompi-signature] price recompute failed:', e.message);
       return json(503, { error: 'price_check_unavailable' });
@@ -133,6 +179,56 @@ exports.handler = async (event) => {
       }
       console.warn(`[create-wompi-signature] OTASync mock fallback active — accepting client amount without recompute. bookingCode=${decoded.bookingCode}, client=${clientAmountInCents}`);
     }
+
+    /* A8: persist the guest's free-text note keyed by bookingCode so the webhook
+       can attach it to the OTASync reservation. Best-effort; never blocks the
+       signature. Gated OFF by default. */
+    if ((await notesToPmsEnabled()) && guestNotes && decoded.bookingCode) {
+      try {
+        const notesStore = getStore({ name: 'booking-notes', consistency: 'strong' });
+        await notesStore.set(`note-${decoded.bookingCode}`, JSON.stringify({ notes: guestNotes, createdAt: new Date().toISOString() }));
+      } catch (e) {
+        console.warn('[create-wompi-signature] note persist failed (non-fatal):', e.message);
+      }
+    }
+
+    /* Frente A: persist the applied discount code keyed by bookingCode so the
+       webhook can RE-validate it (not expired/exhausted/blackout) and increment
+       its usage idempotently after the reservation is created. The code never
+       travels inside the Wompi reference. Only persist when the discount
+       actually applied to the signed amount; best-effort, never blocks. */
+    if (discountCode && verdict.discount && verdict.discount.applied && decoded.bookingCode) {
+      try {
+        const discStore = getStore({ name: 'booking-discounts', consistency: 'strong' });
+        await discStore.set(`disc-${decoded.bookingCode}`, JSON.stringify({
+          code: discountCode,
+          email: decoded.email || '',
+          signedAmountCents: amountInCents,
+          createdAt: new Date().toISOString()
+        }));
+      } catch (e) {
+        console.warn('[create-wompi-signature] discount persist failed (non-fatal):', e.message);
+      }
+    }
+
+    /* Frente C: persist the marketing opt-in keyed by bookingCode so the webhook
+       can wire it to Odoo (tag 'Opt-in marketing' + Email Marketing list) AFTER
+       the reservation is created. Ley 1581: only persist a positive opt-in; a
+       missing/false value means NO marketing and we store nothing. The flag never
+       travels inside the Wompi reference. Best-effort, never blocks the signature. */
+    if (marketingOptIn && decoded.bookingCode) {
+      try {
+        const mktStore = getStore({ name: 'booking-marketing', consistency: 'strong' });
+        await mktStore.set(`mkt-${decoded.bookingCode}`, JSON.stringify({
+          accepted: true,
+          email: decoded.email || '',
+          channel: 'motor-reserva-directa',
+          createdAt: new Date().toISOString()
+        }));
+      } catch (e) {
+        console.warn('[create-wompi-signature] marketing opt-in persist failed (non-fatal):', e.message);
+      }
+    }
   }
 
   const integrity = crypto
@@ -142,3 +238,5 @@ exports.handler = async (event) => {
 
   return json(200, { reference, amountInCents, currency, signature: { integrity } });
 };
+
+exports._test = { sanitizeIncomingNotes, notesToPmsEnabled, discountEnabled, parseMarketingOptIn };

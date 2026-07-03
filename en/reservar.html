@@ -560,7 +560,7 @@
     if(!room)return null;
     extras=extras||{};
     const nights=dateDiff(search.checkin,search.checkout);
-    const nightly=rate==='best'?room.priceFlexible:Math.round(room.priceFlexible/0.9);
+    const nightly=rate==='best'?room.priceFlexible:Math.round(room.priceFlexible*1.10);
     const base=room.priceFlexible;            /* percentages use the base (Best Price) nightly */
     const roomSub=nightly*nights;
     /* taxable extras (subject to VAT) */

@@ -9,14 +9,14 @@ require('./_env');
         booking email or surname (same second-factor gate as get-booking).
      2. We record the request (Netlify Blobs, audit + idempotency).
      3. We alert the hotel team (admin email) to apply the rate-plan policy
-        (Flexible: free up to 48 h before check-in / Best Price: non-refundable)
+        (Estricta: 100% refund up to 7 days before / Flexible: 100% up to 24 h before)
         and process the refund through the original payment channel.
      4. We acknowledge to the guest by email.
    The previous UI pretended to cancel while calling no API at all; this
    endpoint replaces that dead end with a real, auditable request. */
 
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
-const { sendEmail, adminEmail, esc, formatCOP, formatDateES } = require('./_email');
+const { sendEmail, adminEmail, esc, formatCOP, formatDateES, cancellationAckHtml } = require('./_email');
 const { helpers: bookingHelpers } = require('./get-booking');
 const { getSessionKey } = require('./_otasync');
 const { createRefundRequest, recoverPaymentInfo, REFUND_SLA_BUSINESS_DAYS } = require('./_refunds-store');
@@ -65,24 +65,13 @@ function adminCancellationHtml({ booking, clientIp }) {
     </ul>
     <p>Acciones pendientes del equipo:</p>
     <ol>
-      <li>Verificar la tarifa de la reserva (Flexible: cancelación gratuita hasta 48 h antes del check-in · Best Price: no reembolsable) en la nota de OTASync.</li>
+      <li>Verificar la tarifa de la reserva (Estricta: gratis hasta 7 días antes · Flexible: gratis hasta 24 h antes; fuera de plazo se cobra 1ª noche + impuestos + 3,5%; no-show 24 h tras el check-in sin reembolso) en la nota de OTASync.</li>
       <li>Cancelar la reserva en OTASync si la política lo permite.</li>
-      <li>Tramitar el reembolso por el canal de pago original (Wompi / Mercado Pago / datáfono / efectivo) <strong>dentro de ${REFUND_SLA_BUSINESS_DAYS} días hábiles</strong> y responder al huésped. Registrar el avance en el panel (cotizar-admin → Reembolsos).</li>
+      <li>Tramitar el reembolso por el canal de pago original (Wompi / Mercado Pago / datáfono / efectivo) <strong>dentro de ${REFUND_SLA_BUSINESS_DAYS} días hábiles</strong> y responder al huésped. Registrar el avance en el panel (/admin → Reembolsos).</li>
     </ol>`;
 }
 
-function guestAckHtml({ booking }) {
-  return `<p>Hola ${esc(booking.guestName || '')},</p>
-    <p>Recibimos tu solicitud de cancelación para la reserva <strong>${esc(booking.bookingCode)}</strong>
-    (${esc(formatDateES(booking.checkIn))} → ${esc(formatDateES(booking.checkOut))}).</p>
-    <p>Nuestro equipo la revisará según la política de tu tarifa
-    (Flexible: cancelación gratuita hasta 48 horas antes del check-in ·
-    Best Price: no reembolsable) y te confirmará por este medio en menos de 24 horas.</p>
-    <p>Cuando el reembolso aplique, se procesa por el mismo medio de pago en un
-    máximo de <strong>${REFUND_SLA_BUSINESS_DAYS} días hábiles</strong>.</p>
-    <p>Si necesitas ayuda inmediata escríbenos por WhatsApp: +57 310 249 0414.</p>
-    <p>— Equipo Estar, Manizales</p>`;
-}
+/* Guest cancellation acknowledgment is now the branded cancellationAckHtml() in _email.js. */
 
 /* Core flow shared by the HTTP handler and the WhatsApp bot
    (_whatsapp-bot.js). Returns a discriminated result:
@@ -149,7 +138,7 @@ async function submitCancellationRequest({ bookingCode, providedFactor, clientIp
       await sendEmail({
         to: booking.guestEmail,
         subject: `Recibimos tu solicitud de cancelación — ${booking.bookingCode}`,
-        html: guestAckHtml({ booking })
+        html: cancellationAckHtml({ booking, lang: booking.lang })
       });
     } catch (e) {
       console.error('[request-cancellation] guest ack failed:', e.message);

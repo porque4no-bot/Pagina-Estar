@@ -121,7 +121,7 @@ test('verifyDirectBookingAmount accepts the Best Price (avgPrice) total', async 
   });
 });
 
-test('verifyDirectBookingAmount accepts the Flexible rate (best / 0.9)', async () => {
+test('verifyDirectBookingAmount accepts the Flexible rate (best * 1.10)', async () => {
   const otaResponse = {
     rooms: [{
       id_room_types: 31348,
@@ -137,8 +137,8 @@ test('verifyDirectBookingAmount accepts the Flexible rate (best / 0.9)', async (
       checkin: '2026-07-01', checkout: '2026-07-03', guestsCount: 2,
       roomTypeId: '31348', extrasMask: '000000'
     };
-    /* Flexible nightly = round(251000 / 0.9) = 278889. Subtotal 2 nights = 557778. */
-    const flexibleCents = 278889 * 2 * 100;
+    /* Flexible nightly = round(251000 * 1.10) = 276100. Subtotal 2 nights = 552200. */
+    const flexibleCents = 276100 * 2 * 100;
     const verdict = await verifyDirectBookingAmount(decoded, flexibleCents);
     assert.equal(verdict.ok, true);
   });

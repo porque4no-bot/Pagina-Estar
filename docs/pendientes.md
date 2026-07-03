@@ -4,6 +4,58 @@ Lista de trabajo priorizada surgida de la revisión de negocio e integraciones
 (junio 2026). Cada ítem incluye el contexto necesario para arrancar sin
 re-investigar.
 
+> **Estado verificado 2026-06-22:** los 3 "bloqueantes de contenido" del §6 ya
+> están **hechos** — parqueadero eliminado (§6.3), identidad legal **Mirada SAS ·
+> NIT 902.032.515-0** publicada (§6.7), check-out unificado a **11:00** (§6.9); la
+> entregabilidad de correos quedó confirmada. Nada desplegado todavía. Los §6.1 /
+> §6.2 / §6.5 (planes de tarifa, mascota, reprecio de extras) siguen pendientes de
+> confirmación del dueño. Muchos toggles del Carril A ya se gestionan desde
+> **`/admin → Configuración`** (ver `docs/variables-a-cargar.md`).
+
+---
+
+## 0. SOCIOS / terceros — esperando respuesta o decisión (no es trabajo técnico)
+
+Bloque de cosas que NO dependen del equipo técnico; van a la mesa de socios /
+proveedores. (Decisiones del dueño 2026-06-21.)
+
+- **WhatsApp bot — handoff humano:** pendiente de conversación con socios (quién
+  responde, horario, modo B vs B+C). Hasta decidir, no se cargan credenciales Meta.
+- **Cámara de Comercio + RUT (descargables) + confirmar dígito de verificación del
+  NIT:** pendiente con socios. Cuando estén, se suben a Drive y se enlazan en
+  `empresas.html` / footer legal (§6.7).
+- **Estadía larga — estructura legal** (hospedaje turístico vs. arrendamiento):
+  decisión de socios; afecta retención de depósito (§6.4).
+- **Booking.com — medio de cobro** (tarjeta virtual VCC vs. transferencia):
+  esperando respuesta del account manager (§4).
+- **Facturación (Odoo) — coordinación con el equipo de facturación:** reunión
+  pendiente para definir cómo nos integramos (ver §1 y la auditoría Odoo). Para
+  arrancar la Parte 1 (botón "Solicitar factura") solo falta el **correo del
+  equipo de facturación** (`BILLING_TEAM_EMAIL`). Dudas consolidadas en
+  `docs/preguntas-numera.md`.
+- **Reembolsos — plantilla de pagos masivos de Bancolombia:** pendiente del dueño
+  para el CSV de transferencias manuales (Fase 2 reembolsos). *(El ejecutor de
+  reembolso automático de **Mercado Pago** ya existe — `_mp-refund.js`, gateado por
+  `REFUND_GATEWAY_AUTO_ENABLED`; Wompi no tiene API → sigue manual.)*
+
+### Producto / CRM — ideas a definir (no construir aún; decisión de negocio)
+Del 2026-06-21. Detalle en `docs/plan-odoo.md` (Roadmap de producto y CRM):
+- **Bolsas de noches** (prepago para viajeros frecuentes) — definir cómo se vende,
+  consume y controla el saldo.
+- **Reservas de grupos** — flujo + cotización específicos.
+- **Pipelines CRM por perfil** (larga estadía, grupos, agencias, corporativo,
+  comisionistas) + **analítica por perfil**.
+- **Servicios auxiliares futuros** (tours, transporte, eventos) — pensar el modelo
+  antes de incorporarlos al catálogo/cotización.
+- **Comisionistas** como tipo de contacto/rol comercial (comisiones, atribución).
+
+### Odoo Fases 5-6 — esperan CONTENIDO del dueño / equipo (la estructura la monto yo)
+Del 2026-06-22. Detalle en `docs/plan-odoo.md`. Fases 1-4 ya construidas; estas dos requieren material que no se puede inventar:
+- **Fase 5 · Inventory/Purchase (costear amenities):** el **catálogo de insumos/amenities con costos reales** (café, kits de aseo, toallas…) + coordinar con **Numera** la frontera (nuestro = compras + recepción; suyo = contabilizar la factura del proveedor). El desayuno es tercerizado → sin recetas.
+- **Fase 6 · Sign (contratos):** las **plantillas de contrato** de larga estadía / convenio corporativo (legal).
+- **Fase 6 · eLearning (capacitación):** el **contenido** de los cursos (videos cortos + PDF de checklists) por rol — inducción/legal (ESCNNA, datos), recepción (check-in/SIRE-TRA/chapas/PQR), cocina (QR desayuno), housekeeping (limpieza), mantenimiento. **La estructura de cursos la monto yo; el video/PDF lo produce el equipo.**
+- **Fase 6 · Documents:** repositorio de RUT/Cámara/contratos de empresas. NO se mueve PII de huésped ahí.
+
 ---
 
 ## 1. Integración con Odoo (ERP / contabilidad)
@@ -93,11 +145,21 @@ completas — ese es el riesgo regulatorio actual.
 **Estado actual del código:** el botón "Cancelar reserva" del motor ahora envía
 una **solicitud** real (`request-cancellation`): verifica la reserva con
 segundo factor, alerta al equipo por correo y confirma al huésped. La
-cancelación en OTASync y el reembolso siguen siendo manuales. La tarifa
-(Flexible vs. Best Price) aún **no** queda registrada de forma estructurada en
-el PMS — va implícita en el monto pagado; registrar el plan en la referencia
-de pago y en la nota de la reserva es prerrequisito para automatizar
-reembolsos.
+cancelación en OTASync y el reembolso siguen siendo manuales.
+
+**Avances (2026-06-22):**
+- **Cancelaciones que entran por OTASync ya se manejan** —
+  `otasync-webhook.handleCancellations`: envía correo al huésped de la web,
+  avisa al equipo y **libera el hold**. Plantillas nuevas en `_email.js`
+  (`cancellationConfirmedHtml` / `adminCancellationHtml`).
+- **El plan tarifario (Estricta/Flexible) ya se deriva del monto pagado en el
+  servidor** (no se confía en el cliente). Sigue pendiente registrarlo de forma
+  explícita en la **nota de la reserva** del PMS para que sea legible por reserva.
+- **Datos para reembolso de tarjeta capturados al pagar** — `_payment-details.js`
+  guarda código de autorización, fecha, últimos dígitos y monto al momento del
+  pago (Wompi), para no tener que buscarlos semanas después (ver
+  `docs/mensajes-terceros.md` §2). El reembolso automático de **Mercado Pago** ya
+  tiene ejecutor (`_mp-refund.js`, gateado por `REFUND_GATEWAY_AUTO_ENABLED`).
 
 **Lo investigado sobre los rieles de devolución:**
 
@@ -210,14 +272,41 @@ por Booking.com y definir el modelo de pago oficial del canal.
 
 - Pre-hold de inventario en el checkout directo (reutilizar `createHold`).
 - Reintento con backoff en `insertReservation` (hoy 1 intento / timeout 10 s).
-- Manejar eventos `reservation edit/cancel` del webhook OTASync (cancelaciones
-  desde OTAs no liberan holds ni se sincronizan).
-- Las notas/solicitudes especiales del huésped no llegan al PMS (la referencia
-  Wompi no las codifica).
-- Control de capacidad de extras (parqueadero, early/late) y precios de extras
-  en configuración (Blobs) en vez de hardcode en `_pricing.js`.
-- Emails faltantes: pago rechazado/pendiente, pre-llegada, post-estadía,
-  recordatorio de cotización por vencer.
+- ~~Manejar eventos `reservation edit/cancel` del webhook OTASync~~ **(HECHO,
+  2026-06-22):** `otasync-webhook.handleCancellations` libera el hold, avisa al
+  equipo y le escribe al huésped de la web. *(El loop de upsert de huéspedes a
+  Odoo desde el mismo webhook ya estaba; ver `docs/continuacion-odoo.md`.)*
+- Las notas/solicitudes especiales del huésped → PMS: gateado por
+  `GUEST_NOTES_TO_PMS_ENABLED` (toggle en `/admin → Configuración`). Probar con
+  reserva real antes de prender.
+- Control de capacidad de extras (early/late) y precios de extras en
+  configuración (Blobs) en vez de hardcode en `_pricing.js`. *(Nota: ya existe la
+  base — `_settings.js` + pestaña "Configuración" en `/admin` gestiona toggles
+  desde Blobs con override sobre env; hoy gestiona interruptores de sí/no, no aún
+  los precios de extras. Y existe `_discount-store.js` + `/admin → Códigos` para
+  cupones de descuento, gateado por `DISCOUNT_CODES_ENABLED`.)*
+- **Correos transaccionales rediseñados (HECHO, 2026-06-19).** Todos unificados
+  bajo la identidad de marca (encabezado crema + logo, banda olivo/terracota/arena,
+  pie con estrella) en `_email.js` (shell + componentes compartidos) y
+  `send-confirmation.js`. Cubre: confirmación de reserva (directa y cotización),
+  cotización por vencer, pre-llegada ES/EN (con botón "Hacer mi check-in" → guest
+  app), post-estadía ES/EN, datos de reembolso ES/EN, y los internos (tesorería,
+  pago-sin-reserva, sin-disponibilidad). Enlaces de mapa reales (Google/Waze del
+  sitio), política de cancelación corregida (Estricta/Flexible).
+- **Correo de códigos de acceso (DISEÑADO; integración de chapa CONSTRUIDA, apagada).**
+  `_email.accessCodesHtml` está listo (banda olivo, tarjetas portería/apartaestudio,
+  QR de desayuno, mapa, guest app). El sitio/FAQ lo prometen ("recibirás los códigos
+  un día antes"). Decisión dueño (2026-06-19): **los códigos cambian por estadía**
+  (cerradura inteligente). **Avance (2026-06-22):** el cliente de la chapa ya existe
+  — `_ttlock.js` (TTLock Open Platform, mock-safe, gateado por `TTLOCK_ENABLED` +
+  `TTLOCK_*`). Para activarlo falta: (1) cargar las credenciales TTLock + el mapa
+  `TTLOCK_LOCKS_JSON` (chapa por apartaestudio), (2) cablear la emisión del código por
+  reserva al disparo del correo al completar el check-in digital, (3) probar con una
+  chapa real. Prender desde `/admin → Configuración`.
+- Emails aún faltantes: pago rechazado/pendiente.
+- **Cancelación B2B = 48 h aparte (decisión dueño 2026-06-19).** Las cotizaciones
+  corporativas (`send-quote-email.js`, `cotizacion.html`) mantienen su propia
+  política de 48 h; NO se alinean a Estricta/Flexible de reservas directas.
 - IVA en check-in: checklist operativo en guest app + reporte mensual de IVA
   diferido vs. cobrado.
 - **Pedidos de servicios del guest app → cobro y comunicación con Kunas.** Desde
@@ -283,20 +372,24 @@ Notas de implementación:
 - Reescribir `cancelacion.html` / `en/cancelacion.html` (secciones 1 y 2),
   etiquetas de tarifa en `motor-app.jsx` + `i18n/motor.*.json`, system prompt
   del bot, y la política que muestra `ManageBooking`.
+- **✅ DECIDIDO (1-jul, DEFINITIVO):** en el **detalle de la reserva en OTASync debe
+  quedar el PLAN COMPRADO** (Estricta/Flexible), legible por reserva. Y para las
+  reservas de **OTA hay que averiguar cómo EXTRAER el plan comprado desde Booking,
+  Airbnb y Expedia** (channel manager/OTASync o APIs de cada OTA) para reflejarlo.
+  Ver memoria `decisiones-tarifas-checkin`.
 
 ### 6.5 Reprecio de extras (late checkout / early check-in)
-Dejan de ser montos fijos; pasan a **% del precio estándar por noche** de la
-habitación (tarifa base/Estricta):
 - **Late checkout** hasta las **2:00 PM** → **15%** de la noche estándar.
   (Hoy: $60.000 fijo, "hasta las 3:00 pm" — cambia hora y modelo.)
-- **Early check-in** escalonado (entre más temprano, más caro):
-  - Entrada **2 h antes** del check-in (≈1:00 PM) → **15%**
-  - Entrada desde las **10:00 AM** → **35%**
-  - Entrada desde las **6:00 AM** (o antes) → **50%**
-  (Hoy: $50.000 fijo, "desde las 10:00 am".)
-- Impacto: `_pricing.js` (multiplicadores % en vez de `flat`), `reservar.html`
-  (`BE_EXTRAS` + cálculo), y el system prompt del bot. El early pasa de 1 a 3
-  opciones — revisar el `extrasMask` de la referencia Wompi.
+- **Early check-in — ✅ DECIDIDO (1-jul, DEFINITIVO · no re-litigar):** **fijo 25%**
+  de la noche, **redondeado a los $5.000 más próximos** (se DESCARTA el escalonado
+  15/35/50). **Sujeto a disponibilidad** (solo si no hay conflicto con otra reserva
+  en esa habitación) y **comprable SOLO al momento del check-in** (que se puede hacer
+  el día antes) — se ofrece/cobra desde la **guest app**, no al reservar. Detalle en
+  la memoria `decisiones-tarifas-checkin`.
+  - Falta implementar: redondeo a 5k, chequeo de no-conflicto en la habitación
+    (OTASync), y sacar el early como extra del momento de reservar. Hoy ya está al
+    25% plano en las 3 superficies.
 - Pendiente: ¿desayuno ($20k/persona/noche) se mantiene igual? (no se mencionó)
 
 ### 6.6 Métodos de pago en la web (PSE y Nequi)
@@ -333,9 +426,12 @@ Política de tiempos a publicar (sujeto a los tiempos de cada proveedor):
   cuando se apruebe una cancelación con reembolso: enviar al huésped un
   **formulario** donde indique **a qué cuenta** quiere el reembolso (banco,
   tipo y número de cuenta, titular, documento) + correo de notificación al
-  equipo para tramitarlo. Engancha con `request-cancellation` (hoy solo
-  registra la solicitud; falta el paso de captura de cuenta + el correo con
-  los datos para tesorería).
+  equipo para tramitarlo. **CONSTRUIDO (apagado):** `datos-cuenta.html` +
+  `_refunds-store.js` + pestaña **Reembolsos** en `/admin`; gateado por
+  `REFUND_BANK_FORM_ENABLED` (toggle en `/admin → Configuración`) y firmado con
+  `REFUND_LINK_SECRET`. Los datos de tarjeta para reversión por soporte se
+  capturan al pagar (`_payment-details.js`). **Pendiente menor:** mostrar esos
+  datos de tarjeta dentro del registro en el panel.
 - Publicar la tabla de tiempos en `cancelacion.html` con la nota "los plazos
   dependen de los tiempos de procesamiento de cada medio de pago".
 

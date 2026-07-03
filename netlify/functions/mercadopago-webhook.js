@@ -5,10 +5,18 @@ const {
   processApprovedPayment,
   timingSafeEqualString,
   decodeDirectReference,
+  alreadyProcessed,
+  markProcessed,
   QUOTE_ID_RE
 } = require('./_payments');
 const { getQuoteStore, loadQuote } = require('./_quotes-store');
-const { sendEmail } = require('./_email');
+const {
+  loadIntent: loadGuestPaymentIntent,
+  markIntentStatus: markGuestPaymentStatus,
+  GUEST_ORDER_REF_RE
+} = require('./_guest-payments');
+const { postOrderExtrasToFolio } = require('./_otasync');
+const { sendEmail, paymentPendingHtml, paymentRejectedHtml } = require('./_email');
 
 function headers() {
   return { 'Content-Type': 'application/json' };
@@ -135,10 +143,69 @@ async function notifyGuestPaymentOutcome(transaction, kind, overrides = {}) {
       subject: kind === 'pending'
         ? 'Tu pago está en proceso — Hotel Estar'
         : 'Tu pago no pudo procesarse — Hotel Estar',
-      html: kind === 'pending' ? paymentPendingEmailHtml(contact) : paymentDeclinedEmailHtml(contact)
+      html: kind === 'pending' ? paymentPendingHtml({ contact }) : paymentRejectedHtml({ contact })
     });
   } catch (e) {
     console.error(`[mercadopago-webhook] guest ${kind} payment email failed:`, e.message);
+  }
+}
+
+/* Handle a Mercado Pago payment whose reference is a guest-app service order
+   (GST-...). Mirror of wompi-webhook.handleGuestServicePayment: loads the
+   payment intent, verifies the paid amount matches what we stored, posts the
+   charge + payment onto the reservation folio in OTASync/Kunas, and marks the
+   intent paid (idempotent on the intent status). add_extra/add_payment are NOT
+   idempotent in OTASync and the caller pre-marks the transaction as processed,
+   so we never auto-retry: a folio failure flags the intent for manual
+   follow-up rather than risk duplicate folio lines. Deps injectable for tests. */
+async function handleGuestServicePayment(transaction, corsHeaders, overrides = {}) {
+  const deps = {
+    loadIntent: loadGuestPaymentIntent,
+    markIntentStatus: markGuestPaymentStatus,
+    postOrderToFolio: postOrderExtrasToFolio,
+    ...overrides
+  };
+  const reference = transaction.reference;
+  const reply = (obj) => ({ statusCode: 200, headers: corsHeaders, body: JSON.stringify(obj) });
+
+  let intent;
+  try {
+    intent = await deps.loadIntent(reference);
+  } catch (e) {
+    console.error('[mercadopago-webhook] guest-payment store unavailable:', e.message);
+    return reply({ message: 'Guest payment store unavailable; logged for manual follow-up' });
+  }
+  if (!intent) {
+    console.error(`[mercadopago-webhook] guest order ${reference} not found for paid payment ${transaction.id}`);
+    return reply({ message: 'Guest order intent not found' });
+  }
+  if (intent.status === 'paid') {
+    return reply({ received: true, duplicate: true });
+  }
+
+  // Defense in depth: only post the amount we stored for this order.
+  const paidCents = Number(transaction.amountCents);
+  const expectedCents = Number(intent.amountInCents);
+  if (Number.isFinite(paidCents) && Number.isFinite(expectedCents) && paidCents !== expectedCents) {
+    console.error(`[mercadopago-webhook] guest order ${reference} amount mismatch: paid=${paidCents}, expected=${expectedCents}, payment=${transaction.id}. Not posting; manual follow-up.`);
+    await deps.markIntentStatus(reference, 'amount_mismatch', { transactionId: transaction.id, paidCents });
+    return reply({ message: 'Amount mismatch; logged for manual follow-up' });
+  }
+
+  try {
+    const result = await deps.postOrderToFolio({
+      idReservations: intent.bookingCode,
+      items: intent.items,
+      payment: { amount: expectedCents / 100, method: 'card', note: `Pago en línea Mercado Pago ${transaction.id}` }
+    });
+    await deps.markIntentStatus(reference, 'paid', {
+      transactionId: transaction.id, paidAt: new Date().toISOString(), folio: result
+    });
+    return reply({ received: true, folio: result });
+  } catch (e) {
+    console.error(`[mercadopago-webhook] guest order ${reference} folio posting failed for paid payment ${transaction.id}: ${e.message}. MANUAL follow-up required.`);
+    await deps.markIntentStatus(reference, 'paid_folio_failed', { transactionId: transaction.id, error: e.message });
+    return reply({ message: 'Paid but folio posting failed; logged for manual follow-up' });
   }
 }
 
@@ -153,15 +220,30 @@ function getPaymentId(event, body) {
   );
 }
 
-function verifyMercadoPagoSignature(event, paymentId) {
-  const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
+/* Signature verification.
+ *
+ * Mercado Pago Checkout Pro does NOT always let the merchant generate a webhook
+ * secret in the panel. When MERCADOPAGO_WEBHOOK_SECRET is absent we therefore
+ * SKIP signature validation and lean on the only thing an attacker cannot forge:
+ * the payment is re-fetched from the Mercado Pago API with OUR access token
+ * (fetchPayment below) and we only act on status==='approved' WITH a matching
+ * amount. A forged webhook carrying a fake/foreign payment id either 404s at the
+ * API or returns a payment that is not 'approved' / does not match the expected
+ * amount, so it can never create a reservation.
+ *
+ * When the secret IS configured we still validate the HMAC signature first, as
+ * defense in depth (the API re-fetch then runs as a second gate). */
+function verifyMercadoPagoSignature(event, paymentId, env = process.env) {
+  const secret = env.MERCADOPAGO_WEBHOOK_SECRET;
   if (!secret) {
-    console.error('CRITICAL: MERCADOPAGO_WEBHOOK_SECRET is not configured. Rejecting webhook.');
-    return { ok: false, statusCode: 500, message: 'Webhook secret not configured on server' };
+    /* No secret configured → cannot HMAC-verify. Defer entirely to the
+       API re-fetch (source of truth). Not an error. */
+    return { ok: true, verified: false, reason: 'no_secret_api_verify' };
   }
 
-  const signatureHeader = event.headers['x-signature'] || event.headers['X-Signature'];
-  const requestId = event.headers['x-request-id'] || event.headers['X-Request-Id'];
+  const headers = event.headers || {};
+  const signatureHeader = headers['x-signature'] || headers['X-Signature'];
+  const requestId = headers['x-request-id'] || headers['X-Request-Id'];
   if (!signatureHeader || !requestId || !paymentId) {
     return { ok: false, statusCode: 401, message: 'Missing signature components' };
   }
@@ -187,18 +269,22 @@ function verifyMercadoPagoSignature(event, paymentId) {
     return { ok: false, statusCode: 401, message: 'Invalid signature' };
   }
 
-  return { ok: true };
+  return { ok: true, verified: true };
 }
 
-async function fetchPayment(paymentId) {
-  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+/* Re-fetch the payment from the Mercado Pago API. THIS is the source of truth:
+   we authenticate with our own access token, so the JSON it returns (status,
+   amount, currency, reference) cannot be forged by whoever posted the webhook.
+   `fetchImpl` and `env` are injectable for tests (no network, no real token). */
+async function fetchPayment(paymentId, { fetchImpl = fetch, env = process.env } = {}) {
+  const accessToken = env.MERCADOPAGO_ACCESS_TOKEN;
   if (!accessToken) throw new Error('MERCADOPAGO_ACCESS_TOKEN is not configured');
 
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort(), 12000);
   let res;
   try {
-    res = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
+    res = await fetchImpl(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${accessToken}` },
       signal: ctrl.signal
@@ -214,7 +300,20 @@ async function fetchPayment(paymentId) {
   return data;
 }
 
-exports.handler = async (event) => {
+async function handleWebhook(event, overrides = {}) {
+  const deps = {
+    env: process.env,
+    fetchImpl: fetch,
+    processApprovedPayment,
+    handleGuestServicePayment,
+    notifyGuestPaymentOutcome,
+    alreadyProcessed,
+    markProcessed,
+    settingsGet: require('./_settings').get,
+    ...overrides
+  };
+  const env = deps.env;
+
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: headers(), body: '' };
   if (event.httpMethod !== 'POST') return response(405, { error: 'Method Not Allowed. Use POST.' });
   if (event.body && event.body.length > 20000) return response(413, { error: 'Payload too large' });
@@ -224,21 +323,33 @@ exports.handler = async (event) => {
   catch (e) { return response(400, { error: 'Invalid JSON request body' }); }
 
   const paymentId = getPaymentId(event, body);
-  const sig = verifyMercadoPagoSignature(event, paymentId);
+  const sig = verifyMercadoPagoSignature(event, paymentId, env);
   if (!sig.ok) return response(sig.statusCode, { error: sig.message });
+  if (!paymentId) return response(400, { error: 'Missing payment id' });
 
+  /* Source of truth: re-fetch the payment from the MP API with our access token.
+     When no webhook secret is set this is the ONLY trust anchor (a forged
+     webhook cannot make this return an approved, amount-matching payment). */
   let payment;
   try {
-    payment = await fetchPayment(paymentId);
+    payment = await fetchPayment(paymentId, { fetchImpl: deps.fetchImpl, env });
   } catch (e) {
     console.error('[mercadopago-webhook]', e.message);
     return response(502, { error: 'Failed to verify payment with Mercado Pago' });
   }
 
   const transaction = normalizeTransaction('mercadopago', payment);
-  if (process.env.DEBUG) {
-    console.log(`[mercadopago-webhook] payment=${transaction.id} reference=${transaction.reference} status=${transaction.status}`);
+  if (env.DEBUG) {
+    console.log(`[mercadopago-webhook] payment=${transaction.id} reference=${transaction.reference} status=${transaction.status} verified=${sig.verified}`);
   }
+
+  /* Los correos de cortesía al huésped (rechazo/pendiente) solo se envían desde
+     un webhook con FIRMA VERIFICADA. En modo sin secreto (verified=false) un
+     tercero que conozca un payment_id real podría disparar correos a ese huésped;
+     el camino del dinero (crear la reserva) sí procede porque se re-consulta la
+     API con nuestro token. Configurar MERCADOPAGO_WEBHOOK_SECRET reactiva estos
+     avisos. */
+  const canNotifyGuest = !!sig.verified;
 
   if (transaction.status === 'rejected' || transaction.status === 'failed') {
     console.error(`[mercadopago-webhook] payment ${transaction.id} ${transaction.rawStatus}; reference=${transaction.reference}`);
@@ -246,33 +357,68 @@ exports.handler = async (event) => {
        refunds/chargebacks to 'failed', where "no se realizó ningún cobro"
        would be wrong. */
     const raw = String(transaction.rawStatus || '').toLowerCase();
-    if (raw === 'rejected' || raw === 'cancelled') {
-      await notifyGuestPaymentOutcome(transaction, 'declined');
+    if (canNotifyGuest && (raw === 'rejected' || raw === 'cancelled')) {
+      await deps.notifyGuestPaymentOutcome(transaction, 'declined');
     }
     return response(200, { message: `Payment ${transaction.status}. Logged for manual follow-up.` });
   }
 
   if (transaction.status !== 'approved') {
-    if (transaction.status === 'pending') {
+    if (canNotifyGuest && transaction.status === 'pending') {
       /* "No vuelvas a pagar" solo aplica a tarjetas en proceso. En métodos
          offline (PSE/Efecty/ticket), 'pending' significa que el huésped AÚN debe
          pagar, así que ese mensaje sería engañoso → se omite. */
       const pm = String(transaction.paymentMethod || '').toLowerCase();
       if (/credit|debit|visa|master|amex|account_money/.test(pm)) {
-        await notifyGuestPaymentOutcome(transaction, 'pending');
+        await deps.notifyGuestPaymentOutcome(transaction, 'pending');
       }
     }
     return response(200, { message: `Payment status is ${transaction.status}. Skipping reservation.` });
   }
 
+  if (transaction.currency !== 'COP') {
+    console.error(`[mercadopago-webhook] invalid currency ${transaction.currency} for payment ${transaction.id}`);
+    return response(200, { message: 'Invalid currency; logged for manual follow-up' });
+  }
+
+  /* Guest-app service order paid online: reference is the order eventId (GST-...).
+     Gated by GUEST_SERVICE_PAYMENT_MODE (mercadopago/both) so it stays inert
+     until guest-app online payment is enabled for MP. Deduped by the shared
+     processed-transactions store (markProcessed) before posting to the folio,
+     since add_extra/add_payment are not idempotent. */
+  const guestSvcMode = String((await deps.settingsGet('GUEST_SERVICE_PAYMENT_MODE')) || '').toLowerCase();
+  if (GUEST_ORDER_REF_RE.test(transaction.reference || '') &&
+      ['mercadopago', 'both'].includes(guestSvcMode)) {
+    if (await deps.alreadyProcessed(transaction.id)) {
+      return response(200, { received: true, duplicate: true });
+    }
+    await deps.markProcessed(transaction.id);
+    try {
+      return await deps.handleGuestServicePayment(transaction, headers());
+    } catch (e) {
+      console.error('[mercadopago-webhook] guest service payment failed:', e.message);
+      return response(500, { error: 'Failed to process guest service payment' });
+    }
+  }
+
+  /* Reservation creation (direct bookings + corporate quotes). The amount is
+     re-verified server-side inside processApprovedPayment (against the stored
+     quote total or the encoded direct-reference amount) — the client price is
+     never trusted. */
   try {
-    return await processApprovedPayment(transaction, headers());
+    return await deps.processApprovedPayment(transaction, headers());
   } catch (e) {
     console.error('[mercadopago-webhook] reservation processing failed:', e.message);
     return response(500, { error: 'Failed to process approved payment' });
   }
-};
+}
+
+exports.handler = (event) => handleWebhook(event);
 
 exports._test = {
-  notifyGuestPaymentOutcome
+  handleWebhook,
+  verifyMercadoPagoSignature,
+  fetchPayment,
+  notifyGuestPaymentOutcome,
+  handleGuestServicePayment
 };

@@ -5,7 +5,7 @@
    they resolve to a live phone number. Use during setup, before flipping
    WHATSAPP_BOT_ENABLED=true. See docs/whatsapp-bot.md. */
 
-const { authenticateAdmin } = require('./_firebase-auth');
+const { authorize } = require('./_authz');
 const { waConfig, isConfigured } = require('./_whatsapp');
 
 exports.handler = async (event) => {
@@ -20,7 +20,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
   if (event.httpMethod !== 'GET') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-  const auth = await authenticateAdmin(event);
+  const auth = await authorize(event, 'integrations.probe');
   if (!auth.ok) return { statusCode: auth.statusCode, headers: corsHeaders, body: JSON.stringify({ error: auth.error }) };
 
   const c = waConfig();

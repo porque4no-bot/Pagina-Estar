@@ -43,7 +43,7 @@ function beTrack(eventName, params) {
 function gaItem(room, rate, search) {
   if (!room) return null;
   const nights = dateDiff(search.checkin, search.checkout);
-  const nightly = rate === 'best' ? room.priceFlexible : Math.round(room.priceFlexible / 0.9);
+  const nightly = rate === 'best' ? room.priceFlexible : Math.round(room.priceFlexible * 1.10);
   return {
     item_id: room.roomTypeId || room.id,
     item_name: room.name,
@@ -292,7 +292,7 @@ function StepWrapper({ num, title, state, summaryLine, onEdit, children, lang })
 function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) {
   const t = i18nEngine[lang];
   const priceBest = room.priceFlexible;
-  const priceFlex = Math.round(room.priceFlexible / 0.9);
+  const priceFlex = Math.round(room.priceFlexible * 1.10);
   const activePrice = rate === 'best' ? priceBest : priceFlex;
 
   // Translate details
@@ -427,7 +427,7 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
                   <span className="be-badge-save">{t.save10}</span>
                 </div>
                 <div className="be-rate-price">{formatCOP(priceBest)}<span>/{t.noche}</span></div>
-                <div className="be-rate-sub">{t.nonRefundable}</div>
+                <div className="be-rate-sub">{t.strictCancel}</div>
               </button>
             </div>
             <div className="be-room-total-row">
@@ -594,6 +594,19 @@ function GuestForm({ guest, setGuest, onContinue, lang }) {
             <span>{t.privacyAgreement}</span>
           </label>
         </div>
+        {/* Frente C — opt-in de marketing OPCIONAL, separado del consentimiento de
+            privacidad (que sigue obligatorio arriba). Ley 1581: solo opt-in; sin
+            marcar = NO marketing. El valor viaja en el body de create-wompi-signature
+            (no en la referencia) y, con opt-in, el webhook lo cablea a Odoo. */}
+        <div className="be-field be-field-full">
+          <label htmlFor="guest-marketing" className="be-checkbox-label">
+            <input id="guest-marketing" type="checkbox"
+              checked={Boolean(guest.marketingOptIn)}
+              onChange={e => set('marketingOptIn', e.target.checked)} />
+            <span>{t.marketingOptIn}</span>
+          </label>
+          <p className="be-field-help" style={{ marginTop: 'var(--space-1)', color: 'var(--ink-300)' }}>{t.marketingOptInHelp}</p>
+        </div>
         <div className="be-field be-field-full">
           <p className="be-legal-notice">
             {t.escnnaNotice} <a href="escnna.html" target="_blank">{t.escnnaLink}</a>.
@@ -672,6 +685,92 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
   const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
   const [loading, setLoading] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
+
+  /* ── Frente A: discount code ──────────────────────────────────
+     The field stays hidden until /api/validate-discount-code reports the
+     feature is enabled (DISCOUNT_CODES_ENABLED). The discount is ALWAYS
+     re-validated and re-priced server-side at signing time; this is only the
+     in-line UX. `applied` holds the server's confirmed { code, discountCents }. */
+  const [discountEnabledUi, setDiscountEnabledUi] = useState(false);
+  const [discountInput, setDiscountInput] = useState('');
+  const [discountChecking, setDiscountChecking] = useState(false);
+  const [discountApplied, setDiscountApplied] = useState(null); /* { code, discountCents } */
+  const [discountError, setDiscountError] = useState(null);
+
+  /* The amount actually charged today (online subtotal minus any applied
+     discount, never below 0). Used everywhere we previously used calc.subtotal. */
+  const baseSubtotalCents = calc ? Math.round(calc.subtotal * 100) : 0;
+  const discountCents = discountApplied ? Math.min(discountApplied.discountCents || 0, baseSubtotalCents) : 0;
+  const payableCents = Math.max(0, baseSubtotalCents - discountCents);
+
+  const discountReasonText = (reason) => {
+    switch (reason) {
+      case 'expired': return t.discountExpired;
+      case 'already_used': return t.discountAlreadyUsed;
+      case 'exhausted': return t.discountExhausted;
+      case 'min_nights': return t.discountMinNights;
+      case 'room_not_eligible': return t.discountRoom;
+      case 'blackout': return t.discountBlackout;
+      default: return t.discountInvalid;
+    }
+  };
+
+  React.useEffect(() => {
+    /* Probe whether discounts are enabled (and hide the field if not). A blank
+       code returns reason:'invalid' with enabled flag, which is all we need. */
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch('/api/validate-discount-code?code=__probe__');
+        const d = await r.json();
+        if (alive && d && d.enabled === true) setDiscountEnabledUi(true);
+      } catch (e) { /* feature stays hidden */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  /* If the booking (room/rate/extras/dates) changes, drop a previously applied
+     discount so the displayed total can never be stale vs. the server price. */
+  React.useEffect(() => {
+    setDiscountApplied(null);
+    setDiscountError(null);
+  }, [booking.room && booking.room.id, booking.rate, JSON.stringify(booking.extras), search.checkin, search.checkout, search.guests]);
+
+  const applyDiscount = async () => {
+    const code = (discountInput || '').trim().toUpperCase();
+    if (!code) return;
+    setDiscountChecking(true);
+    setDiscountError(null);
+    setDiscountApplied(null);
+    try {
+      const params = new URLSearchParams({
+        code,
+        email: (booking.guest && booking.guest.email) || '',
+        nights: String(calc ? calc.nights : ''),
+        roomTypeId: booking.room.roomTypeId || '',
+        checkin: search.checkin || '',
+        checkout: search.checkout || '',
+        subtotalCents: String(baseSubtotalCents)
+      });
+      const r = await fetch('/api/validate-discount-code?' + params.toString());
+      const d = await r.json();
+      if (d && d.valid) {
+        setDiscountApplied({ code: d.code || code, discountCents: d.discountCents || 0 });
+      } else {
+        setDiscountError(discountReasonText(d && d.reason));
+      }
+    } catch (e) {
+      setDiscountError(t.discountInvalid);
+    } finally {
+      setDiscountChecking(false);
+    }
+  };
+
+  const removeDiscount = () => {
+    setDiscountApplied(null);
+    setDiscountError(null);
+    setDiscountInput('');
+  };
 
   const translatedRoomName = t.roomNames[booking.room.id] || booking.room.name;
 
@@ -759,7 +858,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       const code = genCode();
 
       // Encode booking details into the Wompi reference (max 255 chars)
-      // Format: 1|checkinYYMMDD|checkoutYYMMDD|guests|roomTypeId|firstName|lastName|email|phone|extrasMask|code
+      // Format: 1|checkinYYMMDD|checkoutYYMMDD|guests|roomTypeId|firstName|lastName|email|phone|extrasMask|code|colombian|business|priceCents|ratePlan
       const formatDateYYMMDD = (dStr) => {
         if (!dStr) return '000000';
         return dStr.replace(/-/g, '').substring(2);
@@ -781,7 +880,8 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
         code,
         isColombian ? '1' : '0',
         isBusinessTrip ? '1' : '0',
-        Math.round(calc.subtotal * 100) // 14th field: price in cents
+        payableCents, // 14th field: price in cents (con descuento ya aplicado si lo hay)
+        booking.rate === 'flexible' ? 'F' : 'B' // 15th field: plan tarifario (F=Flexible 100% hasta 24 h / B=Best=Estricta 100% hasta 7 días)
       ].join('|');
 
       const encodedRef = btoa(unescape(encodeURIComponent(serialized)))
@@ -807,8 +907,18 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             reference: encodedRef,
-            amountInCents: Math.round(calc.subtotal * 100),
-            currency: 'COP'
+            amountInCents: payableCents,
+            currency: 'COP',
+            /* Frente A: discount code travels APART from the reference; the
+               server re-validates it and signs the discounted amount. */
+            discountCode: discountApplied ? discountApplied.code : '',
+            /* A8: free-text guest note (server persists it and the payment
+               webhook attaches it to the OTASync reservation). */
+            notes: ((booking.guest && booking.guest.notas) || '').trim().slice(0, 500),
+            /* Frente C: opt-in de marketing (Ley 1581). Viaja en el body, NO en
+               la referencia; el server lo persiste y, con opt-in, el webhook lo
+               cablea a Odoo (tag + lista de Email Marketing). */
+            marketingOptIn: Boolean(booking.guest && booking.guest.marketingOptIn)
           })
         });
         sigData = await sigRes.json();
@@ -909,9 +1019,15 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
               <span>{mustPayIVA ? (lang === 'es' ? 'IVA a pagar en alojamiento (19%)*' : 'VAT due at property (19%)*') : (lang === 'es' ? 'IVA exento sujeto a validacion*' : 'VAT exempt, subject to validation*')}</span>
               <span style={!mustPayIVA ? { textDecoration: 'line-through', opacity: 0.75 } : undefined}>{formatCOP(calc.iva)}</span>
             </div>
+            {discountApplied && discountCents > 0 && (
+              <div className="be-summary-line" style={{ color: 'var(--olive-700)' }}>
+                <span>{t.discountLine} ({discountApplied.code})</span>
+                <span>−{formatCOP(Math.round(discountCents / 100))}</span>
+              </div>
+            )}
             <div className="be-summary-line be-summary-total">
               <span>{lang === 'es' ? 'Total a pagar hoy' : 'Total to pay today'}</span>
-              <span>{formatCOP(calc.subtotal)}</span>
+              <span>{formatCOP(Math.round(payableCents / 100))}</span>
             </div>
           </div>
 
@@ -963,6 +1079,45 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
           )}
         </>
       )}
+      {discountEnabledUi && (
+        <div style={{ marginTop: 8, marginBottom: 16 }}>
+          <label style={{ display: 'block', fontFamily: 'var(--font-label)', fontSize: 12, letterSpacing: '0.06em', color: 'var(--ink)', marginBottom: 8 }}>
+            {t.discountLabel}
+          </label>
+          {discountApplied ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 8, background: 'var(--olive-100)', border: '1px solid var(--olive-300)', color: 'var(--olive-700)', fontSize: 13 }}>
+                <Icon name="check" size={14} />
+                {t.discountApplied}: <strong>{discountApplied.code}</strong>
+              </span>
+              <button type="button" className="be-btn-secondary" style={{ padding: '8px 14px', fontSize: 12 }}
+                onClick={removeDiscount} disabled={loading}>
+                {t.discountRemove}
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                value={discountInput}
+                onChange={(e) => setDiscountInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyDiscount(); } }}
+                placeholder={t.discountPlaceholder}
+                disabled={discountChecking || loading}
+                style={{ flex: '1 1 180px', minWidth: 0, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 14, textTransform: 'uppercase' }}
+              />
+              <button type="button" className="be-btn-secondary" style={{ padding: '10px 18px', fontSize: 13 }}
+                onClick={applyDiscount} disabled={discountChecking || loading || !discountInput.trim()}>
+                {discountChecking ? t.discountChecking : t.discountApply}
+              </button>
+            </div>
+          )}
+          {discountError && (
+            <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--terracotta-700)' }}>{discountError}</p>
+          )}
+        </div>
+      )}
+
       <p className="be-section-intro" style={{ marginTop: 20 }}>{t.paymentIntro}</p>
       <div className="be-payment-options">
         {BE_PAYMENTS.map(pm => {
@@ -1105,7 +1260,7 @@ function BookingSummary({ booking, search, lang }) {
       <p className="be-summary-rate-badge">
         {booking.rate === 'flexible'
           ? `✶ ${t.flexible} — ${t.refundable}`
-          : `✶ ${t.bestPrice} — ${t.nonRefundable}`}
+          : `✶ ${t.bestPrice} — ${t.strictCancel}`}
       </p>
       {calc && (
         <div className="be-summary-breakdown">
@@ -1154,7 +1309,7 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
   const reservationPending = !!(paymentDetails && paymentDetails.reservationPending);
 
   const roomName = t.roomNames[booking.room.id] || booking.room.name;
-  const rateLabel = booking.rate === 'flexible' ? `${t.flexible} — ${t.refundable}` : `${t.bestPrice} — ${t.nonRefundable}`;
+  const rateLabel = booking.rate === 'flexible' ? `${t.flexible} — ${t.refundable}` : `${t.bestPrice} — ${t.strictCancel}`;
 
   const isColombian = isColombianGuest(booking.guest);
   const isBusinessTrip = isBusinessGuest(booking.guest, lang);

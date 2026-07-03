@@ -1,9 +1,10 @@
 User-agent: *
 Allow: /
-Disallow: /admin/
+Disallow: /admin
 Disallow: /api/
 Disallow: /.netlify/
 Disallow: /cotizar-admin.html
+Disallow: /desayuno-admin.html
 Disallow: /cotizacion.html
 Disallow: /node_modules/
 Disallow: /uploads/
