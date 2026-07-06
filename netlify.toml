@@ -153,6 +153,9 @@
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    # A-11: HSTS en un sitio con pagos/login admin/PII (evita SSL-stripping en el
+    # primer request). Sin `preload` a propósito hasta validar HTTPS de subdominios.
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     # NOTE: Content-Security-Policy is emitted by build.js into dist/_headers
     # so that inline <script> blocks can be allow-listed by SHA-256 hash and
     # `'unsafe-inline'` is no longer required on script-src.
@@ -162,16 +165,21 @@
   for = "/admin"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
+    # A-11: no cachear PII del panel (bfcache podría re-mostrarla con "atrás" en un
+    # equipo compartido de recepción).
+    Cache-Control = "no-store, no-cache, must-revalidate"
 
 [[headers]]
   for = "/cotizar-admin.html"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store, no-cache, must-revalidate"
 
 [[headers]]
   for = "/cotizacion.html"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store, no-cache, must-revalidate"
 
 # Guest-facing breakfast passes (opened via signed link; no login, no camera).
 [[headers]]
