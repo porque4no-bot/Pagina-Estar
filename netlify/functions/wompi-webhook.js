@@ -1058,12 +1058,11 @@ exports.handler = async (event, context) => {
   }
 
   // Guest-app service order paid online: reference is the order eventId (GST-...).
-  // guest-action builds a Wompi checkout when the mode is 'wompi' OR 'both'
-  // (both => guest chooses), so accept both here or a paid GST order in 'both'
-  // mode would fall through, never settle to the folio, and strand the payment.
-  const guestSvcMode = String(await get('GUEST_SERVICE_PAYMENT_MODE') || '').toLowerCase();
-  if (GUEST_ORDER_REF_RE.test(transaction.reference || '') &&
-      (guestSvcMode === 'wompi' || guestSvcMode === 'both')) {
+  // A-13: enrutar SIEMPRE al handler de servicio si la referencia es GST- (no
+  // depender del GUEST_SERVICE_PAYMENT_MODE actual). El handler es idempotente y,
+  // si no existe el intent, responde 200 sin efecto. Depender del modo estrancaba
+  // el pago cuando el admin lo cambiaba entre el checkout y la llegada del webhook.
+  if (GUEST_ORDER_REF_RE.test(transaction.reference || '')) {
     addProcessedTransaction(transaction.id);
     if (txStore) {
       try { await txStore.set(String(transaction.id), '1', { ttl: 86400 }); } catch (e) { /* non-fatal */ }
