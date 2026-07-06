@@ -371,18 +371,26 @@ async function sendConfirmationEmail(params, deps = {}) {
     }
   }
 
-  const emailHtml = buildEmailHtml({
-    guestName: guestName || 'Huésped',
-    bookingCode: bookingCode || 'N/A',
-    roomName: roomName || 'Apartaestudio',
-    checkIn: checkIn || '',
-    checkOut: checkOut || '',
-    nights: parseInt(nights) || 1,
-    totalAmount: parseFloat(totalAmount) || 0,
-    paidAmount: parseFloat(paidAmount) || parseFloat(totalAmount) || 0,
-    phone: phone || '',
-    passUrl
-  });
+  let emailHtml;
+  try {
+    emailHtml = buildEmailHtml({
+      guestName: guestName || 'Huésped',
+      bookingCode: bookingCode || 'N/A',
+      roomName: roomName || 'Apartaestudio',
+      checkIn: checkIn || '',
+      checkOut: checkOut || '',
+      nights: parseInt(nights) || 1,
+      totalAmount: parseFloat(totalAmount) || 0,
+      paidAmount: parseFloat(paidAmount) || parseFloat(totalAmount) || 0,
+      phone: phone || '',
+      passUrl
+    });
+  } catch (e) {
+    /* Si armar el correo lanza, liberar el claim de dedupe para no suprimir
+       permanentemente un correo legítimo (quedaría reintentable por el otro trigger). */
+    await releaseDedupe();
+    throw e;
+  }
 
   const resendController = new AbortController();
   const resendTimeoutId = setTimeout(() => resendController.abort(), 10000);

@@ -190,19 +190,27 @@ exports.handler = async (event) => {
 
   /* Amount guard: never approve more than what was paid. */
   let amountCents = refund.refundAmountCents;
+  /* Monto pagado original = TOPE del reembolso. Del registro o, si falta (reserva
+     vieja / booking-results vencido / payment-details ausente), el que APORTE el
+     admin en body.originalAmountCents (verificado por él desde Wompi/MP). Se
+     persiste con auditoría para no bloquear el flujo por completo. */
+  let knownOriginal = (refund.originalAmountCents && refund.originalAmountCents > 0) ? refund.originalAmountCents : 0;
+  let backfilledOriginal = false;
+  if (!knownOriginal && body.originalAmountCents != null) {
+    const oc = parseInt(body.originalAmountCents, 10);
+    if (Number.isFinite(oc) && oc > 0) { knownOriginal = oc; backfilledOriginal = true; }
+  }
   if (body.amountCents !== undefined && body.amountCents !== null) {
     amountCents = parseInt(body.amountCents, 10);
     if (!Number.isFinite(amountCents) || amountCents <= 0) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'amountCents inválido' }) };
     }
-    /* Sin monto original conocido NO hay tope: distinguir "sin tope" de "dentro
-       del tope". Aprobar a ciegas un monto arbitrario (transferencia manual con
-       originalAmountCents null/0 por reserva vieja o blob vencido) permitiría
-       transferir de más. Exigir recuperar/ingresar el monto pagado antes. */
-    if (!refund.originalAmountCents || refund.originalAmountCents <= 0) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'No se conoce el monto pagado original de esta reserva; recupéralo antes de aprobar un monto de reembolso.' }) };
+    /* Sin tope conocido no se aprueba a ciegas (evita transferir de más), pero se
+       ofrece la vía: enviar originalAmountCents para fijarlo. */
+    if (!knownOriginal) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'No se conoce el monto pagado original; envíalo en originalAmountCents (verificado en Wompi/MP) para fijar el tope del reembolso.' }) };
     }
-    if (amountCents > refund.originalAmountCents) {
+    if (amountCents > knownOriginal) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'El reembolso no puede superar el monto pagado' }) };
     }
   }
@@ -217,7 +225,7 @@ exports.handler = async (event) => {
 
     if (action === 'set-amount') {
       if (amountCents == null) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Falta amountCents' }) };
-      const res = await transitionStatus(bookingCode, refund.status, actor, `Monto de reembolso fijado: ${amountCents} centavos`, { refundAmountCents: amountCents });
+      const res = await transitionStatus(bookingCode, refund.status, actor, `Monto de reembolso fijado: ${amountCents} centavos${backfilledOriginal ? ` · monto pagado ${knownOriginal} (ingresado)` : ''}`, backfilledOriginal ? { refundAmountCents: amountCents, originalAmountCents: knownOriginal } : { refundAmountCents: amountCents });
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, refund: res.refund }) };
     }
 
@@ -245,6 +253,7 @@ exports.handler = async (event) => {
        execution behind the dry-run/second gate. No money moves here. */
     const target = refund.route === ROUTE.MANUAL_BANK ? STATUS.NEEDS_BANK_DETAILS : STATUS.APPROVED;
     const patch = { refundAmountCents: amountCents, approvedAt: new Date().toISOString(), approvedBy: actor, approvalNotes: notes || null };
+    if (backfilledOriginal) patch.originalAmountCents = knownOriginal;
 
     /* A9: for manual transfers, mint a signed link so the guest can submit the
        account. Gated by REFUND_BANK_FORM_ENABLED. Best-effort (a sign/email

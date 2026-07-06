@@ -79,8 +79,9 @@ test('booking flow reaches the Wompi payment step', async ({ page }) => {
   await expect(page.locator('.be-step-active .be-step-footer .be-btn-primary')).toBeEnabled();
 });
 
-test('extras: late check-out, early check-in and a pet update the summary', async ({ page }) => {
-  // Mock room avgPrice = 250.000 → late 15% = 37.500, early 25% = 62.500, pet = 200.000 (flat).
+test('extras: late check-out and a pet update the summary', async ({ page }) => {
+  // Mock room avgPrice = 250.000 → late 15% = 37.500, pet = 200.000 (flat).
+  // Early check-in ya NO se vende en el motor (solo en el check-in) → no aparece aquí.
   await page.goto('/reservar.html?checkin=2026-08-10&checkout=2026-08-13&guests=2');
   await expect(page.locator('.be-room-card')).toBeVisible();
   await page.locator('.be-room-select-btn').first().click();
@@ -88,14 +89,14 @@ test('extras: late check-out, early check-in and a pet update the summary', asyn
 
   // Inputs are visually hidden (the ✶ is the visible control), so click the labels.
   await page.locator('.be-extra-row', { hasText: 'Late check-out' }).click();
-  await page.locator('.be-extra-row', { hasText: 'Early check-in' }).click();
   await page.locator('.be-extra-row', { hasText: 'Mascota' }).click();
+
+  // Early check-in fue removido del motor: no debe ofrecerse.
+  await expect(page.locator('.be-extra-row', { hasText: 'Early check-in' })).toHaveCount(0);
 
   const summary = page.locator('.be-summary-breakdown');
   await expect(summary).toContainText('Late check-out');
-  await expect(summary).toContainText('Early check-in');
   await expect(summary).toContainText('Mascota');
   await expect(summary).toContainText('$ 37.500');   // late = 15% of 250.000
-  await expect(summary).toContainText('$ 62.500');   // early = 25% of 250.000
   await expect(summary).toContainText('$ 200.000');  // pet flat charge
 });

@@ -876,11 +876,16 @@ function normalizeReservation(r) {
   };
 }
 
-/* True si la fila es un HOLD interno (BLOQUEO/COT-) y no un huésped real. Misma
-   heurística que otasync-webhook: nombre /^bloqueo/i o reference /^COT-/i. */
+/* True si la fila es un HOLD interno (bloqueo tentativo) y no un huésped real.
+   El nombre 'BLOQUEO' identifica el hold. La rama por reference COT- SOLO cuenta
+   si además el status es tentative: una cotización PAGADA se inserta como reserva
+   CONFIRMADA real que también lleva reference COT- y el nombre del contacto —
+   ese huésped corporativo NO debe filtrarse del tablero. */
 function isHoldReservation(r) {
   const name = `${(r && r.firstName) || ''} ${(r && r.lastName) || ''}`.trim();
-  return /^bloqueo/i.test(name) || /^COT-/i.test(String((r && r.reference) || ''));
+  const status = String((r && r.status) || '').toLowerCase();
+  return /^bloqueo/i.test(name) ||
+    (/^COT-/i.test(String((r && r.reference) || '')) && status === 'tentative');
 }
 
 const RESERVATIONS_MAX_PAGES = 20;
