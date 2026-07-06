@@ -2,6 +2,12 @@
   command = "npm run build"
   publish = "dist"
   functions = "netlify/functions"
+  # Evita gastar minutos de build en commits que NO afectan el sitio: si entre el
+  # último deploy y este commit lo único que cambió son .docx o .gitignore, el
+  # comando `git diff --quiet` sale 0 y Netlify CANCELA el build. Cualquier cambio
+  # en código/HTML/funciones/docs deja diferencias → sale ≠0 → sí construye.
+  # (Si CACHED_COMMIT_REF no existe —primer build/force-push— git falla → sí construye.)
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ':(exclude)*.docx' ':(exclude).gitignore'"
 
 [functions]
   included_files = ["rooms_db.json", "docs/bot-conocimiento.md"]
