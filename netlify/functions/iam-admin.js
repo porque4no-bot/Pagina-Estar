@@ -178,6 +178,19 @@ exports.handler = async (event) => {
               : (existing && existing.status) || 'active',
         updatedBy: actor
       });
+      /* Guard "nunca sin admin" también por la vía upsert: suspender al último
+         admin (o a uno mismo) con status:'suspended' dejaría el panel sin
+         administrador. El invariante existía en suspend/delete pero no aquí. */
+      if (record.status === 'suspended') {
+        if (targetEmail === actor && !isEnvAdmin) {
+          return forbidden(headers, 'No puedes suspenderte a ti mismo');
+        }
+        const envAdmins = require('./_authz').adminEnvList();
+        const allUsers = await iam.listUsers();
+        if (adminsRemainingAfter(allUsers, envAdmins, targetEmail, customRolesMap) < 1) {
+          return forbidden(headers, 'La operación dejaría el sistema sin ningún administrador');
+        }
+      }
       record.auditLog = Array.isArray(record.auditLog) ? record.auditLog : [];
       record.auditLog.push({ ts: nowIso(), actor, action: existing ? 'update' : 'create', detail: `roles=[${roles.join(',')}]` });
       await iam.saveUser(record);

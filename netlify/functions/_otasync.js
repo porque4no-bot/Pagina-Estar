@@ -583,8 +583,18 @@ async function cancelReservation(idReservations) {
       if (res.ok) {
         let data = {};
         try { data = await res.json(); } catch (_) { /* tolera respuesta sin cuerpo */ }
-        const status = (data && data.reservation && data.reservation.status) || (data && data.status) || 'canceled';
-        return { ok: true, status };
+        /* OTASync puede devolver 200 con un CUERPO DE ERROR (la reserva sigue viva).
+           Exigir una señal AFIRMATIVA de cancelación; si no la hay, LANZAR (no
+           devolver ok:false) para que el caller no marque la reserva como cancelada
+           y se dispare la alerta crítica del catch. */
+        const rsv = (data && data.reservation) || {};
+        const status = rsv.status || (data && data.status) || '';
+        const canceledSignal = /cancel/i.test(String(status)) ||
+          !!(rsv.date_canceled || rsv.canceled || (data && data.date_canceled) || (data && data.success === true));
+        if (!canceledSignal) {
+          throw new Error(`delete/delete devolvió 200 sin señal de cancelación (status="${status}")`);
+        }
+        return { ok: true, status: status || 'canceled' };
       }
       if (res.status >= 500 && attempt < CANCEL_MAX_ATTEMPTS) {
         console.warn(`[otasync] delete/delete attempt ${attempt}/${CANCEL_MAX_ATTEMPTS} returned status ${res.status}; retrying in ${CANCEL_BACKOFF_MS[attempt - 1]}ms`);

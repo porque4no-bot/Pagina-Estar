@@ -171,7 +171,14 @@ exports.handler = async (event) => {
     if (!Number.isFinite(amountCents) || amountCents <= 0) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'amountCents inválido' }) };
     }
-    if (refund.originalAmountCents && amountCents > refund.originalAmountCents) {
+    /* Sin monto original conocido NO hay tope: distinguir "sin tope" de "dentro
+       del tope". Aprobar a ciegas un monto arbitrario (transferencia manual con
+       originalAmountCents null/0 por reserva vieja o blob vencido) permitiría
+       transferir de más. Exigir recuperar/ingresar el monto pagado antes. */
+    if (!refund.originalAmountCents || refund.originalAmountCents <= 0) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'No se conoce el monto pagado original de esta reserva; recupéralo antes de aprobar un monto de reembolso.' }) };
+    }
+    if (amountCents > refund.originalAmountCents) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'El reembolso no puede superar el monto pagado' }) };
     }
   }
