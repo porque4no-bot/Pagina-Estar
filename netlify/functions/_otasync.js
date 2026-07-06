@@ -871,8 +871,16 @@ function normalizeReservation(r) {
     nights: parseInt(r.nights, 10) || 0,
     hasBreakfast: reservaTieneDesayuno(r),
     roomName: (r.rooms && r.rooms[0] && r.rooms[0].name) || '',
+    reference: String(r.reference || ''),
     lang: inferLang(r.country)
   };
+}
+
+/* True si la fila es un HOLD interno (BLOQUEO/COT-) y no un huésped real. Misma
+   heurística que otasync-webhook: nombre /^bloqueo/i o reference /^COT-/i. */
+function isHoldReservation(r) {
+  const name = `${(r && r.firstName) || ''} ${(r && r.lastName) || ''}`.trim();
+  return /^bloqueo/i.test(name) || /^COT-/i.test(String((r && r.reference) || ''));
 }
 
 const RESERVATIONS_MAX_PAGES = 20;
@@ -920,7 +928,7 @@ async function getReservationsByDate({ filterBy, dfrom, dto, arrivals = 0, depar
 }
 
 module.exports = {
-  getReservationsByDate, normalizeReservation, inferLang, reservaTieneDesayuno,
+  getReservationsByDate, normalizeReservation, isHoldReservation, inferLang, reservaTieneDesayuno,
   otasyncCreds, hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
   buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, cancelReservation, createConfirmedReservation,
   insertReservation,

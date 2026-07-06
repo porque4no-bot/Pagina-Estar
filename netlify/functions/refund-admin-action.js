@@ -3,6 +3,30 @@ const { authorize } = require('./_authz');
 const { getRefund, transitionStatus, STATUS, ROUTE } = require('./_refunds-store');
 const { flag } = require('./_settings');
 
+/* A-14: cuando el reembolso se COMPLETA (mark-done → plata devuelta, la estadía no
+   ocurrió), devolver el uso del cupón al pool para que el candado un-uso-por-email
+   y el cupo no queden consumidos por una reserva cancelada. Idempotente por booking
+   (restoreDiscountUse borra la marca booking:<code>:<bookingCode>). Best-effort. */
+async function maybeRestoreDiscount(bookingCode) {
+  if (!bookingCode) return;
+  try {
+    const { getStore } = require('@netlify/blobs');
+    const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+    const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_BLOBS_TOKEN;
+    const opts = { name: 'booking-discounts', consistency: 'strong' };
+    if (siteID && token) { opts.siteID = siteID; opts.token = token; }
+    const store = getStore(opts);
+    const raw = await store.get(`disc-${bookingCode}`);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (!d || !d.code) return;
+    const { restoreDiscountUse } = require('./_discount-store');
+    await restoreDiscountUse(d.code, { email: d.email || '', bookingCode });
+  } catch (e) {
+    console.error('[refund-admin-action] restore discount failed (non-fatal):', e.message);
+  }
+}
+
 /* Cada acción exige su propio permiso atómico (mapa de _permissions.js):
    approve → refunds.approve · deny → refunds.deny · set-amount → refunds.set_amount
    mark-processing / mark-done → refunds.mark_done. */
@@ -208,6 +232,7 @@ exports.handler = async (event) => {
       const res = await transitionStatus(bookingCode, STATUS.DONE, actor,
         notes || `Reembolso completado por ${actor}${payoutRef ? ` · ref ${payoutRef}` : ''}`,
         { completedAt: new Date().toISOString(), completedBy: actor, payoutRef: payoutRef || null });
+      await maybeRestoreDiscount(bookingCode); /* A-14: devolver el cupón al pool */
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, refund: res.refund }) };
     }
 
