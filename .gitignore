@@ -29,3 +29,6 @@ _correos-extracted.html
 _correos-text.txt
 
 _gen-logo.js
+
+# Documentos Word generados (deliverables, no versionar)
+*.docx
