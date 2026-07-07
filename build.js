@@ -511,8 +511,8 @@ async function build() {
   // Validate i18n dictionaries (symmetric keys, including nested objects).
   validateI18nDicts();
 
-  console.log('Minifying shell.js, kunas.js, guest-app.js and consent.js...');
-  const jsFilesToMinify = ['shell.js', 'kunas.js', 'guest-app.js', 'consent.js'];
+  console.log('Minifying shell.js, kunas.js, guest-app.js, portal.js and consent.js...');
+  const jsFilesToMinify = ['shell.js', 'kunas.js', 'guest-app.js', 'portal.js', 'consent.js'];
   for (const jsFile of jsFilesToMinify) {
     let js = fs.readFileSync(path.join(rootDir, jsFile), 'utf8');
     if (jsFile === 'shell.js') {

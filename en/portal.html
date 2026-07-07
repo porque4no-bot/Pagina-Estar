@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" type="image/png" href="../assets/favicon.png">
+<link rel="apple-touch-icon" href="../assets/favicon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#28292b">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>Client portal · estar</title>
+<meta name="description" content="Estar client portal: quotes, balance, invoices and stays. Secure access by email link or Google account.">
+<link rel="stylesheet" href="../colors_and_type.css?v=2">
+<link rel="stylesheet" href="../styles.css?v=4">
+<style>
+  .portal-wrap { max-width: 960px; margin: 0 auto; padding: 48px 20px 96px; }
+  .portal-hero { text-align: center; margin: 0 0 var(--space-6); }
+  .portal-hero .eyebrow { color: var(--terracotta); }
+  .portal-card { max-width: 460px; margin: 0 auto; background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg, 16px); padding: 32px 28px; box-shadow: 0 1px 2px rgba(40,41,43,.05), 0 14px 34px rgba(40,41,43,.06); }
+  .portal-field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 var(--space-4); }
+  .portal-field label { font-family: var(--font-label); font-size: 12px; letter-spacing: .04em; color: var(--ink-500); }
+  .portal-field input { padding: 13px 14px; border: 1px solid var(--border); border-radius: var(--radius-md, 8px); font-family: var(--font-body); font-size: 15px; background: var(--white); color: var(--ink); }
+  .portal-btn { width: 100%; padding: 14px 16px; border: none; border-radius: var(--radius-md, 8px); background: var(--olive); color: var(--white); font-family: var(--font-label); font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+  .portal-btn[disabled] { opacity: .55; cursor: not-allowed; }
+  .portal-divider { display: flex; align-items: center; gap: 12px; margin: var(--space-5) 0; color: var(--ink-300); font-family: var(--font-label); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+  .portal-divider::before, .portal-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .portal-google { width: 100%; padding: 13px 16px; border: 1px solid var(--border-strong); border-radius: var(--radius-md, 8px); background: var(--white); color: var(--ink); font-family: var(--font-label); font-size: 13px; font-weight: 700; letter-spacing: .04em; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+  .portal-google svg { width: 18px; height: 18px; }
+  .portal-msg { margin-top: 16px; padding: 12px 14px; border-radius: var(--radius-md, 8px); font-family: var(--font-body); font-size: 14px; }
+  .portal-msg.ok { background: var(--olive-100); color: var(--success); }
+  .portal-msg.err { background: var(--terracotta-100); color: var(--terracotta-700); }
+  .portal-fine { margin: var(--space-4) 0 0; font-family: var(--font-body); font-size: 12px; color: var(--ink-500); text-align: center; }
+  .portal-loading { text-align: center; padding: 64px 20px; font-family: var(--font-body); color: var(--ink-500); }
+
+  .portal-appbar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 var(--space-5); }
+  .portal-appbar h1 { margin: 0; }
+  .portal-appbar .portal-user { font-family: var(--font-label); font-size: 13px; color: var(--ink-500); }
+  .portal-tabs { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--border); margin: 0 0 var(--space-5); padding: 0 0 var(--space-3); }
+  .portal-tab { border: none; background: transparent; padding: 9px 14px; border-radius: var(--radius-pill, 999px); font-family: var(--font-label); font-size: 13px; font-weight: 700; letter-spacing: .03em; color: var(--ink-500); cursor: pointer; }
+  .portal-tab.is-active { background: var(--olive); color: var(--white); }
+  .portal-panel { min-height: 160px; }
+  .portal-note { font-family: var(--font-body); color: var(--ink-500); padding: 24px 4px; }
+  .portal-list { list-style: none; margin: 0; padding: 0; }
+  .portal-list-item { display: flex; justify-content: space-between; gap: 16px; padding: 14px 4px; border-bottom: 1px solid var(--border); font-family: var(--font-body); }
+  .portal-list-title { color: var(--ink); font-weight: 700; }
+  .portal-list-meta { color: var(--ink-500); }
+  .portal-textlink { background: none; border: none; padding: 0; color: var(--terracotta-700); font-family: var(--font-label); font-size: 13px; cursor: pointer; text-decoration: underline; }
+
+  /* El botón de cerrar sesión sólo es alcanzable cuando la app está montada.
+     Se ata por CSS a la visibilidad de #portalApp (que portal.js alterna con
+     show()) para que nunca quede desincronizado con el flujo login ⇄ app.
+     Fallback seguro: si el navegador no soporta :has(), queda oculto igual
+     que hoy (sin regresión). */
+  #portalLogout { display: none; }
+  body:has(#portalApp:not([hidden])) #portalLogout { display: inline-flex; align-items: center; }
+</style>
+<script src="../portal.js?v=1" defer></script>
+</head>
+<body data-header="dark">
+
+<header class="site-header">
+  <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
+    <a href="index.html" class="brand" aria-label="estar — home">
+      <span class="star-mark" aria-hidden="true"></span>
+      <img src="../assets/logo.png" alt="estar" class="logo-img" width="120" height="32">
+    </a>
+    <nav style="display:flex;align-items:center;gap:16px;">
+      <a class="t-link" href="/portal.html" hreflang="es">ES</a>
+      <button id="portalLogout" class="portal-textlink" type="button">
+        <span class="lang-es" lang="es">Cerrar sesión</span>
+        <span class="lang-en" lang="en">Sign out</span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<main class="portal-wrap">
+
+  <!-- Portal off (PORTAL_ENABLED flag) -->
+  <section id="portalDisabled" hidden>
+    <div class="portal-loading">
+      <span class="lang-es" lang="es">El portal no está disponible por ahora. Escríbenos a reservas@estar.com.co.</span>
+      <span class="lang-en" lang="en">The portal is not available right now. Write to reservas@estar.com.co.</span>
+    </div>
+  </section>
+
+  <!-- Verifying link / identity -->
+  <section id="portalVerifying" hidden>
+    <div class="portal-loading">
+      <span class="lang-es" lang="es">Verificando tu acceso…</span>
+      <span class="lang-en" lang="en">Verifying your access…</span>
+    </div>
+  </section>
+
+  <!-- Login -->
+  <section id="portalLogin" hidden>
+    <div class="portal-hero">
+      <p class="eyebrow">
+        <span class="lang-es" lang="es">Portal de clientes</span>
+        <span class="lang-en" lang="en">Client portal</span>
+      </p>
+      <h1 class="t-h2">
+        <span class="lang-es" lang="es">Tu relación con Estar, en un solo lugar</span>
+        <span class="lang-en" lang="en">Your relationship with Estar, in one place</span>
+      </h1>
+    </div>
+
+    <div class="portal-card">
+      <form id="portalLoginForm" novalidate>
+        <div class="portal-field">
+          <label for="portalEmail">
+            <span class="lang-es" lang="es">Correo electrónico</span>
+            <span class="lang-en" lang="en">Email address</span>
+          </label>
+          <input id="portalEmail" name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@company.com" required>
+        </div>
+        <button id="portalRequestBtn" class="portal-btn" type="submit">
+          <span class="lang-es" lang="es">Enviarme un enlace de acceso</span>
+          <span class="lang-en" lang="en">Send me a sign-in link</span>
+        </button>
+      </form>
+
+      <div class="portal-divider">
+        <span class="lang-es" lang="es">o</span>
+        <span class="lang-en" lang="en">or</span>
+      </div>
+
+      <button id="portalGoogleBtn" class="portal-google" type="button">
+        <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.02-3.7H.96v2.34A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.98 10.72a5.4 5.4 0 0 1 0-3.44V4.94H.96a9 9 0 0 0 0 8.12l3.02-2.34z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58C13.47.9 11.43 0 9 0A9 9 0 0 0 .96 4.94l3.02 2.34C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+        <span class="lang-es" lang="es">Continuar con Google</span>
+        <span class="lang-en" lang="en">Continue with Google</span>
+      </button>
+
+      <div id="portalRequestMsg" class="portal-msg" role="status" aria-live="polite" hidden></div>
+
+      <p class="portal-fine">
+        <span class="lang-es" lang="es">Acceso seguro. El enlace de correo expira en 15 minutos y es de un solo uso.</span>
+        <span class="lang-en" lang="en">Secure access. The email link expires in 15 minutes and can be used once.</span>
+      </p>
+    </div>
+  </section>
+
+  <!-- App (tab router) -->
+  <section id="portalApp" hidden>
+    <div class="portal-appbar">
+      <div>
+        <p class="eyebrow" id="portalGreeting"></p>
+        <h1 class="t-h3" style="margin:0;">
+          <span class="lang-es" lang="es">Bienvenido</span>
+          <span class="lang-en" lang="en">Welcome</span>
+        </h1>
+      </div>
+      <span class="portal-user" id="portalUserEmail"></span>
+    </div>
+    <nav class="portal-tabs" id="portalTabs" role="tablist"></nav>
+    <div class="portal-panel" id="portalPanel" role="tabpanel"></div>
+  </section>
+
+</main>
+
+<!-- Google/Firebase leg: verifies on the client, but the portal session is issued
+     by /api/portal-session (the Firebase token is never used as the session). The
+     bridge shares window.PortalSession with portal.js. -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut,
+  setPersistence, browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAwgKBDAsDb51tZor9vFWo8AnOho5HFPyU",
+  authDomain: "estar-4d0da.firebaseapp.com",
+  projectId: "estar-4d0da",
+  storageBucket: "estar-4d0da.firebasestorage.app",
+  messagingSenderId: "625515728348",
+  appId: "1:625515728348:web:a7cac6610f61e71018d319",
+  measurementId: "G-9LHX50PT8E"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
+setPersistence(auth, browserLocalPersistence).catch(function () {});
+
+window.PortalSession = window.PortalSession || {};
+window.PortalSession.firebaseSignIn = function () {
+  return signInWithPopup(auth, provider).then(function (cred) { return cred.user.getIdToken(); });
+};
+window.PortalSession.firebaseSignOut = function () {
+  try { return signOut(auth); } catch (e) { /* noop */ }
+};
+</script>
+
+</body>
+</html>

@@ -139,6 +139,30 @@
   to = "/admin"
   status = 301
 
+# Portal Estar (empresas / residentes) — clean access URLs. The pages ship as
+# portal.html / en/portal.html; these rewrites serve them at /portal and
+# /en/portal without exposing the .html. Gated OFF at runtime (PORTAL_ENABLED);
+# a disabled portal just renders its "próximamente" state.
+[[redirects]]
+  from = "/portal"
+  to = "/portal.html"
+  status = 200
+
+[[redirects]]
+  from = "/en/portal"
+  to = "/en/portal.html"
+  status = 200
+
+# Portal Estar API (all gated OFF by their own flags — PORTAL_ENABLED /
+# CREDIT_ENABLED / PAGARE_ESIGN_ENABLED / COLLECTIONS_ENABLED). These are
+# reached through the generic /api/* rewrite below — no dedicated rule needed.
+# Endpoints & backing functions (verified to exist):
+#   /api/portal-session   → portal-session.js   (magic-link + Google session)
+#   /api/portal-company   → portal-company.js   (empresa: cotizaciones/cartera/facturas/pedidos)
+#   /api/portal-resident  → portal-resident.js  (residente: estado de cuenta + pedidos/PQR)
+#   /api/credit-enroll    → credit-enroll.js    (solicitud de crédito, gated CREDIT_ENABLED)
+#   /api/pagare-sign      → pagare-sign.js       (firma de pagaré, gated PAGARE_ESIGN_ENABLED)
+#   /api/collections-run  → collections-run.js   (gestión de cobranza, gated COLLECTIONS_ENABLED)
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
@@ -226,6 +250,20 @@
 
 [[headers]]
   for = "/en/datos-cuenta.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, no-cache, must-revalidate"
+
+# Portal Estar: serves client account data (cartera, facturas, crédito — PII
+# financiera, Ley 1266/1581). Keep it out of search and out of any cache.
+[[headers]]
+  for = "/portal.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, no-cache, must-revalidate"
+
+[[headers]]
+  for = "/en/portal.html"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow, noarchive"
     Cache-Control = "no-store, no-cache, must-revalidate"

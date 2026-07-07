@@ -229,7 +229,7 @@ Panel functions migrated to the new `authorize` layer (per-permission gate, env-
 | `_quotes-store` | Quote persistence, tax math (IVA 19%, INC 8%), hold management |
 | `_payments` | Payment status tracking, webhook event logging |
 | `_email` | Email template rendering (Resend) — shared brand shell; includes `cancellationConfirmedHtml`/`adminCancellationHtml` (cancellations), `accessCodesHtml` (lock codes), `preArrivalHtml`/`postStayHtml` (with optional NPS link) |
-| `_permissions` | Authorization catalogue: 22 atomic `recurso.accion` permissions + default roles (`admin`/`recepcion`/`cocina`/`tesoreria`). Pure module (no I/O); single source of truth for what can be done |
+| `_permissions` | Authorization catalogue: atomic `recurso.accion` permissions (incl. `portal.view`/`credito.ver`/`credito.aprobar`/`cobranza.gestionar`) + default roles (`admin`/`recepcion`/`cocina`/`tesoreria`). Pure module (no I/O); single source of truth for what can be done |
 | `_iam-store` | Users/roles persistence in Netlify Blobs (`iam` store: `user/<email>`, `role/<id>`). Additive to env vars; empty (falls back to env) without Blobs |
 | `_authz` | `authorize(event, permission)` drop-in guard. Identity stays 100% Firebase; resolves email → effective permissions across env vars (`ADMIN_EMAILS`/`STAFF_EMAILS` = break-glass superusers) + the iam store. Demo grant only locally (never on a Netlify deploy) |
 | `_settings` | `flag(key)`/`get(key, fallback)` for panel-managed config: Blobs override (`app-settings` store) → `process.env` fallback, ~30s cache. **Whitelist (`MANAGEABLE`) that never admits secrets**; 17+ manageable toggles |
@@ -290,6 +290,29 @@ The `/admin` panel adds an **authorization** layer on top of the existing Fireba
 ### Door locks (TTLock)
 
 `_ttlock` is a mock-safe TTLock Open Platform client (`TTLOCK_ENABLED` + `TTLOCK_*`) that can mint per-reservation temporary keyboard PINs; the email template (`accessCodesHtml`) already exists. Off by default; never breaks check-in.
+
+### Portal Estar (`/portal`) — gated OFF
+
+Self-service client portal with **two profiles**, entirely **rollback/OFF by default** (umbrella flag `PORTAL_ENABLED`). Pages ship as `portal.html` + `/en/portal.html` (served at `/portal` and `/en/portal`, both `noindex`/`no-store`) with `portal.js`; blueprint in `docs/plan-portal-estar.md`.
+
+- **Two profiles:** **empresa** (B2B corporate — quotes, cartera/aging, facturas, pedidos) and **residente** (extended-stay — estado de cuenta, service orders, PQR, and the optional credit track).
+- **Auth (its OWN audience, NOT Firebase staff):** the portal mints a **self-signed HMAC session token** (`portal-session.js`, same 2-part `base64url(payload).sig` shape as the guest app) via **magic-link** (short-TTL email token exchanged for a full session) or **Google/Firebase login** (verify the client's Firebase ID token server-side, then mint the portal token). Secret is `PORTAL_SESSION_SECRET` — **separate** from `GUEST_APP_TOKEN_SECRET` to keep token audiences isolated. Data functions gate with `requirePortalSession(event)`, never `_authz.authorize` (that is the staff/admin carril). No OTASync/Odoo credentials reach the client.
+- **Credit is human-in-the-loop (Ley 1266):** the AI only **extracts signals** and **recommends** (`aprobar`/`requiere_codeudor`/`rechazar` with justification); the decision is ALWAYS a human with the `credito.aprobar` permission. Financial PII (extractos, DataCrédito, pagaré) is encrypted at rest with `_crypto-vault` `seal()`/`open()` (AAD bound to the record) and requires explicit recorded consent.
+- **Collections (`COLLECTIONS_ENABLED`):** mora interest with a **hard ceiling at the vigente usura rate** (never above); collection fees are a **cumulative fixed amount per gesture actually performed** (each WhatsApp/call/letter adds its configured fixed cost, default 0 — itemized, never a % of balance). **A single identified number per channel, no number rotation** (compliance decision); opt-out + allowed-hours enforced by the engine. Collections clausulado pending lawyer review.
+- **Admin oversight:** the `portal.view` permission (granted to `recepcion` and `tesoreria`) lets staff supervise the portal from `/admin`; `credito.ver`/`credito.aprobar`/`cobranza.gestionar` gate the credit and collections staff actions.
+
+New atomic permissions: `portal.view`, `credito.ver`, `credito.aprobar`, `cobranza.gestionar`. New manageable flags (all OFF, non-secret): `PORTAL_ENABLED`, `CREDIT_ENABLED`, `PAGARE_ESIGN_ENABLED`, `DATACREDITO_ENABLED`, `COLLECTIONS_ENABLED`.
+
+| Function | Purpose |
+|---|---|
+| `portal-session` | **Gated OFF (`PORTAL_ENABLED`).** Issues/verifies the portal's own signed session token: `request` sends a magic link (short-TTL token), `verify` exchanges it (or a Firebase ID token) for a full session. Rate-limited, uniform no-enumeration responses. Exports `requirePortalSession` — the trust boundary every `portal-*` data function calls |
+| `portal-company` | **Gated OFF (`PORTAL_ENABLED`).** Empresa profile (GET): the company's cotizaciones (filtered by NIT/email, `toPublic`) + cartera aging/buckets + facturas + pedidos via `_odoo.getCartera`/`getInvoices`/`getOrders`. Requires `session.profile==='empresa'` |
+| `portal-resident` | **Gated OFF (`PORTAL_ENABLED`).** Residente profile: GET estado de cuenta (`_odoo.getCartera`+`getInvoices`, read-only); POST routes service orders (aseo extra → Kunas folio, gated `GUEST_SERVICE_FOLIO_ENABLED`), reservation changes, and PQR (`HELPDESK_ENABLED`). Requires `session.profile==='residente'` |
+| `credit-enroll` | **Gated OFF (`CREDIT_ENABLED`).** Residente credit application: explicit Ley 1266 consent (channel+server timestamp), PDFs encrypted at rest (`_crypto-vault.seal`), runs `_credit-analysis` signal extraction + recommendation, stores a `pendiente_revision` application in Blobs (`credit-applications`). Never approves — a human with `credito.aprobar` decides; recommendation is not leaked to the applicant |
+| `pagare-sign` | **Gated OFF (`PAGARE_ESIGN_ENABLED`).** Electronic pagaré signing: builds the título-valor from `_pagare`, seals HMAC signing evidence, encrypts at rest, applies the usura ceiling (`TASA_USURA_ANUAL`). `PAGARE_PROVIDER` = `own` (HMAC) \| `external` (stub). Clausulado pending lawyer review |
+| `collections-run` | **Gated OFF (`COLLECTIONS_ENABLED`).** Staff-triggered collections (`authorize(event,'cobranza.gestionar')`): mora interest capped at usura + cumulative itemized per-gesture fees, allowed-hours + opt-out, WhatsApp template / voice escalation. No number rotation |
+
+**Shared modules (portal):** `portal-session.js` also exports `verifyPortalSession`/`signSessionToken`/`resolvePortalIdentity` (identity resolver is a stub → replace with Odoo `res.partner`). `_credit-analysis` (pure `evaluateCreditRecommendation` + Claude-backed `extractCreditSignals`, mock-safe), `_pagare` (pagaré template/checklist + `own`/`external`/DataCrédito interfaces), `_datacredito` (v1 **manual** ingest/report — encrypts at rest, only enqueues an ops task, **never reports on its own**), `_collections` (pure mora/fee math + gesture log). All mock-safe, never throw, OFF by default. `_odoo` gained read-only `getCartera`/`getInvoices`/`getOrders`/`resolvePartnerId` (mock-safe) for the empresa profile.
 
 ### Scheduled functions
 
@@ -457,6 +480,53 @@ NPS_ENABLED=             # 'true' to link the NPS survey in the post-stay email
 NPS_SURVEY_URL=          # optional override for the survey URL
 ```
 
+**Portal Estar (gated OFF — see `docs/plan-portal-estar.md`):**
+```
+# Portal shell + own signed session (secret is portal-specific, NOT the guest secret)
+PORTAL_ENABLED=              # 'true' activates the portal (default OFF; panel-manageable)
+PORTAL_SESSION_SECRET=       # SECRET — HMAC signing key for the portal session token (Netlify only)
+PORTAL_SESSION_TTL_SECONDS=  # optional (default 24h)
+PORTAL_BASE_URL=             # optional — absolute magic-link origin (falls back to GUEST_APP_BASE_URL / request host)
+PORTAL_EMPRESA_EMAILS=       # optional — emails resolved to the 'empresa' profile (Odoo resolver stub)
+PORTAL_EMPRESA_NIT_JSON=     # optional — JSON email→NIT map when the token lacks a nit claim
+PORTAL_DRIVE_FOLDER_ID=      # optional — default Drive folder for empresa docs
+PORTAL_DRIVE_FOLDER_JSON=    # optional — JSON NIT/email→folderId map
+PORTAL_RESIDENT_RESERVATION_JSON= # optional — JSON email→id_reservations (locate the residente folio)
+# FIREBASE_PROJECT_ID (already above) powers the Google login leg;
+# GUEST_APP_DATA_ENCRYPTION_KEY (already above) encrypts portal financial PII at rest.
+
+# Credit (AI recommends, a human with credito.aprobar decides)
+CREDIT_ENABLED=              # 'true' activates credit applications (default OFF; panel-manageable)
+CREDIT_AI_MODEL=             # optional — Claude model for signal extraction (reuses ANTHROPIC_API_KEY)
+CREDIT_AI_MAX_TOKENS=        # optional
+CREDIT_AI_TIMEOUT_MS=        # optional
+
+# Pagaré (clausulado pending lawyer review)
+PAGARE_ESIGN_ENABLED=        # 'true' enables pagaré signing (default OFF; panel-manageable)
+PAGARE_PROVIDER=own          # own (HMAC) | external (stub)
+PAGARE_SIGN_SECRET=          # SECRET — seals the HMAC signing-evidence receipt (Netlify only)
+PAGARE_PROVIDER_API_KEY=     # SECRET — external e-sign provider (only if external)
+PAGARE_PROVIDER_URL=         # optional — external provider URL
+PAGARE_DEMO_MODE=            # optional — sign without secrets (local/dev)
+TASA_USURA_ANUAL=            # optional — vigente usura rate E.A. (hard ceiling on mora); update monthly
+
+# DataCrédito (v1 MANUAL — never reports on its own)
+DATACREDITO_ENABLED=         # 'true' enables manual report prep (default OFF; panel-manageable)
+DATACREDITO_API_URL=         # future — operator URL (API/RPA not implemented)
+DATACREDITO_API_KEY=         # future SECRET — operator key (Netlify only)
+
+# Collections (mora capped at usura; cumulative per-gesture fees; no number rotation)
+COLLECTIONS_ENABLED=             # 'true' activates the collections engine (default OFF; panel-manageable)
+COLLECTIONS_TASA_USURA_MENSUAL= # optional — monthly usura fraction (e.g. 0.026); HARD ceiling (unset ⇒ mora 0)
+COLLECTIONS_COST_WHATSAPP=0      # optional — fixed COP cost per WhatsApp gesture (cumulative, itemized; default 0)
+COLLECTIONS_COST_LLAMADA=0       # optional — fixed COP cost per call (default 0)
+COLLECTIONS_COST_CARTA=0         # optional — fixed COP cost per letter (default 0)
+COLLECTIONS_MAX_INTENTOS=        # optional (default 5)
+COLLECTIONS_HOUR_START=          # optional — allowed-contact window start (default 7)
+COLLECTIONS_HOUR_END=            # optional — allowed-contact window end (default 19)
+COLLECTIONS_WA_TEMPLATE=         # optional — pre-approved Meta template for first out-of-window contact
+```
+
 **Misc:**
 ```
 ALLOWED_ORIGIN=http://localhost:8888
@@ -464,7 +534,7 @@ PROXY_URL=
 DEBUG=
 ```
 
-Most Carril-A toggles above (e.g. `DISCOUNT_CODES_ENABLED`, `REFUND_GATEWAY_AUTO_ENABLED`, `STAY_EMAILS_*`, `HELPDESK_ENABLED`, `NPS_ENABLED`, `TTLOCK_ENABLED`, `WHATSAPP_BOT_ENABLED`) are also manageable from the **Configuración** tab in `/admin`, which overrides the env var at runtime (~30s, no redeploy). Secrets are never manageable from the panel.
+Most Carril-A toggles above (e.g. `DISCOUNT_CODES_ENABLED`, `REFUND_GATEWAY_AUTO_ENABLED`, `STAY_EMAILS_*`, `HELPDESK_ENABLED`, `NPS_ENABLED`, `TTLOCK_ENABLED`, `WHATSAPP_BOT_ENABLED`, and the Portal Estar flags `PORTAL_ENABLED`/`CREDIT_ENABLED`/`PAGARE_ESIGN_ENABLED`/`DATACREDITO_ENABLED`/`COLLECTIONS_ENABLED`) are also manageable from the **Configuración** tab in `/admin`, which overrides the env var at runtime (~30s, no redeploy). Secrets are never manageable from the panel.
 
 **Wompi configuration notes:**
 - Register Wompi events against `/api/wompi-webhook`; use the Wompi events secret as `WOMPI_WEBHOOK_SECRET`

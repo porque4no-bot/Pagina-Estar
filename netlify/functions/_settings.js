@@ -91,7 +91,47 @@ const MANAGEABLE = {
   LEGAL_DOCS_ENABLED:            { type: 'bool', group: 'Recepción/Legal', label: 'Registro de documentos legales',
                                    desc: 'Muestra el registro de documentos legales de la empresa (RUT, RNT, Cámara de Comercio, certificaciones bancarias) con alertas de vigencia. Lee la carpeta de Google Drive configurada.' },
   LEGAL_DOCS_REQUEST_CONTACT:    { type: 'text', group: 'Recepción/Legal', label: 'Contacto para solicitar documentos',
-                                   desc: 'Número o correo que aparece en la alerta cuando un documento está vencido o por vencer ("solicítalo a …"). Por ahora, el número de gerencia (primer número de escalamiento).' }
+                                   desc: 'Número o correo que aparece en la alerta cuando un documento está vencido o por vencer ("solicítalo a …"). Por ahora, el número de gerencia (primer número de escalamiento).' },
+  // Portal Estar (empresas / residentes) — TODO gated OFF por defecto.
+  // Solo los interruptores booleanos NO secretos son gestionables aquí. Los
+  // secretos (PORTAL_SESSION_SECRET, PAGARE_SIGN_SECRET, DATACREDITO_API_KEY, …)
+  // viven SOLO en Netlify y jamás entran a la lista blanca.
+  PORTAL_ENABLED:                { type: 'bool', group: 'Portal Estar', label: 'Portal de clientes (empresas / residentes)',
+                                   desc: 'Activa el Portal Estar: login por magic-link o Google, estado de cuenta, cotizaciones, facturas y pedidos. Off por defecto. Requiere PORTAL_SESSION_SECRET en Netlify.' },
+  CREDIT_ENABLED:                { type: 'bool', group: 'Portal Estar', label: 'Solicitudes de crédito',
+                                   desc: 'Habilita la solicitud de crédito del residente (consentimiento Ley 1266 + carga de documentos cifrados). La IA solo emite una recomendación; la aprobación la hace SIEMPRE una persona con permiso "Aprobar crédito". Off por defecto.' },
+  PAGARE_ESIGN_ENABLED:          { type: 'bool', group: 'Portal Estar', label: 'Firma electrónica de pagaré',
+                                   desc: 'Permite firmar electrónicamente el pagaré desde el portal. Clausulado pendiente de revisión legal — NO encender en producción sin visto bueno del abogado. Off por defecto.' },
+  DATACREDITO_ENABLED:           { type: 'bool', group: 'Portal Estar', label: 'Reporte a DataCrédito (manual)',
+                                   desc: 'Habilita el registro/preparación de reportes a DataCrédito (v1 manual: encola una tarea para cargar a mano, nunca reporta solo). Requiere base legal y aviso previo al titular (Ley 1266). Off por defecto.' },
+  COLLECTIONS_ENABLED:           { type: 'bool', group: 'Portal Estar', label: 'Motor de cobranza',
+                                   desc: 'Activa las gestiones de cobranza (recordatorios por WhatsApp/correo/llamada). Interés de mora con techo en la usura vigente; costos de cobranza acumulativos por gestión efectuada. Clausulado pendiente de abogado. Off por defecto.' },
+  // Cobranza — parámetros gestionables (convención #13). NINGUNO es secreto: son
+  // topes legales, costos fijos y ventanas horarias que cambian sin redeploy.
+  COLLECTIONS_TASA_USURA_MENSUAL:{ type: 'number', group: 'Portal Estar', label: 'Tope de mora: tasa de usura mensual (%)',
+                                   desc: 'TECHO DURO del interés de mora, en % mensual, según la usura vigente que certifica la Superfinanciera. Actualízalo cada mes: el sistema NUNCA cobra mora por encima de este valor. Si se deja en 0, no se calcula mora.' },
+  COLLECTIONS_COST_WHATSAPP:     { type: 'number', group: 'Portal Estar', label: 'Costo de cobranza por WhatsApp (COP)',
+                                   desc: 'Costo fijo, en pesos, que suma CADA WhatsApp de cobranza realmente enviado (monto acumulativo por gestión efectuada, NO un porcentaje del saldo). Se itemiza y registra. Default 0.' },
+  COLLECTIONS_COST_LLAMADA:      { type: 'number', group: 'Portal Estar', label: 'Costo de cobranza por llamada (COP)',
+                                   desc: 'Costo fijo, en pesos, que suma CADA llamada de cobranza realmente hecha (monto acumulativo por gestión efectuada, NO un porcentaje del saldo). Se itemiza y registra. Default 0.' },
+  COLLECTIONS_COST_CARTA:        { type: 'number', group: 'Portal Estar', label: 'Costo de cobranza por carta (COP)',
+                                   desc: 'Costo fijo, en pesos, que suma CADA carta de cobranza realmente emitida (monto acumulativo por gestión efectuada, NO un porcentaje del saldo). Se itemiza y registra. Default 0.' },
+  COLLECTIONS_MAX_INTENTOS:      { type: 'number', group: 'Portal Estar', label: 'Máximo de gestiones de cobranza',
+                                   desc: 'Cuántas gestiones de contacto se permiten por deudor antes de detenerse. Default 5.' },
+  COLLECTIONS_HOUR_START:        { type: 'number', group: 'Portal Estar', label: 'Hora de inicio para contactar (0-23)',
+                                   desc: 'Hora más temprana (formato 24h) a la que se puede contactar al deudor. Fuera de la franja NO se envía ni se cobra ninguna gestión. Default 7.' },
+  COLLECTIONS_HOUR_END:          { type: 'number', group: 'Portal Estar', label: 'Hora de fin para contactar (0-23)',
+                                   desc: 'Hora más tardía (formato 24h) a la que se puede contactar al deudor. Fuera de la franja NO se envía ni se cobra ninguna gestión. Default 19.' },
+  COLLECTIONS_DEDUP_WINDOW_HOURS:{ type: 'number', group: 'Portal Estar', label: 'Ventana anti-doble-cobro (horas)',
+                                   desc: 'Horas durante las cuales NO se repite una gestión de la misma etapa/canal (evita contactar y cobrar dos veces al mismo deudor). Default 24.' },
+  COLLECTIONS_WA_TEMPLATE:       { type: 'text', group: 'Portal Estar', label: 'Plantilla de WhatsApp para cobranza',
+                                   desc: 'Nombre de la plantilla PRE-APROBADA en Meta que se usa para las gestiones de cobranza por WhatsApp fuera de la ventana de 24h. Es el nombre de la plantilla, NO un secreto. Default cobranza_recordatorio.' }
+  // NOTA (plan §9): NO se añaden PORTAL_EMPRESA_ENABLED / PORTAL_RESIDENTE_ENABLED.
+  // Ninguna función los lee: portal-company.js, portal-resident.js y portal-session.js
+  // gatean SOLO con flag('PORTAL_ENABLED'). PORTAL_ENABLED es el interruptor umbrella
+  // único; exponer sub-flags gestionables que nada consume crearía controles falsos en
+  // el panel. Si en el futuro se separa el gating por audiencia, se añaden aquí junto
+  // con el gate real en cada función.
 };
 
 function isManageable(key) { return Object.prototype.hasOwnProperty.call(MANAGEABLE, String(key || '')); }
