@@ -27,12 +27,14 @@ function floatAfter(pattern) {
 }
 
 test('reservar.html calcTotal extras math matches _pricing', () => {
-  // lines.push({key:'desayuno',amount:20000*search.guests*nights})
-  assert.equal(numberAfter(/extras\.desayuno\)lines\.push\(\{key:'desayuno',amount:(\d+)\*search\.guests/),
+  // const desayunoSub = extras.desayuno ? 20000*search.guests*nights : 0
+  assert.equal(numberAfter(/desayunoSub = extras\.desayuno \? (\d+)\*search\.guests/),
     EXTRAS_PRICES.desayuno.price, 'desayuno price drifted between front-end and server');
-  // late check-out = 15% of the base nightly
-  assert.equal(floatAfter(/extras\.late\)lines\.push\(\{key:'late',amount:Math\.round\(base\*([\d.]+)\)/),
+  // const lateSub = extras.late ? Math.round(base*0.15) : 0
+  assert.equal(floatAfter(/lateSub = extras\.late \? Math\.round\(base\*([\d.]+)\)/),
     EXTRAS_PRICES.late.pct, 'late pct drifted');
+  // desayuno tributa INC 8% (no IVA 19%) — decisión dueño; verifica el % en calcTotal
+  assert.equal(floatAfter(/const inc=Math\.round\(desayunoSub\*([\d.]+)\)/), 0.08, 'INC del desayuno debe ser 8%');
   // early check-in ya NO se vende en el motor (solo en el check-in) → no se valida aquí.
   // mascota = flat charge (VAT included)
   assert.equal(numberAfter(/extras\.mascota\?(\d+)/),

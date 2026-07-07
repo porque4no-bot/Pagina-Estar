@@ -564,19 +564,25 @@
     const nightly=rate==='best'?room.priceFlexible:Math.round(room.priceFlexible*1.10);
     const base=room.priceFlexible;            /* percentages use the base (Best Price) nightly */
     const roomSub=nightly*nights;
-    /* taxable extras (subject to VAT) */
-    const lines=[];
-    if(extras.desayuno)lines.push({key:'desayuno',amount:20000*search.guests*nights});
-    if(extras.late)lines.push({key:'late',amount:Math.round(base*0.15)});
+    /* Taxes (estimate settled at reception; the online charge excludes them):
+       - VAT 19% on room + late check-out.
+       - Consumption tax (INC) 8% on breakfast (NOT VAT; foreigners are NOT exempt
+         from it, unlike accommodation VAT). Owner decision 2026-07. */
+    const desayunoSub = extras.desayuno ? 20000*search.guests*nights : 0;
+    const lateSub = extras.late ? Math.round(base*0.15) : 0;
     /* early check-in is no longer charged in the engine (only at check-in) */
+    const lines=[];
+    if(extras.desayuno)lines.push({key:'desayuno',amount:desayunoSub});
+    if(extras.late)lines.push({key:'late',amount:lateSub});
     const exTaxable=lines.reduce((s,l)=>s+l.amount,0);
-    /* pet: $200k VAT-included → counts toward the online charge but not the VAT base */
+    /* pet: $200k VAT-included → counts toward the online charge but not the tax base */
     const mascotaSub=extras.mascota?200000:0;
     if(extras.mascota)lines.push({key:'mascota',amount:200000});
-    const taxable=roomSub+exTaxable;
-    const iva=Math.round(taxable*.19);
-    const sub=taxable+mascotaSub;             /* online charge today (VAT excluded) */
-    return{nights,nightly,roomSub,extrasSub:exTaxable+mascotaSub,mascotaSub,taxable,subtotal:sub,iva,total:sub+iva,extrasLines:lines};
+    const ivaBase=roomSub+lateSub;
+    const iva=Math.round(ivaBase*0.19);
+    const inc=Math.round(desayunoSub*0.08);
+    const sub=roomSub+exTaxable+mascotaSub;   /* online charge today (taxes excluded) */
+    return{nights,nightly,roomSub,extrasSub:exTaxable+mascotaSub,mascotaSub,ivaBase,taxable:ivaBase,subtotal:sub,iva,inc,total:sub+iva+inc,extrasLines:lines};
   }
 </script>
 <script src="../motor-app.js"></script>

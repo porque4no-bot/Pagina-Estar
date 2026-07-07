@@ -690,19 +690,25 @@
     const nightly=rate==='best'?room.priceFlexible:Math.round(room.priceFlexible*1.10);
     const base=room.priceFlexible;            /* los % usan la noche base (Best Price) */
     const roomSub=nightly*nights;
-    /* extras gravables (entran al IVA) */
-    const lines=[];
-    if(extras.desayuno)lines.push({key:'desayuno',amount:20000*search.guests*nights});
-    if(extras.late)lines.push({key:'late',amount:Math.round(base*0.15)});
+    /* Impuestos (estimación a liquidar en recepción; el cobro online va sin ellos):
+       - IVA 19% sobre alojamiento + late check-out.
+       - INC 8% sobre el desayuno (impuesto al consumo, NO IVA; NO se exime a
+         extranjeros como sí el IVA de alojamiento). Decisión dueño 2026-07. */
+    const desayunoSub = extras.desayuno ? 20000*search.guests*nights : 0;
+    const lateSub = extras.late ? Math.round(base*0.15) : 0;
     /* early check-in ya no se cobra en el motor (solo en el check-in) */
+    const lines=[];
+    if(extras.desayuno)lines.push({key:'desayuno',amount:desayunoSub});
+    if(extras.late)lines.push({key:'late',amount:lateSub});
     const exTaxable=lines.reduce((s,l)=>s+l.amount,0);
-    /* mascota: $200k IVA incluido → entra al cobro online pero no a la base de IVA */
+    /* mascota: $200k IVA incluido → entra al cobro online pero no a la base de impuestos */
     const mascotaSub=extras.mascota?200000:0;
     if(extras.mascota)lines.push({key:'mascota',amount:200000});
-    const taxable=roomSub+exTaxable;
-    const iva=Math.round(taxable*.19);
-    const sub=taxable+mascotaSub;             /* cobro online de hoy (sin IVA) */
-    return{nights,nightly,roomSub,extrasSub:exTaxable+mascotaSub,mascotaSub,taxable,subtotal:sub,iva,total:sub+iva,extrasLines:lines};
+    const ivaBase=roomSub+lateSub;
+    const iva=Math.round(ivaBase*0.19);
+    const inc=Math.round(desayunoSub*0.08);
+    const sub=roomSub+exTaxable+mascotaSub;   /* cobro online de hoy (sin impuestos) */
+    return{nights,nightly,roomSub,extrasSub:exTaxable+mascotaSub,mascotaSub,ivaBase,taxable:ivaBase,subtotal:sub,iva,inc,total:sub+iva+inc,extrasLines:lines};
   }
 </script>
 <script src="motor-app.js"></script>
