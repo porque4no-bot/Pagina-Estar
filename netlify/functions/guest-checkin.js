@@ -328,6 +328,7 @@ exports._test = {
   normalizeDocumentType,
   normalizeSex,
   validateGuest,
+  validateGuests,
   isForeignGuest,
   normalizeMarketingConsent,
   normalizeGuestEntry,
@@ -702,6 +703,17 @@ function validateGuests(entries) {
   const missing = perGuest.flatMap(result =>
     result.missing.map(field => `guests.${result.index}.${field}`)
   );
+  /* A-20: un mismo documento NO puede referenciarse para varios huéspedes
+     no-menores. fileFromDraftRef solo valida propiedad de la key, no unicidad, así
+     que sin esto se podían crear N registros con una sola imagen. */
+  const seenDocKeys = new Map();
+  entries.forEach((entry, index) => {
+    if (entry && entry.isMinor) return;
+    const key = entry && entry.documentRef && entry.documentRef.key;
+    if (!key) return;
+    if (seenDocKeys.has(key)) missing.push(`guests.${index}.documentoDuplicado`);
+    else seenDocKeys.set(key, index);
+  });
   const warnings = perGuest.flatMap(result =>
     result.warnings.map(warning => `Huésped ${result.index + 1}: ${warning}`)
   );
