@@ -56,6 +56,7 @@ Root HTML pages (Spanish, canonical):
 | `cotizar-admin.html` | Admin panel — served at **`/admin`** (rewrite). Tabs: **Hoy** (day board, `staff-today`), quotes, refunds, and **breakfast** (embeds `desayuno-admin.html` in an iframe), códigos, usuarios, configuración. noindex |
 | `desayuno.html` | Staff: breakfast-pass verifier — scan/lookup a reservation, mark breakfast served, + cycle/day served counts (noindex) |
 | `desayuno-admin.html` | Admin: breakfast money analytics + day board ("día de desayunos") + per-reservation lookup with courtesy action (noindex). Embedded as the **Desayunos** tab of `/admin`; `/desayuno-admin` redirects there |
+| `aseo.html` | Staff: cleaning quality control — housekeeper photographs each checklist item (bed, bathroom, kitchen…) and an AI vision audit validates the photo (well-taken + cleanliness) before accepting it (noindex) |
 | `privacidad.html` / `aviso-legal.html` / `cancelacion.html` / `cookies.html` / `escnna.html` | Legal |
 | `404.html` | Error page |
 
@@ -201,6 +202,13 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | `upload-drive-credentials` | Service account credential upload (admin) |
 | `drive-probe` | Health check for Google Drive integration |
 
+**Cleaning quality control (control de aseo):**
+
+| Function | Purpose |
+|---|---|
+| `cleaning-checklist` | Returns the cleaning checklist items (bed, bathroom, kitchen, living area, towels) for the staff panel (`aseo.html`). Single source is `_cleaning-audit.CHECKLIST`. Staff auth. |
+| `validate-cleaning-photo` | Audits a housekeeping photo with Claude vision against the item's rubric, then applies a **hybrid** decision **in code** (not the prompt): `rechazada` (photo poorly taken or clearly not the subject → hard block, not stored), `advertida` (cleanliness issues → stored with the observations, does not block), `aprobada`. On accept, stores the image to Google Drive (`aseo/<date>/<apartment>/`) **and** Netlify Blobs (`cleaning-photos`), plus the verdict/metadata to Blobs (`cleaning-audits`). Staff auth. |
+
 **WhatsApp chatbot (Meta Cloud API):**
 
 | Function | Purpose |
@@ -244,6 +252,8 @@ Panel functions migrated to the new `authorize` layer (per-permission gate, env-
 | `_pdf-render` | PDFKit server-side PDF rendering |
 | `_quote-audit` | Audit log storage and retrieval |
 | `_google-drive` | Google Drive API integration (service account) |
+| `_cleaning-audit` | Cleaning-photo AI audit: the checklist (`CHECKLIST`) + `auditPhoto` (Claude vision, forced tool for structured output; mock verdict without `ANTHROPIC_API_KEY`) + `evaluateDecision` (hybrid decision **in code**: rechazada/advertida/aprobada) |
+| `_cleaning-store` | Cleaning-audit persistence in Blobs: verdict/metadata (`cleaning-audits`) + image bytes backup (`cleaning-photos`), keyed `${apartmentSlug}:${item}:${YYYY-MM-DD}` (retake overwrites) |
 | `_firebase-auth` | Firebase authentication for admin pages |
 | `_rate-limit` | Request rate limiting |
 | `_odoo` | Odoo connector (ERP/CRM) — JSON-RPC, mock no-op sin credenciales. **Fase 1** *maestro de clientes*: `upsertPartner` crea/encuentra un `res.partner` deduplicado por NIT/email y lo enriquece (`country_id`/`lang`/`comment` + campos `x_estar_*`: canal, ultimo_checkout, noches_total, presupuesto, motivo_viaje, perfil, escritos solo si existen en la instancia) + `markLeadWonByQuote`/`markLeadLost` (desde `revalidate-quotes`). **Fase 2** captación: `addToMailingList` (Email Marketing) y leads de newsletter/contacto (vía `submission-created`). **Fase 4** PQR: `createHelpdeskTicket` (desde `guest-action`, team id 3). NPS post-estadía (Fase 3) va en el correo. Plan: `docs/plan-integracion-odoo-otasync.md` |
@@ -456,6 +466,16 @@ HELPDESK_TEAM_ID=        # Helpdesk team id (default 3)
 NPS_ENABLED=             # 'true' to link the NPS survey in the post-stay email
 NPS_SURVEY_URL=          # optional override for the survey URL
 ```
+
+**Cleaning quality control (control de aseo — `aseo.html`):**
+```
+ANTHROPIC_API_KEY=        # shared with the WhatsApp bot; unset ⇒ mock verdict (every photo approved)
+CLEANING_AI_MODEL=        # default claude-sonnet-5 (claude-opus-4-8 for max rigor on fine detail)
+CLEANING_AI_TIMEOUT_MS=   # default 30000
+```
+Access is gated by `STAFF_EMAILS`/`ADMIN_EMAILS` (Firebase, same as the breakfast
+panel). Photos are archived to Google Drive when `GOOGLE_DRIVE_FOLDER_ID` +
+service-account are configured; otherwise only the Blobs backup is kept.
 
 **Misc:**
 ```
