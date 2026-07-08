@@ -233,18 +233,33 @@ function isValidEmail(value) {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
 }
 
-/* Resolución de perfil (empresa | residente) — FALLBACK PURO, sin red.
-   Lee la allowlist PORTAL_EMPRESA_EMAILS (coma-separada) y por defecto trata al
-   usuario como 'residente'. Se usa sólo cuando el store maestro `portal-accounts`
-   no tiene la cuenta (o Blobs no está disponible en demo). El resolvedor
-   autoritativo es `resolvePortalAccount` (store-backed). PURO. */
-function resolvePortalIdentity(rawEmail, name) {
-  const mail = normalizeEmail(rawEmail);
-  const empresaList = (process.env.PORTAL_EMPRESA_EMAILS || '')
+function emailList(envVar) {
+  return (process.env[envVar] || '')
     .split(',')
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
-  const profile = empresaList.includes(mail) ? 'empresa' : 'residente';
+}
+
+/* Resolución de perfil (empresa | residente) — FALLBACK PURO, sin red.
+   Lee las allowlists PORTAL_EMPRESA_EMAILS / PORTAL_RESIDENTE_EMAILS. Se usa sólo
+   cuando el store maestro `portal-accounts` no tiene la cuenta (o Blobs no está
+   disponible en demo). El resolvedor autoritativo es `resolvePortalAccount`.
+
+   ENDURECIMIENTO (default-deny en producción): si hay CUALQUIER allowlist
+   configurada, un correo que no esté en ninguna lista ni en el store NO recibe
+   perfil (profile:null) → el handler lo rechaza. Así un correo verificado
+   cualquiera (Google/magic-link) no obtiene sesión de 'residente' por defecto.
+   Sólo cuando NO hay ninguna allowlist (modo demo/rollout local) se conserva el
+   fallback histórico a 'residente' para no romper el flujo de pruebas. PURO. */
+function resolvePortalIdentity(rawEmail, name) {
+  const mail = normalizeEmail(rawEmail);
+  const empresaList = emailList('PORTAL_EMPRESA_EMAILS');
+  const residenteList = emailList('PORTAL_RESIDENTE_EMAILS');
+  const lockdown = empresaList.length > 0 || residenteList.length > 0;
+  let profile;
+  if (empresaList.includes(mail)) profile = 'empresa';
+  else if (residenteList.includes(mail)) profile = 'residente';
+  else profile = lockdown ? null : 'residente';   // default-deny si hay allowlist
   return { email: mail, profile, name: String(name || '').trim().slice(0, 120) };
 }
 
@@ -358,6 +373,13 @@ async function handleRequest(event, body) {
      El correo es best-effort y nunca lanza. */
   try {
     const identity = await resolvePortalAccount(mail);
+    /* Default-deny: no enviamos enlace a un correo sin perfil (no inscrito, con
+       lockdown activo). La respuesta al cliente sigue siendo UNIFORME abajo, así
+       que esto no revela si el correo existe — sólo evita mandarle un correo. */
+    if (!identity || !identity.profile) {
+      if (process.env.DEBUG) console.log('[portal-session] magic link NOT sent (no profile) for', maskEmail(mail));
+      return json(200, { ok: true });   // respuesta UNIFORME (no revela si el correo existe)
+    }
     const jti = crypto.randomBytes(16).toString('hex');
     const token = signToken(
       { sub: identity.email, profile: identity.profile, purpose: PURPOSE_MAGIC, jti },
@@ -429,6 +451,13 @@ async function handleVerify(event, body) {
     identity = await resolvePortalAccount(payload.sub, payload.name);
   } else {
     return json(400, { error: 'missing_identity' });
+  }
+
+  /* Default-deny: si la resolución no asignó perfil (correo no está en ninguna
+     allowlist ni en el store maestro, con lockdown activo) no se emite sesión.
+     Evita que cualquier correo verificado obtenga acceso de 'residente'. */
+  if (!identity || !identity.profile) {
+    return json(403, { error: 'not_enrolled' });
   }
 
   /* El token de sesión lleva, además de la identidad base, los claims de

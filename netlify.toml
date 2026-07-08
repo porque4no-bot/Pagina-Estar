@@ -161,6 +161,7 @@
 #   /api/portal-company   → portal-company.js   (empresa: cotizaciones/cartera/facturas/pedidos)
 #   /api/portal-resident  → portal-resident.js  (residente: estado de cuenta + pedidos/PQR)
 #   /api/credit-enroll    → credit-enroll.js    (solicitud de crédito, gated CREDIT_ENABLED)
+#   /api/credit-decision  → credit-decision.js  (DECISIÓN HUMANA de crédito: credito.ver/credito.aprobar)
 #   /api/pagare-sign      → pagare-sign.js       (firma de pagaré, gated PAGARE_ESIGN_ENABLED)
 #   /api/collections-run  → collections-run.js   (gestión de cobranza, gated COLLECTIONS_ENABLED)
 [[redirects]]

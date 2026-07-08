@@ -231,12 +231,18 @@ Enrolment (cliente, portal)  →  Análisis IA (server)  →  Decisión humana (
    - **La IA NO decide ni reporta.** Solo escribe la recomendación cifrada en
      `portal-credit`; `creditStatus='recommended'`.
 
-3. **Decisión humana — `portal-credit-decision.js`** (`/api/portal-credit-decision`)
-   - `authorize(event, 'credito.aprobar')` (Firebase staff). Flag `CREDIT_ENABLED`.
-   - Un humano ve la recomendación + señales y decide `aprobar`/`rechazar`/
-     `requiere_codeudor`, con cupo y plazo. Se registra actor + timestamp + motivo
-     (auditoría). `creditStatus='approved'|'rejected'`.
-   - **Solo aquí** se habilita un cupo de crédito; jamás automático.
+3. **Decisión humana — `credit-decision.js`** (`/api/credit-decision`) ✅ CONSTRUIDO
+   - `authorize(event, 'credito.aprobar')` (Firebase staff, NO el token del portal).
+     Flag `CREDIT_ENABLED` (inerte OFF).
+   - `GET` = cola de revisión (`credito.ver`): lista `pendiente_revision`, y con
+     `?applicationId=` descifra el análisis (justificación/señales/recomendación) +
+     resumen del solicitante para que el asesor decida; **el acceso al expediente
+     financiero queda auditado** (`credit-audit`).
+   - `POST` = un humano decide `aprobar`/`rechazar`/`requiere_codeudor`. Fija
+     `estado`, registra `revisadoPor`/`revisadoEn` + notas (auditoría append-only) y
+     marca `decididoPorHumano`. La cola nunca expone el sobre cifrado ni los docs.
+   - **Solo aquí** se decide; la IA jamás escribe un estado terminal. (El alta de un
+     cupo/pagaré subsiguiente sigue en `pagare-sign`, pendiente de abogado.)
 
 ### 6.2 Permisos / stores / cifrado
 

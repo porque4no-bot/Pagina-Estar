@@ -51,10 +51,29 @@ test('requirePortalSession lanza 401 con token inválido', () => {
   );
 });
 
-test('resolvePortalIdentity mapea empresa por allowlist (case-insensitive) y residente por defecto', () => {
+test('resolvePortalIdentity mapea empresa/residente por allowlist (case-insensitive)', () => {
+  const prevRes = process.env.PORTAL_RESIDENTE_EMAILS;
+  process.env.PORTAL_RESIDENTE_EMAILS = 'residente@correo.com';
   assert.equal(portal.resolvePortalIdentity('VENTAS@ACME.COM').profile, 'empresa');
   assert.equal(portal.resolvePortalIdentity('otra@empresa.co').profile, 'empresa');
+  assert.equal(portal.resolvePortalIdentity('RESIDENTE@Correo.com').profile, 'residente');
+  if (prevRes === undefined) delete process.env.PORTAL_RESIDENTE_EMAILS; else process.env.PORTAL_RESIDENTE_EMAILS = prevRes;
+});
+
+test('resolvePortalIdentity: default-DENY (profile null) para correo desconocido con allowlist activa', () => {
+  // PORTAL_EMPRESA_EMAILS está seteado ⇒ lockdown activo ⇒ un correo cualquiera NO
+  // obtiene sesión de 'residente' por defecto (endurecimiento de acceso).
+  assert.equal(portal.resolvePortalIdentity('persona@gmail.com').profile, null);
+});
+
+test('resolvePortalIdentity: SIN allowlist (demo/rollout) conserva el fallback a residente', () => {
+  const prevEmp = process.env.PORTAL_EMPRESA_EMAILS;
+  const prevRes = process.env.PORTAL_RESIDENTE_EMAILS;
+  delete process.env.PORTAL_EMPRESA_EMAILS;
+  delete process.env.PORTAL_RESIDENTE_EMAILS;
   assert.equal(portal.resolvePortalIdentity('persona@gmail.com').profile, 'residente');
+  if (prevEmp === undefined) delete process.env.PORTAL_EMPRESA_EMAILS; else process.env.PORTAL_EMPRESA_EMAILS = prevEmp;
+  if (prevRes === undefined) delete process.env.PORTAL_RESIDENTE_EMAILS; else process.env.PORTAL_RESIDENTE_EMAILS = prevRes;
 });
 
 test('resolvePortalIdentity normaliza el correo', () => {
