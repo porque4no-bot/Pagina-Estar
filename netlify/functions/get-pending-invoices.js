@@ -1,5 +1,6 @@
 require('./_env');
 const { authorize } = require('./_authz');
+const { flag } = require('./_settings');
 
 /* GET — borradores de factura pendientes de emitir (facturación electrónica DIAN
    vía Numera). Lee del store de Netlify Blobs 'invoices'. Cada borrador es lo que
@@ -68,10 +69,11 @@ exports.handler = async (event) => {
 
   const status = (event.queryStringParameters || {}).status || null;
   try {
+    const invoicingEnabled = await flag('NUMERA_INVOICING_ENABLED');
     const result = await listInvoiceDrafts();
     let invoices = result.invoices || [];
     if (status) invoices = invoices.filter(inv => String(inv && inv.status || '') === status);
-    return { statusCode: 200, headers, body: JSON.stringify({ invoices, isMock: !!result.isMock }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ invoices, isMock: !!result.isMock, invoicingEnabled }) };
   } catch (e) {
     console.error('[get-pending-invoices]', e.message);
     /* Mock-safe hasta el borde: nunca 5xx por falta de Blobs. */

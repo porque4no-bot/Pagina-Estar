@@ -2053,7 +2053,7 @@ function facMoney(v) {
   return '$' + n.toLocaleString('es-CO');
 }
 async function facAction(action, ref, btn) {
-  if (!ref) return;
+  if (!ref) { alert('No se puede emitir: falta la referencia de la reserva.'); return; }
   const prev = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = 'Emitiendo…'; }
   try {
@@ -2079,6 +2079,7 @@ async function loadFacturacion() {
   const empty = document.getElementById('facEmpty');
   const errEl = document.getElementById('facError');
   const gate = document.getElementById('facGateNote');
+  if (gate) gate.textContent = '';
   wrap.style.display = 'none'; empty.style.display = 'none'; errEl.style.display = 'none';
   loading.style.display = 'block';
   const canIssue = hasPerm('invoices.issue');
@@ -2088,7 +2089,12 @@ async function loadFacturacion() {
     const d = await r.json().catch(() => ({}));
     loading.style.display = 'none';
     if (!r.ok) { errEl.textContent = d.error || ('Error ' + r.status); errEl.style.display = 'block'; return; }
-    if (gate) gate.textContent = d.isMock ? 'La emisión real está desactivada (DRY-RUN / sin credenciales Numera).' : '';
+    if (gate) {
+      const notes = [];
+      if (d.invoicingEnabled === false) notes.push('La emisión real está desactivada (NUMERA_INVOICING_ENABLED); no se emitirá nada.');
+      if (d.isMock) notes.push('No se pudo leer el almacén de borradores (Blobs no disponible); se muestra una lista vacía.');
+      gate.textContent = notes.join(' ');
+    }
     const list = d.invoices || [];
     if (!list.length) { empty.style.display = 'block'; return; }
     const body = document.getElementById('facBody');
@@ -2097,7 +2103,7 @@ async function loadFacturacion() {
       const cliente = it.cliente || it.guestName || it.nombre || it.email || '—';
       const monto = it.total != null ? it.total : (it.monto != null ? it.monto : it.amount);
       const estado = it.estado || it.status || 'borrador';
-      const btn = canIssue
+      const btn = canIssue && ref
         ? '<button type="button" class="btn btn-ghost-dark" style="padding:6px 12px;font-size:11px" data-fac-ref="' + hoyEsc(ref) + '">Emitir</button>'
         : '';
       return '<tr><td>' + hoyEsc(ref) + '</td><td>' + hoyEsc(cliente) + '</td><td>' + facMoney(monto) + '</td><td>' + hoyEsc(estado) + '</td><td style="text-align:right">' + btn + '</td></tr>';
@@ -2127,6 +2133,7 @@ async function loadDocumentos() {
   const empty = document.getElementById('docEmpty');
   const errEl = document.getElementById('docError');
   const gate = document.getElementById('docGateNote');
+  if (gate) gate.textContent = '';
   wrap.style.display = 'none'; empty.style.display = 'none'; errEl.style.display = 'none';
   loading.style.display = 'block';
   try {
