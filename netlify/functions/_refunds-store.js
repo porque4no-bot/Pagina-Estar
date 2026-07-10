@@ -87,7 +87,7 @@ async function recoverPaymentInfo(bookingCode) {
       out.paymentProvider = r.provider || null;
       out.paymentMethod = r.paymentMethod || null;
       out.transactionId = r.transactionId || null;
-      out.originalAmountCents = r.amountInCents || null;
+      out.originalAmountCents = r.amountInCents || r.amountCents || null;
       out.ratePlan = r.ratePlan || null;
     }
   } catch (e) { /* ignore — fall through to durable capture */ }

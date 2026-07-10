@@ -1528,7 +1528,7 @@ exports.handler = async (event, context) => {
             provider: 'wompi',
             bookingCode: decoded.bookingCode,
             transactionId: transaction.id,
-            amountCents: transaction.amount_in_cents,
+            amountInCents: transaction.amount_in_cents,
             createdAt: new Date().toISOString()
           }));
         } catch (_) { /* best-effort */ }

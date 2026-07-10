@@ -590,7 +590,7 @@ async function cancelReservation(idReservations) {
         const rsv = (data && data.reservation) || {};
         const status = rsv.status || (data && data.status) || '';
         const canceledSignal = /cancel/i.test(String(status)) ||
-          !!(rsv.date_canceled || rsv.canceled || (data && data.date_canceled) || (data && data.success === true));
+          !!(rsv.date_canceled || rsv.canceled || (data && data.date_canceled));
         if (!canceledSignal) {
           throw new Error(`delete/delete devolvió 200 sin señal de cancelación (status="${status}")`);
         }
