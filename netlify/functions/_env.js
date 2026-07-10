@@ -6,10 +6,14 @@
 const fs = require('fs');
 const path = require('path');
 
-function loadEnv() {
+function loadEnv(envPath) {
   if (process.env.NODE_ENV === 'production' || process.env.NETLIFY === 'true') return;
+  // node --test define NODE_TEST_CONTEXT en cada proceso de test: la suite
+  // unitaria debe ser determinista e inmune a las credenciales reales del
+  // .env local (mismo resultado que en CI, donde no hay .env).
+  if (process.env.NODE_TEST_CONTEXT) return;
   try {
-    const envPath = path.join(__dirname, '../../.env');
+    envPath = envPath || path.join(__dirname, '../../.env');
     if (!fs.existsSync(envPath)) return;
     fs.readFileSync(envPath, 'utf8').split(/\r?\n/).forEach(line => {
       const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
@@ -28,3 +32,5 @@ function loadEnv() {
 }
 
 loadEnv();
+
+module.exports = { loadEnv };
