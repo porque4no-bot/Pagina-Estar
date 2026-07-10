@@ -136,6 +136,9 @@ exports.handler = async event => {
        residente porta un token de portal, no de guest-app: las audiencias deben
        coincidir para que pueda firmar su pagaré desde el portal. */
     const session = requirePortalSession(event);
+    if (session.profile !== 'residente') {
+      return json(403, { error: 'La firma de pagaré es solo para residentes.' });
+    }
 
     const body = parseJsonBody(event, 20000);
     const consent = body.consent || {};
@@ -165,13 +168,14 @@ exports.handler = async event => {
     const pagareId = newPagareId();
     const providerName = await get('PAGARE_PROVIDER', 'own', {});
     const provider = pagare.getProvider(providerName);
+    const bookingCode = String(session.reservation || session.bookingCode || '').slice(0, 80);
 
     /* Datos del pagaré. El nombre/documento del deudor se toman del cuerpo pero la
        referencia de reserva y el nombre confiable vienen de la sesión firmada. */
     const input = {
       pagareId,
-      bookingCode: session.sub || '',
-      deudorNombre: String(body.deudorNombre || session.guest || '').slice(0, 160),
+      bookingCode,
+      deudorNombre: String(body.deudorNombre || session.name || '').slice(0, 160),
       deudorTipoDocumento: String(body.deudorTipoDocumento || '').slice(0, 20),
       deudorDocumento: String(body.deudorDocumento || '').slice(0, 40),
       deudorDireccion: String(body.deudorDireccion || '').slice(0, 200),

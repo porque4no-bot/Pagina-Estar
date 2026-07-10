@@ -770,7 +770,7 @@ async function resolvePartnerId(partnerKey, opts) {
    Suma el saldo pendiente (amount_residual) de las líneas por cobrar del cliente
    y las agrupa en buckets de mora. Devuelve
      { partnerId, total, buckets, documentos, count, isMock }.
-   Mock-safe; nunca lanza (tolera Contabilidad ausente devolviendo vacío). */
+   Mock-safe; nunca lanza (marca `unavailable` si Odoo falla). */
 async function getCartera(partnerKey, opts) {
   opts = opts || {};
   if (!isConfigured()) {
@@ -811,9 +811,19 @@ async function getCartera(partnerKey, opts) {
     rows = await executeKw('account.move.line', 'search_read', [domain, fields],
       withCtx({ order: 'date_maturity asc', limit: opts.limit || 500 }), transport);
   } catch (e) {
-    /* Contabilidad no instalada / campo ausente: cartera vacía, no fatal. */
-    if (process.env.DEBUG) console.log('[odoo] getCartera search_read falló (cartera vacía):', e.message);
-    rows = [];
+    /* No representar fallos de Odoo como "saldo cero": el caller debe poder
+       distinguir cartera no disponible de una cartera realmente vacía. */
+    if (process.env.DEBUG) console.log('[odoo] getCartera search_read falló (cartera no disponible):', e.message);
+    return {
+      partnerId,
+      total: null,
+      buckets: emptyBuckets(),
+      documentos: [],
+      count: 0,
+      isMock: false,
+      unavailable: true,
+      error: 'odoo_cartera_unavailable'
+    };
   }
   const lines = (Array.isArray(rows) ? rows : []).map(mapCarteraLine);
   const aged = computeAging(lines, opts.nowMs);
