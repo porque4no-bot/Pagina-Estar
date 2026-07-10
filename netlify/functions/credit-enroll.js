@@ -58,7 +58,6 @@ const {
 } = require('./_guest-app');
 const { verifyPortalSession } = require('./portal-session');
 const { extractCreditSignals, evaluateCreditRecommendation } = require('./_credit-analysis');
-const { requirePortalSession: requireSignedPortalSession } = require('./portal-session');
 
 /* ── Demo mode PROPIO del carril de crédito ────────────────────────────────
    NO reutilizamos _guest-app.isDemoMode: ese honra GUEST_APP_DEMO_MODE, un
