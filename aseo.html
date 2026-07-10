@@ -138,7 +138,7 @@
      navegador antes de subirla y la audita la IA en el backend. */
   (function () {
     var items = [];        // [{id,label,hint}]
-    var state = {};        // id -> { image, decision }
+    var state = {};        // apartment -> item id -> { image, decision, result }
 
     function $(id) { return document.getElementById(id); }
 
@@ -203,6 +203,20 @@
       else { b.className = 'badge badge--todo'; b.textContent = 'Pendiente'; }
     }
 
+    function apartmentKey() {
+      return $('apartment').value.trim();
+    }
+
+    function stateForApartment(key, create) {
+      if (!key) return {};
+      if (create && !state[key]) state[key] = {};
+      return state[key] || {};
+    }
+
+    function apartmentState(create) {
+      return stateForApartment(apartmentKey(), create);
+    }
+
     function renderVerdict(id, res) {
       var el = document.querySelector('.item[data-item="' + id + '"] .verdict');
       if (!el) return;
@@ -226,8 +240,9 @@
     function updateProgress() {
       var total = items.length;
       var registradas = 0, obs = 0;
+      var current = apartmentState(false);
       items.forEach(function (it) {
-        var d = state[it.id] && state[it.id].decision;
+        var d = current[it.id] && current[it.id].decision;
         if (d === 'aprobada' || d === 'advertida') registradas++;
         if (d === 'advertida') obs++;
       });
@@ -236,10 +251,33 @@
       $('progress').innerHTML = msg;
     }
 
+    function syncCards() {
+      var current = apartmentState(false);
+      items.forEach(function (it) {
+        var st = current[it.id];
+        var card = document.querySelector('.item[data-item="' + it.id + '"]');
+        if (!card) return;
+        var preview = card.querySelector('.preview');
+        var auditBtn = card.querySelector('.auditbtn');
+        var verdict = card.querySelector('.verdict');
+        setBadge(it.id, st && st.decision);
+        if (st && st.image) {
+          preview.src = st.image; preview.hidden = false;
+          auditBtn.hidden = false;
+        } else {
+          preview.removeAttribute('src'); preview.hidden = true;
+          auditBtn.hidden = true;
+        }
+        if (st && st.result) renderVerdict(it.id, st.result);
+        else verdict.innerHTML = '';
+      });
+      updateProgress();
+    }
+
     async function audit(id) {
-      var apt = $('apartment').value.trim();
+      var apt = apartmentKey();
       if (!apt) { toast('Escribe el apartamento primero.'); $('apartment').focus(); return; }
-      var st = state[id];
+      var st = stateForApartment(apt, false)[id];
       if (!st || !st.image) { toast('Toma la foto primero.'); return; }
 
       var card = document.querySelector('.item[data-item="' + id + '"]');
@@ -248,14 +286,23 @@
       try {
         var res = await api('validate-cleaning-photo', { apartment: apt, item: id, image: st.image });
         st.decision = res.decision;
-        setBadge(id, res.decision);
-        renderVerdict(id, res);
-        updateProgress();
+        st.result = res;
+        if (apartmentKey() === apt) {
+          setBadge(id, res.decision);
+          renderVerdict(id, res);
+          updateProgress();
+        } else {
+          syncCards();
+        }
         if (res.decision === 'aprobada') toast('Aprobada ✓');
         else if (res.decision === 'advertida') toast('Registrada con observaciones');
         else toast('Rechazada — repite la foto');
       } catch (e) {
-        card.querySelector('.verdict').innerHTML = '<p class="err" style="margin:0;">' + escapeHtml(e.message) + '</p>';
+        if (apartmentKey() === apt) {
+          card.querySelector('.verdict').innerHTML = '<p class="err" style="margin:0;">' + escapeHtml(e.message) + '</p>';
+        } else {
+          syncCards();
+        }
       } finally {
         btn.disabled = false; btn.textContent = 'Auditar foto';
       }
@@ -282,13 +329,26 @@
 
       input.addEventListener('change', async function () {
         var file = input.files && input.files[0];
+        var apt = apartmentKey();
         if (!file) return;
+        if (!apt) {
+          toast('Escribe el apartamento primero.');
+          $('apartment').focus();
+          input.value = '';
+          return;
+        }
         try {
           var dataUrl = await compress(file);
-          state[it.id] = { image: dataUrl, decision: state[it.id] && state[it.id].decision };
-          preview.src = dataUrl; preview.hidden = false;
-          auditBtn.hidden = false;
-          card.querySelector('.verdict').innerHTML = '';
+          stateForApartment(apt, true)[it.id] = { image: dataUrl };
+          if (apartmentKey() === apt) {
+            preview.src = dataUrl; preview.hidden = false;
+            auditBtn.hidden = false;
+            card.querySelector('.verdict').innerHTML = '';
+            setBadge(it.id, null);
+            updateProgress();
+          } else {
+            syncCards();
+          }
         } catch (e) { toast('No se pudo procesar la imagen.'); }
       });
 
@@ -306,6 +366,7 @@
       }
       $('items').innerHTML = items.map(itemCard).join('');
       items.forEach(wireCard);
+      $('apartment').addEventListener('input', syncCards);
       updateProgress();
     }
 
