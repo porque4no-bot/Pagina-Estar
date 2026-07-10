@@ -133,13 +133,12 @@ async function findDuplicateAseo(key, now) {
      · { claimed: true }              → ganamos la clave, proceder a postear al folio.
      · { claimed: false, record }     → otro writer ya la tomó (duplicado concurrente);
                                          `record` es el marcador previo si se pudo leer.
-     · { claimed: true, noStore: true}→ sin Blobs no hay dedup posible: fail-open (la
-                                         ventana secuencial de findDuplicateAseo sigue
-                                         atrapando reintectos no-concurrentes).
+     · { claimed: false, noStore: true}→ sin Blobs no hay dedup posible: fail-closed
+                                          para no duplicar cargos al folio.
    Best-effort: nunca lanza. */
 async function claimAseo(key, record, now) {
   const store = idemStore();
-  if (!store || !key) return { claimed: true, noStore: true };
+  if (!store || !key) return { claimed: false, noStore: true };
   const payload = JSON.stringify({
     eventId: record.eventId,
     bookingCode: record.bookingCode,
@@ -530,6 +529,11 @@ exports.handler = async (event) => {
            clave nunca ganan ambas la reclamación, así que solo una carga el folio;
            la que pierde se responde como duplicado sin recargar los $50.000. */
         const claim = await claimAseo(idemKey, record, now);
+        if (claim.noStore) {
+          return json(503, {
+            error: 'No fue posible garantizar la idempotencia del cargo. Intenta de nuevo.'
+          });
+        }
         if (!claim.claimed) {
           const prev = claim.record;
           return json(200, {
