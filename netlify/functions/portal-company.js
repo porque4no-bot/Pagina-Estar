@@ -70,10 +70,10 @@ function parseJsonMap(raw) {
   }
 }
 
-/* Mapea la sesión (email/profile del token del portal) → identidad de empresa:
-   { email, nit }. El NIT sale del claim de sesión si existe, o de un mapa de
-   env opcional email→NIT (PORTAL_EMPRESA_NIT_JSON). Sin NIT conocido se usa el
-   email como clave de partner en Odoo (getCartera acepta {email}). PURO. */
+/* Mapea la sesión (email/profile del token del portal) → identidad de empresa.
+   El NIT sale del claim de sesión si existe, o de un mapa de env opcional
+   email→NIT (PORTAL_EMPRESA_NIT_JSON). Los claims firmados de Odoo/Drive ganan
+   sobre fallbacks de env. PURO. */
 function resolveCompany(session) {
   const email = normalizeEmail(session && session.sub);
   let nit = String((session && session.nit) || '').trim().slice(0, 50);
@@ -82,12 +82,18 @@ function resolveCompany(session) {
     const mapped = map[email];
     if (mapped) nit = String(mapped).trim().slice(0, 50);
   }
-  return { email, nit };
+  return {
+    email,
+    nit,
+    odooPartnerKey: session && session.odooPartnerKey,
+    driveFolderId: String((session && session.driveFolderId) || '').trim().slice(0, 120)
+  };
 }
 
-/* partnerKey para Odoo: prioriza NIT (mismo orden de dedup que upsertPartner)
-   y cae al email cuando no hay NIT. null si no hay ninguno. */
+/* partnerKey para Odoo: prioriza el claim firmado (store maestro), luego NIT
+   (mismo orden de dedup que upsertPartner) y cae al email. */
 function partnerKeyFor(company) {
+  if (company.odooPartnerKey != null) return company.odooPartnerKey;
   if (company.nit) return { vat: company.nit };
   if (company.email) return { email: company.email };
   return null;
@@ -101,7 +107,7 @@ function docsLinkFor(company) {
   const map = parseJsonMap(process.env.PORTAL_DRIVE_FOLDER_JSON);
   const byNit = company.nit ? (map[company.nit] || map[normalizeNitDigits(company.nit)]) : null;
   const byEmail = company.email ? map[company.email] : null;
-  const folderId = String(byNit || byEmail || process.env.PORTAL_DRIVE_FOLDER_ID || '').trim();
+  const folderId = String(company.driveFolderId || byNit || byEmail || process.env.PORTAL_DRIVE_FOLDER_ID || '').trim();
   if (!folderId) return null;
   return {
     folderId,

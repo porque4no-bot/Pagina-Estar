@@ -273,6 +273,7 @@ function resolveResident(session) {
     email: normalizeEmail(session && session.sub),
     name: cleanText(session && session.name, 120),
     reservationId: resolveReservationId(session),
+    odooPartnerKey: session && session.odooPartnerKey,
     lang: lang(session && session.lang)
   };
 }
@@ -410,11 +411,13 @@ async function openHelpdeskTicket(record) {
   return { created: Boolean(res && res.id), id: res && res.id, isMock: res && res.isMock };
 }
 
-/* Estado de cuenta del residente: cartera + facturas de Odoo por email
-   (solo-lectura, mock-safe). Cada fuente se envuelve para que un fallo no rompa
-   el resto. */
+/* Estado de cuenta del residente: cartera + facturas de Odoo por claim firmado
+   de partner (si existe) o email. Cada fuente se envuelve para que un fallo no
+   rompa el resto. */
 async function loadAccountStatement(resident) {
-  const partnerKey = resident.email ? { email: resident.email } : null;
+  const partnerKey = resident.odooPartnerKey != null
+    ? resident.odooPartnerKey
+    : (resident.email ? { email: resident.email } : null);
   const safe = async (factory, fallback) => {
     try { return await factory(); } catch (e) {
       console.error('[portal-resident] source failed:', e.message);
@@ -524,24 +527,24 @@ exports.handler = async (event) => {
         });
       }
 
+      /* Mark-before-work ATÓMICO: reclama la clave antes de cualquier efecto
+         externo (folio o notificación). Así también se deduplican doble-clicks
+         cuando el posteo a folio está apagado. */
+      const claim = await claimAseo(idemKey, record, now);
+      if (!claim.claimed) {
+        const prev = claim.record;
+        return json(200, {
+          ok: true,
+          eventId: (prev && prev.eventId) || record.eventId,
+          type: record.type,
+          status: 'duplicate',
+          duplicate: true,
+          total: (prev && prev.total != null) ? prev.total : record.total,
+          folio: (prev && prev.folio) || { posted: false, reason: 'duplicate' }
+        });
+      }
+
       if (await flag('GUEST_SERVICE_FOLIO_ENABLED')) {
-        /* Mark-before-work ATÓMICO: reclama la clave con escritura condicional
-           (onlyIfNew) ANTES de postear. Dos peticiones concurrentes con la misma
-           clave nunca ganan ambas la reclamación, así que solo una carga el folio;
-           la que pierde se responde como duplicado sin recargar los $50.000. */
-        const claim = await claimAseo(idemKey, record, now);
-        if (!claim.claimed) {
-          const prev = claim.record;
-          return json(200, {
-            ok: true,
-            eventId: (prev && prev.eventId) || record.eventId,
-            type: record.type,
-            status: 'duplicate',
-            duplicate: true,
-            total: (prev && prev.total != null) ? prev.total : record.total,
-            folio: (prev && prev.folio) || { posted: false, reason: 'duplicate' }
-          });
-        }
         try {
           response.folio = await deps.postOrderToFolio({
             idReservations: record.bookingCode,
@@ -563,6 +566,7 @@ exports.handler = async (event) => {
       } else {
         response.folio = { posted: false, reason: 'disabled' };
         record.folioStatus = 'disabled';
+        await recordAseo(idemKey, record, response.folio, now);
       }
     }
 

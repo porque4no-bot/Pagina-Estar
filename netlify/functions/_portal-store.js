@@ -130,6 +130,7 @@ function accountToClaims(account) {
   if (profile === 'empresa') {
     if (account.nit) claims.nit = String(account.nit).trim().slice(0, 50);
     if (account.empresa) claims.empresa = String(account.empresa).trim().slice(0, 160);
+    if (account.driveFolderId) claims.driveFolderId = String(account.driveFolderId).trim().slice(0, 120);
   } else {
     const codes = normReservationCodes(account.reservationCodes);
     if (codes.length) {

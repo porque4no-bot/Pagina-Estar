@@ -108,8 +108,8 @@ const MANAGEABLE = {
                                    desc: 'Activa las gestiones de cobranza (recordatorios por WhatsApp/correo/llamada). Interés de mora con techo en la usura vigente; costos de cobranza acumulativos por gestión efectuada. Clausulado pendiente de abogado. Off por defecto.' },
   // Cobranza — parámetros gestionables (convención #13). NINGUNO es secreto: son
   // topes legales, costos fijos y ventanas horarias que cambian sin redeploy.
-  COLLECTIONS_TASA_USURA_MENSUAL:{ type: 'number', group: 'Portal Estar', label: 'Tope de mora: tasa de usura mensual (%)',
-                                   desc: 'TECHO DURO del interés de mora, en % mensual, según la usura vigente que certifica la Superfinanciera. Actualízalo cada mes: el sistema NUNCA cobra mora por encima de este valor. Si se deja en 0, no se calcula mora.' },
+  COLLECTIONS_TASA_USURA_MENSUAL:{ type: 'number', group: 'Portal Estar', label: 'Tope de mora: tasa de usura mensual (fracción)',
+                                   desc: 'TECHO DURO del interés de mora como fracción mensual decimal (ej. 0.026 = 2.6%), según la usura vigente que certifica la Superfinanciera. Actualízalo cada mes: el sistema NUNCA cobra mora por encima de este valor. Si se deja en 0, no se calcula mora.' },
   COLLECTIONS_COST_WHATSAPP:     { type: 'number', group: 'Portal Estar', label: 'Costo de cobranza por WhatsApp (COP)',
                                    desc: 'Costo fijo, en pesos, que suma CADA WhatsApp de cobranza realmente enviado (monto acumulativo por gestión efectuada, NO un porcentaje del saldo). Se itemiza y registra. Default 0.' },
   COLLECTIONS_COST_LLAMADA:      { type: 'number', group: 'Portal Estar', label: 'Costo de cobranza por llamada (COP)',

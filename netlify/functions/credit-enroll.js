@@ -57,6 +57,7 @@ const {
   parseJsonBody
 } = require('./_guest-app');
 const { extractCreditSignals, evaluateCreditRecommendation } = require('./_credit-analysis');
+const { requirePortalSession: requireSignedPortalSession } = require('./portal-session');
 
 /* ── Demo mode PROPIO del carril de crédito ────────────────────────────────
    NO reutilizamos _guest-app.isDemoMode: ese honra GUEST_APP_DEMO_MODE, un
@@ -79,47 +80,19 @@ const ALLOWED_DOC_KINDS = new Set(['extracto', 'datacredito']);
 const DEFAULT_CREDIT_RETENTION_YEARS = 5;
 
 /* ── Sesión del portal (token propio firmado, aislado de guest/admin) ──────
-   Verificador inline (mirror de requireGuest) con SECRETO PROPIO
-   PORTAL_SESSION_SECRET, para no cruzar audiencias con GUEST_APP_TOKEN_SECRET
-   ni exponer identidad Firebase de staff al solicitante. */
-function bearer(event) {
-  const headers = event.headers || {};
-  const auth = headers.authorization || headers.Authorization || '';
-  const m = String(auth).match(/^Bearer\s+(.+)$/i);
-  return m ? m[1] : '';
-}
-
-function verifyPortalToken(token) {
-  const secret = process.env.PORTAL_SESSION_SECRET || '';
-  if (!secret) return null;
-  const parts = String(token || '').split('.');
-  if (parts.length !== 2) return null;
-  const [encoded, signature] = parts;
-  const expected = crypto.createHmac('sha256', secret).update(encoded).digest('base64url');
-  const a = Buffer.from(signature);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+   Reutiliza el guard compartido de portal-session para que el modo demo local
+   (secreto fijo de desarrollo) y producción verifiquen exactamente igual. */
+function requireCreditPortalSession(event) {
   try {
-    const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
-    if (!payload.sub || !payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
-    if (payload.purpose && payload.purpose !== 'session') return null; // un magic-link no vale como sesión
-    return payload;
+    return requireSignedPortalSession(event);
   } catch (e) {
-    return null;
+    if (!creditDemoMode()) throw e;
   }
-}
-
-function requirePortalSession(event) {
-  const payload = verifyPortalToken(bearer(event));
-  if (payload) return payload;
   // Identidad demo SIN token: exclusiva de desarrollo local real. Falla CERRADO
   // en cualquier deploy Netlify o NODE_ENV=production — nunca se concede acceso a
   // este endpoint de PII financiera sin un token de sesión válido en producción,
   // ni aunque GUEST_APP_DEMO_MODE esté activo.
-  if (creditDemoMode()) return { sub: 'demo-portal', demo: true };
-  const error = new Error('Sesión del portal inválida o expirada.');
-  error.statusCode = 401;
-  throw error;
+  return { sub: 'demo-portal', profile: 'residente', demo: true };
 }
 
 /* ── Blob store (patrón compartido del repo) ── */
@@ -211,7 +184,10 @@ exports.handler = async event => {
 
   try {
     // 2) Sesión del portal (identidad del solicitante; no se confía para decidir).
-    const session = requirePortalSession(event);
+    const session = requireCreditPortalSession(event);
+    if (session.profile !== 'residente') {
+      return json(403, { error: 'La solicitud de crédito es solo para residentes.' });
+    }
 
     const body = parseJsonBody(event, MAX_BODY_BYTES);
 

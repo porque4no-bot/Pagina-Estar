@@ -219,7 +219,7 @@ test('getCartera consulta cuentas por cobrar, normaliza y agrega por buckets', a
   clearEnv();
 });
 
-test('getCartera con Contabilidad ausente (search_read lanza) devuelve cartera vacía sin propagar', async () => {
+test('getCartera con Contabilidad ausente (search_read lanza) marca cartera no disponible', async () => {
   setEnv();
   const odoo = require(ODOO);
   odoo._resetAuthCache();
@@ -230,9 +230,11 @@ test('getCartera con Contabilidad ausente (search_read lanza) devuelve cartera v
   });
   const r = await odoo.getCartera(10, { transport, nowMs: NOW });
   assert.equal(r.partnerId, 10);
-  assert.equal(r.total, 0);
+  assert.equal(r.total, null);
   assert.deepEqual(r.documentos, []);
   assert.equal(r.isMock, false);
+  assert.equal(r.unavailable, true);
+  assert.equal(r.error, 'odoo_cartera_unavailable');
   clearEnv();
 });
 
