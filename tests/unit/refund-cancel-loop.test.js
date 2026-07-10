@@ -12,16 +12,19 @@ function fakeModule(id, exportsObj) {
   require.cache[id] = { id, filename: id, loaded: true, exports: exportsObj };
 }
 
-function load({ flagOn, cancelImpl }) {
+function load({ flagOn, cancelImpl, refund }) {
   const transitions = [];
   const alerts = [];
 
+  fakeModule(P('_authz'), {
+    authorize: async () => ({ ok: true, email: 'admin@x.co' })
+  });
   fakeModule(P('_settings'), {
     flag: async (k) => (k === 'OTASYNC_AUTO_CANCEL_ENABLED' ? !!flagOn : false),
     get: async () => undefined
   });
   fakeModule(P('_refunds-store'), {
-    getRefund: async () => null,
+    getRefund: async () => refund || null,
     transitionStatus: async (bookingCode, status, by, note, patch) => {
       transitions.push({ bookingCode, status, by, note, patch });
       return { refund: { bookingCode, status, ...(patch || {}) } };
@@ -36,7 +39,7 @@ function load({ flagOn, cancelImpl }) {
 
   delete require.cache[P('refund-admin-action')];
   const mod = require('../../netlify/functions/refund-admin-action');
-  return { maybeCancel: mod._test.maybeCancelReservationInPms, transitions, alerts };
+  return { handler: mod.handler, maybeCancel: mod._test.maybeCancelReservationInPms, transitions, alerts };
 }
 
 test('flag OFF: no cancela ni transiciona', async () => {
@@ -84,4 +87,24 @@ test('best-effort: si cancelReservation lanza, no rompe (devuelve null) y alerta
   assert.equal(alerts.length, 1);
   assert.equal(alerts[0].kind, 'otasync_cancel_failed');
   assert.match(alerts[0].dedupeKey, /^otasync-cancel-EST-7$/);
+});
+
+test('approve sin amountCents vuelve a validar el tope pagado original', async () => {
+  const { handler, transitions } = load({
+    flagOn: false,
+    refund: {
+      bookingCode: 'EST-OVER',
+      status: 'NEEDS_REVIEW',
+      route: 'gateway_assisted',
+      refundAmountCents: 60000,
+      originalAmountCents: 50000
+    }
+  });
+  const res = await handler({
+    httpMethod: 'POST',
+    body: JSON.stringify({ bookingCode: 'EST-OVER', action: 'approve' })
+  });
+  assert.equal(res.statusCode, 400);
+  assert.match(JSON.parse(res.body).error, /superar el monto pagado/);
+  assert.equal(transitions.length, 0);
 });

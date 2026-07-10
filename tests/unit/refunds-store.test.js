@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { refundRoute, ROUTE, STATUS, REFUND_SLA_BUSINESS_DAYS, createRefundRequest } = require('../../netlify/functions/_refunds-store');
+const { refundRoute, ROUTE, STATUS, REFUND_SLA_BUSINESS_DAYS, createRefundRequest, recoverPaymentInfo } = require('../../netlify/functions/_refunds-store');
 
 test('refundRoute: Mercado Pago card/account is gateway-auto', () => {
   assert.equal(refundRoute('mercadopago', 'visa'), ROUTE.GATEWAY_AUTO);
@@ -53,4 +53,35 @@ test('STATUS exposes the documented refund lifecycle states', () => {
 
 test('REFUND_SLA_BUSINESS_DAYS is the single source for the 15-business-day promise', () => {
   assert.equal(REFUND_SLA_BUSINESS_DAYS, 15);
+});
+
+test('recoverPaymentInfo reads pending Wompi snapshots with legacy amountCents', async () => {
+  const blobsPath = require.resolve('@netlify/blobs');
+  const previous = require.cache[blobsPath];
+  const bookingResults = new Map([
+    ['direct-EST-PENDING', JSON.stringify({
+      provider: 'wompi',
+      paymentMethod: 'CARD',
+      transactionId: 'wompi-1',
+      amountCents: 123000
+    })]
+  ]);
+  require.cache[blobsPath] = {
+    id: blobsPath,
+    filename: blobsPath,
+    loaded: true,
+    exports: {
+      getStore: () => ({
+        get: async (key) => bookingResults.get(key) || null
+      })
+    }
+  };
+  try {
+    const info = await recoverPaymentInfo('EST-PENDING');
+    assert.equal(info.originalAmountCents, 123000);
+    assert.equal(info.paymentProvider, 'wompi');
+  } finally {
+    if (previous) require.cache[blobsPath] = previous;
+    else delete require.cache[blobsPath];
+  }
 });

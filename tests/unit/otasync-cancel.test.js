@@ -46,6 +46,19 @@ test('cancelReservation: soft-cancel exitoso devuelve {ok, status:"canceled"}', 
   });
 });
 
+test('cancelReservation: success:true sin estado cancelado NO confirma cancelación', async () => {
+  await withOtasync(async (url) => {
+    const login = loginOk(url); if (login) return login;
+    if (url.endsWith('/api/reservation/delete/delete')) {
+      return new Response(JSON.stringify({ success: true, reservation: { id_reservations: 555, status: 'confirmed' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  }, async () => {
+    const { cancelReservation } = require('../../netlify/functions/_otasync');
+    await assert.rejects(() => cancelReservation('555'), /sin señal de cancelación/);
+  });
+});
+
 test('cancelReservation: 404 es idempotente → {ok:true, alreadyGone:true}', async () => {
   await withOtasync(async (url) => {
     const login = loginOk(url); if (login) return login;
