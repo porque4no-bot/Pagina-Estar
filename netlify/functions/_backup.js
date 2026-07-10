@@ -29,11 +29,17 @@ const MAX_ENTRY_BYTES = parseInt(process.env.BACKUP_MAX_ENTRY_BYTES, 10) || 6 * 
 const BACKUP_STORE_GROUPS = [
   {
     id: 'business', pii: false,
-    stores: ['quotes', 'quote-audit', 'refunds', 'breakfast-redemptions', 'cancellation-requests']
+    /* A-7: incluye stores durables antes omitidos e IRRECUPERABLES: iam
+       (usuarios/roles), discount-codes/discount-usage (cupones), app-settings
+       (flags del panel), quote-requests (leads B2B). */
+    stores: ['quotes', 'quote-audit', 'refunds', 'breakfast-redemptions', 'cancellation-requests',
+             'iam', 'discount-codes', 'discount-usage', 'app-settings', 'quote-requests']
   },
   {
     id: 'pii', pii: true,
-    stores: ['guest-checkins', 'guest-events', 'guest-documents', 'guest-minor-documents']
+    /* payment-details (auth code + últimos-4 para reembolsos tardíos) va aquí para
+       que NUNCA se copie a Drive (solo cifrado en el backup de negocio). */
+    stores: ['guest-checkins', 'guest-events', 'guest-documents', 'guest-minor-documents', 'payment-details']
   }
 ];
 

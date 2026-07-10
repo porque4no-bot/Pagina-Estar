@@ -60,9 +60,12 @@ exports.handler = async () => {
       try {
         const snap = await snapshotStore(store);
         await writeSnapshot(backupStore, dateKey, group.id, snap);
+        /* A-7: una entrada oversized se guarda SIN datos → cuenta como fallo para
+           forzar el correo (antes pasaba en silencio; el resumen solo salía con error). */
+        const oversized = snap.entries.filter(e => e.oversized).length;
         const err = snap.error || snap.entries.some(e => e.error);
-        if (err) hadError = true;
-        results.push({ group: group.id, store, scanned: snap.scanned, bytes: snap.totalBytes, ok: !snap.error });
+        if (err || oversized > 0) hadError = true;
+        results.push({ group: group.id, store, scanned: snap.scanned, bytes: snap.totalBytes, oversized, ok: !snap.error });
         await maybeCopyToDrive(dateKey, group, snap, results);
       } catch (e) {
         hadError = true;
@@ -80,7 +83,7 @@ exports.handler = async () => {
   try {
     if (hadError || process.env.BACKUP_ALWAYS_EMAIL === 'true') {
       const totalBytes = results.reduce((s, r) => s + (r.bytes || 0), 0);
-      const rows = results.map(r => `<li>${esc(r.group)}/${esc(r.store || '—')}: ${r.skipped ? esc(r.skipped) : `${r.scanned || 0} blobs, ${fmtMB(r.bytes || 0)}${r.ok ? '' : ' ⚠ ' + esc(r.error || 'error')}`}</li>`).join('');
+      const rows = results.map(r => `<li>${esc(r.group)}/${esc(r.store || '—')}: ${r.skipped ? esc(r.skipped) : `${r.scanned || 0} blobs, ${fmtMB(r.bytes || 0)}${r.oversized ? ` ⚠ ${r.oversized} sin respaldar (>límite)` : ''}${r.ok ? '' : ' ⚠ ' + esc(r.error || 'error')}`}</li>`).join('');
       await sendEmail({
         to: adminEmail(),
         subject: `${hadError ? '⚠ ' : ''}Respaldo Blobs ${dateKey} — ${fmtMB(totalBytes)}`,

@@ -487,3 +487,25 @@ test('guest check-in submit rejects guests beyond reservation capacity', async (
     _test.resetDeps();
   }
 });
+
+/* A-20: un mismo documento no puede referenciarse para varios huéspedes no-menores. */
+test('validateGuests: rechaza el mismo documento reutilizado entre huéspedes', () => {
+  const g = { documentType: 'CC', documentNumber: '123', firstName: 'Ana', lastName: 'Ríos', sex: 'F', nationality: 'CO' };
+  const entries = [
+    { guest: { ...g, documentNumber: '111' }, documentRef: { key: 'doc/AAA' } },
+    { guest: { ...g, documentNumber: '222' }, documentRef: { key: 'doc/AAA' } }, // mismo doc → inválido
+  ];
+  const r = _test.validateGuests(entries);
+  assert.ok(r.missing.some(m => /documentoDuplicado/.test(m)), 'debe marcar documento duplicado');
+  assert.equal(r.valid, false);
+});
+
+test('validateGuests: documentos distintos por huésped → sin duplicado', () => {
+  const g = { documentType: 'CC', firstName: 'Ana', lastName: 'Ríos', sex: 'F', nationality: 'CO' };
+  const entries = [
+    { guest: { ...g, documentNumber: '111' }, documentRef: { key: 'doc/AAA' } },
+    { guest: { ...g, documentNumber: '222' }, documentRef: { key: 'doc/BBB' } },
+  ];
+  const r = _test.validateGuests(entries);
+  assert.ok(!r.missing.some(m => /documentoDuplicado/.test(m)), 'no debe marcar duplicado');
+});

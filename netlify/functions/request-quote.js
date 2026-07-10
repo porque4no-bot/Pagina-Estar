@@ -285,9 +285,38 @@ exports.handler = async (event, context) => {
     console.error('[request-quote] Odoo (cliente/lead) no fatal:', odooErr.message);
   }
 
+  /* A-10: persistir el lead B2B en un store DURABLE antes de intentar el correo.
+     Antes, el único registro era un correo best-effort (+ Odoo, no-op sin
+     credenciales): sin RESEND_API_KEY o con Resend caído, el lead desaparecía sin
+     rastro. Ahora queda guardado siempre y, si el correo falla, se alerta. */
+  let leadPersisted = false;
+  try {
+    const { getStore } = require('@netlify/blobs');
+    const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+    const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_BLOBS_TOKEN;
+    const opts = { name: 'quote-requests', consistency: 'strong' };
+    if (siteID && token) { opts.siteID = siteID; opts.token = token; }
+    const store = getStore(opts);
+    const key = `lead-${new Date().toISOString().replace(/[:.]/g, '-')}-${String(sanitized.email || 'anon').slice(0, 60)}`;
+    await store.set(key, JSON.stringify({ ...sanitized, leadId: leadId || null, createdAt: new Date().toISOString() }));
+    leadPersisted = true;
+  } catch (e) {
+    console.error('[request-quote] no se pudo persistir el lead (se intentará el correo):', e.message);
+  }
+
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) {
     if (process.env.DEBUG) console.log('[request-quote] RESEND_API_KEY no configurada. Solicitud recibida:', sanitized.empresa);
+    if (!leadPersisted) {
+      try {
+        await require('./_alert').reportAlert({
+          kind: 'quote_request_lost', severity: 'error',
+          message: `Lead B2B sin correo NI persistencia (empresa: ${sanitized.empresa || '?'}, email: ${sanitized.email || '?'})`,
+          context: { empresa: sanitized.empresa, email: sanitized.email },
+          dedupeKey: `quote-request-lost-${String(sanitized.email || 'anon')}`
+        });
+      } catch (_) { /* best-effort */ }
+    }
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ received: true }) };
   }
 

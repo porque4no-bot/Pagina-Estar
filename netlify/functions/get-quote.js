@@ -1,6 +1,15 @@
 require('./_env');
+const crypto = require('crypto');
 const { getQuoteStore, loadQuote, saveQuote, effectiveStatus, toPublic } = require('./_quotes-store');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
+
+/* Comparación de tokens en tiempo constante (evita timing oracle sobre publicToken). */
+function tokenEqual(a, b) {
+  const ba = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
 
 /* Legacy: decode a quote that was fully encoded in the URL (?d=) */
 function decodeLegacy(encoded) {
@@ -45,7 +54,7 @@ exports.handler = async (event, context) => {
         return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización no encontrada', expired: false }) };
       }
 
-      if (quote.publicToken && token !== quote.publicToken) {
+      if (quote.publicToken && !tokenEqual(token, quote.publicToken)) {
         return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotizacion no encontrada', expired: false }) };
       }
 

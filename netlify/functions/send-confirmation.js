@@ -334,16 +334,27 @@ async function sendConfirmationEmail(params, deps = {}) {
     return { sent: false, reason: 'no-key' };
   }
 
-  // Idempotency: if a confirmation for this booking already went out, skip.
+  // Idempotency: RECLAMAR la clave atómicamente ANTES de enviar (onlyIfNew), para
+  // que dos ejecuciones concurrentes (webhook + cliente) no envíen ambas. El
+  // read-then-write anterior tenía una carrera. Si el envío falla, se libera el
+  // reclamo (releaseDedupe) para que siga siendo reintentable.
   const store = d.dedupe ? d.getStore() : null;
+  let claimedDedupe = false;
+  const releaseDedupe = async () => {
+    if (claimedDedupe && store && dedupeKey) {
+      try { await store.delete(dedupeKey); } catch (_) { /* best-effort */ }
+    }
+  };
   if (store && dedupeKey) {
     try {
-      if (await store.get(dedupeKey)) {
+      const claim = await store.set(dedupeKey, JSON.stringify({ claimedAt: new Date().toISOString() }), { onlyIfNew: true });
+      if (claim && claim.modified === false) {
         if (process.env.DEBUG) console.log(`[send-confirmation] duplicate suppressed for booking ${dedupeKey}`);
         return { sent: false, reason: 'duplicate', duplicate: true };
       }
+      claimedDedupe = true;
     } catch (e) {
-      if (process.env.DEBUG) console.warn('[send-confirmation] dedup read failed; sending anyway:', e.message);
+      if (process.env.DEBUG) console.warn('[send-confirmation] dedup claim failed; sending anyway:', e.message);
     }
   }
 
@@ -360,18 +371,26 @@ async function sendConfirmationEmail(params, deps = {}) {
     }
   }
 
-  const emailHtml = buildEmailHtml({
-    guestName: guestName || 'Huésped',
-    bookingCode: bookingCode || 'N/A',
-    roomName: roomName || 'Apartaestudio',
-    checkIn: checkIn || '',
-    checkOut: checkOut || '',
-    nights: parseInt(nights) || 1,
-    totalAmount: parseFloat(totalAmount) || 0,
-    paidAmount: parseFloat(paidAmount) || parseFloat(totalAmount) || 0,
-    phone: phone || '',
-    passUrl
-  });
+  let emailHtml;
+  try {
+    emailHtml = buildEmailHtml({
+      guestName: guestName || 'Huésped',
+      bookingCode: bookingCode || 'N/A',
+      roomName: roomName || 'Apartaestudio',
+      checkIn: checkIn || '',
+      checkOut: checkOut || '',
+      nights: parseInt(nights) || 1,
+      totalAmount: parseFloat(totalAmount) || 0,
+      paidAmount: parseFloat(paidAmount) || parseFloat(totalAmount) || 0,
+      phone: phone || '',
+      passUrl
+    });
+  } catch (e) {
+    /* Si armar el correo lanza, liberar el claim de dedupe para no suprimir
+       permanentemente un correo legítimo (quedaría reintentable por el otro trigger). */
+    await releaseDedupe();
+    throw e;
+  }
 
   const resendController = new AbortController();
   const resendTimeoutId = setTimeout(() => resendController.abort(), 10000);
@@ -396,6 +415,7 @@ async function sendConfirmationEmail(params, deps = {}) {
     clearTimeout(resendTimeoutId);
   } catch (err) {
     clearTimeout(resendTimeoutId);
+    await releaseDedupe();
     if (err.name === 'AbortError') return { sent: false, reason: 'timeout' };
     throw err;
   }
@@ -411,6 +431,7 @@ async function sendConfirmationEmail(params, deps = {}) {
         dedupeKey: 'send-confirmation-resend'
       });
     } catch (_) { /* alert best-effort */ }
+    await releaseDedupe();
     return { sent: false, reason: 'resend-error', status: resendResponse.status };
   }
 

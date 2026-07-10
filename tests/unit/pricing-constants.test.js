@@ -27,15 +27,15 @@ function floatAfter(pattern) {
 }
 
 test('reservar.html calcTotal extras math matches _pricing', () => {
-  // lines.push({key:'desayuno',amount:20000*search.guests*nights})
-  assert.equal(numberAfter(/extras\.desayuno\)lines\.push\(\{key:'desayuno',amount:(\d+)\*search\.guests/),
+  // const desayunoSub = extras.desayuno ? 20000*search.guests*nights : 0
+  assert.equal(numberAfter(/desayunoSub = extras\.desayuno \? (\d+)\*search\.guests/),
     EXTRAS_PRICES.desayuno.price, 'desayuno price drifted between front-end and server');
-  // late check-out = 15% of the base nightly
-  assert.equal(floatAfter(/extras\.late\)lines\.push\(\{key:'late',amount:Math\.round\(base\*([\d.]+)\)/),
+  // const lateSub = extras.late ? Math.round(base*0.15) : 0
+  assert.equal(floatAfter(/lateSub = extras\.late \? Math\.round\(base\*([\d.]+)\)/),
     EXTRAS_PRICES.late.pct, 'late pct drifted');
-  // early check-in = 25% of the base nightly
-  assert.equal(floatAfter(/extras\.early\)lines\.push\(\{key:'early',amount:Math\.round\(base\*([\d.]+)\)/),
-    EXTRAS_PRICES.early.pct, 'early pct drifted');
+  // desayuno tributa INC 8% (no IVA 19%) — decisión dueño; verifica el % en calcTotal
+  assert.equal(floatAfter(/const inc=Math\.round\(desayunoSub\*([\d.]+)\)/), 0.08, 'INC del desayuno debe ser 8%');
+  // early check-in ya NO se vende en el motor (solo en el check-in) → no se valida aquí.
   // mascota = flat charge (VAT included)
   assert.equal(numberAfter(/extras\.mascota\?(\d+)/),
     EXTRAS_PRICES.mascota.price, 'mascota price drifted');
@@ -53,8 +53,22 @@ test('reservar.html BE_EXTRAS catalogue matches _pricing', () => {
   };
   assert.equal(numFor('desayuno', 'price'), EXTRAS_PRICES.desayuno.price);
   assert.equal(numFor('late', 'pct'), EXTRAS_PRICES.late.pct);
-  assert.equal(numFor('early', 'pct'), EXTRAS_PRICES.early.pct);
+  // early check-in fue removido del motor (solo se compra en el check-in).
+  assert.ok(!/id:'early'/.test(block), 'early NO debe estar en BE_EXTRAS del motor');
   assert.equal(numFor('mascota', 'price'), EXTRAS_PRICES.mascota.price);
+});
+
+test('early check-in: solo en el check-in (guest), 25% redondeado a $5.000', () => {
+  const { SERVICES } = require('../../netlify/functions/_services-catalog');
+  assert.deepEqual(SERVICES.early.surfaces, ['guest'], 'early solo en guest');
+  assert.equal(SERVICES.early.pct, 0.25);
+  assert.equal(SERVICES.early.round5k, true);
+  // priceForService redondea a 5.000: 25% de una noche de $224.900 = 56.225 → 55.000
+  const { _test } = require('../../netlify/functions/guest-action');
+  if (_test && _test.priceForService) {
+    assert.equal(_test.priceForService(SERVICES.early, 224900), 55000);
+    assert.equal(_test.priceForService(SERVICES.late, 224900), Math.round(0.15 * 224900));
+  }
 });
 
 test('server modules consume the shared _pricing source', () => {

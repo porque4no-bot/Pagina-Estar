@@ -74,7 +74,7 @@ test('guest app UI (guest.html) prices match the catalogue', () => {
   // Each card: data-service-id + either a flat data-service-price or a
   // %-of-night data-service-pct. Attribute order is fixed by convention so the
   // visible <strong> price text can be checked against the catalogue too.
-  const cardRe = /<article class="guest-service-card" data-service-id="([^"]+)" data-service-(price|pct)="([^"]+)">([\s\S]*?)<\/article>/g;
+  const cardRe = /<article class="guest-service-card" data-service-id="([^"]+)" data-service-(price|pct)="([^"]+)"[^>]*>([\s\S]*?)<\/article>/g;
   const seen = new Set();
   let m;
   while ((m = cardRe.exec(guestHtml)) !== null) {

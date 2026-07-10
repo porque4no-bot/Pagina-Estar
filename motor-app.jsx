@@ -437,7 +437,7 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
               <span className="be-room-total">{formatCOP(activePrice * nights)} <span>{t.plusTax}</span></span>
             </div>
             <p style={{ fontSize: 11, color: 'var(--ink-300)', fontStyle: 'italic', margin: '4px 0 8px 0', lineHeight: 1.4 }}>
-              {lang === 'es' ? '* IVA (19%) segun nacionalidad y motivo del viaje' : '* VAT (19%) depends on nationality and travel purpose'}
+              {lang === 'es' ? '* IVA alojamiento (19%) segun nacionalidad y motivo del viaje. El desayuno paga INC 8% (no exento).' : '* Accommodation VAT (19%) depends on nationality and travel purpose. Breakfast pays 8% consumption tax (not exempt).'}
             </p>
             <button className="be-btn-primary be-room-select-btn" onClick={() => onSelect(room, rate)}>
               {t.selectBtn}
@@ -1019,6 +1019,12 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
               <span>{mustPayIVA ? (lang === 'es' ? 'IVA a pagar en alojamiento (19%)*' : 'VAT due at property (19%)*') : (lang === 'es' ? 'IVA exento sujeto a validacion*' : 'VAT exempt, subject to validation*')}</span>
               <span style={!mustPayIVA ? { textDecoration: 'line-through', opacity: 0.75 } : undefined}>{formatCOP(calc.iva)}</span>
             </div>
+            {calc.inc > 0 && (
+              <div className="be-summary-line">
+                <span>{lang === 'es' ? 'INC desayuno (8%)*' : 'Breakfast consumption tax (8%)*'}</span>
+                <span>{formatCOP(calc.inc)}</span>
+              </div>
+            )}
             {discountApplied && discountCents > 0 && (
               <div className="be-summary-line" style={{ color: 'var(--olive-700)' }}>
                 <span>{t.discountLine} ({discountApplied.code})</span>
@@ -1286,6 +1292,12 @@ function BookingSummary({ booking, search, lang }) {
             <span>{mustPayIVA ? (lang === 'es' ? 'IVA a pagar en alojamiento (19%)*' : 'VAT due at property (19%)*') : (lang === 'es' ? 'IVA exento sujeto a validacion*' : 'VAT exempt, subject to validation*')}</span>
             <span style={!mustPayIVA ? { textDecoration: 'line-through', opacity: 0.75 } : undefined}>{formatCOP(calc.iva)}</span>
           </div>
+          {calc.inc > 0 && (
+            <div className="be-summary-line sm">
+              <span>{lang === 'es' ? 'INC desayuno (8%)*' : 'Breakfast consumption tax (8%)*'}</span>
+              <span>{formatCOP(calc.inc)}</span>
+            </div>
+          )}
           <div className="be-summary-line total"><span>{lang === 'es' ? 'Total online hoy' : 'Total online today'}</span><span>{formatCOP(calc.subtotal)}</span></div>
           <p style={{ fontSize: 10, opacity: 0.8, fontStyle: 'italic', margin: '6px 0 0 0', lineHeight: 1.3 }}>
             {lang === 'es' 

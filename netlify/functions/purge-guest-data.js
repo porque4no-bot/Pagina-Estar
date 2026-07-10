@@ -62,7 +62,7 @@ function getStoreSafe(name) {
 async function purgeStore(name, now) {
   const store = getStoreSafe(name);
   if (!store) return { store: name, deleted: 0, scanned: 0, skipped: true };
-  let deleted = 0, scanned = 0;
+  let deleted = 0, scanned = 0, deleteErrors = 0;
   let listing;
   try {
     listing = await store.list();
@@ -78,10 +78,11 @@ async function purgeStore(name, now) {
       await store.delete(b.key);
       deleted++;
     } catch (e) {
+      deleteErrors++;
       console.error(`[purge-guest-data] delete failed ${name}/${b.key}:`, e.message);
     }
   }
-  return { store: name, deleted, scanned };
+  return { store: name, deleted, scanned, deleteErrors };
 }
 
 exports.handler = async () => {
@@ -102,6 +103,20 @@ exports.handler = async () => {
                <pre>${results.map(r => `${r.store}: ${r.deleted}/${r.scanned}`).join('\n')}</pre>`
       });
     } catch (e) { console.error('[purge-guest-data] summary email failed:', e.message); }
+  }
+
+  /* Cumplimiento Ley 1581: si la purga FALLÓ (list o delete), la PII se retiene de
+     más y nadie se enteraría (el correo solo sale con totalDeleted>0). Alertar. */
+  const failed = results.filter(r => r.error || (r.deleteErrors || 0) > 0);
+  if (failed.length) {
+    try {
+      await require('./_alert').reportAlert({
+        kind: 'purge_failed', severity: 'error',
+        message: `purge-guest-data no pudo purgar PII en ${failed.length} store(s); retención Ley 1581 en riesgo`,
+        context: { failed: failed.map(r => ({ store: r.store, error: r.error || null, deleteErrors: r.deleteErrors || 0 })) },
+        dedupeKey: 'purge-guest-data'
+      });
+    } catch (e) { console.error('[purge-guest-data] alert failed:', e.message); }
   }
 
   return { statusCode: 200, body: JSON.stringify({ retentionYears: RETENTION_YEARS, totalDeleted, results }) };

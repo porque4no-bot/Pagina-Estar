@@ -305,6 +305,7 @@ const SERVICE_CATALOG = Object.fromEntries(
 /* Exposed for the anti-drift guard test (services-catalog.test.js). */
 exports._test.SERVICE_CATALOG = SERVICE_CATALOG;
 exports._test.GUEST_SERVICE_KEYS = GUEST_SERVICE_KEYS;
+exports._test.priceForService = priceForService;
 
 /* Average paid night for the booking (totalAmount / nights), used as the base
    for %-of-night services. totalAmount already includes IVA, so the resulting
@@ -319,11 +320,13 @@ function nightBaseFromSession(session) {
 
 /* Authoritative unit price. Flat → catalog price. %-of-night → pct × nightBase,
    rounded to the peso (the guest app mirrors this exact formula client-side).
-   Returns null when a %-of-night service can't be priced (token missing the
-   night base, e.g. an order placed on a pre-deploy session). */
+   Los servicios con `round5k` (early check-in, decisión firme) se redondean a los
+   $5.000 más cercanos. Returns null when a %-of-night service can't be priced. */
 function priceForService(service, nightBase) {
   if (typeof service.pct === 'number') {
-    return nightBase > 0 ? Math.round(service.pct * nightBase) : null;
+    if (!(nightBase > 0)) return null;
+    const raw = service.pct * nightBase;
+    return service.round5k ? Math.round(raw / 5000) * 5000 : Math.round(raw);
   }
   return service.price;
 }

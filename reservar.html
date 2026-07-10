@@ -653,7 +653,8 @@
   const BE_EXTRAS = [
     { id:'desayuno', kind:'perGuestNight', name:'Desayuno', desc:'Café, fruta y huevos cada mañana', price:20000, unit:'/ persona / noche', icon:'coffee' },
     { id:'late', kind:'pct', pct:0.15, name:'Late check-out', desc:'Salida hasta las 2:00 pm (sujeto a disponibilidad)', unit:'15% de la noche', icon:'clock' },
-    { id:'early', kind:'pct', pct:0.25, name:'Early check-in', desc:'Entrada desde las 6:00 am (sujeto a disponibilidad)', unit:'25% de la noche', icon:'sunrise' },
+    /* Early check-in NO se vende en el motor: se compra SOLO en el check-in
+       (decisión firme). Su bit en el extrasMask queda reservado (append-only). */
     { id:'mascota', kind:'flat', price:200000, name:'Mascota', desc:'Una mascota por reserva · IVA incluido', unit:'por reserva', icon:'paw-print' }
   ];
   /* Posición de cada flag en el extrasMask de la referencia Wompi. APPEND ONLY:
@@ -666,7 +667,7 @@
       extras.desayuno ? '1' : '0',
       '0',                              /* parqueadero (reservado) */
       extras.late ? '1' : '0',
-      extras.early ? '1' : '0',
+      '0',                              /* early check-in: reservado (solo en el check-in) */
       '0',                              /* traslado (reservado) */
       '0',                              /* tour (reservado) */
       extras.mascota ? '1' : '0'
@@ -689,19 +690,25 @@
     const nightly=rate==='best'?room.priceFlexible:Math.round(room.priceFlexible*1.10);
     const base=room.priceFlexible;            /* los % usan la noche base (Best Price) */
     const roomSub=nightly*nights;
-    /* extras gravables (entran al IVA) */
+    /* Impuestos (estimación a liquidar en recepción; el cobro online va sin ellos):
+       - IVA 19% sobre alojamiento + late check-out.
+       - INC 8% sobre el desayuno (impuesto al consumo, NO IVA; NO se exime a
+         extranjeros como sí el IVA de alojamiento). Decisión dueño 2026-07. */
+    const desayunoSub = extras.desayuno ? 20000*search.guests*nights : 0;
+    const lateSub = extras.late ? Math.round(base*0.15) : 0;
+    /* early check-in ya no se cobra en el motor (solo en el check-in) */
     const lines=[];
-    if(extras.desayuno)lines.push({key:'desayuno',amount:20000*search.guests*nights});
-    if(extras.late)lines.push({key:'late',amount:Math.round(base*0.15)});
-    if(extras.early)lines.push({key:'early',amount:Math.round(base*0.25)});
+    if(extras.desayuno)lines.push({key:'desayuno',amount:desayunoSub});
+    if(extras.late)lines.push({key:'late',amount:lateSub});
     const exTaxable=lines.reduce((s,l)=>s+l.amount,0);
-    /* mascota: $200k IVA incluido → entra al cobro online pero no a la base de IVA */
+    /* mascota: $200k IVA incluido → entra al cobro online pero no a la base de impuestos */
     const mascotaSub=extras.mascota?200000:0;
     if(extras.mascota)lines.push({key:'mascota',amount:200000});
-    const taxable=roomSub+exTaxable;
-    const iva=Math.round(taxable*.19);
-    const sub=taxable+mascotaSub;             /* cobro online de hoy (sin IVA) */
-    return{nights,nightly,roomSub,extrasSub:exTaxable+mascotaSub,mascotaSub,taxable,subtotal:sub,iva,total:sub+iva,extrasLines:lines};
+    const ivaBase=roomSub+lateSub;
+    const iva=Math.round(ivaBase*0.19);
+    const inc=Math.round(desayunoSub*0.08);
+    const sub=roomSub+exTaxable+mascotaSub;   /* cobro online de hoy (sin impuestos) */
+    return{nights,nightly,roomSub,extrasSub:exTaxable+mascotaSub,mascotaSub,ivaBase,taxable:ivaBase,subtotal:sub,iva,inc,total:sub+iva+inc,extrasLines:lines};
   }
 </script>
 <script src="motor-app.js"></script>

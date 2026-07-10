@@ -18,7 +18,7 @@
 
 require('./_env');
 const { getReservationsByDate, hasOtasyncCreds } = require('./_otasync');
-const { sendEmail, preArrivalHtml, postStayHtml, formatDateES } = require('./_email');
+const { sendEmail, preArrivalHtml, postStayHtml, formatDateES, formatDateEN } = require('./_email');
 const { flag, get } = require('./_settings');
 
 /* Valores por defecto (de Netlify). El panel puede sobreescribirlos en runtime
@@ -89,7 +89,7 @@ async function processBatch(store, reservations, type, predicate, targetDate, op
     try {
       const html = type === 'pre' ? preArrivalHtml({ resv: r, lang: r.lang }) : postStayHtml({ resv: r, lang: r.lang, npsUrl });
       const subject = type === 'pre'
-        ? (r.lang === 'en' ? `Your stay at Estar — ${formatDateES(r.dateArrival)}` : `Tu llegada a Estar — ${formatDateES(r.dateArrival)}`)
+        ? (r.lang === 'en' ? `Your stay at Estar — ${formatDateEN(r.dateArrival)}` : `Tu llegada a Estar — ${formatDateES(r.dateArrival)}`)
         : (r.lang === 'en' ? 'Thank you for staying with us — Estar' : 'Gracias por tu estadía — Estar');
       await send({ to: r.email, subject, html });
       await markSent(store, key);
