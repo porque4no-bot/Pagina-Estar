@@ -623,6 +623,298 @@ async function markLeadLost(quoteId, reason, opts) {
   return { id: leadId, lost: true, isMock: false };
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   PORTAL EMPRESA — lectura de cartera, facturas y pedidos (solo-lectura)
+   ══════════════════════════════════════════════════════════════════════════
+   Estas funciones alimentan el portal empresa (vista de cuenta corriente del
+   cliente corporativo). Son de SOLO LECTURA: nunca crean ni modifican nada en
+   Odoo. Requieren Contabilidad (account.move / account.move.line) y, para
+   getOrders, el módulo Ventas (sale.order) — si algún modelo no está instalado
+   devuelven una estructura vacía sin lanzar.
+
+   Mock-safe igual que el resto del conector: sin credenciales devuelven
+   `isMock:true` con montos en cero, jamás lanzan.
+
+   GATING: la EXPOSICIÓN de estos datos (PII financiera, Ley 1266/1581) se
+   controla en la función HTTP que las consume (portal-*.js), que debe:
+     1) require('./_settings').flag('PORTAL_ENABLED') → OFF ⇒ respuesta inerte,
+     2) require('./_authz').authorize(event, 'cartera.view'  o rol tesorería),
+     3) sesión propia del portal (patrón guest-session), NUNCA credenciales
+        OTASync/Odoo en el cliente.
+   El conector solo lee; no decide autorización. */
+
+function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+
+/* Extrae id/nombre de un campo many2one de Odoo, que llega como [id, 'Nombre']
+   (o `false` si está vacío). */
+function m2oId(v) { return Array.isArray(v) ? v[0] : (typeof v === 'number' ? v : null); }
+function m2oName(v) { return Array.isArray(v) ? (v[1] || '') : (typeof v === 'string' ? v : ''); }
+
+/* Fecha de Odoo ('YYYY-MM-DD') → epoch ms en UTC. Determinista (no depende del
+   huso horario del proceso, para que el cálculo de días vencidos sea estable).
+   Devuelve null si la fecha es falsy o no parseable. */
+function parseOdooDateMs(dateStr) {
+  if (!dateStr) return null;
+  const s = String(dateStr).slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (m) return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const t = Date.parse(s);
+  return isNaN(t) ? null : t;
+}
+
+/* Días vencidos = (hoy − fecha de vencimiento) en días enteros. Positivo si ya
+   venció, ≤0 si aún no. Sin fecha de vencimiento ⇒ 0 (se trata como corriente).
+   PURA: `nowMs` inyectable para tests deterministas. */
+function daysOverdue(dateMaturity, nowMs) {
+  const due = parseOdooDateMs(dateMaturity);
+  if (due == null) return 0;
+  const now = (nowMs == null) ? Date.now() : nowMs;
+  return Math.floor((now - due) / 86400000);
+}
+
+/* Clasifica los días vencidos en el bucket de aging. PURA. */
+function agingBucket(days) {
+  if (days <= 0) return 'corriente';
+  if (days <= 30) return 'd1_30';
+  if (days <= 60) return 'd31_60';
+  if (days <= 90) return 'd61_90';
+  return 'mas90';
+}
+
+function emptyBuckets() {
+  return { corriente: 0, d1_30: 0, d31_60: 0, d61_90: 0, mas90: 0 };
+}
+
+/* Suma la cartera por buckets a partir de líneas normalizadas. PURA y
+   determinista (núcleo testeable sin red). Cada línea:
+     { moveId, moveName, invoiceDate, dateMaturity, amountResidual }
+   Devuelve { total, buckets:{corriente,d1_30,d31_60,d61_90,mas90}, documentos:[...] }.
+   Ignora líneas con saldo 0. */
+function computeAging(lines, nowMs) {
+  const buckets = emptyBuckets();
+  const documentos = [];
+  let total = 0;
+  for (const ln of (Array.isArray(lines) ? lines : [])) {
+    const saldo = Number(ln && ln.amountResidual) || 0;
+    if (!saldo) continue;
+    const dias = daysOverdue(ln.dateMaturity, nowMs);
+    const bucket = agingBucket(dias);
+    buckets[bucket] = round2(buckets[bucket] + saldo);
+    total = round2(total + saldo);
+    documentos.push({
+      moveId: ln.moveId != null ? ln.moveId : null,
+      documento: ln.moveName || '',
+      fecha: ln.invoiceDate || null,
+      vencimiento: ln.dateMaturity || null,
+      saldo: round2(saldo),
+      diasVencido: dias,
+      bucket
+    });
+  }
+  return { total: round2(total), buckets, documentos };
+}
+
+/* Normaliza una línea de account.move.line (search_read) al shape que consume
+   computeAging. move_id llega como [id, 'FAC/2026/0001']. */
+function mapCarteraLine(row) {
+  row = row || {};
+  return {
+    moveId: m2oId(row.move_id),
+    moveName: row.move_name || m2oName(row.move_id) || '',
+    invoiceDate: row.invoice_date || row.date || null,
+    dateMaturity: row.date_maturity || null,
+    amountResidual: Number(row.amount_residual || 0)
+  };
+}
+
+/* Resuelve un partnerKey → id de res.partner. Acepta:
+     - number / string numérica → se usa tal cual,
+     - { vat } / { nit }        → search por vat normalizado,
+     - { email } o string con '@' → search por email (=ilike),
+     - string no numérica sin '@' → se trata como vat.
+   Reusa el MISMO orden de dedup que upsertPartner (vat antes que email).
+   Devuelve null si no hay match (las getX devuelven estructura vacía, no lanzan).
+   No fatal: cualquier error de red se traga y devuelve null. */
+async function resolvePartnerId(partnerKey, opts) {
+  opts = opts || {};
+  if (partnerKey == null) return null;
+  if (typeof partnerKey === 'number') return (Number.isFinite(partnerKey) && partnerKey > 0) ? partnerKey : null;
+  const transport = opts.transport;
+  const c = odooConfig();
+  const ctx = c.companyId ? { allowed_company_ids: [c.companyId] } : null;
+  const withCtx = (kw) => (ctx ? { ...(kw || {}), context: ctx } : (kw || {}));
+
+  let domain = null;
+  if (typeof partnerKey === 'string') {
+    const s = partnerKey.trim();
+    if (/^\d+$/.test(s)) return parseInt(s, 10) || null;
+    if (s.includes('@')) domain = [['email', '=ilike', s.toLowerCase()]];
+    else { const vat = normalizeVat(s); if (vat) domain = [['vat', '=', vat]]; }
+  } else if (typeof partnerKey === 'object') {
+    const vat = normalizeVat(partnerKey.vat || partnerKey.nit);
+    if (vat) domain = [['vat', '=', vat]];
+    else if (partnerKey.email) domain = [['email', '=ilike', String(partnerKey.email).toLowerCase().trim()]];
+    else if (partnerKey.id) return parseInt(partnerKey.id, 10) || null;
+  }
+  if (!domain) return null;
+  try {
+    const found = await executeKw('res.partner', 'search', [domain], withCtx({ limit: 1 }), transport);
+    if (Array.isArray(found) && found.length) return found[0];
+  } catch (e) {
+    if (process.env.DEBUG) console.log('[odoo] resolvePartnerId falló:', e.message);
+  }
+  return null;
+}
+
+/* ── Cartera (aging de cuentas por cobrar) ──
+   Suma el saldo pendiente (amount_residual) de las líneas por cobrar del cliente
+   y las agrupa en buckets de mora. Devuelve
+     { partnerId, total, buckets, documentos, count, isMock }.
+   Mock-safe; nunca lanza (tolera Contabilidad ausente devolviendo vacío). */
+async function getCartera(partnerKey, opts) {
+  opts = opts || {};
+  if (!isConfigured()) {
+    if (process.env.DEBUG) console.log('[odoo] mock getCartera');
+    return { partnerId: null, total: 0, buckets: emptyBuckets(), documentos: [], count: 0, isMock: true };
+  }
+  const transport = opts.transport;
+  const c = odooConfig();
+  const ctx = c.companyId ? { allowed_company_ids: [c.companyId] } : null;
+  const withCtx = (kw) => (ctx ? { ...(kw || {}), context: ctx } : (kw || {}));
+
+  const partnerId = await resolvePartnerId(partnerKey, { transport });
+  if (!partnerId) {
+    return { partnerId: null, total: 0, buckets: emptyBuckets(), documentos: [], count: 0, isMock: false };
+  }
+
+  /* Domain robusto entre versiones: cuentas por cobrar posteadas con saldo, no
+     conciliadas. `full_reconcile_id = false` evita depender de `reconciled`
+     (que no existe en todas las versiones). */
+  const domain = [
+    ['partner_id', '=', partnerId],
+    ['account_id.account_type', '=', 'asset_receivable'],
+    ['parent_state', '=', 'posted'],
+    ['amount_residual', '!=', 0],
+    ['full_reconcile_id', '=', false]
+  ];
+  /* NO pedir 'invoice_date' aquí: es campo de la CABECERA account.move, no de la
+     línea account.move.line (que expone 'date' y 'date_maturity'). Si el campo no
+     existe en el modelo de línea, Odoo lanza 'Invalid field invoice_date' y el
+     try/catch de abajo lo tragaría → cartera VACÍA (deuda vencida enmascarada como
+     total 0). mapCarteraLine ya usa invoiceDate = row.invoice_date || row.date.
+     'move_name' tampoco se pide: no existe en la línea en varias versiones y caería
+     en el mismo catch → cartera vacía; mapCarteraLine deriva el nombre del tuple
+     move_id ([id, name]). */
+  const fields = ['move_id', 'date', 'date_maturity', 'amount_residual', 'currency_id'];
+  let rows = [];
+  try {
+    rows = await executeKw('account.move.line', 'search_read', [domain, fields],
+      withCtx({ order: 'date_maturity asc', limit: opts.limit || 500 }), transport);
+  } catch (e) {
+    /* Contabilidad no instalada / campo ausente: cartera vacía, no fatal. */
+    if (process.env.DEBUG) console.log('[odoo] getCartera search_read falló (cartera vacía):', e.message);
+    rows = [];
+  }
+  const lines = (Array.isArray(rows) ? rows : []).map(mapCarteraLine);
+  const aged = computeAging(lines, opts.nowMs);
+  const currency = (Array.isArray(rows) && rows.length) ? m2oName(rows[0].currency_id) : '';
+  return { partnerId, currency: currency || undefined, ...aged, count: aged.documentos.length, isMock: false };
+}
+
+/* ── Facturas de venta (account.move / out_invoice) ──
+   Devuelve { partnerId, count, invoices:[...], isMock }. Cada factura:
+     { id, numero, fecha, vencimiento, monto, saldo, subtotal, estado,
+       estadoPago, moneda }.
+   opts: { limit=50, order='invoice_date desc', includeRefunds }. Mock-safe. */
+async function getInvoices(partnerKey, opts) {
+  opts = opts || {};
+  if (!isConfigured()) {
+    if (process.env.DEBUG) console.log('[odoo] mock getInvoices');
+    return { partnerId: null, count: 0, invoices: [], isMock: true };
+  }
+  const transport = opts.transport;
+  const c = odooConfig();
+  const ctx = c.companyId ? { allowed_company_ids: [c.companyId] } : null;
+  const withCtx = (kw) => (ctx ? { ...(kw || {}), context: ctx } : (kw || {}));
+
+  const partnerId = await resolvePartnerId(partnerKey, { transport });
+  if (!partnerId) return { partnerId: null, count: 0, invoices: [], isMock: false };
+
+  const types = opts.includeRefunds ? ['out_invoice', 'out_refund'] : ['out_invoice'];
+  const domain = [
+    ['partner_id', '=', partnerId],
+    ['move_type', 'in', types],
+    ['state', '=', 'posted']
+  ];
+  const fields = ['name', 'invoice_date', 'invoice_date_due', 'amount_total', 'amount_residual', 'amount_untaxed', 'move_type', 'state', 'payment_state', 'currency_id'];
+  let rows = [];
+  try {
+    rows = await executeKw('account.move', 'search_read', [domain, fields],
+      withCtx({ order: opts.order || 'invoice_date desc', limit: opts.limit || 50 }), transport);
+  } catch (e) {
+    if (process.env.DEBUG) console.log('[odoo] getInvoices search_read falló (sin facturas):', e.message);
+    rows = [];
+  }
+  const invoices = (Array.isArray(rows) ? rows : []).map(r => ({
+    id: r.id,
+    numero: r.name || '',
+    fecha: r.invoice_date || null,
+    vencimiento: r.invoice_date_due || null,
+    monto: round2(r.amount_total),
+    saldo: round2(r.amount_residual),
+    subtotal: round2(r.amount_untaxed),
+    tipo: r.move_type || 'out_invoice',
+    estado: r.state || '',
+    estadoPago: r.payment_state || '',
+    moneda: m2oName(r.currency_id) || undefined
+  }));
+  return { partnerId, count: invoices.length, invoices, isMock: false };
+}
+
+/* ── Pedidos de venta (sale.order) ──
+   Devuelve { partnerId, count, orders:[...], isMock }. Cada pedido:
+     { id, numero, fecha, monto, subtotal, estado, estadoFactura, moneda }.
+   Requiere el módulo Ventas; si no está instalado devuelve lista vacía (no
+   lanza). opts: { limit=50, order='date_order desc', states }. Mock-safe. */
+async function getOrders(partnerKey, opts) {
+  opts = opts || {};
+  if (!isConfigured()) {
+    if (process.env.DEBUG) console.log('[odoo] mock getOrders');
+    return { partnerId: null, count: 0, orders: [], isMock: true };
+  }
+  const transport = opts.transport;
+  const c = odooConfig();
+  const ctx = c.companyId ? { allowed_company_ids: [c.companyId] } : null;
+  const withCtx = (kw) => (ctx ? { ...(kw || {}), context: ctx } : (kw || {}));
+
+  const partnerId = await resolvePartnerId(partnerKey, { transport });
+  if (!partnerId) return { partnerId: null, count: 0, orders: [], isMock: false };
+
+  const domain = [['partner_id', '=', partnerId]];
+  if (Array.isArray(opts.states) && opts.states.length) domain.push(['state', 'in', opts.states]);
+  const fields = ['name', 'date_order', 'amount_total', 'amount_untaxed', 'state', 'invoice_status', 'currency_id'];
+  let rows = [];
+  try {
+    rows = await executeKw('sale.order', 'search_read', [domain, fields],
+      withCtx({ order: opts.order || 'date_order desc', limit: opts.limit || 50 }), transport);
+  } catch (e) {
+    /* Módulo Ventas no instalado (modelo inexistente) u otro fallo: sin pedidos. */
+    if (process.env.DEBUG) console.log('[odoo] getOrders search_read falló (sin pedidos / Ventas no instalado):', e.message);
+    rows = [];
+  }
+  const orders = (Array.isArray(rows) ? rows : []).map(r => ({
+    id: r.id,
+    numero: r.name || '',
+    fecha: r.date_order || null,
+    monto: round2(r.amount_total),
+    subtotal: round2(r.amount_untaxed),
+    estado: r.state || '',
+    estadoFactura: r.invoice_status || '',
+    moneda: m2oName(r.currency_id) || undefined
+  }));
+  return { partnerId, count: orders.length, orders, isMock: false };
+}
+
 /* Para tests: limpiar el uid y los catálogos cacheados entre escenarios. */
 function _resetAuthCache() {
   cachedUid = null;
@@ -637,5 +929,9 @@ module.exports = {
   createHelpdeskTicket,
   findOrCreateMailingList, addToMailingList,
   quoteMarker, getWonStageId, getLostReasonId, findLeadIdForQuote,
-  markLeadWonByQuote, markLeadLost, _resetAuthCache
+  markLeadWonByQuote, markLeadLost,
+  /* Portal empresa (solo-lectura): cartera / facturas / pedidos + helpers puros */
+  round2, m2oId, m2oName, parseOdooDateMs, daysOverdue, agingBucket, emptyBuckets,
+  computeAging, mapCarteraLine, resolvePartnerId, getCartera, getInvoices, getOrders,
+  _resetAuthCache
 };
