@@ -32,12 +32,11 @@ const SERVICES = {
   desayuno: { es: 'Desayuno', en: 'Breakfast', price: 20000, tax: 'inc', multiplier: 'perGuestPerNight', surfaces: ['booking', 'quote', 'guest'] },
 
   /* Booking-engine extras (mask-encoded; see _pricing.js EXTRAS_KEYS).
-     late + early are also offered in the guest app (owner decision 2026-06-18):
-     priced there as the same %-of-night, computed from the booking's average
-     paid night (totalAmount / nights, IVA included). mascota is a flat surcharge
-     offered in both the booking engine and the guest app. */
+     late is offered in the booking engine + guest app. early check-in se compra
+     SOLO en el check-in (guest) — decisión firme; su % se REDONDEA a $5.000
+     (round5k). mascota es un recargo plano en ambas superficies. */
   late:    { es: 'Late check-out', en: 'Late check-out', pct: 0.15, tax: 'iva', multiplier: 'pctOfNight', surfaces: ['booking', 'guest'] },
-  early:   { es: 'Early check-in',  en: 'Early check-in',  pct: 0.25, tax: 'iva', multiplier: 'pctOfNight', surfaces: ['booking', 'guest'] },
+  early:   { es: 'Early check-in',  en: 'Early check-in',  pct: 0.25, tax: 'iva', multiplier: 'pctOfNight', round5k: true, surfaces: ['guest'] },
   mascota: { es: 'Mascota', en: 'Pet', price: 200000, tax: 'included', multiplier: 'flat', surfaces: ['booking', 'guest'] },
 
   /* Corporate-quote services */

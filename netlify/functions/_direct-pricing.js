@@ -170,9 +170,12 @@ async function computeDirectBookingTotals(decoded, opts = {}) {
 function withinTolerance(actualCents, expectedCents) {
   if (expectedCents <= 0) return false;
   const diff = Math.abs(actualCents - expectedCents);
-  /* Tolerate at least 1 peso (100 cents) AND PRICE_TOLERANCE_RATIO of total
-     so rounding inside `Math.round(price * 100)` never trips the gate. */
-  const allowed = Math.max(100, Math.round(expectedCents * PRICE_TOLERANCE_RATIO));
+  /* La aritmética de precio del cliente y del servidor es IDÉNTICA (ambos hacen
+     Math.round(precioNoche * 1.10) por noche + los mismos extras), así que la
+     deriva legítima es ~0. La tolerancia solo absorbe el redondeo de
+     Math.round(price * 100): basta un piso pequeño con TECHO ABSOLUTO. Sin techo,
+     el 0,5% dejaba subpagar sistemáticamente (~$11k en una estadía cara). */
+  const allowed = Math.min(500, Math.max(100, Math.round(expectedCents * PRICE_TOLERANCE_RATIO)));
   return diff <= allowed;
 }
 

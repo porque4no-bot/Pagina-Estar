@@ -24,7 +24,14 @@ function fakeStore() {
   return {
     map,
     get: async (k) => (map.has(k) ? map.get(k) : null),
-    set: async (k, v) => { map.set(k, v); }
+    /* Emula la semántica de Netlify Blobs: onlyIfNew no sobrescribe una clave
+       existente y devuelve { modified:false }; delete la borra. */
+    set: async (k, v, opts) => {
+      if (opts && opts.onlyIfNew && map.has(k)) return { modified: false };
+      map.set(k, v);
+      return { modified: true };
+    },
+    delete: async (k) => { map.delete(k); }
   };
 }
 

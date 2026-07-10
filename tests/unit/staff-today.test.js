@@ -26,6 +26,7 @@ function load({ authOk = true, perms = ['guests.checkin.view', 'refunds.view'], 
   });
   fakeModule(P('_otasync'), {
     hasOtasyncCreds: () => hasCreds,
+    isHoldReservation: (r) => /^bloqueo/i.test(`${(r && r.firstName) || ''} ${(r && r.lastName) || ''}`.trim()) || /^COT-/i.test(String((r && r.reference) || '')),
     getReservationsByDate: async ({ filterBy }) => filterBy === 'date_departure'
       ? { reservations: departures, isMock: false }
       : { reservations: window, isMock: false }

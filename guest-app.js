@@ -1663,10 +1663,11 @@
     const nightBase = nights > 0 && totalAmount > 0 ? totalAmount / nights : 0;
     $$('.guest-service-card[data-service-pct]').forEach(card => {
       const pct = Number(card.dataset.servicePct) || 0;
+      const round = Number(card.dataset.serviceRound) || 0; /* early check-in → 5000 */
       const display = card.querySelector('[data-service-price-display]');
       const addBtn = card.querySelector('.guest-add-service');
       if (nightBase > 0 && pct > 0) {
-        const amount = Math.round(pct * nightBase);
+        const amount = round > 0 ? Math.round(pct * nightBase / round) * round : Math.round(pct * nightBase);
         card.dataset.servicePrice = String(amount);
         /* Match the static cards' "$X.XXX" style (no space) so the grid reads
            uniformly; the cart uses money() like the rest of the app. */

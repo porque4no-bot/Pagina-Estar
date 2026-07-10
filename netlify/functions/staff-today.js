@@ -1,6 +1,6 @@
 require('./_env');
 const { authorize } = require('./_authz');
-const { getReservationsByDate, hasOtasyncCreds } = require('./_otasync');
+const { getReservationsByDate, hasOtasyncCreds, isHoldReservation } = require('./_otasync');
 
 /*
  * staff-today — Staff App v1 (read-only), Sprint 1 (Mesa Redonda: el mayor vacío
@@ -96,10 +96,12 @@ exports.handler = async (event) => {
       getReservationsByDate({ filterBy: 'date_departure', dfrom: date, dto: date, departures: 1 })
     ]);
 
-    const windowList = (windowArrivals.reservations || []).filter(r => ACTIVE_STATUSES.has(String(r.status || '').toLowerCase()));
+    /* Excluir nuestros holds internos (BLOQUEO/COT-) para que recepción no vea
+       "huéspedes fantasma" ni se inflen los conteos del tablero. */
+    const windowList = (windowArrivals.reservations || []).filter(r => ACTIVE_STATUSES.has(String(r.status || '').toLowerCase()) && !isHoldReservation(r));
     const arrivals = windowList.filter(r => r.dateArrival === date);
     const inHouse = windowList.filter(r => r.dateArrival <= date && r.dateDeparture > date);
-    const departures = (departuresRes.reservations || []).filter(r => ACTIVE_STATUSES.has(String(r.status || '').toLowerCase()));
+    const departures = (departuresRes.reservations || []).filter(r => ACTIVE_STATUSES.has(String(r.status || '').toLowerCase()) && !isHoldReservation(r));
 
     let refunds = null;
     if (canSeeRefunds) {

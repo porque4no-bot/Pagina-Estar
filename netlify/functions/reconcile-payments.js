@@ -37,7 +37,9 @@ async function directBookingReconciled(resultsStore, bookingCode) {
     if (!raw) return false;
     /* A pending entry (sold_out / failed insert) is NOT reconciled — it still
        needs manual handling, so we want it reported. */
-    try { return !JSON.parse(raw).reservationPending; } catch (e) { return true; }
+    /* Blob corrupto → fail-safe: tratar como NO reconciliado para que el huérfano
+       se reporte y se revise a mano, en vez de darlo por bueno en silencio. */
+    try { return !JSON.parse(raw).reservationPending; } catch (e) { return false; }
   } catch (e) {
     return false;
   }

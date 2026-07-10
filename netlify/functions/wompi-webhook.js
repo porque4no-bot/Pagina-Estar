@@ -6,7 +6,7 @@ const { getStore } = require('@netlify/blobs');
 const {
   getQuoteStore, loadQuote, saveQuote, effectiveStatus, computeQuoteTotal
 } = require('./_quotes-store');
-const { getAvailabilityByType, findUnavailable, releaseHold, buildExtrasFromQuote, postOrderExtrasToFolio } = require('./_otasync');
+const { getAvailabilityByType, findUnavailable, releaseHold, buildExtrasFromQuote, postOrderExtrasToFolio, insertReservation } = require('./_otasync');
 const { loadIntent: loadGuestPaymentIntent, markIntentStatus: markGuestPaymentStatus, GUEST_ORDER_REF_RE } = require('./_guest-payments');
 const { verifyDirectBookingAmount, EXTRAS_KEYS, EXTRAS_PRICES } = require('./_direct-pricing');
 const { sendEmail, adminEmail, paymentConfirmationHtml, adminPendingHtml, paymentPendingHtml, paymentRejectedHtml } = require('./_email');
@@ -1058,12 +1058,11 @@ exports.handler = async (event, context) => {
   }
 
   // Guest-app service order paid online: reference is the order eventId (GST-...).
-  // guest-action builds a Wompi checkout when the mode is 'wompi' OR 'both'
-  // (both => guest chooses), so accept both here or a paid GST order in 'both'
-  // mode would fall through, never settle to the folio, and strand the payment.
-  const guestSvcMode = String(await get('GUEST_SERVICE_PAYMENT_MODE') || '').toLowerCase();
-  if (GUEST_ORDER_REF_RE.test(transaction.reference || '') &&
-      (guestSvcMode === 'wompi' || guestSvcMode === 'both')) {
+  // A-13: enrutar SIEMPRE al handler de servicio si la referencia es GST- (no
+  // depender del GUEST_SERVICE_PAYMENT_MODE actual). El handler es idempotente y,
+  // si no existe el intent, responde 200 sin efecto. Depender del modo estrancaba
+  // el pago cuando el admin lo cambiaba entre el checkout y la llegada del webhook.
+  if (GUEST_ORDER_REF_RE.test(transaction.reference || '')) {
     addProcessedTransaction(transaction.id);
     if (txStore) {
       try { await txStore.set(String(transaction.id), '1', { ttl: 86400 }); } catch (e) { /* non-fatal */ }
@@ -1169,10 +1168,21 @@ exports.handler = async (event, context) => {
   let expectedCentsForAlert = 0;
   let discountVerdict = null;
 
-  if (appliedDiscount && appliedDiscount.code) {
-    /* Discounted booking: recompute authoritatively WITH the code re-validated.
-       verifyDirectBookingAmount returns ok only if paid matches a discounted
-       subtotal AND the code still validates (expiry/usage/blackout). */
+  if (appliedDiscount && appliedDiscount.code && appliedDiscount.signedAmountCents != null && Number.isFinite(Number(appliedDiscount.signedAmountCents))) {
+    /* El monto CON descuento ya quedó fijado por la firma de integridad Wompi al
+       firmar (paid == signed, garantía de Wompi). Confiar en ese monto en vez de
+       re-validar el código: si el cupón cruzó vencimiento/cupo/blackout ENTRE la
+       firma y el webhook, un pago legítimo con descuento NO debe rechazarse
+       (quedaría cobrado sin reserva). consumeDiscountUse (CAS, más abajo) sigue
+       siendo el ÚNICO guardián del cupo. */
+    const signed = Number(appliedDiscount.signedAmountCents);
+    if (Math.abs(transaction.amount_in_cents - signed) > 100) {
+      priceVerifyOk = false;
+      priceReason = 'amount_mismatch_signed_discount';
+      expectedCentsForAlert = signed;
+    }
+  } else if (appliedDiscount && appliedDiscount.code) {
+    /* Blob de descuento viejo sin signedAmountCents → re-validar como antes. */
     try {
       discountVerdict = await verifyDirectBookingAmount(decoded, transaction.amount_in_cents, {
         discountCode: appliedDiscount.code,
@@ -1501,32 +1511,30 @@ exports.handler = async (event, context) => {
       note: `${guestNote ? 'Nota del huésped: ' + guestNote + '. ' : ''}Plan: ${ratePlan === 'flexible' ? 'Flexible (reembolso 100% hasta 24 h antes)' : ratePlan === 'best' ? 'Estricta (reembolso 100% hasta 7 días antes)' : 'N/D'}. Teléfono del huésped: ${sanitizePhone(decoded.phone)}. Extras: ${escapeHtml(extrasText)}. IVA (19%): ${ivaNote}. Creado por Webhook Wompi. ID Transacción: ${transaction.id}`
     };
 
-    const insertController = new AbortController();
-    const insertTimeoutId = setTimeout(() => insertController.abort(), 10000);
-    let response;
+    /* A-4/C5: insertar con reintentos + backoff + alerta crítica (misma resiliencia
+       que la ruta directa de Mercado Pago vía _payments). Si falla tras los
+       reintentos, dejar un marcador reservationPending para que reconcile-payments
+       lo detecte EXPLÍCITAMENTE (no solo por ausencia del registro), y re-lanzar
+       para que el catch del handler avise por correo y responda 200 (Wompi no
+       reintenta el webhook). */
+    let data;
     try {
-      response = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reservationPayload),
-        signal: insertController.signal
-      });
-      clearTimeout(insertTimeoutId);
+      data = await insertReservation(reservationPayload);
     } catch (err) {
-      clearTimeout(insertTimeoutId);
-      if (err.name === 'AbortError') {
-        return { statusCode: 504, body: JSON.stringify({ error: 'Request timeout' }) };
+      if (directBookingResultStore) {
+        try {
+          await directBookingResultStore.set(`direct-${decoded.bookingCode}`, JSON.stringify({
+            reservationPending: true,
+            provider: 'wompi',
+            bookingCode: decoded.bookingCode,
+            transactionId: transaction.id,
+            amountCents: transaction.amount_in_cents,
+            createdAt: new Date().toISOString()
+          }));
+        } catch (_) { /* best-effort */ }
       }
       throw err;
     }
-
-    if (!response.ok) {
-      const detail = await readResponseSnippet(response);
-      console.error(`[wompi-webhook] Kunas insert failed. status=${response.status}, roomTypeId=${decoded.roomTypeId}, id_rooms=${selectedRoomId || 0}, bookingCode=${decoded.bookingCode}, tx=${transaction.id}, amount=${transaction.amount_in_cents}${detail ? ', body=' + detail : ''}`);
-      throw new Error(`Kunas API booking submission returned status ${response.status}`);
-    }
-
-    const data = await response.json();
     const finalBookingCode = data.id_reservations || decoded.bookingCode;
     console.log(`[wompi-webhook] OTASync insert response: ${JSON.stringify(data)}, finalBookingCode=${finalBookingCode}`);
 

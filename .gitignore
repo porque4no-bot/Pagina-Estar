@@ -30,5 +30,5 @@ _correos-text.txt
 
 _gen-logo.js
 
-# Deliverables generados (Word) — no van al repo
+# Documentos Word generados (deliverables, no versionar)
 *.docx
