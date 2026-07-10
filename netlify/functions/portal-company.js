@@ -70,10 +70,10 @@ function parseJsonMap(raw) {
   }
 }
 
-/* Mapea la sesión (email/profile del token del portal) → identidad de empresa:
-   { email, nit }. El NIT sale del claim de sesión si existe, o de un mapa de
-   env opcional email→NIT (PORTAL_EMPRESA_NIT_JSON). Sin NIT conocido se usa el
-   email como clave de partner en Odoo (getCartera acepta {email}). PURO. */
+/* Mapea la sesión (email/profile del token del portal) → identidad de empresa.
+   El NIT sale del claim de sesión si existe, o de un mapa de env opcional
+   email→NIT (PORTAL_EMPRESA_NIT_JSON). Los claims firmados de Odoo/Drive ganan
+   sobre fallbacks de env. PURO. */
 function resolveCompany(session) {
   const email = normalizeEmail(session && session.sub);
   let nit = String((session && session.nit) || '').trim().slice(0, 50);
@@ -82,26 +82,35 @@ function resolveCompany(session) {
     const mapped = map[email];
     if (mapped) nit = String(mapped).trim().slice(0, 50);
   }
-  return { email, nit };
+  return {
+    email,
+    nit,
+    odooPartnerKey: session && session.odooPartnerKey,
+    driveFolderId: String((session && session.driveFolderId) || '').trim().slice(0, 120)
+  };
 }
 
-/* partnerKey para Odoo: prioriza NIT (mismo orden de dedup que upsertPartner)
-   y cae al email cuando no hay NIT. null si no hay ninguno. */
+/* partnerKey para Odoo: prioriza el claim firmado (store maestro), luego NIT
+   (mismo orden de dedup que upsertPartner) y cae al email. */
 function partnerKeyFor(company) {
+  if (company.odooPartnerKey != null) return company.odooPartnerKey;
   if (company.nit) return { vat: company.nit };
   if (company.email) return { email: company.email };
   return null;
 }
 
 /* Enlace a la carpeta Drive de documentación de la empresa. Resuelve por NIT
-   (dígitos) o email desde un mapa de env opcional (PORTAL_DRIVE_FOLDER_JSON), o
-   cae a una carpeta por defecto (PORTAL_DRIVE_FOLDER_ID). Devuelve null si no
-   hay carpeta configurada — nunca inventa un enlace. */
+   (dígitos) o email desde un mapa de env opcional (PORTAL_DRIVE_FOLDER_JSON).
+   Devuelve null si no hay carpeta específica — nunca comparte una carpeta global
+   entre empresas. */
 function docsLinkFor(company) {
   const map = parseJsonMap(process.env.PORTAL_DRIVE_FOLDER_JSON);
   const byNit = company.nit ? (map[company.nit] || map[normalizeNitDigits(company.nit)]) : null;
   const byEmail = company.email ? map[company.email] : null;
-  const folderId = String(byNit || byEmail || process.env.PORTAL_DRIVE_FOLDER_ID || '').trim();
+  /* Combina el claim per-empresa (driveFolderId, firmado en la sesión) con el
+     mapa por NIT/email. SIN fallback global (PORTAL_DRIVE_FOLDER_ID) para no
+     compartir una misma carpeta de Drive entre empresas (fuga cross-tenant). */
+  const folderId = String(company.driveFolderId || byNit || byEmail || '').trim();
   if (!folderId) return null;
   return {
     folderId,

@@ -189,7 +189,7 @@ exports.handler = async (event) => {
   }
 
   /* Amount guard: never approve more than what was paid. */
-  let amountCents = refund.refundAmountCents;
+  let amountCents = refund.refundAmountCents == null ? refund.refundAmountCents : parseInt(refund.refundAmountCents, 10);
   /* Monto pagado original = TOPE del reembolso. Del registro o, si falta (reserva
      vieja / booking-results vencido / payment-details ausente), el que APORTE el
      admin en body.originalAmountCents (verificado por él desde Wompi/MP). Se
@@ -247,6 +247,15 @@ exports.handler = async (event) => {
     /* approve */
     if (amountCents == null) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Define el monto a reembolsar antes de aprobar' }) };
+    }
+    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'amountCents inválido' }) };
+    }
+    if (!knownOriginal) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'No se conoce el monto pagado original; envíalo en originalAmountCents (verificado en Wompi/MP) para fijar el tope del reembolso.' }) };
+    }
+    if (amountCents > knownOriginal) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'El reembolso no puede superar el monto pagado' }) };
     }
     /* Manual transfers still need the guest's bank details (collected by the
        form in Fase 2); gateway refunds go straight to APPROVED for later

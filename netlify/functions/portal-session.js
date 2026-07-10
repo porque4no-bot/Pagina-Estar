@@ -293,6 +293,7 @@ async function resolvePortalAccount(rawEmail, name) {
   };
   if (claims.nit) identity.nit = claims.nit;
   if (claims.empresa) identity.empresa = claims.empresa;
+  if (claims.driveFolderId) identity.driveFolderId = claims.driveFolderId;
   if (claims.reservation) identity.reservation = claims.reservation;
   if (claims.reservationCodes) identity.reservationCodes = claims.reservationCodes;
   if (claims.odooPartnerKey != null) identity.odooPartnerKey = claims.odooPartnerKey;
@@ -306,6 +307,7 @@ function routingClaims(identity) {
   if (!identity) return out;
   if (identity.nit) out.nit = identity.nit;
   if (identity.empresa) out.empresa = identity.empresa;
+  if (identity.driveFolderId) out.driveFolderId = identity.driveFolderId;
   if (identity.reservation) out.reservation = identity.reservation;
   if (identity.reservationCodes) out.reservationCodes = identity.reservationCodes;
   if (identity.odooPartnerKey != null) out.odooPartnerKey = identity.odooPartnerKey;
@@ -467,6 +469,7 @@ async function handleVerify(event, body) {
     {
       sub: identity.email,
       profile: identity.profile,
+      name: identity.name,
       ...routingClaims(identity),
       purpose: PURPOSE_SESSION
     },
