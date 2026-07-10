@@ -370,6 +370,6 @@ exports.handler = async (event, context) => {
     };
   } catch (err) {
     console.error('[send-quote-email] Error:', err.message);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ sent: false, error: 'Error interno del servidor', details: err.message }) };
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ sent: false, error: 'Error interno del servidor' }) };
   }
 };

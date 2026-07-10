@@ -178,17 +178,27 @@ exports.handler = async (event) => {
               : (existing && existing.status) || 'active',
         updatedBy: actor
       });
-      /* Guard "nunca sin admin" también por la vía upsert: suspender al último
-         admin (o a uno mismo) con status:'suspended' dejaría el panel sin
-         administrador. El invariante existía en suspend/delete pero no aquí. */
-      if (record.status === 'suspended') {
-        if (targetEmail === actor && !isEnvAdmin) {
-          return forbidden(headers, 'No puedes suspenderte a ti mismo');
-        }
-        const envAdmins = require('./_authz').adminEnvList();
-        const allUsers = await iam.listUsers();
-        if (adminsRemainingAfter(allUsers, envAdmins, targetEmail, customRolesMap) < 1) {
-          return forbidden(headers, 'La operación dejaría el sistema sin ningún administrador');
+      if (record.status === 'suspended' && targetEmail === actor && !isEnvAdmin) {
+        return forbidden(headers, 'No puedes suspenderte a ti mismo');
+      }
+      /* Guard "nunca sin admin" por la vía upsert. Se dispara cuando el cambio
+         QUITA la condición de admin a alguien que la tenía — sea suspendiéndolo
+         (status:'suspended') o despojándolo de roles/permisos (roles:[] deja al
+         usuario ACTIVO pero sin users.manage). Antes solo cubría la suspensión,
+         así que un admin activo podía quedar sin permisos y dejar el panel sin
+         administrador. adminsRemainingAfter excluye al target, así que un valor
+         < 1 significa cero admins tras la degradación. */
+      {
+        const wasAdmin = existing && existing.status !== 'suspended' &&
+          effectivePermsForRecord(existing, customRolesMap).has('users.manage');
+        const willBeAdmin = record.status !== 'suspended' &&
+          effectivePermsForRecord(record, customRolesMap).has('users.manage');
+        if (wasAdmin && !willBeAdmin) {
+          const envAdmins = require('./_authz').adminEnvList();
+          const allUsers = await iam.listUsers();
+          if (adminsRemainingAfter(allUsers, envAdmins, targetEmail, customRolesMap) < 1) {
+            return forbidden(headers, 'La operación dejaría el sistema sin ningún administrador');
+          }
         }
       }
       record.auditLog = Array.isArray(record.auditLog) ? record.auditLog : [];

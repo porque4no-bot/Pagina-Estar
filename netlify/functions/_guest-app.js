@@ -238,7 +238,13 @@ function matchesAccessKey(booking, accessKey) {
   if (!candidate || candidate.length < 2) return false;
   const lastName = normalizeComparable(booking.guestLastName);
   if (lastName) {
-    return lastName === candidate || lastName.split(' ').includes(candidate);
+    /* Apellido completo exacto (a cualquier longitud) O un token del apellido de
+       >= 3 chars. Antes aceptaba tokens de 2 letras ("de", "la", "da"): partículas
+       comunes que debilitaban el segundo factor frente a códigos enumerables.
+       Igualado con get-booking.identityMatches. */
+    if (lastName === candidate) return true;
+    if (candidate.length >= 3 && lastName.split(' ').includes(candidate)) return true;
+    return false;
   }
   const nameParts = normalizeComparable(booking.guestName).split(/\s+/).filter(Boolean);
   const inferredLastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';

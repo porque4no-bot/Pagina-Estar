@@ -152,6 +152,11 @@ const KUNAS_CONFIG = {
           if (currentYear === year && currentMonth === month) {
             renderRangePicker(calendarContainer);
           }
+        } else {
+          /* Respuesta 200 sin `rooms` (p. ej. {error:...}): sin esta rama el caché
+             quedaba atascado en 'loading' para siempre y ese mes no volvía a
+             intentar ni mostraba precios. Se deja un fallback vacío. */
+          window.estarRatesCache[cacheKey] = {};
         }
       })
       .catch(err => {

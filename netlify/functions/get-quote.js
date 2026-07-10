@@ -2,6 +2,7 @@ require('./_env');
 const crypto = require('crypto');
 const { getQuoteStore, loadQuote, saveQuote, effectiveStatus, toPublic } = require('./_quotes-store');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
+const { flag } = require('./_settings');
 
 /* Comparación de tokens en tiempo constante (evita timing oracle sobre publicToken). */
 function tokenEqual(a, b) {
@@ -84,7 +85,15 @@ exports.handler = async (event, context) => {
       return { statusCode: 200, headers: corsHeaders, body: JSON.stringify(pub) };
     }
 
-    /* ── Legacy encoded quote (?d=) ── */
+    /* ── Legacy encoded quote (?d=) ──
+       El payload es base64 SIN firma: cualquiera puede fabricar una "cotización"
+       con empresa/precios arbitrarios y mostrarla en el dominio oficial (spoofing
+       / phishing con la marca). Las cotizaciones vigentes usan ?id=&t= (store +
+       publicToken), así que esta ruta queda DESACTIVADA salvo que se encienda
+       explícitamente LEGACY_QUOTE_D_ENABLED (default OFF). */
+    if (encoded && !(await flag('LEGACY_QUOTE_D_ENABLED'))) {
+      return { statusCode: 404, headers: corsHeaders, body: JSON.stringify({ error: 'Cotización no encontrada', expired: false }) };
+    }
     if (encoded) {
       let quoteData;
       try { quoteData = decodeLegacy(encoded); }
@@ -108,7 +117,7 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ error: 'Error interno del servidor', details: err.message })
+      body: JSON.stringify({ error: 'Error interno del servidor' })
     };
   }
 };

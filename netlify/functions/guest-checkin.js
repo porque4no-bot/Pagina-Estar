@@ -6,6 +6,7 @@ const {
   corsHeaders,
   guestStore,
   json,
+  openBinaryFromStore,
   parseJsonBody,
   protectRecord,
   requireGuest,
@@ -35,6 +36,7 @@ const VALID_DOCUMENT_TYPES = ['CC', 'TI', 'CE', 'Pasaporte'];
 const defaultDeps = {
   archiveGuestPayload,
   guestStore,
+  openBinaryFromStore,
   protectRecord,
   requireGuest,
   sealBinaryForStore,
@@ -155,24 +157,30 @@ function decodeFile(file) {
 
 async function stageDraftDocument(session, file, slotIndex, docKind) {
   /* docKind segments the draft namespace so identity uploads and minor docs
-     (registro civil, autorización) never collide on key. The TTL stays at 24h. */
+     (registro civil, autorización) never collide on key.
+     El buffer del documento (imagen de la cédula/pasaporte) se CIFRA en reposo
+     con el crypto-vault, igual que los documentos definitivos. Netlify Blobs no
+     soporta TTL real, así que el draft se borra explícitamente al consumirlo en
+     el submit (fileFromDraftRef) y la purga de retención cubre el store como red. */
   const safeKind = docKind ? String(docKind).replace(/[^a-z0-9-]+/gi, '').slice(0, 40) : '';
   const prefix = safeKind ? `${safeKind}/` : '';
   const key = `${session.sub}/${prefix}${Date.now()}-${crypto.randomBytes(8).toString('hex')}.json`;
+  const sealed = deps.sealBinaryForStore(file.buffer, `${session.sub}|checkin-draft`);
   const payload = {
     name: file.name,
     contentType: file.contentType,
     size: file.size,
-    dataBase64: file.buffer.toString('base64'),
+    dataSealed: typeof sealed.value === 'string' ? sealed.value : sealed.value.toString('base64'),
+    encrypted: !!sealed.encrypted,
     slotIndex: Number.isInteger(slotIndex) ? slotIndex : null,
     docKind: safeKind || null,
     createdAt: new Date().toISOString()
   };
   const store = deps.guestStore('guest-checkin-drafts');
   if (typeof store.setJSON === 'function') {
-    await store.setJSON(key, payload, { ttl: 24 * 60 * 60 });
+    await store.setJSON(key, payload);
   } else {
-    await store.set(key, JSON.stringify(payload), { ttl: 24 * 60 * 60 });
+    await store.set(key, JSON.stringify(payload));
   }
   return {
     key,
@@ -191,8 +199,21 @@ async function fileFromDraftRef(session, documentRef) {
     draft = await store.get(key, { type: 'json' });
   }
   if (!draft) return null;
+  /* Recupera el buffer: sobre cifrado nuevo (dataSealed) o base64 en claro legado
+     (dataBase64, drafts anteriores al cifrado). */
+  let buffer;
+  if (draft.dataSealed != null) {
+    buffer = deps.openBinaryFromStore(draft.dataSealed, `${session.sub}|checkin-draft`);
+  } else {
+    buffer = Buffer.from(String(draft.dataBase64 || ''), 'base64');
+  }
+  /* El draft ya se consumió: bórralo para no dejar copias del documento de
+     identidad acumulándose en reposo (Blobs no expira solo). Best-effort. */
+  if (typeof store.delete === 'function') {
+    try { await store.delete(key); } catch (e) { /* non-fatal */ }
+  }
   return {
-    buffer: Buffer.from(String(draft.dataBase64 || ''), 'base64'),
+    buffer: Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || ''),
     contentType: cleanText(draft.contentType, 80),
     name: cleanText(draft.name || 'documento', 120),
     size: Number(draft.size || 0)
@@ -658,6 +679,10 @@ async function normalizeGuestEntry(entry, index, session) {
   return {
     guest,
     file,
+    /* Se conserva documentRef para que validateGuests (A-20) detecte el mismo
+       documento referenciado por varios huéspedes: antes se descartaba aquí y la
+       comprobación de duplicados quedaba muerta (siempre undefined). */
+    documentRef: (entry && entry.documentRef) || null,
     isMinor: guest.birthDate ? calculateAge(guest.birthDate) < 18 : false,
     isPrimary: Boolean(entry && entry.isPrimary),
     analysisSource,

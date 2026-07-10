@@ -680,8 +680,13 @@
   function dateDiff(a,b){const d1=new Date(a+'T00:00:00'),d2=new Date(b+'T00:00:00');return Math.max(1,Math.round((d2-d1)/86400000))}
   function formatCOP(n){return '$ '+Number(n).toLocaleString('es-CO').replace(/,/g,'.')}
   function fmtDate(s){if(!s)return '';const d=new Date(s+'T00:00:00');const days=['dom','lun','mar','mié','jue','vie','sáb'];const months=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`}
-  function getToday(){return new Date().toISOString().split('T')[0]}
-  function getOffset(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().split('T')[0]}
+  /* Fecha de HOY en Colombia (UTC-5). Con toISOString() la fecha se calcula en
+     UTC: en un dispositivo en hora Colombia, de 7 p.m. a medianoche devolvía la
+     fecha de MAÑANA e impedía elegir hoy como check-in (franja last-minute). */
+  function bogotaToday(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/Bogota'})}
+  function getToday(){return bogotaToday()}
+  function addDays(iso,n){const d=new Date((iso||bogotaToday())+'T00:00:00');d.setDate(d.getDate()+n);const y=d.getFullYear(),m=('0'+(d.getMonth()+1)).slice(-2),day=('0'+d.getDate()).slice(-2);return `${y}-${m}-${day}`}
+  function getOffset(n){return addDays(bogotaToday(),n)}
   function genCode(){return 'EST-'+Math.random().toString(36).slice(2,7).toUpperCase()}
   function calcTotal(room,rate,extras,search){
     if(!room)return null;

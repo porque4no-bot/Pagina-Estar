@@ -140,10 +140,12 @@ function open(envelope, aad) {
     key = deriveV2(secret, envelope.kid);
   } else {
     /* legacy v1: single secret, sha256 directo, sin aad. La v1 SIEMPRE se
-       escribió con el secreto único, que keyRing() conserva bajo DEFAULT_KID.
-       Usar DEFAULT_KID (no la clave ACTIVA) para que, tras rotar
-       (GUEST_APP_ACTIVE_KEY_ID=k2), los sobres viejos sigan derivando de k1. */
-    const secret = keyRing()[DEFAULT_KID] || rawSecret();
+       escribió con GUEST_APP_DATA_ENCRYPTION_KEY (rawSecret), así que se prefiere
+       ESE por encima del ring: si un operador define GUEST_APP_KEY_RING con una
+       entrada "k1" (DEFAULT_KID) de secreto DISTINTO, keyRing()[DEFAULT_KID]
+       devolvería la clave equivocada y bloquearía todo el PII v1 histórico. Solo
+       si rawSecret ya no existe (migración total al ring) se cae al ring. */
+    const secret = rawSecret() || keyRing()[DEFAULT_KID];
     if (!secret) throw new Error('crypto-vault: no key available for legacy envelope');
     key = deriveV1(secret);
   }

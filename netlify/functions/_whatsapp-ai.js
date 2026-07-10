@@ -348,7 +348,9 @@ const FALLBACK_TEXT = {
 async function handleWithAI(msg, session, deps) {
   const cfg = aiConfig();
   const client = deps.anthropicClient || getClient();
-  const todayIso = new Date().toISOString().split('T')[0];
+  /* Fecha de HOY en Colombia (UTC-5), no en UTC: de 7 p.m. a medianoche la fecha
+     UTC ya es "mañana" y el modelo resolvía "esta noche"/"mañana" un día corrido. */
+  const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 
   const history = Array.isArray(session.aiHistory) ? session.aiHistory : [];
   const messages = [

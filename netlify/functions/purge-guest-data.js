@@ -26,15 +26,21 @@ const PII_STORES = [
   'guest-documents',
   'guest-minor-documents',
   'guest-events',
-  'guest-sync-queue'
+  'guest-sync-queue',
+  /* Staged check-in document uploads (cédula/pasaporte images) — normally deleted
+     as soon as the submit consumes them, but abandoned drafts (guest never
+     submits) must not linger forever since Netlify Blobs has no TTL. */
+  'guest-checkin-drafts'
 ];
 
-/* Pull the leading-millisecond timestamp out of an id/key like
-   "CHK-1717000000000-AB12", "GST-1717000000000-ab12",
-   "SYNC-1717000000000-ABCD" or "CHK-1717000000000-AB12/2/registro-civil.jpg".
+/* Pull the millisecond timestamp out of an id/key. Handles the two shapes used:
+   1. Leading prefix ids/doc keys: "CHK-1717000000000-AB12",
+      "GST-1717000000000-ab12", "CHK-1717000000000-AB12/2/registro-civil.jpg".
+   2. Draft keys: "<sub>/[<kind>/]1717000000000-ab12.json" — the ms follows a "/".
    Returns the epoch ms or null when no recognizable timestamp is present. */
 function timestampFromKey(key) {
-  const m = String(key || '').match(/^[A-Z]+-(\d{13})/);
+  const s = String(key || '');
+  const m = s.match(/^[A-Z]+-(\d{13})/) || s.match(/\/(\d{13})-/);
   if (!m) return null;
   const ms = parseInt(m[1], 10);
   return Number.isFinite(ms) && ms > 0 ? ms : null;

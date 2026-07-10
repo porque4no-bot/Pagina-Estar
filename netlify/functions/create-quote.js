@@ -144,7 +144,7 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ error: 'Error interno del servidor', details: err.message })
+      body: JSON.stringify({ error: 'Error interno del servidor' })
     };
   }
 };

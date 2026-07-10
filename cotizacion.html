@@ -585,7 +585,7 @@ async function startQuotePayment(method) {
     const pref = await fetch('/api/create-mercadopago-preference', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'quote', quoteId: QUOTE_PAY.id })
+      body: JSON.stringify({ type: 'quote', quoteId: QUOTE_PAY.id, publicToken: QUOTE_PAY.token })
     });
     const data = await pref.json();
     if (!pref.ok || !data.init_point) throw new Error(data.message || data.error || 'No se pudo crear la preferencia de pago.');

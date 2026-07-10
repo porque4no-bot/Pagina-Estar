@@ -883,7 +883,10 @@
 
   // Accesibilidad: inyectar skip link
   function injectSkipLink() {
-    if (document.getElementById('skip-to-content')) return;
+    // El build ya inyecta un <a class="skip-link"> (con un target válido resuelto).
+    // Buscar por ESA clase — no por un id que el build no pone — para no dejar DOS
+    // skip-links seguidos (doble parada de Tab) en cada página.
+    if (document.querySelector('.skip-link')) return;
     var skip = document.createElement('a');
     skip.id = 'skip-to-content';
     skip.href = '#main-content';

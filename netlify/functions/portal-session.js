@@ -245,12 +245,13 @@ function emailList(envVar) {
    cuando el store maestro `portal-accounts` no tiene la cuenta (o Blobs no está
    disponible en demo). El resolvedor autoritativo es `resolvePortalAccount`.
 
-   ENDURECIMIENTO (default-deny en producción): si hay CUALQUIER allowlist
-   configurada, un correo que no esté en ninguna lista ni en el store NO recibe
-   perfil (profile:null) → el handler lo rechaza. Así un correo verificado
-   cualquiera (Google/magic-link) no obtiene sesión de 'residente' por defecto.
-   Sólo cuando NO hay ninguna allowlist (modo demo/rollout local) se conserva el
-   fallback histórico a 'residente' para no romper el flujo de pruebas. PURO. */
+   ENDURECIMIENTO (default-deny en producción): en un deploy real (NETLIFY) un
+   correo que no esté en ninguna allowlist ni en el store NO recibe perfil
+   (profile:null) → el handler lo rechaza. Antes el fallback a 'residente' solo
+   se activaba si NO había ninguna allowlist configurada, así que encender
+   PORTAL_ENABLED sin poblar listas le daba sesión de 'residente' a cualquier
+   cuenta Google verificada. Ahora el fallback a 'residente' vive SOLO en modo
+   demo/local; en producción, sin match explícito, se niega. PURO. */
 function resolvePortalIdentity(rawEmail, name) {
   const mail = normalizeEmail(rawEmail);
   const empresaList = emailList('PORTAL_EMPRESA_EMAILS');
@@ -259,7 +260,12 @@ function resolvePortalIdentity(rawEmail, name) {
   let profile;
   if (empresaList.includes(mail)) profile = 'empresa';
   else if (residenteList.includes(mail)) profile = 'residente';
-  else profile = lockdown ? null : 'residente';   // default-deny si hay allowlist
+  /* Sin match explícito el fallback a 'residente' vive SOLO en modo demo/local y
+     SOLO si no hay ninguna allowlist. Se niega el perfil (null) si hay allowlist
+     activa (aunque sea demo) O si es un deploy real (fail-closed): antes bastaba
+     encender PORTAL_ENABLED sin poblar listas para que cualquier cuenta Google
+     verificada recibiera sesión de 'residente'. */
+  else profile = (lockdown || !isDemoMode()) ? null : 'residente';
   return { email: mail, profile, name: String(name || '').trim().slice(0, 120) };
 }
 
