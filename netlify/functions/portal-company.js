@@ -100,14 +100,17 @@ function partnerKeyFor(company) {
 }
 
 /* Enlace a la carpeta Drive de documentación de la empresa. Resuelve por NIT
-   (dígitos) o email desde un mapa de env opcional (PORTAL_DRIVE_FOLDER_JSON), o
-   cae a una carpeta por defecto (PORTAL_DRIVE_FOLDER_ID). Devuelve null si no
-   hay carpeta configurada — nunca inventa un enlace. */
+   (dígitos) o email desde un mapa de env opcional (PORTAL_DRIVE_FOLDER_JSON).
+   Devuelve null si no hay carpeta específica — nunca comparte una carpeta global
+   entre empresas. */
 function docsLinkFor(company) {
   const map = parseJsonMap(process.env.PORTAL_DRIVE_FOLDER_JSON);
   const byNit = company.nit ? (map[company.nit] || map[normalizeNitDigits(company.nit)]) : null;
   const byEmail = company.email ? map[company.email] : null;
-  const folderId = String(company.driveFolderId || byNit || byEmail || process.env.PORTAL_DRIVE_FOLDER_ID || '').trim();
+  /* Combina el claim per-empresa (driveFolderId, firmado en la sesión) con el
+     mapa por NIT/email. SIN fallback global (PORTAL_DRIVE_FOLDER_ID) para no
+     compartir una misma carpeta de Drive entre empresas (fuga cross-tenant). */
+  const folderId = String(company.driveFolderId || byNit || byEmail || '').trim();
   if (!folderId) return null;
   return {
     folderId,

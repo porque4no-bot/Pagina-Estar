@@ -133,13 +133,12 @@ async function findDuplicateAseo(key, now) {
      · { claimed: true }              → ganamos la clave, proceder a postear al folio.
      · { claimed: false, record }     → otro writer ya la tomó (duplicado concurrente);
                                          `record` es el marcador previo si se pudo leer.
-     · { claimed: true, noStore: true}→ sin Blobs no hay dedup posible: fail-open (la
-                                         ventana secuencial de findDuplicateAseo sigue
-                                         atrapando reintectos no-concurrentes).
+     · { claimed: false, noStore: true}→ sin Blobs no hay dedup posible: fail-closed
+                                          para no duplicar cargos al folio.
    Best-effort: nunca lanza. */
 async function claimAseo(key, record, now) {
   const store = idemStore();
-  if (!store || !key) return { claimed: true, noStore: true };
+  if (!store || !key) return { claimed: false, noStore: true };
   const payload = JSON.stringify({
     eventId: record.eventId,
     bookingCode: record.bookingCode,
@@ -545,6 +544,16 @@ exports.handler = async (event) => {
       }
 
       if (await flag('GUEST_SERVICE_FOLIO_ENABLED')) {
+        /* El folio cobra dinero real ($50.000): si no hay store de idempotencia
+           (Blobs), fallamos CERRADO para no arriesgar un doble cargo. El claim ya
+           se reclamó arriba (dedup para todos los caminos); aquí solo endurecemos
+           el camino de dinero. En producción Blobs siempre está — esto solo afecta
+           local/mock sin store. */
+        if (claim.noStore) {
+          return json(503, {
+            error: 'No fue posible garantizar la idempotencia del cargo. Intenta de nuevo.'
+          });
+        }
         try {
           response.folio = await deps.postOrderToFolio({
             idReservations: record.bookingCode,

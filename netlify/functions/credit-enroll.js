@@ -56,6 +56,7 @@ const {
   json,
   parseJsonBody
 } = require('./_guest-app');
+const { verifyPortalSession } = require('./portal-session');
 const { extractCreditSignals, evaluateCreditRecommendation } = require('./_credit-analysis');
 const { requirePortalSession: requireSignedPortalSession } = require('./portal-session');
 
@@ -79,20 +80,26 @@ const ALLOWED_DOC_KINDS = new Set(['extracto', 'datacredito']);
    ajustable sin redeploy vía CREDIT_RETENTION_YEARS. Plazo final = abogado. */
 const DEFAULT_CREDIT_RETENTION_YEARS = 5;
 
-/* ── Sesión del portal (token propio firmado, aislado de guest/admin) ──────
-   Reutiliza el guard compartido de portal-session para que el modo demo local
-   (secreto fijo de desarrollo) y producción verifiquen exactamente igual. */
-function requireCreditPortalSession(event) {
-  try {
-    return requireSignedPortalSession(event);
-  } catch (e) {
-    if (!creditDemoMode()) throw e;
-  }
+/* ── Sesión del portal (token propio firmado, aislado de guest/admin) ────── */
+function bearer(event) {
+  const headers = event.headers || {};
+  const auth = headers.authorization || headers.Authorization || '';
+  const m = String(auth).match(/^Bearer\s+(.+)$/i);
+  return m ? m[1] : '';
+}
+
+function requirePortalSession(event) {
+  const token = bearer(event);
+  const payload = verifyPortalSession(event);
+  if (payload) return payload;
   // Identidad demo SIN token: exclusiva de desarrollo local real. Falla CERRADO
   // en cualquier deploy Netlify o NODE_ENV=production — nunca se concede acceso a
   // este endpoint de PII financiera sin un token de sesión válido en producción,
   // ni aunque GUEST_APP_DEMO_MODE esté activo.
-  return { sub: 'demo-portal', profile: 'residente', demo: true };
+  if (!token && creditDemoMode()) return { sub: 'demo-portal', profile: 'residente', demo: true };
+  const error = new Error('Sesión del portal inválida o expirada.');
+  error.statusCode = 401;
+  throw error;
 }
 
 /* ── Blob store (patrón compartido del repo) ── */
@@ -184,7 +191,7 @@ exports.handler = async event => {
 
   try {
     // 2) Sesión del portal (identidad del solicitante; no se confía para decidir).
-    const session = requireCreditPortalSession(event);
+    const session = requirePortalSession(event);
     if (session.profile !== 'residente') {
       return json(403, { error: 'La solicitud de crédito es solo para residentes.' });
     }

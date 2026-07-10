@@ -168,7 +168,7 @@ exports.handler = async event => {
     const pagareId = newPagareId();
     const providerName = await get('PAGARE_PROVIDER', 'own', {});
     const provider = pagare.getProvider(providerName);
-    const bookingCode = String(session.reservation || session.bookingCode || '').slice(0, 80);
+    const bookingCode = String(session.reservation || session.bookingCode || '').trim().slice(0, 80);
 
     /* Datos del pagaré. El nombre/documento del deudor se toman del cuerpo pero la
        referencia de reserva y el nombre confiable vienen de la sesión firmada. */
