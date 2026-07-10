@@ -683,6 +683,8 @@
         <button type="button" class="admin-tab is-active" data-view="nueva" data-perm="quotes.edit">Nueva cotización</button>
         <button type="button" class="admin-tab" data-view="lista" data-perm="quotes.view">Cotizaciones</button>
         <button type="button" class="admin-tab" data-view="reembolsos" data-perm="refunds.view">Reembolsos</button>
+        <button type="button" class="admin-tab" data-view="facturacion" data-perm="invoices.view" style="display:none">Facturación</button>
+        <button type="button" class="admin-tab" data-view="documentos" data-perm="docs.view" style="display:none">Documentos</button>
         <button type="button" class="admin-tab" data-view="desayunos" data-perm="breakfast.analytics">Desayunos</button>
         <button type="button" class="admin-tab" data-view="codigos" data-perm="quotes.edit">Códigos</button>
         <button type="button" class="admin-tab" data-view="usuarios" data-perm="users.manage" style="display:none">Usuarios</button>
@@ -1037,6 +1039,50 @@
             </tr>
           </thead>
           <tbody id="rfBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════════ VIEW: Facturación (DIAN vía Numera) ══════════════ -->
+    <div id="viewFacturacion" style="display:none">
+      <div class="rf-note" style="margin-bottom:20px">
+        Borradores de <strong>factura electrónica (DIAN vía Numera)</strong> pendientes de emitir.
+        <span id="facGateNote"></span>
+      </div>
+      <div class="lista-toolbar">
+        <button type="button" id="facRefreshBtn" class="btn btn-ghost-dark" style="padding:10px 16px; font-size:11px; margin-left:auto;">Actualizar</button>
+      </div>
+      <div id="facLoading" style="display:none; padding:48px; text-align:center; font-family:var(--font-label); font-size:12px; color:var(--ink-500); letter-spacing:0.08em;">Cargando facturación…</div>
+      <div id="facEmpty" style="display:none; padding:48px; text-align:center; font-family:var(--font-body); font-size:14px; color:var(--ink-500);">No hay borradores de factura pendientes.</div>
+      <div id="facError" style="display:none; padding:24px; text-align:center; font-family:var(--font-label); font-size:12px; color:var(--error-700);"></div>
+      <div class="items-table-wrap" id="facTableWrap" style="display:none">
+        <table class="items-table lista-table">
+          <thead>
+            <tr><th>Referencia</th><th>Cliente</th><th>Monto</th><th>Estado</th><th></th></tr>
+          </thead>
+          <tbody id="facBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════════ VIEW: Documentos legales de la empresa ══════════════ -->
+    <div id="viewDocumentos" style="display:none">
+      <div class="rf-note" style="margin-bottom:20px">
+        Registro de <strong>documentos legales de la empresa</strong> (RUT, RNT, Cámara de Comercio, certificaciones bancarias) con su vigencia.
+        <span id="docGateNote"></span>
+      </div>
+      <div class="lista-toolbar">
+        <button type="button" id="docRefreshBtn" class="btn btn-ghost-dark" style="padding:10px 16px; font-size:11px; margin-left:auto;">Actualizar</button>
+      </div>
+      <div id="docLoading" style="display:none; padding:48px; text-align:center; font-family:var(--font-label); font-size:12px; color:var(--ink-500); letter-spacing:0.08em;">Cargando documentos…</div>
+      <div id="docEmpty" style="display:none; padding:48px; text-align:center; font-family:var(--font-body); font-size:14px; color:var(--ink-500);">No hay documentos registrados.</div>
+      <div id="docError" style="display:none; padding:24px; text-align:center; font-family:var(--font-label); font-size:12px; color:var(--error-700);"></div>
+      <div class="items-table-wrap" id="docTableWrap" style="display:none">
+        <table class="items-table lista-table">
+          <thead>
+            <tr><th>Tipo</th><th>Número</th><th>Empresa</th><th>Emitido</th><th>Estado</th><th></th></tr>
+          </thead>
+          <tbody id="docBody"></tbody>
         </table>
       </div>
     </div>
@@ -1809,6 +1855,10 @@ function switchView(view) {
   document.getElementById('viewNueva').style.display = view === 'nueva' ? 'block' : 'none';
   document.getElementById('viewLista').style.display = view === 'lista' ? 'block' : 'none';
   document.getElementById('viewReembolsos').style.display = view === 'reembolsos' ? 'block' : 'none';
+  const vfac = document.getElementById('viewFacturacion');
+  if (vfac) vfac.style.display = view === 'facturacion' ? 'block' : 'none';
+  const vdoc = document.getElementById('viewDocumentos');
+  if (vdoc) vdoc.style.display = view === 'documentos' ? 'block' : 'none';
   document.getElementById('viewDesayunos').style.display = view === 'desayunos' ? 'block' : 'none';
   const vc = document.getElementById('viewCodigos');
   if (vc) vc.style.display = view === 'codigos' ? 'block' : 'none';
@@ -1821,6 +1871,8 @@ function switchView(view) {
   else if (view === 'nueva') titleEl.textContent = editingQuoteId ? 'Editar cotización' : 'Nueva cotización';
   else if (view === 'lista') titleEl.textContent = 'Cotizaciones';
   else if (view === 'reembolsos') titleEl.textContent = 'Reembolsos';
+  else if (view === 'facturacion') titleEl.textContent = 'Facturación';
+  else if (view === 'documentos') titleEl.textContent = 'Documentos legales';
   else if (view === 'desayunos') titleEl.textContent = 'Desayunos';
   else if (view === 'codigos') titleEl.textContent = 'Códigos de descuento';
   else if (view === 'usuarios') titleEl.textContent = 'Usuarios y roles';
@@ -1828,6 +1880,8 @@ function switchView(view) {
   if (view === 'hoy') loadHoy();
   if (view === 'lista') loadQuotesList();
   if (view === 'reembolsos') loadRefunds();
+  if (view === 'facturacion') loadFacturacion();
+  if (view === 'documentos') loadDocumentos();
   if (view === 'codigos') loadCodigos();
   if (view === 'usuarios') loadIam();
   if (view === 'config') loadSettings();
@@ -1991,6 +2045,117 @@ async function apiIam(action, payload) {
 }
 
 async function loadIam() { await loadRolesIam(); await loadUsersIam(); }
+
+/* ════════════════ Facturación (borradores DIAN vía Numera) ════════════════ */
+function facMoney(v) {
+  const n = Number(v);
+  if (!isFinite(n) || !n) return '—';
+  return '$' + n.toLocaleString('es-CO');
+}
+async function facAction(action, ref, btn) {
+  if (!ref) return;
+  const prev = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Emitiendo…'; }
+  try {
+    const token = await window.getAuthToken();
+    const r = await fetch('/api/invoice-admin-action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ action, bookingCode: ref })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { alert(d.error || ('Error ' + r.status)); }
+    else if (d.ok === false && d.reason === 'disabled') { alert(d.message || 'La facturación electrónica está desactivada.'); }
+    else if (d.ok === false) { alert(d.message || 'No se pudo emitir.'); }
+    else { alert('Factura emitida.'); loadFacturacion(); }
+  } catch (e) {
+    alert('No se pudo contactar el servidor.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = prev; }
+  }
+}
+async function loadFacturacion() {
+  const wrap = document.getElementById('facTableWrap');
+  const loading = document.getElementById('facLoading');
+  const empty = document.getElementById('facEmpty');
+  const errEl = document.getElementById('facError');
+  const gate = document.getElementById('facGateNote');
+  wrap.style.display = 'none'; empty.style.display = 'none'; errEl.style.display = 'none';
+  loading.style.display = 'block';
+  const canIssue = hasPerm('invoices.issue');
+  try {
+    const token = await window.getAuthToken();
+    const r = await fetch('/api/get-pending-invoices', { headers: { Authorization: 'Bearer ' + token } });
+    const d = await r.json().catch(() => ({}));
+    loading.style.display = 'none';
+    if (!r.ok) { errEl.textContent = d.error || ('Error ' + r.status); errEl.style.display = 'block'; return; }
+    if (gate) gate.textContent = d.isMock ? 'La emisión real está desactivada (DRY-RUN / sin credenciales Numera).' : '';
+    const list = d.invoices || [];
+    if (!list.length) { empty.style.display = 'block'; return; }
+    const body = document.getElementById('facBody');
+    body.innerHTML = list.map(function (it) {
+      const ref = it.bookingCode || it.invoiceId || it.id || it.reserva || '';
+      const cliente = it.cliente || it.guestName || it.nombre || it.email || '—';
+      const monto = it.total != null ? it.total : (it.monto != null ? it.monto : it.amount);
+      const estado = it.estado || it.status || 'borrador';
+      const btn = canIssue
+        ? '<button type="button" class="btn btn-ghost-dark" style="padding:6px 12px;font-size:11px" data-fac-ref="' + hoyEsc(ref) + '">Emitir</button>'
+        : '';
+      return '<tr><td>' + hoyEsc(ref) + '</td><td>' + hoyEsc(cliente) + '</td><td>' + facMoney(monto) + '</td><td>' + hoyEsc(estado) + '</td><td style="text-align:right">' + btn + '</td></tr>';
+    }).join('');
+    body.querySelectorAll('[data-fac-ref]').forEach(function (b) {
+      b.addEventListener('click', function () { facAction('emit', b.getAttribute('data-fac-ref'), b); });
+    });
+    wrap.style.display = 'block';
+  } catch (e) {
+    loading.style.display = 'none';
+    errEl.textContent = 'No se pudo cargar la facturación.'; errEl.style.display = 'block';
+  }
+}
+document.getElementById('facRefreshBtn').addEventListener('click', loadFacturacion);
+
+/* ════════════════ Documentos legales de la empresa ════════════════ */
+var DOC_TIPO_LABEL = { RUT: 'RUT', RNT: 'RNT', CCM: 'Cámara de Comercio', CB: 'Certificación bancaria' };
+var DOC_ESTADO = {
+  ok:              { label: 'Vigente',        color: 'var(--success-700, #2f7d32)' },
+  'por-vencer':    { label: 'Por vencer',     color: 'var(--warning-700, #a86500)' },
+  vencido:         { label: 'Vencido',        color: 'var(--error-700, #b3261e)' },
+  'sin-vencimiento': { label: 'Sin vencimiento', color: 'var(--ink-500)' }
+};
+async function loadDocumentos() {
+  const wrap = document.getElementById('docTableWrap');
+  const loading = document.getElementById('docLoading');
+  const empty = document.getElementById('docEmpty');
+  const errEl = document.getElementById('docError');
+  const gate = document.getElementById('docGateNote');
+  wrap.style.display = 'none'; empty.style.display = 'none'; errEl.style.display = 'none';
+  loading.style.display = 'block';
+  try {
+    const token = await window.getAuthToken();
+    const r = await fetch('/api/get-legal-docs', { headers: { Authorization: 'Bearer ' + token } });
+    const d = await r.json().catch(() => ({}));
+    loading.style.display = 'none';
+    if (!r.ok) { errEl.textContent = d.error || ('Error ' + r.status); errEl.style.display = 'block'; return; }
+    if (gate) gate.textContent = d.isMock ? 'Sin conexión a Drive (LEGAL_DOCS_ENABLED apagado o sin credenciales): no hay documentos que mostrar.' : '';
+    const list = d.docs || [];
+    if (!list.length) { empty.style.display = 'block'; return; }
+    const body = document.getElementById('docBody');
+    body.innerHTML = list.map(function (doc) {
+      const tipo = DOC_TIPO_LABEL[doc.tipo] || doc.tipo || '—';
+      const est = DOC_ESTADO[doc.estado] || { label: doc.estado || '—', color: 'var(--ink-500)' };
+      const badge = '<span style="color:' + est.color + ';font-weight:600">' + hoyEsc(est.label) + '</span>';
+      const ver = doc.webViewLink
+        ? '<a href="' + hoyEsc(doc.webViewLink) + '" target="_blank" rel="noopener" class="btn btn-ghost-dark" style="padding:6px 12px;font-size:11px">Ver</a>'
+        : '';
+      const alerta = doc.alerta ? '<br><span style="color:var(--warning-700,#a86500);font-size:11px">' + hoyEsc(doc.alerta) + '</span>' : '';
+      return '<tr><td>' + hoyEsc(tipo) + alerta + '</td><td>' + hoyEsc(doc.numero || '—') + '</td><td>' + hoyEsc(doc.empresa || '—') + '</td><td>' + hoyEsc(doc.fechaEmision || '—') + '</td><td>' + badge + '</td><td style="text-align:right">' + ver + '</td></tr>';
+    }).join('');
+    wrap.style.display = 'block';
+  } catch (e) {
+    loading.style.display = 'none';
+    errEl.textContent = 'No se pudo cargar el registro de documentos.'; errEl.style.display = 'block';
+  }
+}
+document.getElementById('docRefreshBtn').addEventListener('click', loadDocumentos);
 
 /* ════════════════ Códigos de descuento (Frente A) ════════════════ */
 let COD_BLACKOUTS = [];
