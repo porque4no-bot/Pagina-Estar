@@ -68,4 +68,23 @@
 - **Concepto nota crédito (22):** → **TICKET**, te cuenta.
 - **Usuario de la API (26):** **mejor un usuario distinto, rol "cliente".** Preguntó ¿es para **BTW o Numera**? → respuesta nuestra: **Numera** (consumimos `esnumera.com/api/v1`).
 
+### Sondeo del endpoint real (21-ago-2026, sin credenciales)
+
+Probamos `https://esnumera.com/api/v1` en vivo con `node scripts/numera-test.js`
+(cuerpos incompletos a propósito: los rechaza la validación del servidor, **no se
+emitió nada**). Lo que quedó confirmado sin necesidad de preguntar:
+
+| Hallazgo | Detalle | Impacto |
+|---|---|---|
+| La API está viva | FastAPI; errores en `detail` (string) o arreglo de validación (422) | Nuestro cliente leía `message` → nunca veíamos el motivo real. **Corregido** (`describeError`) |
+| Cabecera de autenticación | `Auth: <access_token>` (403 `Auth required`); `Authorization: Bearer` se ignora | Confirma lo que hace `_numera.js` |
+| `company_id` es un **UUID** | 422 `UUID input should be a string…` | **No** es el `company 5` de Odoo → hay que pedir el UUID de Mirada (pregunta 16) |
+| El encabezado exige `invoiceNum` **y** `legalNumber` | 400 `invoiceNum es obligatorio` / `legalNumber es obligatorio`, **antes** de validar el token | **Responde la pregunta 15: el número lo enviamos NOSOTROS.** Falta solo saber **qué resolución/prefijo DIAN** usamos para ventas web |
+| Valida totales del lado servidor | Exige `subtotal_documento`, `valor_impuesto_documento`, `retenciones_documento` | Es exactamente lo que ya replicamos en `validate()` |
+| Orden de validación | Primero el cuerpo, **después** el token (`403 Usuario no autorizado` con token inválido) | Podemos seguir mapeando el contrato sin credenciales, pero **nada más se puede probar sin usuario** |
+
+**Bloqueante para seguir:** el usuario de API (Numera, rol "cliente", distinto — lo
+propuso Jorge), su contraseña y el `company_id` (UUID). Con eso el mismo script
+prueba login real y el resto de la validación.
+
 **Acciones:** (1) abrir **ticket** con 17, 18 (docs), 21, 22 + confirmar 15; (2) responder a Jorge lo del usuario (Numera, rol cliente, distinto); (3) esperar a Ingrid (sandbox BTW).
