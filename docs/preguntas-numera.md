@@ -124,8 +124,37 @@ emitió nada**). Lo que quedó confirmado sin necesidad de preguntar:
 | Valida totales del lado servidor | Exige `subtotal_documento`, `valor_impuesto_documento`, `retenciones_documento` | Es exactamente lo que ya replicamos en `validate()` |
 | Orden de validación | Primero el cuerpo, **después** el token (`403 Usuario no autorizado` con token inválido) | Podemos seguir mapeando el contrato sin credenciales, pero **nada más se puede probar sin usuario** |
 
-**Bloqueante para seguir:** el usuario de API (Numera, rol "cliente", distinto — lo
-propuso Jorge), su contraseña y el `company_id` (UUID). Con eso el mismo script
-prueba login real y el resto de la validación.
+**Sondeo AUTENTICADO (21-ago-2026, con el usuario ya cargado).** Login correcto
+(JWT `iss: esnumera.com`, **vigencia ~24 h**, sin claim de empresa ⇒ el `company_id`
+del cuerpo es lo ÚNICO que decide a nombre de quién sale la factura → fijarlo por
+variable de entorno, jamás desde el cliente). Un POST con cuerpo vacío devolvió:
+
+```
+500 { "title":"One or more validation errors occurred.", "status":400,
+      "errors": { "Customer.Name":["Falta campo Name"],
+                  "Customer.ResaleID":["Falta campo ResaleID"],
+                  "InvcHead.InvoiceType":["Falta campo InvoiceType"] } }
+```
+
+Dos cosas importantes:
+
+- **El cuerpo vacío SÍ viajó hasta el proveedor** (el error es ProblemDetails .NET,
+  no de Numera). No creó documento, pero ⇒ **no se sigue mapeando el contrato a punta
+  de sondeos**: lo que falte sale de la documentación de Numera o de un `company_id`
+  de pruebas.
+- **Mapeo real al ERP intermedio (nombres tipo Epicor, no documentados):**
+  `encabezado.tipo_factura` → `InvcHead.InvoiceType` · `cliente` exige `Name` y
+  **`ResaleID`** (el identificador tributario: NIT/cédula).
+- Los errores del proveedor llegan en un **tercer formato** (objeto `errors`, no
+  `detail`). `describeError()` ya lo entiende y lo prefija `proveedor:` para que en el
+  panel se vea de dónde salió el rechazo.
+
+**No se puede saber el ambiente desde la API:** la superficie es sólo `login` +
+`send-electronic-invoice` (9 rutas de solo lectura probadas → 404) y el token no trae
+claim de ambiente. **Hay que preguntárselo a Ingrid.**
+
+**Bloqueante para seguir:** confirmar con Ingrid si el `company_id` de Mirada apunta
+a **BTW pruebas o a producción DIAN**, y si está en producción pedir uno de pruebas.
+Hasta entonces no se manda ningún payload completo.
 
 **Acciones:** (1) abrir **ticket** con 17, 18 (docs), 21, 22 + confirmar 15; (2) responder a Jorge lo del usuario (Numera, rol cliente, distinto); (3) esperar a Ingrid (sandbox BTW).
