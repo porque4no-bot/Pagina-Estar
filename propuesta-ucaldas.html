@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Propuesta corporativa · Universidad de Caldas — estar</title>
+<meta name="description" content="Propuesta de alojamiento corporativo de Hotel Estar para el Departamento de Internacionalización de la Universidad de Caldas.">
+<!-- Propuesta privada: se comparte por enlace, no se indexa ni aparece en el sitemap. -->
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Estar — Apartaestudios Manizales">
+<meta property="og:title" content="Propuesta corporativa · Universidad de Caldas">
+<meta property="og:description" content="Tarifa corporativa con desayuno incluido y crédito a 30 días para los visitantes del Departamento de Internacionalización.">
+<meta property="og:image" content="https://estar.com.co/assets/photos/interior_detalle.webp">
+<meta property="og:url" content="https://estar.com.co/propuesta-ucaldas.html">
+<link rel="manifest" href="/manifest.json">
+<link rel="stylesheet" href="colors_and_type.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
+<style>
+/* ==========================================================
+   Propuesta corporativa (prefijo pp-). Colores y tipografía
+   salen de colors_and_type.css; botones y tipos base, de
+   styles.css. Pensada también para imprimirse en A4.
+   ========================================================== */
+.pp-wrap { width: 100%; max-width: 1180px; margin: 0 auto; padding-inline: 24px; }
+@media (min-width: 768px) { .pp-wrap { padding-inline: 48px; } }
+
+.pp-label {
+  font-family: var(--font-label); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-500); margin: 0;
+}
+
+/* ── Barra superior ── */
+.pp-bar { background: var(--paper); border-bottom: 1px solid var(--paper-400); }
+.pp-bar-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 16px; }
+.pp-brand { display: flex; align-items: center; gap: 10px; }
+.pp-brand-star { width: 28px; height: 28px; }
+.pp-brand-word { height: 24px; width: auto; }
+.pp-bar-side { display: flex; align-items: center; gap: 20px; }
+.pp-btn-sm { padding: 11px 16px; font-size: 10px; gap: 8px; }
+.btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+@media (max-width: 560px) { .pp-bar-side .pp-label { display: none; } }
+
+/* ── Portada ── */
+.pp-hero { position: relative; background: var(--sand); color: var(--ink); overflow: hidden; }
+.pp-hero-stars {
+  position: absolute; inset: 0; pointer-events: none;
+  background: url("assets/icon-star-charcoal.png") 0 0 / 28px 28px repeat;
+  opacity: 0.045;
+}
+.pp-hero-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; padding-block: 56px 96px; }
+@media (min-width: 960px) {
+  .pp-hero-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); gap: 64px; padding-block: 80px 128px; }
+}
+.pp-pill {
+  display: inline-block; margin: 0 0 24px; padding: 8px 16px;
+  border: 1px solid var(--ink); border-radius: var(--radius-pill);
+  font-family: var(--font-label); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.24em; text-transform: uppercase;
+}
+.pp-title {
+  font-family: var(--font-heading); font-weight: 900;
+  font-size: clamp(44px, 6.6vw, 92px); line-height: 0.95; letter-spacing: -0.03em;
+  margin: 0 0 24px; text-wrap: balance;
+}
+.pp-title .serif-italic { display: block; font-size: 0.72em; letter-spacing: -0.01em; margin-top: 0.12em; }
+.pp-hero .lead { color: var(--ink-800); max-width: 44ch; }
+.pp-to {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 28px;
+  margin-top: 36px; padding-top: 20px;
+  border-top: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+}
+.pp-to-main { grid-column: 1 / -1; }
+.pp-to .pp-label { color: var(--ink-700); margin-bottom: 6px; }
+.pp-to-name {
+  font-family: var(--font-heading); font-weight: 900; font-size: 22px;
+  text-transform: uppercase; letter-spacing: -0.005em; margin: 0;
+}
+.pp-to-line { font-family: var(--font-body); font-size: 15px; line-height: 1.5; color: var(--ink-800); margin: 2px 0 0; }
+.pp-hero-media { margin: 0; border-radius: var(--radius-sm); overflow: hidden; background: var(--sand-300); min-height: 320px; }
+.pp-hero-media img { width: 100%; height: 100%; object-fit: cover; object-position: 64% 50%; }
+@media (max-width: 959px) { .pp-hero-media { aspect-ratio: 4 / 3; min-height: 0; } }
+
+/* ── Resumen de la oferta ── */
+.pp-summary { position: relative; z-index: 1; margin-top: -52px; }
+.pp-summary-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 0;
+  background: var(--paper-400); border: 1px solid var(--paper-400);
+  border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-md);
+}
+@media (min-width: 900px) { .pp-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.pp-sum { background: var(--white); padding: 22px 20px 24px; display: flex; flex-direction: column; gap: 8px; }
+.pp-sum dd { margin: 0; }
+.pp-sum-value {
+  font-family: var(--font-heading); font-weight: 900; font-size: clamp(22px, 2.3vw, 30px);
+  line-height: 1.05; letter-spacing: -0.02em; text-transform: uppercase; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.pp-sum-note { font-family: var(--font-body); font-size: 13px; line-height: 1.5; color: var(--ink-500); }
+.pp-sum.is-accent { background: var(--olive-700); }
+.pp-sum.is-accent .pp-label,
+.pp-sum.is-accent .pp-sum-note { color: color-mix(in srgb, var(--white) 82%, transparent); }
+.pp-sum.is-accent .pp-sum-value { color: var(--white); }
+
+/* ── Secciones ── */
+.pp-section { padding-block: 72px; }
+@media (min-width: 768px) { .pp-section { padding-block: 104px; } }
+.pp-head { display: grid; gap: 18px; margin: 0 0 44px; max-width: 780px; }
+.pp-head .display-m { text-wrap: balance; }
+.pp-muted { background: var(--paper-200); }
+
+/* ── Carta ── */
+.pp-letter { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; }
+@media (min-width: 900px) { .pp-letter { grid-template-columns: 250px minmax(0, 1fr); gap: 72px; } }
+.pp-letter-meta {
+  display: grid; gap: 20px; align-content: start;
+  font-family: var(--font-body); font-size: 14px; line-height: 1.6; color: var(--ink-700);
+}
+.pp-letter-meta p { margin: 0; }
+.pp-letter-meta strong { font-family: var(--font-heading); font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--ink); }
+.pp-letter-body { max-width: 64ch; }
+.pp-letter-body > p { font-family: var(--font-body); font-size: 17px; line-height: 1.75; color: var(--ink-800); margin: 0 0 18px; }
+.pp-sign { display: flex; align-items: center; gap: 14px; margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--paper-400); }
+.pp-sign img { width: 34px; height: 34px; }
+.pp-sign-name { font-family: var(--font-heading); font-weight: 900; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; margin: 0; }
+.pp-sign-role { font-family: var(--font-body); font-style: italic; font-size: 14px; color: var(--ink-500); margin: 2px 0 0; }
+
+/* ── Propuesta económica ── */
+.pp-price { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+@media (min-width: 1000px) { .pp-price { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 40px; align-items: start; } }
+.pp-table-wrap { overflow-x: auto; background: var(--white); border: 1px solid var(--paper-400); border-radius: var(--radius-lg); }
+.pp-table { width: 100%; min-width: 580px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.pp-table th {
+  padding: 14px 18px; text-align: right; white-space: nowrap;
+  border-bottom: 1px solid var(--paper-400);
+  font-family: var(--font-label); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-500);
+}
+.pp-table td {
+  padding: 18px; text-align: right; vertical-align: top; white-space: nowrap;
+  border-bottom: 1px solid var(--paper-200);
+  font-family: var(--font-body); font-size: 15px; color: var(--ink-800);
+}
+.pp-table th:first-child, .pp-table td:first-child { text-align: left; white-space: normal; }
+.pp-table tbody tr:last-child td { border-bottom: 0; }
+.pp-table .pp-group td {
+  padding: 10px 18px; background: var(--paper-200);
+  font-family: var(--font-label); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-700);
+}
+.pp-table .pp-first td { background: var(--olive-100); }
+.pp-table .pp-group-first td { color: var(--olive-700); }
+.pp-concept { display: block; font-family: var(--font-heading); font-weight: 700; font-size: 14px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink); }
+.pp-concept-sub { display: block; margin-top: 4px; font-size: 13px; font-style: italic; color: var(--ink-500); }
+.pp-tax { display: block; margin-bottom: 3px; font-family: var(--font-label); font-weight: 700; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-500); }
+.pp-total { font-family: var(--font-heading); font-weight: 900; font-size: 18px; color: var(--ink); }
+/* En celular cada fila se apila: concepto arriba, tres valores debajo. */
+@media (max-width: 600px) {
+  .pp-table { min-width: 0; }
+  .pp-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .pp-table, .pp-table tbody, .pp-table tr, .pp-table td { display: block; }
+  .pp-table tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 12px; align-items: end; padding: 16px; border-bottom: 1px solid var(--paper-200); }
+  .pp-table tbody tr:last-child { border-bottom: 0; }
+  .pp-table td, .pp-table tbody tr:last-child td { padding: 0; border: 0; text-align: left; white-space: normal; font-size: 14px; }
+  .pp-table td:first-child { grid-column: 1 / -1; margin-bottom: 10px; }
+  .pp-table td[data-label]::before {
+    content: attr(data-label); display: block; margin-bottom: 4px;
+    font-family: var(--font-label); font-weight: 700; font-size: 9px;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-500);
+  }
+  .pp-table .pp-tax { display: none; }
+  .pp-table .pp-group { padding: 10px 16px; background: var(--paper-200); }
+  .pp-table .pp-group td { margin: 0; padding: 0; background: none; }
+  .pp-table .pp-first { background: var(--olive-100); }
+  .pp-table .pp-first td { background: none; }
+  .pp-total { font-size: 16px; }
+}
+.pp-table-note { margin: 14px 2px 0; max-width: 72ch; font-family: var(--font-body); font-size: 13px; line-height: 1.6; color: var(--ink-500); }
+
+.pp-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.pp-card { background: var(--white); border: 1px solid var(--paper-400); border-radius: var(--radius-lg); padding: 24px; }
+.pp-card h3 { font-family: var(--font-heading); font-weight: 900; font-size: 15px; letter-spacing: 0.06em; margin: 0 0 14px; }
+.pp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.pp-list li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; font-family: var(--font-body); font-size: 14.5px; line-height: 1.55; color: var(--ink-800); }
+.pp-list li::before { content: "✶"; color: var(--terracotta); font-size: 12px; line-height: 1.9; }
+.pp-offer { background: var(--olive-700); color: var(--white); border-radius: var(--radius-lg); padding: 24px; }
+.pp-offer .pp-label { color: color-mix(in srgb, var(--white) 78%, transparent); }
+.pp-offer-title { font-family: var(--font-heading); font-weight: 900; font-size: 22px; line-height: 1.1; letter-spacing: -0.01em; text-transform: uppercase; margin: 10px 0; }
+.pp-offer-text { font-family: var(--font-body); font-size: 14.5px; line-height: 1.6; margin: 0; color: color-mix(in srgb, var(--white) 90%, transparent); }
+
+/* ── Simulador ── */
+.pp-sim { margin-top: 56px; display: grid; grid-template-columns: minmax(0, 1fr); background: var(--white); border: 1px solid var(--paper-400); border-radius: var(--radius-lg); overflow: hidden; }
+@media (min-width: 900px) { .pp-sim { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); } }
+.pp-sim-controls { background: var(--paper-200); padding: 28px; display: grid; gap: 20px; align-content: start; }
+.pp-sim-controls h3 { font-family: var(--font-heading); font-weight: 900; font-size: 20px; margin: 0; }
+.pp-sim-intro { font-family: var(--font-body); font-size: 14px; line-height: 1.6; color: var(--ink-700); margin: -10px 0 0; }
+.pp-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: end; }
+.pp-field { display: grid; gap: 8px; }
+.pp-field.is-wide { grid-column: 1 / -1; }
+.pp-field.is-wide .pp-stepper { width: calc(50% - 8px); }
+.pp-stepper {
+  display: grid; grid-template-columns: 42px minmax(0, 1fr) 42px; align-items: center;
+  background: var(--white); border: 1px solid var(--paper-400); border-radius: var(--radius-md); overflow: hidden;
+}
+.pp-stepper button { height: 44px; font-family: var(--font-heading); font-size: 20px; line-height: 1; color: var(--ink-700); transition: background var(--dur-fast) var(--ease-out); }
+.pp-stepper button:hover { background: var(--paper-200); }
+.pp-stepper input {
+  width: 100%; min-width: 0; height: 44px; border: 0; background: transparent; text-align: center;
+  font-family: var(--font-heading); font-weight: 700; font-size: 18px; color: var(--ink);
+  -moz-appearance: textfield; appearance: textfield; font-variant-numeric: tabular-nums;
+}
+.pp-stepper input::-webkit-outer-spin-button,
+.pp-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.pp-check { display: flex; gap: 12px; align-items: flex-start; font-family: var(--font-body); font-size: 14px; line-height: 1.5; color: var(--ink-800); cursor: pointer; }
+.pp-check input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--olive-700); flex-shrink: 0; }
+.pp-sim-result { padding: 28px; display: grid; align-content: start; }
+.pp-sim-result h3 { font-family: var(--font-heading); font-weight: 900; font-size: 15px; letter-spacing: 0.06em; margin: 0 0 6px; }
+.pp-line {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+  padding: 11px 0; border-bottom: 1px solid var(--paper-200);
+  font-family: var(--font-body); font-size: 15px; color: var(--ink-800);
+}
+.pp-line[hidden] { display: none; }
+.pp-line .amt { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pp-line.is-discount .amt { color: var(--olive-700); }
+.pp-line.is-sub { font-size: 13.5px; color: var(--ink-500); }
+.pp-line.is-total {
+  margin-top: 8px; padding-top: 16px; border-bottom: 0; border-top: 2px solid var(--ink);
+  font-family: var(--font-heading); font-weight: 900; font-size: 20px; text-transform: uppercase; color: var(--ink);
+}
+.pp-sim-caption { margin: 14px 0 0; font-family: var(--font-body); font-style: italic; font-size: 13px; line-height: 1.6; color: var(--ink-500); }
+
+/* ── El hotel ── */
+.pp-hotel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; }
+@media (min-width: 960px) { .pp-hotel { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 72px; align-items: center; } }
+.pp-hotel-media { margin: 0; border-radius: var(--radius-sm); overflow: hidden; aspect-ratio: 4 / 5; max-width: 100%; background: var(--sand); }
+.pp-hotel-media img { width: 100%; height: 100%; object-fit: cover; }
+.pp-hotel-text { display: grid; gap: 20px; }
+.pp-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin: 12px 0 0; }
+@media (min-width: 640px) { .pp-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.pp-stat { border-top: 1px solid var(--ink); padding-top: 14px; }
+.pp-stat-num { font-family: var(--font-heading); font-weight: 900; font-size: 34px; line-height: 1; letter-spacing: -0.02em; color: var(--ink); margin: 0 0 8px; font-variant-numeric: tabular-nums; }
+.pp-stat .pp-label { line-height: 1.5; letter-spacing: 0.14em; }
+
+.pp-features {
+  display: grid; gap: 1px; margin-top: 64px;
+  background: var(--paper-400); border: 1px solid var(--paper-400); border-radius: var(--radius-lg); overflow: hidden;
+}
+@media (min-width: 640px) { .pp-features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .pp-features { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.pp-feature { background: var(--paper); padding: 28px 26px 30px; display: grid; gap: 12px; align-content: start; }
+.pp-feature svg { width: 26px; height: 26px; color: var(--terracotta); }
+.pp-feature h3 { font-family: var(--font-heading); font-weight: 900; font-size: 16px; letter-spacing: 0.04em; margin: 0; }
+.pp-feature p { font-family: var(--font-body); font-size: 14.5px; line-height: 1.65; color: var(--ink-700); margin: 0; }
+
+/* ── Apartaestudios ── */
+.pp-rooms { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.pp-room {
+  display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: 18px; align-items: center;
+  background: var(--white); border: 1px solid var(--paper-400); border-radius: var(--radius-lg); overflow: hidden;
+}
+.pp-room img { width: 100%; height: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.pp-room-body { display: grid; gap: 6px; padding: 14px 16px 14px 0; }
+.pp-room-num { font-family: var(--font-label); font-weight: 700; font-size: 10px; letter-spacing: 0.2em; color: var(--terracotta-700); margin: 0; }
+.pp-room h3 { font-family: var(--font-heading); font-weight: 900; font-size: 18px; letter-spacing: 0.01em; margin: 0; }
+.pp-room-specs { font-family: var(--font-body); font-size: 13.5px; line-height: 1.5; color: var(--ink-700); margin: 0; }
+@media (min-width: 1120px) {
+  .pp-rooms { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+  .pp-room { grid-template-columns: 1fr; align-items: start; gap: 0; }
+  .pp-room img { height: auto; aspect-ratio: 3 / 2; }
+  .pp-room-body { padding: 16px 18px 20px; }
+}
+.pp-rooms-note { margin: 20px 0 0; font-family: var(--font-body); font-size: 14px; line-height: 1.6; color: var(--ink-700); }
+.pp-rooms-note a { color: var(--terracotta-700); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ── Ubicación ── */
+.pp-location { background: var(--ink); color: var(--paper); }
+.pp-location .display-m { color: var(--paper); }
+.pp-location .body { color: color-mix(in srgb, var(--paper) 82%, transparent); }
+.pp-loc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; }
+@media (min-width: 960px) { .pp-loc { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 72px; align-items: center; } }
+.pp-places { list-style: none; margin: 28px 0 0; padding: 0; border-top: 1px solid color-mix(in srgb, var(--paper) 18%, transparent); }
+.pp-place {
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  padding: 13px 0; border-bottom: 1px solid color-mix(in srgb, var(--paper) 18%, transparent);
+}
+.pp-place-key {
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--paper); color: var(--olive-700);
+  font-family: var(--font-heading); font-weight: 900; font-size: 13px;
+}
+.pp-place-key.is-home { background: var(--terracotta); color: var(--white); font-size: 14px; }
+.pp-place-name { font-family: var(--font-body); font-size: 15px; line-height: 1.4; color: var(--paper); }
+.pp-place-dist {
+  font-family: var(--font-label); font-weight: 700; font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; white-space: nowrap; font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--paper) 72%, transparent);
+}
+.pp-loc-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-top: 22px; }
+.pp-loc-foot p { margin: 0; font-family: var(--font-body); font-style: italic; font-size: 13px; color: color-mix(in srgb, var(--paper) 62%, transparent); }
+.pp-location .text-link { color: var(--paper); }
+.pp-map { margin: 0; justify-self: center; width: 100%; max-width: 440px; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid color-mix(in srgb, var(--paper) 14%, transparent); }
+.pp-map img { width: 100%; height: auto; }
+
+/* ── Reseñas ── */
+.pp-reviews { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+@media (min-width: 800px) { .pp-reviews { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.pp-review { margin: 0; background: var(--white); border: 1px solid var(--paper-400); border-radius: var(--radius-lg); padding: 26px; display: grid; gap: 18px; align-content: space-between; }
+.pp-review blockquote { margin: 0; font-family: var(--font-body); font-style: italic; font-size: 16px; line-height: 1.6; color: var(--ink-800); }
+.pp-review figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; }
+.pp-review figcaption .pp-label { white-space: nowrap; }
+.pp-review-score { color: var(--terracotta-700); }
+
+/* ── Condiciones y reserva ── */
+.pp-terms { display: grid; grid-template-columns: minmax(0, 1fr); gap: 48px; }
+@media (min-width: 960px) { .pp-terms { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 64px; align-items: start; } }
+.pp-terms h3 { font-family: var(--font-heading); font-weight: 900; font-size: 18px; letter-spacing: 0.04em; margin: 0 0 16px; }
+.pp-dl { margin: 0; border-top: 1px solid var(--ink); }
+.pp-dl div { display: grid; gap: 4px; padding: 16px 0; border-bottom: 1px solid var(--paper-400); }
+@media (min-width: 640px) { .pp-dl div { grid-template-columns: 140px minmax(0, 1fr); gap: 24px; } }
+.pp-dl dt { padding-top: 4px; font-family: var(--font-label); font-weight: 700; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-700); }
+.pp-dl dd { margin: 0; font-family: var(--font-body); font-size: 15px; line-height: 1.65; color: var(--ink-800); }
+.pp-steps { list-style: none; margin: 0; padding: 0; counter-reset: pp-step; border-top: 1px solid var(--ink); }
+.pp-step { counter-increment: pp-step; display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 14px; padding: 18px 0; border-bottom: 1px solid var(--paper-400); }
+.pp-step::before { content: counter(pp-step, decimal-leading-zero); font-family: var(--font-heading); font-weight: 900; font-size: 22px; line-height: 1; color: var(--terracotta); }
+.pp-step h4 { font-family: var(--font-heading); font-weight: 900; font-size: 15px; letter-spacing: 0.04em; margin: 0 0 6px; }
+.pp-step p { font-family: var(--font-body); font-size: 14.5px; line-height: 1.6; color: var(--ink-700); margin: 0; }
+.pp-note-box { margin-top: 24px; padding: 20px 22px; border: 1px dashed var(--sand-700); border-radius: var(--radius-lg); background: var(--paper); }
+.pp-note-text { margin: 8px 0 0; font-family: var(--font-body); font-size: 14px; line-height: 1.6; color: var(--ink-800); }
+
+/* ── Contacto ── */
+.pp-contact { background: var(--sand); }
+.pp-contact-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; }
+@media (min-width: 960px) { .pp-contact-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: 72px; align-items: end; } }
+.pp-contact .lead { color: var(--ink-800); }
+.pp-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+@media (max-width: 560px) { .pp-actions .btn { width: 100%; justify-content: center; } }
+.pp-contact .eyebrow { color: var(--ink-800); }
+.pp-contact-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
+.pp-contact-list li { display: grid; gap: 4px; padding: 14px 0; border-bottom: 1px solid color-mix(in srgb, var(--ink) 20%, transparent); }
+.pp-contact-list .pp-label { color: var(--ink-700); }
+.pp-contact-value { font-family: var(--font-heading); font-weight: 700; font-size: 17px; color: var(--ink); overflow-wrap: anywhere; }
+
+/* ── Pie ── */
+.pp-footer { background: var(--ink); color: color-mix(in srgb, var(--paper) 70%, transparent); padding-block: 48px; }
+.pp-footer-inner { display: grid; gap: 24px; }
+@media (min-width: 800px) { .pp-footer-inner { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 40px; } }
+.pp-footer-logo { width: 84px; height: auto; filter: invert(96%) sepia(7%) saturate(248%) hue-rotate(2deg) brightness(106%) contrast(95%); }
+.pp-footer p { margin: 0; font-family: var(--font-body); font-size: 13px; line-height: 1.7; }
+.pp-footer nav { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.pp-footer nav a { font-family: var(--font-label); font-weight: 700; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: color-mix(in srgb, var(--paper) 70%, transparent); transition: color var(--dur-base) var(--ease-out); }
+.pp-footer nav a:hover { color: var(--paper); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-stepper button { transition: none; }
+}
+
+/* ── Impresión / PDF (A4) ──
+   En impresión el ancho útil es ~700px, así que las columnas de escritorio se
+   fijan aquí explícitamente. */
+@page { size: A4; margin: 12mm 12mm 14mm; }
+@media print {
+  body { background: var(--white); }
+  .pp-noprint, .cookie-consent, .skip-link { display: none !important; }
+  .pp-page, .pp-page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pp-wrap { max-width: none; padding-inline: 0; }
+  .pp-bar { border-bottom: 0; }
+  .pp-bar-inner { padding-block: 0 12px; }
+  .pp-bar-side .pp-label { display: block; }
+  .pp-hero { border-radius: var(--radius-lg); }
+  .pp-hero-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr); gap: 28px; padding: 30px 28px 64px; }
+  .pp-hero-media { min-height: 0; aspect-ratio: auto; }
+  .pp-title { font-size: 44px; }
+  .pp-to { margin-top: 24px; }
+  .pp-summary { margin-top: -40px; padding-inline: 16px; }
+  .pp-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); box-shadow: none; }
+  .pp-sum { padding: 16px 14px 18px; }
+  .pp-sum-value { font-size: 20px; }
+  .pp-sum-note { font-size: 11px; }
+  .pp-section { padding-block: 22px; }
+  .pp-head { margin-bottom: 22px; gap: 10px; }
+  .pp-head .lead { font-size: 13.5px; }
+  .display-m { font-size: 30px; }
+  .pp-muted { background: transparent; }
+  .pp-letter { grid-template-columns: 180px minmax(0, 1fr); gap: 36px; padding-top: 24px; }
+  .pp-letter-meta { font-size: 12.5px; gap: 16px; }
+  .pp-letter-body > p { font-size: 14px; line-height: 1.75; margin-bottom: 16px; }
+  .pp-sign { margin-top: 24px; padding-top: 18px; }
+  .pp-price { grid-template-columns: 1fr; gap: 12px; }
+  .pp-table { min-width: 0; }
+  .pp-table td { padding: 8px 12px; font-size: 12.5px; }
+  .pp-table th { padding: 8px 12px; }
+  .pp-table .pp-group td { padding: 6px 12px; }
+  .pp-concept, .pp-concept-sub { display: inline; font-size: 11.5px; }
+  .pp-concept-sub { margin: 0 0 0 6px; }
+  .pp-concept-sub::before { content: "· "; }
+  .pp-tax { display: inline; margin: 0 4px 0 0; }
+  .pp-total { font-size: 14px; }
+  .pp-side { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .pp-card, .pp-offer { padding: 14px; }
+  .pp-card h3 { font-size: 11.5px; margin-bottom: 8px; }
+  .pp-list { gap: 5px; }
+  .pp-list li, .pp-offer-text { font-size: 11.5px; line-height: 1.45; }
+  .pp-offer-title { font-size: 15px; margin: 6px 0; }
+  .pp-sim { grid-template-columns: 1fr; margin-top: 20px; }
+  .pp-sim-controls { display: none; }
+  .pp-sim-result { padding: 18px 22px; }
+  .pp-line { font-size: 13px; padding: 7px 0; }
+  .pp-line.is-total { font-size: 16px; }
+  .pp-hotel { grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr); gap: 28px; }
+  .pp-hotel .body { font-size: 13.5px; }
+  .pp-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .pp-stat-num { font-size: 26px; }
+  .pp-stat .pp-label { font-size: 9px; letter-spacing: 0.06em; }
+  .pp-features { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 28px; }
+  .pp-feature { padding: 14px 16px; gap: 6px; }
+  .pp-feature h3 { font-size: 13px; }
+  .pp-feature p { font-size: 12px; line-height: 1.55; }
+  .pp-rooms-note { margin-top: 10px; font-size: 12px; }
+  .pp-rooms { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+  .pp-room { grid-template-columns: 1fr; align-items: start; gap: 0; }
+  .pp-room img { height: auto; aspect-ratio: 3 / 2; }
+  .pp-room-body { padding: 10px 10px 12px; }
+  .pp-room h3 { font-size: 13px; }
+  .pp-room-specs { font-size: 11px; }
+  .pp-location { border-radius: var(--radius-lg); }
+  .pp-location .pp-wrap { padding-inline: 28px; }
+  .pp-loc { grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr); gap: 24px; align-items: center; }
+  .pp-location .body { font-size: 13px; }
+  .pp-places { margin-top: 16px; }
+  .pp-place { padding: 7px 0; }
+  .pp-place-name { font-size: 12.5px; }
+  .pp-place-dist { font-size: 9.5px; }
+  .pp-keep { break-inside: avoid; }
+  .pp-reviews { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .pp-review { padding: 18px; }
+  .pp-review blockquote { font-size: 13px; }
+  .pp-terms { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 28px; }
+  .pp-dl div { grid-template-columns: 100px minmax(0, 1fr); gap: 14px; padding: 10px 0; }
+  .pp-dl dd, .pp-step p, .pp-note-text { font-size: 12.5px; }
+  .pp-step { padding: 11px 0; }
+  .pp-contact { border-radius: var(--radius-lg); }
+  .pp-contact .pp-wrap { padding-inline: 28px; }
+  .pp-contact-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: 28px; }
+  .pp-footer { padding-block: 20px; margin-top: 12px; border-radius: var(--radius-lg); }
+  .pp-footer .pp-wrap { padding-inline: 24px; }
+  .pp-footer-inner { grid-template-columns: auto minmax(0, 1fr); }
+  .pp-footer nav { display: none; }
+  .pp-break { break-before: page; }
+  .pp-hotel, .pp-features, .pp-rooms, .pp-loc, .pp-reviews, .pp-terms > div, .pp-contact-grid { break-inside: avoid; }
+  .pp-card, .pp-offer, .pp-sim, .pp-feature, .pp-room, .pp-review, .pp-step, .pp-dl div, .pp-table tr, .pp-contact, .pp-footer { break-inside: avoid; }
+  h2, h3, h4 { break-after: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="pp-page">
+
+<!-- ============================== BARRA ============================== -->
+<header class="pp-bar">
+  <div class="pp-wrap pp-bar-inner">
+    <a href="index.html" class="pp-brand" aria-label="estar — sitio web">
+      <img src="assets/icon-star-charcoal.png" alt="" class="pp-brand-star" width="28" height="28">
+      <img src="assets/logo.png" alt="estar" class="pp-brand-word" width="60" height="24">
+    </a>
+    <div class="pp-bar-side">
+      <p class="pp-label">Propuesta N.° 2026-UC-01</p>
+      <button type="button" class="btn btn-ghost-dark pp-btn-sm pp-noprint" data-print>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+        Imprimir / PDF
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main-content">
+
+<!-- ============================== PORTADA ============================== -->
+<section class="pp-hero" aria-labelledby="pp-title">
+  <div class="pp-hero-stars" aria-hidden="true"></div>
+  <div class="pp-wrap pp-hero-grid">
+    <div>
+      <p class="pp-pill">Propuesta corporativa</p>
+      <h1 class="pp-title" id="pp-title">Sus visitantes, <span class="serif-italic">a pasos del campus.</span></h1>
+      <p class="lead">Alojamiento con desayuno y crédito a 30 días para los invitados del Departamento de Internacionalización de la Universidad de Caldas.</p>
+      <div class="pp-to">
+        <div class="pp-to-main">
+          <p class="pp-label">Preparada para</p>
+          <p class="pp-to-name">Margarita López</p>
+          <p class="pp-to-line">Departamento de Internacionalización · Universidad de Caldas</p>
+        </div>
+        <div>
+          <p class="pp-label">Fecha</p>
+          <p class="pp-to-line">29 de septiembre de 2026</p>
+        </div>
+        <div>
+          <p class="pp-label">Vigencia</p>
+          <p class="pp-to-line">Estadías hasta el 31 de diciembre de 2026</p>
+        </div>
+      </div>
+    </div>
+    <figure class="pp-hero-media">
+      <img src="assets/photos/interior_detalle.webp" alt="Apartaestudio de Estar con cama doble, armario y luz natural" width="1920" height="1281" fetchpriority="high">
+    </figure>
+  </div>
+</section>
+
+<!-- ============================== RESUMEN ============================== -->
+<div class="pp-summary">
+  <div class="pp-wrap">
+    <dl class="pp-summary-grid">
+      <div class="pp-sum">
+        <dt class="pp-label">Tarifa por noche</dt>
+        <dd class="pp-sum-value">$245.000</dd>
+        <dd class="pp-sum-note">Una persona, IVA incluido · $205.882 antes de IVA</dd>
+      </div>
+      <div class="pp-sum">
+        <dt class="pp-label">Desayuno</dt>
+        <dd class="pp-sum-value">Incluido</dd>
+        <dd class="pp-sum-note">Todos los días, de 7:00 a 10:00 a. m.</dd>
+      </div>
+      <div class="pp-sum">
+        <dt class="pp-label">Forma de pago</dt>
+        <dd class="pp-sum-value">Crédito a 30 días</dd>
+        <dd class="pp-sum-note">Factura electrónica a nombre de la Universidad</dd>
+      </div>
+      <div class="pp-sum is-accent">
+        <dt class="pp-label">Primera reserva</dt>
+        <dd class="pp-sum-value">10%</dd>
+        <dd class="pp-sum-note">En toda la primera reserva: $220.500 la noche, IVA incluido</dd>
+      </div>
+    </dl>
+  </div>
+</div>
+
+<!-- ============================== CARTA ============================== -->
+<section class="pp-section pp-break" aria-label="Carta de presentación">
+  <div class="pp-wrap pp-letter">
+    <div class="pp-letter-meta">
+      <p>Manizales, 29 de septiembre de 2026</p>
+      <p>Señora<br><strong>Margarita López</strong><br>Departamento de Internacionalización<br>Universidad de Caldas<br>Ciudad</p>
+      <p><strong>Asunto:</strong> propuesta de alojamiento corporativo</p>
+    </div>
+    <div class="pp-letter-body">
+      <p>Estimada Margarita:</p>
+      <p>Gracias por tener en cuenta a Estar para alojar a los visitantes del Departamento de Internacionalización. Somos un apartahotel boutique de cinco apartaestudios en La Estrella, el mismo barrio de la Sede Central de la Universidad, y a 400 metros de la Sede Palogrande. Los profesores, investigadores y estudiantes que ustedes reciban pueden ir y volver del campus caminando.</p>
+      <p>Para la Universidad proponemos una tarifa corporativa de $245.000 por noche para una persona, con desayuno incluido. Ese valor ya tiene el IVA; antes de impuestos son $205.882. Si el apartaestudio se comparte, cada huésped adicional suma $35.000 por noche. Damos crédito a 30 días con factura electrónica a nombre de la Universidad, un 10% de descuento en toda la primera reserva y, si lo necesitan, almuerzo y cena por $35.000 cada uno.</p>
+      <p>Más abajo encuentra el detalle de valores, las condiciones y los pasos para reservar. Con gusto ajustamos la propuesta a la agenda de visitantes que tengan prevista.</p>
+      <p>Cordialmente,</p>
+      <div class="pp-sign">
+        <img src="assets/icon-star-charcoal.png" alt="" width="34" height="34">
+        <div>
+          <p class="pp-sign-name">Rafael Castaño</p>
+          <p class="pp-sign-role">Cofundador · Hotel Estar</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== PROPUESTA ECONÓMICA ============================== -->
+<section class="pp-section pp-muted pp-break" aria-labelledby="pp-precio">
+  <div class="pp-wrap">
+    <div class="pp-head">
+      <p class="eyebrow terracotta">Propuesta económica</p>
+      <h2 class="display-m" id="pp-precio">Una tarifa clara, <span class="serif-italic">antes y después de impuestos.</span></h2>
+      <p class="lead">La tarifa es por apartaestudio y por noche, para una persona. Mostramos el valor antes de impuestos para facilitar sus trámites de presupuesto.</p>
+    </div>
+
+    <div class="pp-price">
+      <div>
+        <div class="pp-table-wrap">
+          <table class="pp-table">
+            <caption class="visually-hidden">Tarifas de la propuesta, antes y después de impuestos</caption>
+            <thead>
+              <tr>
+                <th scope="col">Concepto</th>
+                <th scope="col">Antes de impuestos</th>
+                <th scope="col">Impuesto</th>
+                <th scope="col">Valor total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="pp-group"><td colspan="4">Alojamiento</td></tr>
+              <tr>
+                <td><span class="pp-concept">Noche en apartaestudio</span><span class="pp-concept-sub">Una persona, con desayuno incluido</span></td>
+                <td data-label="Antes de impuestos">$205.882</td>
+                <td data-label="IVA 19%"><span class="pp-tax">IVA 19%</span>$39.118</td>
+                <td class="pp-total" data-label="Valor total">$245.000</td>
+              </tr>
+              <tr>
+                <td><span class="pp-concept">Huésped adicional</span><span class="pp-concept-sub">En acomodación múltiple, por noche</span></td>
+                <td data-label="Antes de impuestos">$29.412</td>
+                <td data-label="IVA 19%"><span class="pp-tax">IVA 19%</span>$5.588</td>
+                <td class="pp-total" data-label="Valor total">$35.000</td>
+              </tr>
+              <tr class="pp-group"><td colspan="4">Alimentación opcional</td></tr>
+              <tr>
+                <td><span class="pp-concept">Almuerzo</span><span class="pp-concept-sub">Por persona</span></td>
+                <td data-label="Antes de impuestos">$32.407</td>
+                <td data-label="INC 8%"><span class="pp-tax">INC 8%</span>$2.593</td>
+                <td class="pp-total" data-label="Valor total">$35.000</td>
+              </tr>
+              <tr>
+                <td><span class="pp-concept">Cena</span><span class="pp-concept-sub">Por persona</span></td>
+                <td data-label="Antes de impuestos">$32.407</td>
+                <td data-label="INC 8%"><span class="pp-tax">INC 8%</span>$2.593</td>
+                <td class="pp-total" data-label="Valor total">$35.000</td>
+              </tr>
+              <tr class="pp-group pp-group-first"><td colspan="4">Primera reserva · 10% de descuento en todo</td></tr>
+              <tr class="pp-first">
+                <td><span class="pp-concept">Noche en apartaestudio</span><span class="pp-concept-sub">Una persona, con desayuno incluido</span></td>
+                <td data-label="Antes de impuestos">$185.294</td>
+                <td data-label="IVA 19%"><span class="pp-tax">IVA 19%</span>$35.206</td>
+                <td class="pp-total" data-label="Valor total">$220.500</td>
+              </tr>
+              <tr class="pp-first">
+                <td><span class="pp-concept">Huésped adicional</span><span class="pp-concept-sub">En acomodación múltiple, por noche</span></td>
+                <td data-label="Antes de impuestos">$26.471</td>
+                <td data-label="IVA 19%"><span class="pp-tax">IVA 19%</span>$5.029</td>
+                <td class="pp-total" data-label="Valor total">$31.500</td>
+              </tr>
+              <tr class="pp-first">
+                <td><span class="pp-concept">Almuerzo o cena</span><span class="pp-concept-sub">Por persona</span></td>
+                <td data-label="Antes de impuestos">$29.167</td>
+                <td data-label="INC 8%"><span class="pp-tax">INC 8%</span>$2.333</td>
+                <td class="pp-total" data-label="Valor total">$31.500</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="pp-table-note">Valores en pesos colombianos (COP). El alojamiento lleva IVA del 19% y los almuerzos y cenas, impuesto nacional al consumo (impoconsumo) del 8%.</p>
+      </div>
+
+      <div class="pp-side">
+        <div class="pp-card">
+          <h3>Incluido en cada noche</h3>
+          <ul class="pp-list">
+            <li>Apartaestudio privado con cocina equipada y baño privado</li>
+            <li>Desayuno de 7:00 a 10:00 a. m.</li>
+            <li>WiFi de fibra óptica, TV cable y Smart TV de 43 pulgadas</li>
+            <li>Check-in digital y códigos de acceso personales</li>
+            <li>Atención por WhatsApp durante la estadía</li>
+          </ul>
+        </div>
+        <div class="pp-offer">
+          <p class="pp-label">Primera reserva</p>
+          <p class="pp-offer-title">10% de descuento en toda la reserva</p>
+          <p class="pp-offer-text">La noche queda en $220.500 con IVA ($185.294 antes de impuestos), el huésped adicional en $31.500 y el almuerzo o la cena en $31.500.</p>
+        </div>
+        <div class="pp-card">
+          <h3>Almuerzo y cena</h3>
+          <ul class="pp-list">
+            <li>$35.000 por persona cada uno, impoconsumo incluido</li>
+            <li>Se programan al hacer la reserva</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulador -->
+    <div class="pp-sim" id="simulador">
+      <div class="pp-sim-controls pp-noprint">
+        <h3>Calcule una estadía</h3>
+        <p class="pp-sim-intro">Cambie los valores para estimar el presupuesto de una visita.</p>
+        <div class="pp-fields">
+          <div class="pp-field">
+            <label class="pp-label" for="simRooms">Apartaestudios</label>
+            <div class="pp-stepper">
+              <button type="button" data-step="-1" data-target="simRooms" aria-label="Quitar un apartaestudio">−</button>
+              <input id="simRooms" type="number" inputmode="numeric" min="1" max="5" value="1">
+              <button type="button" data-step="1" data-target="simRooms" aria-label="Agregar un apartaestudio">+</button>
+            </div>
+          </div>
+          <div class="pp-field">
+            <label class="pp-label" for="simNights">Noches</label>
+            <div class="pp-stepper">
+              <button type="button" data-step="-1" data-target="simNights" aria-label="Quitar una noche">−</button>
+              <input id="simNights" type="number" inputmode="numeric" min="1" max="90" value="5">
+              <button type="button" data-step="1" data-target="simNights" aria-label="Agregar una noche">+</button>
+            </div>
+          </div>
+          <div class="pp-field is-wide">
+            <label class="pp-label" for="simExtra">Huéspedes adicionales por noche</label>
+            <div class="pp-stepper">
+              <button type="button" data-step="-1" data-target="simExtra" aria-label="Quitar un huésped adicional">−</button>
+              <input id="simExtra" type="number" inputmode="numeric" min="0" max="8" value="0">
+              <button type="button" data-step="1" data-target="simExtra" aria-label="Agregar un huésped adicional">+</button>
+            </div>
+          </div>
+          <div class="pp-field">
+            <label class="pp-label" for="simLunches">Almuerzos (total)</label>
+            <div class="pp-stepper">
+              <button type="button" data-step="-1" data-target="simLunches" aria-label="Quitar un almuerzo">−</button>
+              <input id="simLunches" type="number" inputmode="numeric" min="0" max="450" value="0">
+              <button type="button" data-step="1" data-target="simLunches" aria-label="Agregar un almuerzo">+</button>
+            </div>
+          </div>
+          <div class="pp-field">
+            <label class="pp-label" for="simDinners">Cenas (total)</label>
+            <div class="pp-stepper">
+              <button type="button" data-step="-1" data-target="simDinners" aria-label="Quitar una cena">−</button>
+              <input id="simDinners" type="number" inputmode="numeric" min="0" max="450" value="5">
+              <button type="button" data-step="1" data-target="simDinners" aria-label="Agregar una cena">+</button>
+            </div>
+          </div>
+        </div>
+        <label class="pp-check" for="simFirst">
+          <input id="simFirst" type="checkbox" checked>
+          <span>Es la primera reserva (10% de descuento en toda la reserva)</span>
+        </label>
+      </div>
+
+      <div class="pp-sim-result" aria-live="polite">
+        <h3>Presupuesto estimado</h3>
+        <div class="pp-line"><span id="outLodgingLabel">Alojamiento con desayuno · 5 noches</span><span class="amt" id="outLodging">$1.225.000</span></div>
+        <div class="pp-line" id="rowExtra" hidden><span id="outExtraLabel">Huéspedes adicionales · 0</span><span class="amt" id="outExtra">$0</span></div>
+        <div class="pp-line" id="rowLunches" hidden><span id="outLunchesLabel">Almuerzos · 0</span><span class="amt" id="outLunches">$0</span></div>
+        <div class="pp-line" id="rowDinners"><span id="outDinnersLabel">Cenas · 5</span><span class="amt" id="outDinners">$175.000</span></div>
+        <div class="pp-line is-discount" id="rowDiscount"><span>Descuento primera reserva (10%)</span><span class="amt" id="outDiscount">−$140.000</span></div>
+        <div class="pp-line is-sub"><span>Valor antes de impuestos</span><span class="amt" id="outBase">$1.072.304</span></div>
+        <div class="pp-line is-sub"><span>IVA 19% sobre el alojamiento</span><span class="amt" id="outIva">$176.029</span></div>
+        <div class="pp-line is-sub" id="rowInc"><span>Impoconsumo 8% sobre la alimentación</span><span class="amt" id="outInc">$11.667</span></div>
+        <div class="pp-line is-total"><span>Total</span><span class="amt" id="outTotal">$1.260.000</span></div>
+        <p class="pp-sim-caption" id="simCaption">Ejemplo: 1 apartaestudio, 5 noches y 5 cenas, con el descuento de primera reserva. Es un valor de referencia; la factura se emite por las noches y los servicios que efectivamente se tomen.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== EL HOTEL ============================== -->
+<section class="pp-section" aria-labelledby="pp-hotel">
+  <div class="pp-wrap">
+    <div class="pp-hotel">
+      <figure class="pp-hotel-media">
+        <img src="assets/photos/mzl648.webp" alt="Entrada de Estar con el letrero «Tu hogar en Manizales»" width="1000" height="666">
+      </figure>
+      <div class="pp-hotel-text">
+        <p class="eyebrow terracotta">El hotel</p>
+        <h2 class="display-m" id="pp-hotel">Un apartahotel boutique <span class="serif-italic">hecho en Manizales.</span></h2>
+        <p class="body">Estar abrió en 2023. Lo fundamos dos hermanos manizaleños, Rafael y Daniela Castaño, con una idea sencilla: que quien llegue a la ciudad tenga un lugar cómodo, bien ubicado y fácil de usar, con la calidez de una casa y el orden de un hotel.</p>
+        <p class="body">Los espacios los diseñó Intempo, la firma de la arquitecta Manuela Arango. Hoy nos visitan turistas, nómadas digitales, médicos residentes y familias de paso por el Eje Cafetero.</p>
+        <div class="pp-stats">
+          <div class="pp-stat"><p class="pp-stat-num">2023</p><p class="pp-label">Año de apertura</p></div>
+          <div class="pp-stat"><p class="pp-stat-num">5</p><p class="pp-label">Apartaestudios</p></div>
+          <div class="pp-stat"><p class="pp-stat-num">9.0</p><p class="pp-label">Booking.com, 126 reseñas</p></div>
+          <div class="pp-stat"><p class="pp-stat-num">9.4</p><p class="pp-label">Puntaje de ubicación</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pp-features">
+      <div class="pp-feature">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        <h3>A pasos del campus</h3>
+        <p>La Sede Central queda en el mismo barrio y la Sede Palogrande a 400 metros. Las universidades Nacional y Católica también están cerca.</p>
+      </div>
+      <div class="pp-feature">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h20"/><path d="M20 12v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="m4 8 16-4"/><path d="m8.86 6.78-.45-1.81a2 2 0 0 1 1.45-2.43l1.94-.48a2 2 0 0 1 2.43 1.46l.45 1.8"/></svg>
+        <h3>Un apartaestudio completo</h3>
+        <p>Cocina equipada con estufa, microondas y cafetera, baño privado y espacio para trabajar. Sirve igual para una noche que para varias semanas.</p>
+      </div>
+      <div class="pp-feature">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+        <h3>Llegada sin llaves</h3>
+        <p>Un día antes, el visitante hace el check-in digital en español o inglés y recibe sus códigos de acceso. Llega directo a su apartaestudio.</p>
+      </div>
+      <div class="pp-feature">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z"/><path d="M16 8h4a2 2 0 0 1 0 4h-4"/></svg>
+        <h3>Desayuno todos los días</h3>
+        <p>De 7:00 a 10:00 a. m., incluido en la tarifa. Almuerzo y cena disponibles por $35.000 cada uno.</p>
+      </div>
+      <div class="pp-feature">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+        <h3>Para trabajar tranquilo</h3>
+        <p>WiFi de fibra óptica y una zona de coworking en el edificio para escribir, preparar clases o tener reuniones virtuales.</p>
+      </div>
+      <div class="pp-feature">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+        <h3>Atención directa</h3>
+        <p>Respondemos por WhatsApp de 6:00 a 10:00 a. m. y de 4:00 a 10:00 p. m., para reservas, cambios y lo que surja durante la estadía.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== APARTAESTUDIOS ============================== -->
+<section class="pp-section pp-muted" aria-labelledby="pp-aptos">
+  <div class="pp-wrap">
+    <div class="pp-head">
+      <p class="eyebrow terracotta">Los apartaestudios</p>
+      <h2 class="display-m" id="pp-aptos">Cinco apartaestudios, <span class="serif-italic">una sola tarifa.</span></h2>
+      <p class="lead">La tarifa corporativa aplica al apartaestudio disponible en las fechas de cada visita. En acomodación múltiple, cada huésped adicional suma $35.000 por noche, hasta la capacidad de cada apartaestudio.</p>
+    </div>
+    <div class="pp-rooms">
+      <article class="pp-room">
+        <img src="assets/photos/tipo1/1.webp" alt="Apartaestudio Clásica" width="1400" height="934">
+        <div class="pp-room-body">
+          <p class="pp-room-num">01</p>
+          <h3>Clásica</h3>
+          <p class="pp-room-specs">29 m² · hasta 2 personas<br>1 cama doble · vista interior</p>
+        </div>
+      </article>
+      <article class="pp-room">
+        <img src="assets/photos/tipo2/1.webp" alt="Apartaestudio Selección" width="1400" height="934">
+        <div class="pp-room-body">
+          <p class="pp-room-num">02</p>
+          <h3>Selección</h3>
+          <p class="pp-room-specs">36 m² · hasta 5 personas<br>King, doble y sencilla · vista a la ciudad</p>
+        </div>
+      </article>
+      <article class="pp-room">
+        <img src="assets/photos/tipo3/1.webp" alt="Apartaestudio Reserva" width="1400" height="934">
+        <div class="pp-room-body">
+          <p class="pp-room-num">03</p>
+          <h3>Reserva</h3>
+          <p class="pp-room-specs">24 m² · hasta 2 personas<br>1 cama doble · vista a la ciudad</p>
+        </div>
+      </article>
+      <article class="pp-room">
+        <img src="assets/photos/tipo4/1.webp" alt="Apartaestudio Origen" width="1400" height="934">
+        <div class="pp-room-body">
+          <p class="pp-room-num">04</p>
+          <h3>Origen</h3>
+          <p class="pp-room-specs">29 m² · hasta 3 personas<br>Doble y sencilla · vista a la ciudad</p>
+        </div>
+      </article>
+      <article class="pp-room">
+        <img src="assets/photos/tipo5/1.webp" alt="Apartaestudio Especial" width="1400" height="934">
+        <div class="pp-room-body">
+          <p class="pp-room-num">05</p>
+          <h3>Especial</h3>
+          <p class="pp-room-specs">27 m² · hasta 2 personas<br>1 cama doble · vista a la ciudad</p>
+        </div>
+      </article>
+    </div>
+    <p class="pp-rooms-note">¿Visitantes por un semestre o más? También tenemos tarifas mensuales de estadía larga. <a href="vivir.html">Ver Extended Stay</a></p>
+  </div>
+</section>
+
+<!-- ============================== UBICACIÓN ============================== -->
+<section class="pp-section pp-location pp-break" aria-labelledby="pp-ubicacion">
+  <div class="pp-wrap pp-loc">
+    <div>
+      <p class="eyebrow on-dark">Ubicación</p>
+      <h2 class="display-m" id="pp-ubicacion" style="margin-top: 18px;">En el barrio <span class="serif-italic">de la Universidad.</span></h2>
+      <p class="body" style="margin-top: 20px;">Estamos en la Calle 61 #23-36, en La Estrella, sector Palogrande. La Sede Central de la Universidad de Caldas queda en el mismo barrio y la zona de restaurantes de El Cable, a pocos minutos a pie.</p>
+      <ol class="pp-places">
+        <li class="pp-place"><span class="pp-place-key is-home" aria-hidden="true">✶</span><span class="pp-place-name">Universidad de Caldas, Sede Central</span><span class="pp-place-dist">Mismo barrio</span></li>
+        <li class="pp-place"><span class="pp-place-key" aria-hidden="true">1</span><span class="pp-place-name">Universidad Católica de Manizales</span><span class="pp-place-dist">200 m · 3 min</span></li>
+        <li class="pp-place"><span class="pp-place-key" aria-hidden="true">2</span><span class="pp-place-name">Universidad de Caldas, Sede Palogrande</span><span class="pp-place-dist">400 m · 5 min</span></li>
+        <li class="pp-place"><span class="pp-place-key" aria-hidden="true">3</span><span class="pp-place-name">Universidad Nacional, sede El Cable</span><span class="pp-place-dist">500 m · 7 min</span></li>
+        <li class="pp-place"><span class="pp-place-key" aria-hidden="true">4</span><span class="pp-place-name">Estadio Palogrande</span><span class="pp-place-dist">400 m · 6 min</span></li>
+        <li class="pp-place"><span class="pp-place-key" aria-hidden="true">5</span><span class="pp-place-name">Torre del Cable</span><span class="pp-place-dist">450 m · 6 min</span></li>
+      </ol>
+      <div class="pp-loc-foot">
+        <p>Distancias a pie desde el hotel. Los números corresponden al mapa.</p>
+        <a class="text-link pp-noprint" href="https://maps.app.goo.gl/QwDXDmpE7NwV4m1ZA" target="_blank" rel="noopener noreferrer">Ver en Google Maps <span class="arr" aria-hidden="true">→</span></a>
+      </div>
+    </div>
+    <figure class="pp-map">
+      <img src="assets/mapa_brochure.webp" alt="Mapa del sector con la ubicación de Estar y las universidades cercanas" width="900" height="1243">
+    </figure>
+  </div>
+</section>
+
+<!-- ============================== RESEÑAS ============================== -->
+<section class="pp-section pp-keep" aria-labelledby="pp-resenas">
+  <div class="pp-wrap">
+    <div class="pp-head">
+      <p class="eyebrow terracotta">Huéspedes</p>
+      <h2 class="display-m" id="pp-resenas">9.0 en Booking.com, <span class="serif-italic">con 126 reseñas.</span></h2>
+    </div>
+    <div class="pp-reviews">
+      <figure class="pp-review">
+        <blockquote>“Muy conveniente, económico, limpio y moderno. La ubicación es excelente, cerca de buenas tiendas, restaurantes y vida nocturna. El personal es súper amable.”</blockquote>
+        <figcaption><span class="pp-label">Douglas · Canadá</span><span class="pp-label pp-review-score">10 ✶</span></figcaption>
+      </figure>
+      <figure class="pp-review">
+        <blockquote>“Excelente hotel, situado en un barrio muy agradable. Los apartaestudios son modernos, cómodos y espaciosos. Todo está muy limpio y bien mantenido.”</blockquote>
+        <figcaption><span class="pp-label">Catherine · Bélgica</span><span class="pp-label pp-review-score">10 ✶</span></figcaption>
+      </figure>
+      <figure class="pp-review">
+        <blockquote>“¡El mejor lugar para quedarse en Manizales! Amé cada detalle, lo limpio y acogedor que era. Súper cerca al Cable, la Av. Santander y restaurantes.”</blockquote>
+        <figcaption><span class="pp-label">Angélica · Colombia</span><span class="pp-label pp-review-score">10 ✶</span></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== CONDICIONES Y RESERVA ============================== -->
+<section class="pp-section pp-muted pp-break" aria-labelledby="pp-condiciones">
+  <div class="pp-wrap">
+    <div class="pp-head">
+      <p class="eyebrow terracotta">Condiciones</p>
+      <h2 class="display-m" id="pp-condiciones">Todo claro <span class="serif-italic">desde la primera reserva.</span></h2>
+    </div>
+    <div class="pp-terms">
+      <div>
+        <h3>Condiciones comerciales</h3>
+        <dl class="pp-dl">
+          <div><dt>Tarifa</dt><dd>$245.000 por apartaestudio y por noche para una persona, IVA incluido y con desayuno. En acomodación múltiple, cada huésped adicional paga $35.000 por noche, IVA incluido.</dd></div>
+          <div><dt>Disponibilidad</dt><dd>Sujeta a disponibilidad al momento de confirmar cada reserva.</dd></div>
+          <div><dt>Primera reserva</dt><dd>10% de descuento sobre toda la primera reserva: alojamiento, huéspedes adicionales y alimentación.</dd></div>
+          <div><dt>Alimentación</dt><dd>Almuerzo y cena opcionales, $35.000 por persona cada uno, impoconsumo incluido.</dd></div>
+          <div><dt>Pago</dt><dd>Crédito a 30 días. Al terminar cada estadía emitimos la factura electrónica a nombre de la Universidad y el pago se hace por transferencia dentro de los 30 días siguientes a su fecha.</dd></div>
+          <div><dt>Horarios</dt><dd>Check-in desde las 3:00 p. m. y check-out hasta las 11:00 a. m.</dd></div>
+          <div><dt>Cancelación</dt><dd>Sin costo hasta 48 horas antes de la llegada.</dd></div>
+          <div><dt>Vigencia</dt><dd>Tarifa válida para estadías hasta el 31 de diciembre de 2026.</dd></div>
+        </dl>
+      </div>
+      <div>
+        <h3>Cómo reservar</h3>
+        <ol class="pp-steps">
+          <li class="pp-step"><div><h4>Solicitud</h4><p>Escríbanos por correo o WhatsApp con el nombre del visitante, las fechas y si necesita almuerzo o cena.</p></div></li>
+          <li class="pp-step"><div><h4>Confirmación</h4><p>Confirmamos la disponibilidad y le enviamos el valor de la estadía para su trámite interno.</p></div></li>
+          <li class="pp-step"><div><h4>Llegada</h4><p>Un día antes, el visitante recibe el enlace del check-in digital y después sus códigos de acceso.</p></div></li>
+          <li class="pp-step"><div><h4>Factura</h4><p>Al terminar la estadía emitimos la factura electrónica a nombre de la Universidad, con pago a 30 días.</p></div></li>
+        </ol>
+        <div class="pp-note-box">
+          <p class="pp-label">Registro como proveedor</p>
+          <p class="pp-note-text">Le enviamos el RUT, el certificado de existencia y representación legal y la certificación bancaria de MIRADA S.A.S. para el registro en la Universidad.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== CONTACTO ============================== -->
+<section class="pp-section pp-contact" aria-labelledby="pp-contacto">
+  <div class="pp-wrap pp-contact-grid">
+    <div>
+      <p class="eyebrow terracotta">Hablemos</p>
+      <h2 class="display-m" id="pp-contacto" style="margin-top: 18px;">Quedamos atentos <span class="serif-italic">a sus próximas visitas.</span></h2>
+      <p class="lead" style="margin-top: 20px;">Escríbanos para reservar, resolver dudas o ajustar la propuesta.</p>
+      <div class="pp-actions pp-noprint">
+        <a class="btn btn-primary" href="https://api.whatsapp.com/send/?phone=573102490414&amp;text=Hola%2C%20les%20escribo%20del%20Departamento%20de%20Internacionalizaci%C3%B3n%20de%20la%20Universidad%20de%20Caldas%20sobre%20la%20propuesta%20corporativa." target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.709 1.457h.004c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+          Escribir por WhatsApp
+        </a>
+        <a class="btn btn-ghost-dark" href="mailto:reservas@estar.com.co?subject=Propuesta%20corporativa%20Universidad%20de%20Caldas">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          Enviar un correo
+        </a>
+        <button type="button" class="btn btn-ghost-dark" data-print>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+          Imprimir o guardar en PDF
+        </button>
+      </div>
+    </div>
+    <ul class="pp-contact-list">
+      <li><span class="pp-label">WhatsApp</span><span class="pp-contact-value">+57 310 249 0414</span></li>
+      <li><span class="pp-label">Correo</span><span class="pp-contact-value">reservas@estar.com.co</span></li>
+      <li><span class="pp-label">Dirección</span><span class="pp-contact-value">Cl. 61 #23-36, La Estrella · Manizales</span></li>
+      <li><span class="pp-label">Contacto</span><span class="pp-contact-value">Rafael Castaño, cofundador</span></li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<!-- ============================== PIE ============================== -->
+<footer class="pp-footer">
+  <div class="pp-wrap pp-footer-inner">
+    <img src="assets/logo-stacked-charcoal.png" alt="estar" class="pp-footer-logo" width="313" height="281">
+    <div>
+      <p>Hotel Estar · MIRADA S.A.S. · NIT 902.032.515-0 · RNT 276306</p>
+      <p>Cl. 61 #23-36, La Estrella · Manizales, Caldas, Colombia</p>
+      <p>Propuesta N.° 2026-UC-01 · 29 de septiembre de 2026</p>
+    </div>
+    <nav aria-label="Sitio web de Estar">
+      <a href="index.html">estar.com.co</a>
+      <a href="nosotros.html">Nosotros</a>
+      <a href="faq.html">Preguntas frecuentes</a>
+      <a href="privacidad.html">Privacidad</a>
+    </nav>
+  </div>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // Valores de la propuesta (IVA e impoconsumo incluidos).
+  var RATE = 245000;          // apartaestudio por noche, una persona con desayuno
+  var EXTRA = 35000;          // huésped adicional por noche (acomodación múltiple)
+  var MEAL = 35000;           // almuerzo o cena por persona
+  var FIRST_DISCOUNT = 0.10;  // primera reserva, sobre toda la reserva
+  var IVA = 0.19;
+  var INC = 0.08;
+
+  var nf = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 });
+  function cop(n) { return (n < 0 ? '−' : '') + '$' + nf.format(Math.abs(Math.round(n))); }
+  function byId(id) { return document.getElementById(id); }
+  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+
+  var inputs = {
+    rooms: byId('simRooms'),
+    nights: byId('simNights'),
+    extras: byId('simExtra'),
+    lunches: byId('simLunches'),
+    dinners: byId('simDinners')
+  };
+  var first = byId('simFirst');
+  if (!inputs.rooms || !first) return;
+
+  function read(input) {
+    var min = Number(input.min), max = Number(input.max);
+    var n = Math.round(Number(input.value));
+    if (!isFinite(n)) n = min;
+    return Math.min(max, Math.max(min, n));
+  }
+
+  function render() {
+    var rooms = read(inputs.rooms);
+    var nights = read(inputs.nights);
+    var extras = read(inputs.extras);
+    var lunches = read(inputs.lunches);
+    var dinners = read(inputs.dinners);
+    var isFirst = first.checked;
+
+    var lodgingGross = rooms * nights * RATE;
+    var extraGross = extras * nights * EXTRA;
+    var mealsGross = (lunches + dinners) * MEAL;
+    var keep = isFirst ? 1 - FIRST_DISCOUNT : 1;
+    var lodging = Math.round((lodgingGross + extraGross) * keep);  // lleva IVA
+    var meals = Math.round(mealsGross * keep);                      // lleva impoconsumo
+    var discount = lodgingGross + extraGross + mealsGross - lodging - meals;
+    var iva = Math.round(lodging - lodging / (1 + IVA));
+    var inc = Math.round(meals - meals / (1 + INC));
+    var total = lodging + meals;
+
+    byId('outLodgingLabel').textContent = 'Alojamiento con desayuno · ' +
+      (rooms > 1 ? plural(rooms, 'apartaestudio', 'apartaestudios') + ' × ' : '') +
+      plural(nights, 'noche', 'noches');
+    byId('outLodging').textContent = cop(lodgingGross);
+    byId('rowExtra').hidden = extras === 0;
+    byId('outExtraLabel').textContent = 'Huéspedes adicionales · ' + extras + ' × ' + plural(nights, 'noche', 'noches');
+    byId('outExtra').textContent = cop(extraGross);
+    byId('rowDiscount').hidden = !isFirst;
+    byId('outDiscount').textContent = cop(-discount);
+    byId('rowLunches').hidden = lunches === 0;
+    byId('outLunchesLabel').textContent = 'Almuerzos · ' + lunches;
+    byId('outLunches').textContent = cop(lunches * MEAL);
+    byId('rowDinners').hidden = dinners === 0;
+    byId('outDinnersLabel').textContent = 'Cenas · ' + dinners;
+    byId('outDinners').textContent = cop(dinners * MEAL);
+    byId('outBase').textContent = cop(total - iva - inc);
+    byId('outIva').textContent = cop(iva);
+    byId('rowInc').hidden = meals === 0;
+    byId('outInc').textContent = cop(inc);
+    byId('outTotal').textContent = cop(total);
+
+    var parts = [plural(rooms, 'apartaestudio', 'apartaestudios'), plural(nights, 'noche', 'noches')];
+    if (extras) parts.push(plural(extras, 'huésped adicional', 'huéspedes adicionales') + ' por noche');
+    if (lunches) parts.push(plural(lunches, 'almuerzo', 'almuerzos'));
+    if (dinners) parts.push(plural(dinners, 'cena', 'cenas'));
+    var last = parts.pop();
+    byId('simCaption').textContent = 'Ejemplo: ' + parts.join(', ') + ' y ' + last +
+      (isFirst ? ', con el descuento de primera reserva' : '') +
+      '. Es un valor de referencia; la factura se emite por las noches y los servicios que efectivamente se tomen.';
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-step]'), function (btn) {
+    btn.addEventListener('click', function () {
+      var input = byId(btn.getAttribute('data-target'));
+      input.value = read(input) + Number(btn.getAttribute('data-step'));
+      input.value = read(input);
+      render();
+    });
+  });
+  Object.keys(inputs).forEach(function (key) {
+    var input = inputs[key];
+    input.addEventListener('input', render);
+    input.addEventListener('change', function () { input.value = read(input); render(); });
+  });
+  first.addEventListener('change', render);
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-print]'), function (btn) {
+    btn.addEventListener('click', function () { window.print(); });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

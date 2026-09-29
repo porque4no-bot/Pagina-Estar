@@ -213,6 +213,20 @@
     X-Robots-Tag = "noindex, nofollow"
     Cache-Control = "no-store, no-cache, must-revalidate"
 
+# Propuesta corporativa Universidad de Caldas: se comparte por enlace directo.
+# Fuera de buscadores y sin caché, para que cualquier ajuste se vea de inmediato.
+[[headers]]
+  for = "/propuesta-ucaldas.html"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, no-cache, must-revalidate"
+
+[[headers]]
+  for = "/propuesta-ucaldas"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, no-cache, must-revalidate"
+
 # Guest-facing breakfast passes (opened via signed link; no login, no camera).
 [[headers]]
   for = "/pase-desayuno.html"
