@@ -205,7 +205,7 @@ test('guest completes document analysis, check-in and contract signature', async
 });
 
 test('guest opens the camera modal with the document guide frame', async ({ page, context }) => {
-  await context.grantPermissions(['camera'], { origin: 'http://127.0.0.1:3401' });
+  await context.grantPermissions(['camera'], { origin: `http://127.0.0.1:${parseInt(process.env.E2E_PORT, 10) || 3401}` });
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
