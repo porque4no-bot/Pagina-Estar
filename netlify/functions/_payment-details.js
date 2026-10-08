@@ -51,13 +51,39 @@ function extractWompiPaymentDetails(transaction) {
   };
 }
 
+/* Frente cancel: transacción YA NORMALIZADA por _payments.normalizeTransaction
+   (ruta de Mercado Pago). Antes MP no dejaba ningún registro durable, así que
+   pasados 7 días (booking-results) el reembolso automático no encontraba el
+   número de pago. MP reembolsa por ese id (POST /v1/payments/{id}/refunds). */
+function isNormalizedTransaction(t) {
+  return !!(t && typeof t === 'object' && t.provider && t.amountCents != null && t.amount_in_cents == null);
+}
+
+function extractNormalizedPaymentDetails(transaction) {
+  const t = transaction || {};
+  return {
+    provider: String(t.provider || '').toLowerCase() || null,
+    transactionId: t.id != null && t.id !== '' ? String(t.id) : null,
+    reference: t.reference || null,
+    method: t.paymentMethod || null,
+    amountInCents: t.amountCents != null ? Number(t.amountCents) : null,
+    currency: t.currency || null,
+    cardBrand: null,
+    cardLast4: null,
+    authCode: null,
+    paymentDate: new Date().toISOString()
+  };
+}
+
 /* Snapshot the payment details for a booking. Never throws. `extra` carries
    refund-relevant context not present on the raw transaction (e.g. the rate
    plan, which lives in the booking reference) so it survives just as long. */
 async function savePaymentDetails(bookingCode, transaction, extra) {
   if (!bookingCode) return { saved: false };
   try {
-    const details = extractWompiPaymentDetails(transaction);
+    const details = isNormalizedTransaction(transaction)
+      ? extractNormalizedPaymentDetails(transaction)
+      : extractWompiPaymentDetails(transaction);
     if (extra && typeof extra === 'object') Object.assign(details, extra);
     details.bookingCode = String(bookingCode);
     details.savedAt = new Date().toISOString();
@@ -80,5 +106,6 @@ async function getPaymentDetails(bookingCode) {
 }
 
 module.exports = {
-  extractWompiPaymentDetails, savePaymentDetails, getPaymentDetails, paymentDetailsStore
+  extractWompiPaymentDetails, extractNormalizedPaymentDetails, isNormalizedTransaction,
+  savePaymentDetails, getPaymentDetails, paymentDetailsStore
 };

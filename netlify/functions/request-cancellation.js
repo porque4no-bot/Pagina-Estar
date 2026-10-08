@@ -49,7 +49,16 @@ async function fetchReservation(bookingCode) {
   if (!response.ok) throw new Error(`Kunas API returned status ${response.status} when looking up booking ${bookingCode}`);
   const data = await response.json();
   if (!data || !data.id_reservations) return null;
-  return bookingHelpers.normalizeReservation(data);
+  const booking = bookingHelpers.normalizeReservation(data);
+  /* Frente cancel: datos para encontrar el PAGO del reembolso. `reference` es el
+     código EST del motor (la llave con la que Mercado Pago guarda su resultado) y
+     la nota trae el id de la transacción que escribió el webhook. La nota NO se
+     guarda en el registro de reembolso (tiene el teléfono): solo se lee. */
+  const ref = String(data.reference || '').trim();
+  booking.reference = ref && ref !== booking.bookingCode ? ref : null;
+  booking.pmsNote = typeof data.note === 'string' ? data.note : '';
+  booking.lang = /^en/i.test(String(data.language || data.lang || '')) ? 'en' : 'es';
+  return booking;
 }
 
 function adminCancellationHtml({ booking, clientIp }) {
@@ -73,19 +82,24 @@ function adminCancellationHtml({ booking, clientIp }) {
 
 /* Guest cancellation acknowledgment is now the branded cancellationAckHtml() in _email.js. */
 
-/* Core flow shared by the HTTP handler and the WhatsApp bot
-   (_whatsapp-bot.js). Returns a discriminated result:
+/* Core flow shared by the HTTP handler, the WhatsApp bot (_whatsapp-bot.js) and
+   the guest app (guest-action.js, Frente cancel). Returns a discriminated result:
      { ok: false, code: 'not_found' | 'not_cancellable' | 'notify_failed' }
      { ok: true,  code: 'submitted' | 'already_requested', booking }
+   `preVerified: true` lo usa SOLO un llamador que ya probó la identidad con su
+   propio factor (la sesión firmada del guest app se emite tras código + apellido);
+   en ese caso no se vuelve a pedir el segundo factor. `lang` (opcional) fija el
+   idioma de los correos al huésped.
    Throws on infrastructure errors (OTASync down) — callers map that to their
    own error response. */
-async function submitCancellationRequest({ bookingCode, providedFactor, clientIp, source }) {
+async function submitCancellationRequest({ bookingCode, providedFactor, clientIp, source, preVerified, lang }) {
   const booking = await fetchReservation(bookingCode);
   /* Uniform not-found on mismatch — same anti-enumeration contract as
      get-booking (A-1/A-2). */
-  if (!booking || !bookingHelpers.identityMatches(booking, providedFactor)) {
+  if (!booking || (preVerified !== true && !bookingHelpers.identityMatches(booking, providedFactor))) {
     return { ok: false, code: 'not_found' };
   }
+  if (lang === 'en' || lang === 'es') booking.lang = lang;
   if (!booking.canCancel) {
     return { ok: false, code: 'not_cancellable', status: booking.status };
   }
@@ -137,7 +151,9 @@ async function submitCancellationRequest({ bookingCode, providedFactor, clientIp
     try {
       await sendEmail({
         to: booking.guestEmail,
-        subject: `Recibimos tu solicitud de cancelación — ${booking.bookingCode}`,
+        subject: booking.lang === 'en'
+          ? `We received your cancellation request — ${booking.bookingCode}`
+          : `Recibimos tu solicitud de cancelación — ${booking.bookingCode}`,
         html: cancellationAckHtml({ booking, lang: booking.lang })
       });
     } catch (e) {
@@ -147,13 +163,16 @@ async function submitCancellationRequest({ bookingCode, providedFactor, clientIp
 
   /* Fase 1 de reembolsos: registrar el reembolso (estado NEEDS_REVIEW) para que
      un admin lo apruebe/deniegue desde el panel. Idempotente por bookingCode y
-     no-fatal — la solicitud de cancelación ya quedó registrada y notificada. */
+     no-fatal — la solicitud de cancelación ya quedó registrada y notificada.
+     Frente cancel: el pago se busca por id de OTASync Y por código EST
+     (reference), con la nota de la reserva como último recurso. */
   try {
-    const paymentInfo = await recoverPaymentInfo(booking.bookingCode);
+    const paymentInfo = await recoverPaymentInfo(booking.bookingCode, { reference: booking.reference, note: booking.pmsNote });
     await createRefundRequest({
       booking, paymentInfo, clientIp,
       source: source || 'web',
-      reason: 'Cancelación solicitada por el huésped'
+      reason: 'Cancelación solicitada por el huésped',
+      kind: 'cancellation'
     });
   } catch (e) {
     if (process.env.DEBUG) console.warn('[request-cancellation] refund record creation failed:', e.message);

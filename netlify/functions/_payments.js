@@ -658,6 +658,18 @@ async function processDirectPayment(transaction, corsHeaders) {
     console.warn('[_payments] booking-results write failed (non-fatal):', e.message);
   }
 
+  /* Frente cancel: snapshot DURABLE del pago (~13 meses) por id de OTASync y por
+     código EST (espejo de wompi-webhook). booking-results vence a los 7 días y
+     está con la clave EST, así que sin esto el reembolso automático de MP no
+     encontraba el número de pago. Best-effort (savePaymentDetails nunca lanza). */
+  try {
+    const { savePaymentDetails } = require('./_payment-details');
+    await savePaymentDetails(finalBookingCode, transaction);
+    if (decoded.bookingCode && String(decoded.bookingCode) !== String(finalBookingCode)) {
+      await savePaymentDetails(decoded.bookingCode, transaction);
+    }
+  } catch (e) { /* non-fatal */ }
+
   /* Idempotencia por estadía: registrar SOLO tras inserción exitosa (espejo Wompi)
      para que un segundo pago de la misma estadía se detecte. */
   if (resilient && stayIdemStore) {
