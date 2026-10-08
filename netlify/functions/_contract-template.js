@@ -3,8 +3,14 @@
  * Renders a Spanish or English A4 contract from a guest-contract `record` payload coming
  * out of guest-action.js.
  *
+ * DETERMINISMO (evidencia Ley 527): para el mismo `record` produce SIEMPRE el
+ * mismo HTML. guest-action calcula el SHA-256 sobre el HTML de la vista previa
+ * (lo que el huésped lee) y lo vuelve a calcular al firmar; por eso aquí no se
+ * usa la hora actual: sin `signedAt` el contrato se muestra "pendiente de firma".
+ *
  * Exports:
  *   renderContractHTML(record) -> string (HTML)
+ *   CONTRACT_CLAUSES, CONSENT_TEXT (fuente única; _pdf-render los reutiliza)
  */
 
 function escapeHtml(value) {
@@ -75,6 +81,27 @@ function pick(record, ...keys) {
   return '';
 }
 
+/* Huésped principal de la lista (entry.isPrimary o el primero). */
+function primaryGuestOf(record) {
+  const guests = Array.isArray(record && record.guests) ? record.guests : [];
+  const entry = guests.find(item => item && item.isPrimary) || guests[0];
+  if (!entry) return {};
+  return entry.guest ? entry.guest : entry;
+}
+
+/* "Selección · 402" (sin repetir si el número es igual al nombre). */
+function roomLabel(record, fallback = '—') {
+  const name = String(pick(record, 'roomName', 'room') || '').trim();
+  const number = String(pick(record, 'roomNumber') || '').trim();
+  if (name && number && number !== name) return `${name} · ${number}`;
+  return name || number || fallback;
+}
+
+const CONSENT_TEXT = {
+  es: 'Declaro que he leído, entiendo y acepto íntegramente este contrato de hospedaje, sus cláusulas y políticas, y firmo electrónicamente con plenos efectos legales conforme a la Ley 527 de 1999 y el Decreto 2364 de 2012 de Colombia.',
+  en: 'I declare that I have read, understand, and fully accept this hospitality agreement, its clauses, and policies, and I electronically sign it with full legal effect under Colombian Law 527 of 1999 and Decree 2364 of 2012.'
+};
+
 function contractGuests(record, fallback) {
   const guests = Array.isArray(record.guests) ? record.guests : [];
   const normalized = guests.map(entry => {
@@ -123,25 +150,25 @@ function renderContractHTML(record = {}) {
   const lang = pick(record, 'lang') === 'en' ? 'en' : 'es';
 
   const bookingCode = pick(record, 'bookingCode') || 'SIN-RESERVA';
-  const guestName = pick(record, 'signedName', 'guestName') || 'Huésped';
-  const documentType = pick(record, 'documentType') || (lang === 'en' ? 'Identity Document' : 'Documento de identidad');
-  const documentNumber = pick(record, 'documentNumber', 'documentId') || '—';
+  const primary = primaryGuestOf(record);
+  const primaryName = `${pick(primary, 'firstName')} ${pick(primary, 'lastName')}`.trim();
+  const guestName = pick(record, 'signedName', 'guestName') || primaryName || (lang === 'en' ? 'Guest' : 'Huésped');
+  const documentType = pick(record, 'documentType') || pick(primary, 'documentType') || (lang === 'en' ? 'Identity Document' : 'Documento de identidad');
+  const documentNumber = pick(record, 'documentNumber', 'documentId') || pick(primary, 'documentNumber') || '—';
   const phone = pick(record, 'phone') || '—';
   const email = pick(record, 'email') || '—';
   const checkIn = pick(record, 'checkIn', 'requestedCheckIn');
   const checkOut = pick(record, 'checkOut', 'requestedCheckOut');
-  const roomName = pick(record, 'roomName', 'room') || '—';
+  const roomName = roomLabel(record);
   const capacity = pick(record, 'capacity') || (record.guests ? String(record.guests.length) : '—');
   const totalAmount = pick(record, 'total', 'totalAmount', 'amount');
-  const paymentProvider = pick(record, 'paymentProvider', 'paymentMethod') || '—';
-  const transactionId = pick(record, 'transactionId', 'paymentReference') || '—';
+  const paymentProvider = pick(record, 'paymentProvider', 'paymentMethod');
+  const transactionId = pick(record, 'transactionId', 'paymentReference');
   const contractVersion = pick(record, 'contractVersion') || 'ESTAR-HOSPEDAJE-2026-01';
-  const signedAt = pick(record, 'signedAt') || new Date().toISOString();
-  const consentText = pick(record, 'consentText') || (
-    lang === 'en' 
-      ? 'I declare that I have read, understand, and fully accept this hospitality agreement, its clauses, and policies, and I electronically sign it with full legal effect under Colombian Law 527 of 1999 and Decree 2364 of 2012.'
-      : 'Declaro que he leído, entiendo y acepto íntegramente este contrato de hospedaje, sus cláusulas y políticas, y firmo electrónicamente con plenos efectos legales conforme a la Ley 527 de 1999 y el Decreto 2364 de 2012 de Colombia.'
-  );
+  /* Sin firma todavía (vista previa) NO se usa la hora actual: el HTML debe ser
+     idéntico entre la vista previa y la verificación al firmar. */
+  const signedAt = pick(record, 'signedAt');
+  const consentText = pick(record, 'consentText') || CONSENT_TEXT[lang];
   const eventId = pick(record, 'eventId') || '—';
 
   const normalizedGuests = contractGuests(record, {
@@ -184,7 +211,8 @@ function renderContractHTML(record = {}) {
     roleHotel: 'RNT 276306 — Manizales, Colombia',
     footer: 'Hotel Estar · RNT 276306 · Manizales, Caldas — Colombia<br/>Document generated automatically. Keep this copy along with your payment receipt.',
     clausesTitle: 'Contract Clauses',
-    endOfContract: 'End of contract'
+    endOfContract: 'End of contract',
+    pendingSignature: 'Pending signature'
   } : {
     title: 'Contrato de Hospedaje',
     contractNo: 'Contrato N.º',
@@ -218,8 +246,28 @@ function renderContractHTML(record = {}) {
     roleHotel: 'RNT 276306 — Manizales, Colombia',
     footer: 'Hotel Estar · RNT 276306 · Manizales, Caldas — Colombia<br/>Documento generado automáticamente. Conserve esta copia junto con su comprobante de pago.',
     clausesTitle: 'Cláusulas del contrato',
-    endOfContract: 'Fin del contrato'
+    endOfContract: 'Fin del contrato',
+    pendingSignature: 'Pendiente de firma'
   };
+
+  const issuedText = signedAt ? formatDate(signedAt, lang) : labels.pendingSignature;
+  /* Información de pago: solo las filas con dato (antes salían "—" sueltos). */
+  const paymentRows = [
+    totalAmount !== '' ? [labels.total, formatMoney(totalAmount)] : null,
+    paymentProvider ? [labels.payMethod, paymentProvider] : null,
+    transactionId ? [labels.txId, transactionId] : null
+  ].filter(Boolean);
+  const paymentHtml = paymentRows.length ? `
+    <h2>${escapeHtml(labels.payment)}</h2>
+    <table class="kv">
+      ${paymentRows.map(([k, v]) => `<tr><td class="k">${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join('\n      ')}
+    </table>
+` : '';
+  const stampHtml = signedAt ? `
+      ${escapeHtml(labels.technicalEvidence)} — ${escapeHtml(labels.eventId)}: <strong>${escapeHtml(eventId)}</strong> ·
+      ${escapeHtml(labels.acceptance)}: ${record.acceptedTerms ? escapeHtml(labels.yes) : escapeHtml(labels.no)} ·
+      ${escapeHtml(labels.signedAt)}: ${escapeHtml(formatDate(signedAt, lang))}` : `
+      ${escapeHtml(labels.technicalEvidence)} — ${escapeHtml(labels.pendingSignature)}`;
 
   const occupantsHtml = normalizedGuests.map(g => {
     const role = g.isPrimary ? (lang === 'en' ? 'Primary' : 'Principal') : (lang === 'en' ? 'Companion' : 'Acompañante');
@@ -381,7 +429,7 @@ function renderContractHTML(record = {}) {
       <div class="doc-meta">
         ${escapeHtml(labels.contractNo)} <strong>${escapeHtml(bookingCode)}</strong><br/>
         ${escapeHtml(labels.version)}: ${escapeHtml(contractVersion)}<br/>
-        ${escapeHtml(labels.issued)}: ${escapeHtml(formatDate(signedAt, lang))}
+        ${escapeHtml(labels.issued)}: ${escapeHtml(issuedText)}
       </div>
     </header>
 
@@ -410,22 +458,13 @@ function renderContractHTML(record = {}) {
       <tr><td class="k">${escapeHtml(labels.email)}</td><td>${escapeHtml(email)}</td></tr>
     </table>
 
-    <h2>${escapeHtml(labels.payment)}</h2>
-    <table class="kv">
-      <tr><td class="k">${escapeHtml(labels.total)}</td><td>${escapeHtml(formatMoney(totalAmount))}</td></tr>
-      <tr><td class="k">${escapeHtml(labels.payMethod)}</td><td>${escapeHtml(paymentProvider)}</td></tr>
-      <tr><td class="k">${escapeHtml(labels.txId)}</td><td>${escapeHtml(transactionId)}</td></tr>
-    </table>
-
+${paymentHtml}
     <h2>${escapeHtml(labels.clausesTitle)}</h2>
     ${clausesHtml}
 
     <h2>${escapeHtml(labels.consent)}</h2>
     <p class="clause">${escapeHtml(consentText)}</p>
-    <div class="stamp">
-      ${escapeHtml(labels.technicalEvidence)} — ${escapeHtml(labels.eventId)}: <strong>${escapeHtml(eventId)}</strong> ·
-      ${escapeHtml(labels.acceptance)}: ${record.acceptedTerms ? escapeHtml(labels.yes) : escapeHtml(labels.no)} ·
-      ${escapeHtml(labels.signedAt)}: ${escapeHtml(formatDate(signedAt, lang))}
+    <div class="stamp">${stampHtml}
     </div>
 
     <div class="signatures">
@@ -451,4 +490,4 @@ function renderContractHTML(record = {}) {
 </html>`;
 }
 
-module.exports = { renderContractHTML, escapeHtml };
+module.exports = { renderContractHTML, escapeHtml, CONTRACT_CLAUSES, CONSENT_TEXT, roomLabel };

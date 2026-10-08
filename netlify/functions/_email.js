@@ -624,3 +624,54 @@ module.exports = {
   cancellationAckHtml, cancellationConfirmedHtml, adminCancellationHtml,
   paymentPendingHtml, paymentRejectedHtml
 };
+
+/* Frente guestapp */
+/* Copia del contrato de hospedaje firmado (guest app). Va con el PDF adjunto
+   (lo arma guest-action con _pdf-render) e incluye la huella SHA-256 del texto
+   que el huésped leyó, como evidencia de la firma electrónica (Ley 527).
+   Bilingüe según el idioma en que se firmó. */
+function contractCopyHtml({ record, lang }) {
+  const r = record || {};
+  const en = lang === 'en';
+  const fmt = en ? formatDateEN : formatDateES;
+  let signedAtText = '—';
+  const signed = new Date(r.signedAt || '');
+  if (!Number.isNaN(signed.getTime())) {
+    try {
+      signedAtText = signed.toLocaleString(en ? 'en-US' : 'es-CO', {
+        timeZone: 'America/Bogota', year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit'
+      });
+    } catch (_) {
+      signedAtText = signed.toISOString();
+    }
+  }
+  const room = [r.roomName, r.roomNumber && r.roomNumber !== r.roomName ? r.roomNumber : ''].filter(Boolean).join(' · ');
+  const rows = [
+    [en ? 'Booking' : 'Reserva', esc(r.bookingCode || '—')],
+    [en ? 'Stay' : 'Estadía', `${esc(fmt(r.checkIn))} → ${esc(fmt(r.checkOut))}`],
+    room ? [en ? 'Studio' : 'Apartaestudio', esc(room)] : null,
+    [en ? 'Signed by' : 'Firmado por', esc(r.signedName || '—')],
+    [en ? 'Signed on' : 'Fecha de firma', esc(signedAtText)]
+  ].filter(Boolean);
+  const hashBlock = r.contractHash
+    ? fineprint(`${en ? 'SHA-256 fingerprint of the contract you read' : 'Huella SHA-256 del contrato que leíste'}: <span style="font-family:Consolas,Menlo,monospace;word-break:break-all;">${esc(r.contractHash)}</span>`)
+    : '';
+  const body = en ? `
+    ${greeting(r.signedName, 'en')}
+    ${para('Thank you for signing your hospitality agreement. A PDF copy is attached to this email; please keep it with your booking confirmation.')}
+    ${dataRows(rows)}
+    ${hashBlock}
+    ${whatsappLine('en', 'Questions about your agreement?')}` : `
+    ${greeting(r.signedName, 'es')}
+    ${para('Gracias por firmar tu contrato de hospedaje. Adjuntamos una copia en PDF; consérvala junto con la confirmación de tu reserva.')}
+    ${dataRows(rows)}
+    ${hashBlock}
+    ${whatsappLine('es', '¿Tienes dudas sobre tu contrato?')}`;
+  return emailShell({
+    lang: en ? 'en' : 'es',
+    band: { color: C.olive, eyebrow: en ? 'Agreement signed' : 'Contrato firmado', code: r.bookingCode },
+    bodyHtml: body
+  });
+}
+
+module.exports.contractCopyHtml = contractCopyHtml;

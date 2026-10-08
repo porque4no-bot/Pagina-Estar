@@ -1,6 +1,8 @@
 const crypto = require('crypto');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
-const { renderContractHTML } = require('./_contract-template');
+const { renderContractHTML, CONSENT_TEXT } = require('./_contract-template');
+const { renderContractPDF: _renderContractPDF } = require('./_pdf-render');
+const { logoAttachment } = require('./_logo');
 const { SERVICES } = require('./_services-catalog');
 const { postOrderExtrasToFolio: _postOrderExtrasToFolio } = require('./_otasync');
 const { upsertPartner: _upsertPartner, createHelpdeskTicket: _createHelpdeskTicket } = require('./_odoo');
@@ -8,7 +10,7 @@ const {
   createGuestWompiCheckout: _createGuestWompiCheckout,
   createGuestMercadoPagoCheckout: _createGuestMercadoPagoCheckout
 } = require('./_guest-payments');
-const { sendEmail, adminEmail, esc, formatCOP } = require('./_email');
+const { sendEmail, adminEmail, esc, formatCOP, contractCopyHtml } = require('./_email');
 const { reportAlert: _reportAlert } = require('./_alert');
 const {
   archiveGuestPayload: _archiveGuestPayload,
@@ -19,7 +21,8 @@ const {
   parseJsonBody,
   protectRecord: _protectRecord,
   requireGuest: _requireGuest,
-  syncGuestEvent: _syncGuestEvent
+  syncGuestEvent: _syncGuestEvent,
+  unprotectRecord: _unprotectRecord
 } = require('./_guest-app');
 const { flag, get } = require('./_settings');
 
@@ -51,6 +54,159 @@ function extractUserAgent(event) {
 
 function sha256Hex(value) {
   return crypto.createHash('sha256').update(String(value), 'utf8').digest('hex');
+}
+
+/* ── Contrato de hospedaje (firma electrónica) ───────────────────────────────
+   Flujo: check-in → vista previa → firma.
+   - El contrato se arma con los huéspedes del CHECK-IN registrado (store
+     guest-checkins), no con lo que mande el navegador, y con los datos de la
+     reserva firmados en el token (fechas, apartaestudio, total).
+   - La vista previa devuelve el HTML exacto que el huésped lee y su SHA-256.
+     Al firmar, el servidor vuelve a renderizar ese mismo documento (el render
+     es determinista) y exige que el hash coincida con el que el huésped vio
+     (previewHash): así el contractHash guardado es el del texto leído.
+   - Al firmar se genera el PDF (_pdf-render), se guarda su SHA-256 en la
+     evidencia, se devuelve al navegador y se envía una copia al correo. */
+const CHECKIN_ID_RE = /^CHK-[A-Za-z0-9-]+$/;
+
+function contractError(statusCode, message, code) {
+  return Object.assign(new Error(message), { statusCode, code });
+}
+
+async function loadCheckinForContract(session, requestedId) {
+  let checkinId = cleanText(requestedId, 80);
+  if (!CHECKIN_ID_RE.test(checkinId)) {
+    checkinId = '';
+    try {
+      const index = await deps.guestStore('guest-checkin-index').get(String(session.sub), { type: 'json' });
+      if (index && CHECKIN_ID_RE.test(String(index.checkinId || ''))) checkinId = index.checkinId;
+    } catch (error) {
+      console.warn('[guest-action] checkin index read failed:', error.message);
+    }
+  }
+  if (!checkinId) return null;
+  let stored;
+  try {
+    stored = await deps.guestStore('guest-checkins').get(checkinId, { type: 'json' });
+  } catch (error) {
+    console.error('[guest-action] checkin read failed:', error.message);
+    return null;
+  }
+  if (!stored || String(stored.bookingCode || '') !== String(session.sub)) return null;
+  let record;
+  try {
+    record = deps.unprotectRecord(stored);
+  } catch (error) {
+    console.error('[guest-action] checkin decrypt failed:', error.message);
+    return null;
+  }
+  if (!record || String(record.bookingCode || '') !== String(session.sub)) return null;
+  return { checkinId, record };
+}
+
+/* Documento del contrato (sin firma): lo que se muestra y se hashea. Debe
+   depender SOLO de datos estables (token + check-in + idioma) para que la
+   vista previa y la verificación al firmar produzcan el mismo HTML. */
+function buildContractDocument(session, loaded, lang) {
+  const language = String(lang || '').slice(0, 2).toLowerCase() === 'en' ? 'en' : 'es';
+  const guests = sanitizeContractGuests((loaded.record && loaded.record.guests) || []);
+  const primary = guests.find(guest => guest.isPrimary) || guests[0] || {};
+  const contact = [primary, ...guests].find(guest => guest && guest.email) || primary;
+  const total = Number(session.totalAmount);
+  return {
+    bookingCode: session.sub,
+    guestName: `${primary.firstName || ''} ${primary.lastName || ''}`.trim() || cleanText(session.guest, 160),
+    documentType: primary.documentType || '',
+    documentNumber: primary.documentNumber || '',
+    phone: contact.phone || '',
+    email: contact.email || '',
+    guests,
+    checkinId: loaded.checkinId,
+    contractVersion: CURRENT_CONTRACT_VERSION,
+    checkIn: cleanText(session.checkIn, 20),
+    checkOut: cleanText(session.checkOut, 20),
+    roomName: cleanText(session.roomName, 120),
+    roomNumber: cleanText(session.roomNumber, 40),
+    capacity: Number.isFinite(Number(session.capacity)) && Number(session.capacity) > 0 ? Number(session.capacity) : guests.length,
+    totalAmount: Number.isFinite(total) && total > 0 ? total : '',
+    consentText: CONSENT_TEXT[language],
+    lang: language
+  };
+}
+
+function contractPdfFilename(record, draft) {
+  const code = String(record.bookingCode || 'reserva').replace(/[^A-Za-z0-9-]+/g, '');
+  const base = record.lang === 'en' ? 'hospitality-agreement' : 'contrato-hospedaje';
+  return `${base}-${code}${draft ? (record.lang === 'en' ? '-draft' : '-borrador') : ''}.pdf`;
+}
+
+async function buildContractRecord(body, session, event) {
+  const signedName = cleanText(body.signedName, 160);
+  if (!signedName || body.acceptedTerms !== true) {
+    throw contractError(400, 'Escribe tu nombre y acepta el contrato para firmar.', 'contract_incomplete');
+  }
+  const loaded = await loadCheckinForContract(session, body.checkinId);
+  if (!loaded) {
+    throw contractError(409, 'Completa el check-in antes de firmar el contrato.', 'checkin_required');
+  }
+  const document = buildContractDocument(session, loaded, body.lang);
+  const contractHash = sha256Hex(renderContractHTML(document));
+  const previewHash = cleanText(body.previewHash, 80).toLowerCase();
+  if (!previewHash || previewHash !== contractHash) {
+    throw contractError(409, 'El contrato cambió desde que lo leíste. Ábrelo de nuevo antes de firmar.', 'contract_changed');
+  }
+  /* Audit trail — Ley 527 art. 7 / Decreto 2364:
+     - clientIp + userAgent identify the device the signer used;
+     - signedAt is the server timestamp (clock under our control);
+     - acknowledgedAt records when the user finished reading the preview
+       (client-supplied, sanity-clamped to a reasonable range);
+     - contractVersion pins the template revision presented (server-side);
+     - consentText is the acceptance wording shown, in the signing language;
+     - contractHash is SHA-256 over the exact contract HTML the guest read in
+       the preview (contractHashScope), re-verified here before signing. */
+  let acknowledgedAt = '';
+  if (body.acknowledgedAt) {
+    const parsed = new Date(String(body.acknowledgedAt));
+    if (!Number.isNaN(parsed.getTime()) && Math.abs(Date.now() - parsed.getTime()) < 24 * 3600 * 1000) {
+      acknowledgedAt = parsed.toISOString();
+    }
+  }
+  return {
+    eventId: `GST-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
+    type: 'contract',
+    status: 'received',
+    createdAt: new Date().toISOString(),
+    ...document,
+    bookingCode: session.sub,
+    guestName: session.guest,
+    signedName,
+    acceptedTerms: true,
+    signedAt: new Date().toISOString(),
+    acknowledgedAt,
+    clientIp: event ? extractClientIp(event) : 'unknown',
+    userAgent: event ? extractUserAgent(event) : '',
+    contractHash,
+    contractHashAlgorithm: 'sha256',
+    contractHashScope: 'preview-html'
+  };
+}
+
+/* Copia al huésped con el PDF adjunto. sendEmail no-op sin RESEND_API_KEY. */
+async function sendContractCopy({ record, pdfBuffer }) {
+  const to = String((record && record.email) || '').trim();
+  if (!to || !pdfBuffer) return { sent: false, reason: !to ? 'no-email' : 'no-pdf' };
+  const lang = record.lang === 'en' ? 'en' : 'es';
+  return sendEmail({
+    to,
+    subject: lang === 'en'
+      ? `Your hospitality agreement — booking ${record.bookingCode}`
+      : `Tu contrato de hospedaje — reserva ${record.bookingCode}`,
+    html: contractCopyHtml({ record, lang }),
+    attachments: [
+      logoAttachment(),
+      { filename: contractPdfFilename(record, false), content: Buffer.from(pdfBuffer).toString('base64') }
+    ]
+  });
 }
 
 /* Phase C — team notification. Emails the team a summary of every service order
@@ -230,7 +386,10 @@ const defaultDeps = {
   notifyOrderTeam,
   upsertPartner: _upsertPartner,
   createHelpdeskTicket: _createHelpdeskTicket,
-  reportAlert: _reportAlert
+  reportAlert: _reportAlert,
+  unprotectRecord: _unprotectRecord,
+  renderContractPDF: _renderContractPDF,
+  sendContractCopy
 };
 
 /* Decide which provider settles an online service order. The env mode is the
@@ -267,6 +426,9 @@ exports._test = {
   resolveOnlineProvider,
   buildHelpdeskTicket,
   openHelpdeskTicket,
+  buildContractDocument,
+  loadCheckinForContract,
+  contractPdfFilename,
   CURRENT_CONTRACT_VERSION
 };
 
@@ -408,66 +570,7 @@ function buildEvent(type, body, session, event) {
     };
   }
 
-  if (type === 'contract') {
-    const signedName = cleanText(body.signedName, 160);
-    if (!signedName || body.acceptedTerms !== true) {
-      throw Object.assign(new Error('Escribe tu nombre y acepta el contrato para firmar.'), { statusCode: 400 });
-    }
-    const guests = sanitizeContractGuests(body.guests);
-    const primaryGuest = guests.find(guest => guest.isPrimary) || guests[0] || {};
-    /* Audit trail — Ley 527 art. 7 / Decreto 2364:
-       - clientIp + userAgent identify the device the signer used;
-       - signedAt is the server timestamp (clock under our control);
-       - acknowledgedAt records when the user finished reading the preview
-         (client-supplied, sanity-clamped to a reasonable range);
-       - contractVersion pins the template revision presented;
-       - consentText is the explicit acceptance wording shown to the user;
-       - contractHash is SHA-256 over the rendered HTML the template will
-         produce for this signature, so we can later prove the exact text. */
-    const signedAt = new Date().toISOString();
-    const contractVersion = cleanText(body.contractVersion || CURRENT_CONTRACT_VERSION, 80);
-    const consentText = cleanText(body.consentText, 600) ||
-      'Declaro que he leído, entiendo y acepto íntegramente este contrato de hospedaje y firmo electrónicamente con plenos efectos legales conforme a la Ley 527 de 1999.';
-    const clientIp = event ? extractClientIp(event) : 'unknown';
-    const userAgent = event ? extractUserAgent(event) : '';
-    /* Acknowledgement timestamp from the client; reject anything that is
-       not a valid ISO string OR is more than 24h away from server time. */
-    let acknowledgedAt = '';
-    if (body.acknowledgedAt) {
-      const parsed = new Date(String(body.acknowledgedAt));
-      if (!Number.isNaN(parsed.getTime()) && Math.abs(Date.now() - parsed.getTime()) < 24 * 3600 * 1000) {
-        acknowledgedAt = parsed.toISOString();
-      }
-    }
-    const contractRecord = {
-      ...base,
-      signedName,
-      phone: primaryGuest.phone || '',
-      email: primaryGuest.email || '',
-      guests,
-      acceptedTerms: true,
-      contractVersion,
-      signedAt,
-      acknowledgedAt,
-      consentText,
-      clientIp,
-      userAgent,
-      checkIn: cleanText(body.checkIn, 20) || cleanText(session.checkIn, 20) || '',
-      checkOut: cleanText(body.checkOut, 20) || cleanText(session.checkOut, 20) || '',
-      roomName: cleanText(body.roomName, 120) || cleanText(session.roomName, 120) || '',
-      capacity: Number.isFinite(Number(session.capacity)) ? Number(session.capacity) : guests.length,
-      lang: cleanText(body.lang || 'es', 5)
-    };
-    let renderedHtml = '';
-    try {
-      renderedHtml = renderContractHTML(contractRecord);
-    } catch (renderErr) {
-      console.warn('[guest-action] contract render for hash failed:', renderErr && renderErr.message);
-    }
-    contractRecord.contractHash = renderedHtml ? sha256Hex(renderedHtml) : '';
-    contractRecord.contractHashAlgorithm = 'sha256';
-    return contractRecord;
-  }
+  /* 'contract' se construye en buildContractRecord (async: carga el check-in). */
 
   if (type === 'reservation_change') {
     const requestKind = ['dates', 'guests', 'cancel', 'invoice', 'other'].includes(body.requestKind)
@@ -517,30 +620,43 @@ exports.handler = async event => {
     const type = String(body.type || '');
 
     if (type === 'contract_preview') {
-      const guests = sanitizeContractGuests(body.guests);
-      const primaryGuest = guests.find(guest => guest.isPrimary) || guests[0] || {};
-      const contractRecord = {
-        bookingCode: session.sub,
-        guestName: session.guest,
-        signedName: cleanText(body.signedName || (primaryGuest.firstName && `${primaryGuest.firstName} ${primaryGuest.lastName || ''}`.trim()) || session.guest, 160),
-        phone: primaryGuest.phone || '',
-        email: primaryGuest.email || '',
-        guests,
-        acceptedTerms: false,
-        contractVersion: cleanText(body.contractVersion || CURRENT_CONTRACT_VERSION, 80),
-        signedAt: new Date().toISOString(),
-        consentText: cleanText(body.consentText, 600),
-        checkIn: cleanText(body.checkIn, 20) || cleanText(session.checkIn, 20) || '',
-        checkOut: cleanText(body.checkOut, 20) || cleanText(session.checkOut, 20) || '',
-        roomName: cleanText(body.roomName, 120) || cleanText(session.roomName, 120) || '',
-        capacity: Number.isFinite(Number(session.capacity)) ? Number(session.capacity) : guests.length,
-        lang: cleanText(body.lang || 'es', 5)
-      };
-      const html = renderContractHTML(contractRecord);
-      return json(200, { ok: true, html });
+      /* Vista previa (o borrador en PDF con format:'pdf'). Requiere check-in. */
+      const loaded = await loadCheckinForContract(session, body.checkinId);
+      if (!loaded) {
+        throw contractError(409, 'Completa el check-in antes de ver el contrato.', 'checkin_required');
+      }
+      const document = buildContractDocument(session, loaded, body.lang);
+      const html = renderContractHTML(document);
+      const contractHash = sha256Hex(html);
+      if (body.format === 'pdf') {
+        const pdf = await deps.renderContractPDF({ ...document, contractHash, draft: true });
+        return json(200, {
+          ok: true,
+          contractHash,
+          pdfBase64: Buffer.from(pdf).toString('base64'),
+          filename: contractPdfFilename(document, true)
+        });
+      }
+      return json(200, { ok: true, html, contractHash, checkinId: loaded.checkinId });
     }
 
-    const record = buildEvent(type, body, session, event);
+    const record = type === 'contract'
+      ? await buildContractRecord(body, session, event)
+      : buildEvent(type, body, session, event);
+
+    /* Contrato firmado: PDF de la copia del huésped (best-effort) y su SHA-256
+       en la evidencia, ANTES de persistir. */
+    let contractPdf = null;
+    if (type === 'contract') {
+      try {
+        contractPdf = await deps.renderContractPDF(record);
+        record.pdfSha256 = crypto.createHash('sha256').update(contractPdf).digest('hex');
+      } catch (pdfErr) {
+        console.error('[guest-action] contract PDF render failed:', pdfErr.message);
+        contractPdf = null;
+      }
+    }
+
     await deps.guestStore('guest-events').setJSON(record.eventId, deps.protectRecord(record));
 
     const sync = await deps.syncGuestEvent(record);
@@ -555,6 +671,23 @@ exports.handler = async event => {
       sync,
       archive
     };
+
+    if (type === 'contract') {
+      /* Copia firmada: se devuelve al navegador (descarga) y se envía al correo
+         del huésped. Un fallo de correo nunca anula la firma ya guardada. */
+      response.contractHash = record.contractHash;
+      response.emailed = false;
+      if (contractPdf) {
+        response.pdfBase64 = Buffer.from(contractPdf).toString('base64');
+        response.pdfFilename = contractPdfFilename(record, false);
+        try {
+          const mail = await deps.sendContractCopy({ record, pdfBuffer: contractPdf });
+          response.emailed = Boolean(mail && mail.sent);
+        } catch (mailErr) {
+          console.error('[guest-action] contract copy email failed:', mailErr.message);
+        }
+      }
+    }
 
     if (type === 'order') {
       response.total = record.total;
@@ -670,7 +803,10 @@ exports.handler = async event => {
   } catch (error) {
     console.error('[guest-action]', error.message);
     return json(error.statusCode || 500, {
-      error: error.statusCode ? error.message : 'No fue posible registrar la solicitud.'
+      error: error.statusCode ? error.message : 'No fue posible registrar la solicitud.',
+      /* Código estable para que la app traduzca (sesión vencida, contrato
+         cambiado, check-in pendiente…). */
+      code: error.statusCode ? (error.code || undefined) : undefined
     });
   }
 };
