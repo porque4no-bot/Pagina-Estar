@@ -31,8 +31,10 @@ está apagada hasta que agregues su variable.
 | Variable (Key) | Valor | Qué hace | ¿Prender ahora? |
 |---|---|---|---|
 | `BACKUP_ENABLED` **(panel)** | `true` | Respaldo automático **diario** de la info que vive solo en la nube (cotizaciones, reembolsos, desayunos, datos de huéspedes). Protege contra borrados accidentales. | ✅ **Recomendado ya** |
-| `STAY_EMAILS_ENABLED` **(panel)** | `true` | Correos automáticos al huésped: **"te esperamos"** (1–2 días antes de llegar) y **"gracias por tu estadía"** (al día siguiente de irse). | ⏳ Tras probar con una reserva real |
-| `REVIEW_LINK_URL` | tu enlace de reseñas (Google/Booking) | El botón "deja tu reseña" del correo post-estadía apunta a ese enlace. | Opcional (junto con el anterior) |
+| `STAY_EMAILS_ENABLED` **(panel)** | `true` | Correos automáticos al huésped de **todos los canales** (web, Booking, Expedia…): **"te esperamos"** 2 días antes de llegar (con el enlace al check-in en línea y el código prellenado, horario de recepción y cómo llegar) y **"gracias por tu estadía"** al día siguiente de irse (reseña en Google; en Booking solo a quien reservó por Booking). Los correos relay de Airbnb y los de marcador/propios se saltan. | ⏳ Tras probar con una reserva real |
+| `GOOGLE_REVIEW_URL` **(panel)** | (vacío = `https://g.page/r/CW6uBmyymSHlEBM/review`) | Botón "Reseña en Google" del correo post-estadía. Reemplaza a `REVIEW_LINK_URL` (que sigue valiendo de respaldo). | Opcional |
+| `BOOKING_REVIEW_URL` **(panel)** | (vacío = ficha de estar en Booking) | Botón "Reseña en Booking.com" — solo para huéspedes que reservaron por Booking. | Opcional |
+| `STAY_REVIEW_DISCOUNT_ENABLED` **(panel)** | `true` | El correo post-estadía invita al huésped **directo** a mandar su reseña por WhatsApp para recibir un **código de descuento** (nunca a huéspedes de OTA). Ojo: Google y Booking prohíben reseñas incentivadas. | ⏳ Cuando el código de reseña exista en /admin → Códigos |
 | `GUEST_NOTES_TO_PMS_ENABLED` **(panel)** | `true` | Hace que la **nota/solicitud** que el huésped escribe al reservar (ej. "llego tarde", "piso alto") **llegue a la reserva en Kunas**. | ⏳ Tras probar con una reserva real |
 | `REFUND_BANK_FORM_ENABLED` **(panel)** | `true` | Prende el **formulario** donde el huésped registra su cuenta bancaria para recibir un reembolso por transferencia. | ⏳ Cuando empieces a usar reembolsos |
 | `REFUND_LINK_SECRET` | un texto largo aleatorio (ej. 40+ caracteres) | Clave secreta que **firma el enlace seguro** de ese formulario (para que nadie lo adivine). Si no la pones, reutiliza otra que ya tienes y funciona igual. | Junto con el anterior |
@@ -121,7 +123,8 @@ cuando activemos el bot:
 # --- Funciones nuevas (Carril A) — toggles también disponibles en /admin → Configuración ---
 BACKUP_ENABLED=true
 # STAY_EMAILS_ENABLED=true
-# REVIEW_LINK_URL=https://g.page/tu-hotel/review
+# GOOGLE_REVIEW_URL=https://g.page/r/CW6uBmyymSHlEBM/review   # (antes REVIEW_LINK_URL)
+# STAY_REVIEW_DISCOUNT_ENABLED=true
 # GUEST_NOTES_TO_PMS_ENABLED=true
 # REFUND_BANK_FORM_ENABLED=true
 # REFUND_LINK_SECRET=cambia-esto-por-un-texto-largo-aleatorio

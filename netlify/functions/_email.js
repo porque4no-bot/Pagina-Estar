@@ -322,39 +322,6 @@ function quoteExpiringHtml({ quote, quoteUrl }) {
   return emailShell({ lang: 'es', band: { color: C.terra, eyebrow: 'Tu cotización vence pronto', code: quote.quoteId }, bodyHtml: body });
 }
 
-/* A10 — pre-arrival reminder (sent by the send-stay-emails cron). Bilingual.
-   Carries the digital check-in CTA (FAQ: link 1 day before → codes after). */
-function preArrivalHtml({ resv, lang }) {
-  const r = resv || {};
-  const fmt = lang === 'en' ? formatDateEN : formatDateES;
-  const stay = `${fmt(r.dateArrival)} → ${fmt(r.dateDeparture)}`;
-  const checkinUrl = r.checkinUrl || GUEST_APP_LINK;
-  if (lang === 'en') {
-    const bf = r.hasBreakfast ? para("Your booking includes breakfast — we'll have it ready every morning.") : '';
-    const body = `
-      ${greeting(r.firstName, 'en')}
-      ${para(`Your stay at estar is coming up: <strong>${stay}</strong>. Check-in is from <strong>3:00 pm</strong> and check-out until <strong>11:00 am</strong>. Check-in is 100% digital — complete it the day before and you'll get your smart access codes (building + studio). No keys, no front desk.`)}
-      ${bf}
-      ${ctaCenter(ctaButton(checkinUrl, 'Start my check-in'))}
-      <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
-      ${mapCard('en')}
-      ${guestAppCard('en', r.guestAppUrl)}
-      ${whatsappLine('en')}`;
-    return emailShell({ lang: 'en', band: { color: C.tan, textColor: C.ink, eyebrow: 'We look forward to your stay' }, bodyHtml: body });
-  }
-  const bf = r.hasBreakfast ? para('Tu reserva incluye desayuno — lo tendremos listo cada mañana.') : '';
-  const body = `
-    ${greeting(r.firstName, 'es')}
-    ${para(`Tu estadía en estar está cerca: <strong>${stay}</strong>. El check-in es desde las <strong>3:00 p. m.</strong> y el check-out hasta las <strong>11:00 a. m.</strong> El check-in es 100% digital — complétalo el día antes y recibirás tus códigos de acceso (edificio y apartaestudio). Sin llaves ni recepción.`)}
-    ${bf}
-    ${ctaCenter(ctaButton(checkinUrl, 'Hacer mi check-in'))}
-    <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
-    ${mapCard('es')}
-    ${guestAppCard('es', r.guestAppUrl)}
-    ${whatsappLine('es')}`;
-  return emailShell({ lang: 'es', band: { color: C.tan, textColor: C.ink, eyebrow: 'Te esperamos pronto' }, bodyHtml: body });
-}
-
 /* Access codes — delivered after the guest completes digital check-in (FAQ).
    codes = { building, studio, studioLabel }. passUrl optional (breakfast QRs).
    Not wired to a trigger yet — the smart-lock code source is owner-pending. */
@@ -400,37 +367,6 @@ function accessCodesHtml({ resv, codes, passUrl, lang }) {
     ${guestAppCard(lang, r.guestAppUrl)}
     ${whatsappLine(lang, en ? 'Trouble getting in?' : '¿Algún problema para entrar?')}`;
   return emailShell({ lang: lang || 'es', band: { color: C.olive, eyebrow: en ? 'Your check-in is ready' : 'Tu check-in está listo', code: r.bookingCode }, bodyHtml: body });
-}
-
-/* A10 — post-stay thank you + review ask (sent by the send-stay-emails cron).
-   npsUrl (opt): when present, adds a "tell us about your stay" NPS survey CTA
-   (Odoo Fase 3). Gated by NPS_ENABLED in send-stay-emails; nothing shown if absent. */
-function postStayHtml({ resv, lang, npsUrl }) {
-  const r = resv || {};
-  const reviewUrl = process.env.REVIEW_LINK_URL || WA_LINK;
-  const hasReview = !!process.env.REVIEW_LINK_URL;
-  if (lang === 'en') {
-    const npsBlock = npsUrl ? `
-      <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
-      ${para('How did your stay go? A 1-minute survey helps us keep improving.')}
-      ${ctaCenter(ctaButton(npsUrl, 'Tell us about your stay', 'secondary'))}` : '';
-    const body = `
-      ${greeting(r.firstName, 'en')}
-      ${para(`Thank you for choosing estar. We hope Manizales treated you well and that your studio felt like home. ${hasReview ? 'If you have a minute, a short review helps other travelers find us.' : "We'd love to hear how it went."}`)}
-      ${ctaCenter(ctaButton(reviewUrl, hasReview ? 'Leave a review' : 'Send us feedback'))}
-      ${npsBlock}`;
-    return emailShell({ lang: 'en', band: { color: C.olive, eyebrow: 'Thank you for staying with us' }, bodyHtml: body });
-  }
-  const npsBlock = npsUrl ? `
-    <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
-    ${para('¿Cómo estuvo tu estadía? Una encuesta de 1 minuto nos ayuda a seguir mejorando.')}
-    ${ctaCenter(ctaButton(npsUrl, 'Cuéntanos cómo estuvo tu estadía', 'secondary'))}` : '';
-  const body = `
-    ${greeting(r.firstName, 'es')}
-    ${para(`Gracias por elegir estar. Esperamos que Manizales te haya tratado bien y que tu apartaestudio se sintiera como en casa. ${hasReview ? 'Si tienes un minuto, una reseña corta nos ayuda a que otros viajeros nos encuentren.' : 'Nos encantaría saber cómo te fue.'}`)}
-    ${ctaCenter(ctaButton(reviewUrl, hasReview ? 'Dejar una reseña' : 'Enviarnos tu opinión'))}
-    ${npsBlock}`;
-  return emailShell({ lang: 'es', band: { color: C.olive, eyebrow: 'Gracias por tu estadía' }, bodyHtml: body });
 }
 
 /* A9 — ask the guest for the bank account to receive a manual refund. */
@@ -624,3 +560,202 @@ module.exports = {
   cancellationAckHtml, cancellationConfirmedHtml, adminCancellationHtml,
   paymentPendingHtml, paymentRejectedHtml
 };
+
+/* Frente stay */
+/* ── Correos de estadía: pre-llegada y post-estadía (cron send-stay-emails) ──
+   Reemplazan a las plantillas A10 anteriores, que prometían códigos de acceso
+   automáticos ("sin llaves ni recepción"): las chapas TTLock NO están activas, así
+   que eso era una promesa falsa. El copy de aquí es verificable: check-in en línea
+   con el código de reserva prellenado, horario real de recepción y cómo llegar.
+   Se declaran con `function`, así que el module.exports de arriba las exporta por
+   hoisting con los mismos nombres de siempre (preArrivalHtml / postStayHtml). */
+
+const STAY_RECEPTION_HOURS = {
+  es: 'de 6:00 a 10:00 a. m. y de 4:00 a 10:00 p. m.',
+  en: '6:00–10:00 am and 4:00–10:00 pm'
+};
+
+/* Enlace a "Mi estadía" (guest.html) con el código de reserva prellenado. El
+   apellido del titular sigue siendo obligatorio (segundo factor): el código solo
+   no da acceso. tab=checkin abre directo la pestaña de check-in tras entrar. */
+function guestAppUrl(code, tab) {
+  const c = String(code || '').trim();
+  if (!c) return GUEST_APP_LINK;
+  return `${GUEST_APP_LINK}?code=${encodeURIComponent(c)}${tab ? `&tab=${encodeURIComponent(tab)}` : ''}`;
+}
+
+function guestCheckinUrl(code) {
+  return guestAppUrl(code, 'checkin');
+}
+
+function waLinkWithText(text) {
+  return `${WA_LINK}&text=${encodeURIComponent(text)}`;
+}
+
+/* Tarjeta "Mi estadía" con copy exacto (lo que la app SÍ hace hoy). */
+function stayAppCard(lang, url) {
+  const t = lang === 'en'
+    ? { label: 'My stay', desc: 'Your online check-in, extra services and our Manizales tips, all in one place.', cta: 'Open' }
+    : { label: 'Mi estadía', desc: 'Tu check-in en línea, servicios adicionales y nuestras recomendaciones de Manizales, en un solo lugar.', cta: 'Abrir' };
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 4px;border:1px solid ${C.border};border-radius:10px;border-collapse:separate;">
+    <tbody><tr><td style="padding:15px 16px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr>
+      <td style="vertical-align:middle;">
+        <div style="font-family:${SANS};font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:${C.olive};margin-bottom:4px;">${t.label}</div>
+        <div style="font-family:${SERIF};font-size:13px;line-height:1.45;color:${C.body};">${t.desc}</div>
+      </td>
+      <td align="right" style="vertical-align:middle;padding-left:12px;"><a href="${esc(url || GUEST_APP_LINK)}" style="display:inline-block;padding:11px 18px;background:${C.dark};border-radius:8px;font-family:${SANS};font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#ffffff;text-decoration:none;white-space:nowrap;">${t.cta}</a></td>
+    </tr></tbody></table></td></tr></tbody></table>`;
+}
+
+function stayBoxRow(html) {
+  return `<tr><td style="padding:0 18px 12px;font-family:${SERIF};font-size:14px;line-height:1.6;color:${C.body};">${html}</td></tr>`;
+}
+
+/* Códigos de reserva del correo: resv.bookingCodes (varias reservas del mismo
+   huésped agrupadas en un solo correo) o el id de la reserva. Máx. 6. */
+function stayCodes(r) {
+  const list = Array.isArray(r.bookingCodes) && r.bookingCodes.length
+    ? r.bookingCodes
+    : [r.idReservations || r.bookingCode];
+  return list.map(c => String(c || '').trim()).filter(Boolean).slice(0, 6);
+}
+
+/* Pre-llegada (N días antes; default 2). resv = fila normalizada de OTASync
+   (+ bookingCodes opcional). */
+function preArrivalHtml({ resv, lang }) {
+  const r = resv || {};
+  const en = lang === 'en';
+  const fmt = en ? formatDateEN : formatDateES;
+  const stay = `${fmt(r.dateArrival)} → ${fmt(r.dateDeparture)}`;
+  const codes = stayCodes(r);
+  const single = codes.length <= 1;
+  const hours = en ? STAY_RECEPTION_HOURS.en : STAY_RECEPTION_HOURS.es;
+
+  const intro = en
+    ? `Your stay at estar is coming up: <strong>${stay}</strong>. Check-in is from <strong>3:00 pm</strong> and check-out is until <strong>11:00 am</strong>.`
+    : `Tu estadía en estar está cerca: <strong>${stay}</strong>. El check-in es desde las <strong>3:00 p. m.</strong> y el check-out hasta las <strong>11:00 a. m.</strong>`;
+  const bf = r.hasBreakfast
+    ? para(en ? "Your booking includes breakfast — we'll have it ready every morning." : 'Tu reserva incluye desayuno — lo tendremos listo cada mañana.')
+    : '';
+
+  let checkin;
+  if (single) {
+    const code = codes[0] || '';
+    const how = code
+      ? (en
+        ? `Save time on arrival: do your <strong>online check-in</strong> now. Register your guests with their ID and sign the stay agreement in a few minutes. Sign in with your booking code <strong>${esc(code)}</strong> and the main guest's last name.`
+        : `Ahorra tiempo al llegar: haz tu <strong>check-in en línea</strong> ahora. Registras a los huéspedes con su documento y firmas el contrato de hospedaje en pocos minutos. Entra con tu código de reserva <strong>${esc(code)}</strong> y el apellido del titular.`)
+      : (en
+        ? 'Save time on arrival: do your <strong>online check-in</strong> now. Register your guests with their ID and sign the stay agreement in a few minutes.'
+        : 'Ahorra tiempo al llegar: haz tu <strong>check-in en línea</strong> ahora. Registras a los huéspedes con su documento y firmas el contrato de hospedaje en pocos minutos.');
+    checkin = `${para(how)}${ctaCenter(ctaButton(guestCheckinUrl(code), en ? 'Start my online check-in' : 'Hacer mi check-in en línea'))}`;
+  } else {
+    const rows = codes.map(code => `
+      <tr><td style="padding:0 18px;"><div style="border-top:1px solid ${C.border};height:1px;font-size:0;line-height:0;">&nbsp;</div></td></tr>
+      <tr><td style="padding:12px 18px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr>
+        <td style="font-family:${SANS};font-size:14px;color:${C.ink};">${en ? 'Booking' : 'Reserva'} <strong>${esc(code)}</strong></td>
+        <td align="right"><a href="${esc(guestCheckinUrl(code))}" style="font-family:${SANS};font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${C.olive};text-decoration:none;">${en ? 'Check in →' : 'Hacer check-in →'}</a></td>
+      </tr></tbody></table></td></tr>`).join('');
+    checkin = `${para(en
+      ? `Save time on arrival: do the <strong>online check-in</strong> for each of your ${codes.length} bookings. Register the guests with their ID and sign the stay agreement; sign in with each booking code and the main guest's last name.`
+      : `Ahorra tiempo al llegar: haz el <strong>check-in en línea</strong> de cada una de tus ${codes.length} reservas. Registras a los huéspedes con su documento y firmas el contrato; entra con el código de cada reserva y el apellido del titular.`)}
+      ${box(en ? 'Your bookings' : 'Tus reservas', rows)}`;
+  }
+
+  const arrival = box(en ? 'Your arrival' : 'Tu llegada', `
+    ${stayBoxRow(en
+      ? `Our front desk is open <strong>${hours}</strong>. We'll help you with your check-in when you arrive.`
+      : `Nuestra recepción atiende <strong>${hours}</strong>; allí te acompañamos con tu ingreso.`)}
+    ${stayBoxRow(en
+      ? `Arriving outside those hours? <a href="${esc(WA_LINK)}" style="color:${C.olive};font-weight:700;text-decoration:none;">Message us on WhatsApp</a> before you arrive and we'll arrange your check-in.`
+      : `¿Llegas fuera de ese horario? <a href="${esc(WA_LINK)}" style="color:${C.olive};font-weight:700;text-decoration:none;">Escríbenos por WhatsApp</a> antes de tu llegada y coordinamos tu ingreso.`)}`);
+
+  const body = `
+    ${greeting(r.firstName, en ? 'en' : 'es')}
+    ${para(intro)}
+    ${bf}
+    ${checkin}
+    <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
+    ${arrival}
+    ${mapCard(en ? 'en' : 'es')}
+    ${stayAppCard(en ? 'en' : 'es', guestAppUrl(codes[0]))}
+    ${whatsappLine(en ? 'en' : 'es')}`;
+  return emailShell({
+    lang: en ? 'en' : 'es',
+    band: { color: C.tan, textColor: C.ink, eyebrow: en ? 'We look forward to your stay' : 'Te esperamos pronto', code: single ? codes[0] : undefined },
+    bodyHtml: body
+  });
+}
+
+/* Post-estadía (N días después; default 1): gracias + reseña.
+   reviews = { googleUrl, bookingUrl } (bookingUrl solo para huéspedes de
+   Booking.com: Booking solo acepta reseñas verificadas de quien reservó allí).
+   discountOffer = true → invita a reclamar un código de descuento por WhatsApp
+   tras publicar la reseña (solo huéspedes directos; lo decide send-stay-emails).
+   npsUrl (opc.) → bloque de encuesta NPS (Odoo Fase 3). */
+function postStayHtml({ resv, lang, npsUrl, reviews, discountOffer }) {
+  const r = resv || {};
+  const en = lang === 'en';
+  const rv = reviews || {};
+  const googleUrl = rv.googleUrl || process.env.REVIEW_LINK_URL || '';
+  const bookingUrl = rv.bookingUrl || '';
+  const hasReview = !!(googleUrl || bookingUrl);
+  const code = stayCodes(r)[0] || '';
+
+  let reviewHtml;
+  if (hasReview) {
+    const buttons = [
+      googleUrl ? ctaButton(googleUrl, en ? 'Review on Google' : 'Reseña en Google', 'primary') : '',
+      bookingUrl ? ctaButton(bookingUrl, en ? 'Review on Booking.com' : 'Reseña en Booking.com', 'secondary') : ''
+    ].filter(Boolean);
+    /* apilados (uno por línea): lado a lado se parten en pantallas de celular */
+    const buttonsHtml = buttons.map(b => ctaCenter(b)).join('<div style="height:10px;font-size:0;line-height:0;">&nbsp;</div>');
+    reviewHtml = `
+      ${para(en
+        ? 'Could you spare a minute? Your review helps other travelers find us and helps us keep improving.'
+        : '¿Nos regalas un minuto? Tu reseña ayuda a otros viajeros a encontrarnos y a nosotros a seguir mejorando.')}
+      ${buttonsHtml}
+      ${bookingUrl ? fineprint(en
+        ? 'Booking.com will also send you its own invitation to rate your stay.'
+        : 'Booking.com también te enviará su propia invitación para calificar tu estadía.') : ''}`;
+  } else {
+    reviewHtml = `
+      ${para(en ? "We'd love to hear how it went." : 'Nos encantaría saber cómo te fue.')}
+      ${ctaCenter(ctaButton(WA_LINK, en ? 'Send us feedback' : 'Enviarnos tu opinión'))}`;
+  }
+
+  const discountHtml = (discountOffer && hasReview) ? `
+    <div style="height:16px;font-size:0;line-height:0;">&nbsp;</div>
+    <div style="background:${C.cream};border-radius:12px;padding:20px;text-align:center;">
+      <div style="font-family:${SANS};font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:${C.olive};margin-bottom:8px;">${en ? 'A thank-you from us' : 'Un detalle de nuestra parte'}</div>
+      <p style="margin:0 0 16px;font-family:${SERIF};font-size:14px;line-height:1.65;color:${C.body};">${en
+        ? 'Once your review is published — whatever your opinion — send us the link or a screenshot on WhatsApp and we\'ll send you a <strong>discount code</strong> for your next direct booking at estar.com.co.'
+        : 'Cuando publiques tu reseña —sea cual sea tu opinión—, envíanos por WhatsApp el enlace o una captura y te enviamos un <strong>código de descuento</strong> para tu próxima reserva directa en estar.com.co.'}</p>
+      ${ctaButton(waLinkWithText(en
+        ? `Hi, I left a review of my stay at estar${code ? ` (booking ${code})` : ''}. Could you send me my discount code?`
+        : `Hola, ya dejé mi reseña de mi estadía en estar${code ? ` (reserva ${code})` : ''}. ¿Me envían mi código de descuento?`), en ? 'I left my review' : 'Ya dejé mi reseña', 'dark')}
+    </div>` : '';
+
+  const npsBlock = npsUrl ? `
+    <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
+    ${para(en ? 'How did your stay go? A 1-minute survey helps us keep improving.' : '¿Cómo estuvo tu estadía? Una encuesta de 1 minuto nos ayuda a seguir mejorando.')}
+    ${ctaCenter(ctaButton(npsUrl, en ? 'Tell us about your stay' : 'Cuéntanos cómo estuvo tu estadía', 'secondary'))}` : '';
+
+  const body = `
+    ${greeting(r.firstName, en ? 'en' : 'es')}
+    ${para(en
+      ? 'Thank you for choosing estar. We hope Manizales treated you well and that your studio felt like home.'
+      : 'Gracias por elegir estar. Esperamos que Manizales te haya tratado bien y que tu apartaestudio se sintiera como en casa.')}
+    ${reviewHtml}
+    ${discountHtml}
+    ${npsBlock}`;
+  return emailShell({
+    lang: en ? 'en' : 'es',
+    band: { color: C.olive, eyebrow: en ? 'Thank you for staying with us' : 'Gracias por tu estadía' },
+    bodyHtml: body
+  });
+}
+
+module.exports.guestAppUrl = guestAppUrl;
+module.exports.guestCheckinUrl = guestCheckinUrl;
+module.exports.STAY_RECEPTION_HOURS = STAY_RECEPTION_HOURS;
