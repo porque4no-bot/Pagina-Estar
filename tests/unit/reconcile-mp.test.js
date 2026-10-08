@@ -168,3 +168,44 @@ test('handler: fallo del fetch MP NO impide reportar huérfanos de Wompi (try/ca
     assert.equal(body.orphans, 1, 'el huérfano de Wompi se reporta aunque MP falle');
   } finally { ctx.cleanup(); }
 });
+
+/* Frente MP (oct-2026): ventana de 48 h, alerta de dinero vía reportAlert
+   (correo + tarea en el panel) y UNA sola vez por tx — no cada 30 min. */
+test('reconcile: ventana de 48 h', () => {
+  const { recon, cleanup } = load({});
+  try { assert.equal(recon._test.LOOKBACK_HOURS, 48); } finally { cleanup(); }
+});
+
+test('reconcile: el huérfano se alerta vía reportAlert UNA vez; la corrida siguiente no repite', async () => {
+  const ref = payments.createDirectReference({ checkin: '2026-11-01', checkout: '2026-11-03', guestsCount: 1, roomTypeId: '31348', firstName: 'Ana', lastName: 'R', email: 'a@x.co', phone: '300', extrasMask: '0000000', bookingCode: 'EST-MP-9', amountCents: 30000000 });
+  let searchUrl = '';
+  const fetchImpl = async (url) => {
+    if (String(url).includes('mercadopago')) {
+      searchUrl = String(url);
+      return new Response(JSON.stringify({ results: [mpPayment(ref, 'MP-9', 300000)], paging: { total: 1 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  };
+  const ctx = load({ env: { MERCADOPAGO_ACCESS_TOKEN: 'tok' }, fetchImpl });
+  const alerts = [];
+  const reportAlert = async (a) => { alerts.push(a); return { alerted: true }; };
+  try {
+    const first = JSON.parse((await ctx.recon.handler(undefined, undefined, { reportAlert })).body);
+    assert.equal(first.orphans, 1);
+    assert.equal(first.alerted, 1);
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].kind, 'payment_without_reservation');
+    assert.equal(alerts[0].severity, 'critical');
+    assert.equal(alerts[0].dedupeKey, 'pay-noreservation-MP-9', 'misma tarea que la alerta del webhook para ese tx');
+    assert.equal(alerts[0].context.reference, 'EST-MP-9');
+
+    const begin = new URL(searchUrl).searchParams.get('begin_date');
+    const hours = (Date.now() - new Date(begin).getTime()) / 3600000;
+    assert.ok(hours > 47 && hours < 49, `la búsqueda de MP cubre ~48 h (${hours.toFixed(1)})`);
+
+    const second = JSON.parse((await ctx.recon.handler(undefined, undefined, { reportAlert })).body);
+    assert.equal(second.orphans, 1, 'sigue contándose como huérfano');
+    assert.equal(second.alerted, 0, 'pero no se vuelve a alertar');
+    assert.equal(alerts.length, 1);
+  } finally { ctx.cleanup(); }
+});

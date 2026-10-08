@@ -12,7 +12,6 @@
 
 const { getStore } = require('@netlify/blobs');
 const { getQuoteStore, loadQuote, effectiveStatus } = require('./_quotes-store');
-const { sendEmail, adminEmail } = require('./_email');
 /* Las referencias directas tienen formato distinto por proveedor: Wompi codifica
    "1|..." (decoder en _direct-pricing); Mercado Pago usa "MPDIR-..." (decoder en
    _payments). Probamos ambos al cruzar. */
@@ -49,7 +48,11 @@ const WOMPI_API = process.env.WOMPI_SANDBOX === 'true'
   ? 'https://sandbox.wompi.co/v1'
   : 'https://production.wompi.co/v1';
 
-const LOOKBACK_HOURS = 6;        /* slightly longer than the cron interval     */
+/* Ventana de 48 h (antes 6 h): un pago cuyo webhook falló un viernes en la noche
+   sigue apareciendo el fin de semana. Para no repetir la MISMA alerta cada 30 min
+   durante 48 h, cada huérfano se alerta UNA sola vez (marca por tx en el store
+   'reconcile-notified'); la tarea queda abierta en el panel hasta resolverla. */
+const LOOKBACK_HOURS = 48;
 const MAX_TRANSACTIONS = 100;    /* hard cap to avoid runaway pagination       */
 
 function getProcessedStore() {
@@ -161,35 +164,58 @@ async function fetchRecentApprovedMP() {
   return { transactions: all.slice(0, MAX_TRANSACTIONS) };
 }
 
-function esc(s) {
-  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function getNotifiedStore() {
+  try {
+    return getStore({ name: 'reconcile-notified', consistency: 'strong' });
+  } catch (e) {
+    return null;
+  }
 }
 
-function orphanAlertHtml(orphans) {
-  const rows = orphans.map(o => `
-    <tr>
-      <td>${esc(o.provider || '?')}</td>
-      <td>${esc(o.quoteId || '(none)')}</td>
-      <td>${esc(o.transactionId)}</td>
-      <td>${esc(o.reference || '(none)')}</td>
-      <td>${o.amountCents != null ? (o.amountCents / 100).toLocaleString('es-CO') : '?'}</td>
-      <td>${esc(o.createdAt || '?')}</td>
-      <td>${esc(o.reason)}</td>
-    </tr>`).join('');
-  return `
-    <h2>Pagos sin reserva en OTASync</h2>
-    <p>Encontramos ${orphans.length} transacción(es) APPROVED en las últimas
-    ${LOOKBACK_HOURS} horas que no aparecen procesadas por el webhook. Cada una
-    necesita verificación manual: confirmar en el proveedor, decidir si crear la
-    reserva en OTASync o reembolsar al huésped.</p>
-    <table border="1" cellpadding="6" cellspacing="0">
-      <tr><th>Proveedor</th><th>Quote ID</th><th>Tx</th><th>Reference</th><th>Monto (COP)</th><th>Creada</th><th>Razón</th></tr>
-      ${rows}
-    </table>
-  `;
+function notifiedKey(o) {
+  return `${o.provider || 'unknown'}:${o.transactionId}`;
 }
 
-exports.handler = async () => {
+async function wasNotified(store, o) {
+  if (!store) return false;
+  try { return Boolean(await store.get(notifiedKey(o))); } catch (e) { return false; }
+}
+
+async function markNotified(store, o, now) {
+  if (!store) return;
+  try {
+    await store.set(notifiedKey(o), JSON.stringify({ at: new Date(now).toISOString(), reference: o.reference || null, reason: o.reason }));
+  } catch (e) { /* best-effort: en el peor caso se repite la alerta (dedupe de _alert) */ }
+}
+
+/* Alerta de dinero por huérfano → _alert.reportAlert: correo al equipo + TAREA
+   en el panel (ops-queue). La dedupeKey es la MISMA que usa el webhook para
+   "pago sin reserva" de ese tx, así el webhook y la reconciliación comparten una
+   sola tarea por incidente. */
+async function alertOrphan(o, deps = {}) {
+  const report = deps.reportAlert || require('./_alert').reportAlert;
+  const amount = o.amountCents != null ? Math.round(o.amountCents / 100).toLocaleString('es-CO') : '?';
+  return report({
+    kind: 'payment_without_reservation',
+    severity: 'critical',
+    message: `Reconciliación: pago ${o.provider || '?'} aprobado sin reserva en OTASync — ${o.reference || o.quoteId || o.transactionId} ($${amount}). Verificar en el proveedor y crear la reserva o reembolsar.`,
+    context: {
+      provider: o.provider, transactionId: o.transactionId, reference: o.reference || null,
+      quoteId: o.quoteId || null, amountCents: o.amountCents, createdAt: o.createdAt || null, reason: o.reason
+    },
+    dedupeKey: `pay-noreservation-${o.transactionId}`,
+    ttlSec: 7 * 24 * 3600
+  });
+}
+
+exports.handler = async (event, context, overrides = {}) => {
+  const deps = { now: Date.now, ...overrides };
+  if (event && event.blobs) {
+    try {
+      const blobs = require('@netlify/blobs');
+      if (typeof blobs.connectLambda === 'function') blobs.connectLambda(event);
+    } catch (e) { /* best-effort */ }
+  }
   const txStore = getProcessedStore();
 
   /* Wompi (activo) y Mercado Pago (rollback) se consultan por SEPARADO con
@@ -316,21 +342,27 @@ exports.handler = async () => {
   }
 
   console.error(`[reconcile-payments] ${orphans.length} orphan(s) detected`);
-  try {
-    await sendEmail({
-      to: adminEmail(),
-      subject: `Reconciliación de pagos — ${orphans.length} pago(s) sin reserva`,
-      html: orphanAlertHtml(orphans)
-    });
-  } catch (e) {
-    console.error('[reconcile-payments] alert email failed:', e.message);
+  /* Una alerta (correo + tarea) por huérfano, UNA sola vez por tx: las corridas
+     siguientes (cada 30 min durante la ventana de 48 h) no la repiten. */
+  const notifiedStore = getNotifiedStore();
+  let alerted = 0;
+  for (const o of orphans) {
+    if (await wasNotified(notifiedStore, o)) continue;
+    try {
+      await alertOrphan(o, deps);
+      alerted++;
+    } catch (e) {
+      console.error('[reconcile-payments] orphan alert failed:', e.message);
+      continue;
+    }
+    await markNotified(notifiedStore, o, deps.now());
   }
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ orphans: orphans.length, checked: transactions.length })
+    body: JSON.stringify({ orphans: orphans.length, alerted, checked: transactions.length })
   };
 };
 
 /* Exportado para tests (mock de fetch/blobs). */
-exports._test = { fetchRecentApprovedMP, fetchRecentApproved, directBookingReconciled };
+exports._test = { fetchRecentApprovedMP, fetchRecentApproved, directBookingReconciled, alertOrphan, LOOKBACK_HOURS };
