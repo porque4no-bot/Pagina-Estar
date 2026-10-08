@@ -140,9 +140,14 @@ async function handleCancellations(events, deps = {}) {
     if (resId) canceledIds.push(resId);
 
     const guest = extractGuest(resv);
-    /* Skip our own tentative holds (BLOQUEO) — those are released elsewhere. */
-    const looksLikeHold = guest && /^bloqueo/i.test(String(guest.name || '')) ||
-      /^COT-/i.test(String(resv.reference || ''));
+    /* Skip our own tentative holds (BLOQUEO) — those are released elsewhere.
+       La rama COT- SOLO cuenta como hold si el status es tentative: una cotización
+       PAGADA se inserta como reserva CONFIRMADA que también lleva reference COT-,
+       y su cancelación SÍ debe notificar al huésped y al equipo (seguimiento del
+       reembolso B2B). Misma regla que _otasync.isHoldReservation. */
+    const resvStatus = String(resv.status || '').toLowerCase();
+    const looksLikeHold = (guest && /^bloqueo/i.test(String(guest.name || ''))) ||
+      (/^COT-/i.test(String(resv.reference || '')) && resvStatus === 'tentative');
     if (looksLikeHold) continue;
 
     /* Idempotency: don't notify twice for the same reservation. */

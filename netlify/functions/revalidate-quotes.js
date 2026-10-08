@@ -152,7 +152,12 @@ exports.handler = async () => {
   } else {
     for (const q of quotes) {
       if (!shouldRemindExpiry(q, nowMs, REMINDER_WINDOW_MS)) continue;
-      const quoteUrl = `${baseUrl}/cotizacion.html?id=${encodeURIComponent(q.quoteId)}`;
+      /* El visor exige el publicToken (get-quote responde 404 sin él): sin &t=
+         el cliente veía "Cotización no encontrada". Incluirlo, igual que el
+         enlace que arma create-quote. Si por algún motivo la quote no tiene
+         token, se omite el recordatorio (mejor no enviar un link roto). */
+      if (!q.publicToken) { continue; }
+      const quoteUrl = `${baseUrl}/cotizacion.html?id=${encodeURIComponent(q.quoteId)}&t=${encodeURIComponent(q.publicToken)}`;
       try {
         await sendEmail({
           to: q.email,

@@ -210,6 +210,10 @@ ga4Snippet += `\n<script src="/consent.js" defer></script>`;
 function injectGA4(dir) {
   fs.readdirSync(dir).forEach(entry => {
     const fullPath = path.join(dir, entry);
+    /* dist/netlify/email-templates/ contiene plantillas de correo (invite.html
+       con placeholders {{ .SiteURL }}), NO páginas del sitio: no se les inyecta
+       GA4 ni el skip-link (saldrían como texto/scripts en el correo). */
+    if (entry === 'netlify') return;
     if (fs.lstatSync(fullPath).isDirectory()) {
       injectGA4(fullPath);
     } else if (entry.endsWith('.html')) {
@@ -232,6 +236,7 @@ injectGA4(distDir);
 function injectSkipLink(dir) {
   fs.readdirSync(dir).forEach(entry => {
     const fullPath = path.join(dir, entry);
+    if (entry === 'netlify') return; // no tocar las plantillas de correo (ver injectGA4)
     if (fs.lstatSync(fullPath).isDirectory()) {
       injectSkipLink(fullPath);
       return;
@@ -294,7 +299,10 @@ if (fs.existsSync(root404)) {
     .replace('<html lang="es">', '<html lang="en">')
     // Relative stylesheet hrefs must climb one level from /en/ (assets and
     // nav links already use root-absolute paths, so only CSS needs this).
-    .replace(/href="(colors_and_type\.css|styles\.css)/g, 'href="../$1');
+    .replace(/href="(colors_and_type\.css|styles\.css)/g, 'href="../$1')
+    // La copia ES ya trae el skip-link inyectado en español; tradúcelo (el
+    // re-inyector no corre otra vez sobre esta copia).
+    .replace('>Saltar al contenido principal<', '>Skip to main content<');
   fs.writeFileSync(path.join(distEnDir, '404.html'), en404);
 }
 
@@ -619,6 +627,17 @@ async function build() {
     c = c.replace(/src="assets\/logo\.png"/, 'src="/assets/logo.png"');
     c = c.replace(/href="assets\/favicon\.png"/g, 'href="/assets/favicon.png"');
     fs.writeFileSync(err404Path, c);
+  }
+  // El 404 inglés se sirve (conservando la URL) para cualquier /en/*, así que sus
+  // CSS relativos ("../bundle.css") se rompían en rutas de 2+ segmentos
+  // (/en/rooms/foo → /en/rooms/../bundle.css). Absolutos para que funcionen a
+  // cualquier profundidad, igual que el 404 raíz.
+  const en404Path = path.join(distDir, 'en', '404.html');
+  if (fs.existsSync(en404Path)) {
+    let c = fs.readFileSync(en404Path, 'utf8');
+    c = c.replace(/href="\.\.\/bundle\.css\?v=\d+"/g, 'href="/bundle.css?v=3"');
+    c = c.replace(/href="\.\.\/(bundle\.css)"/g, 'href="/$1"');
+    fs.writeFileSync(en404Path, c);
   }
 }
 

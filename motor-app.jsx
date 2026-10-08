@@ -61,6 +61,7 @@ function parseQueryParams() {
   const checkout = params.get('checkout') || getOffset(4);
   let guests = parseInt(params.get('guests'));
   if (isNaN(guests) || guests < 1) guests = 2;
+  if (guests > 4) guests = 4;   /* tope: el select ofrece 1-4 y el server rechaza >4 con 400 */
   
   let roomParam = params.get('room');
   if (roomParam === 'clasic') roomParam = 'clasica'; // compatibility mapping
@@ -199,8 +200,17 @@ function SearchBar({ search, onSearch, lang }) {
           </div>
           <div className="be-field">
             <label>{t.checkout}</label>
-            <input type="date" value={s.checkout} min={s.checkin || getOffset(1)} required
-              onChange={e => setS({ ...s, checkout: e.target.value })} />
+            {/* min = checkin + 1: antes min={s.checkin} permitía checkout == checkin
+                (0 noches), que el servidor rechaza con 400 y la UI mostraba como
+                falso "sistema caído". Se fuerza al menos 1 noche. */}
+            <input type="date" value={s.checkout} min={s.checkin ? addDays(s.checkin, 1) : getOffset(1)} required
+              onChange={e => {
+                let newCheckout = e.target.value;
+                if (s.checkin && newCheckout && newCheckout <= s.checkin) {
+                  newCheckout = addDays(s.checkin, 1);
+                }
+                setS({ ...s, checkout: newCheckout });
+              }} />
           </div>
           <div className="be-field">
             <label>{t.guests}</label>
@@ -680,7 +690,7 @@ function SandboxBanner({ lang }) {
 }
 
 /* ── PaymentPanel ─────────────────────────────────── */
-function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, lang }) {
+function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, discountApplied, setDiscountApplied, lang }) {
   const t = i18nEngine[lang];
   const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
   const [loading, setLoading] = useState(false);
@@ -694,7 +704,8 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
   const [discountEnabledUi, setDiscountEnabledUi] = useState(false);
   const [discountInput, setDiscountInput] = useState('');
   const [discountChecking, setDiscountChecking] = useState(false);
-  const [discountApplied, setDiscountApplied] = useState(null); /* { code, discountCents } */
+  /* discountApplied/setDiscountApplied ahora vienen de BookingEngine (estado
+     elevado) para que el resumen/confirmación/correo vean el descuento. */
   const [discountError, setDiscountError] = useState(null);
 
   /* The amount actually charged today (online subtotal minus any applied
@@ -826,7 +837,20 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       } catch (e) {
         console.error('[PaymentPanel] Mercado Pago error:', e.message);
         setLoading(false);
-        setPaymentError(e.message || t.paymentErrorFailed);
+        /* Nunca mostrar el código interno (p. ej. "price_mismatch") al huésped. */
+        let mpError;
+        if (e.message === 'sold_out') {
+          mpError = lang === 'es'
+            ? 'Lo sentimos, la habitación seleccionada ya no tiene disponibilidad para las fechas elegidas.'
+            : 'Sorry, the selected room is no longer available for the chosen dates.';
+        } else if (e.message === 'price_mismatch') {
+          mpError = lang === 'es'
+            ? 'Hubo un cambio en la tarifa de la habitación. Por favor, recarga la página para ver los precios actualizados.'
+            : 'There was a change in the room rate. Please refresh the page to view the updated pricing.';
+        } else {
+          mpError = t.paymentErrorFailed;
+        }
+        setPaymentError(mpError);
       }
       return;
     }
@@ -1206,7 +1230,7 @@ function MobileSummaryBar({ booking, search, lang }) {
       <button type="button" className="be-msum-bar" onClick={() => setOpen(o => !o)} aria-expanded={open}>
         <span className="be-msum-info">
           <span className="be-msum-meta">{(lang === 'es' ? 'Total online hoy' : 'Total online today')} · {nights} {nights === 1 ? t.noche : t.noches}</span>
-          <span className="be-msum-total">{formatCOP(calc.subtotal)}</span>
+          <span className="be-msum-total">{formatCOP(booking.payableCents != null ? Math.round(booking.payableCents / 100) : calc.subtotal)}</span>
         </span>
         <Icon name="chevron-down" size={20} className="be-msum-chevron" />
       </button>
@@ -1298,7 +1322,10 @@ function BookingSummary({ booking, search, lang }) {
               <span>{formatCOP(calc.inc)}</span>
             </div>
           )}
-          <div className="be-summary-line total"><span>{lang === 'es' ? 'Total online hoy' : 'Total online today'}</span><span>{formatCOP(calc.subtotal)}</span></div>
+          {booking.discountCents > 0 && (
+            <div className="be-summary-line sm"><span>{lang === 'es' ? 'Descuento' : 'Discount'}{booking.discountCode ? ` (${booking.discountCode})` : ''}</span><span>−{formatCOP(Math.round(booking.discountCents / 100))}</span></div>
+          )}
+          <div className="be-summary-line total"><span>{lang === 'es' ? 'Total online hoy' : 'Total online today'}</span><span>{formatCOP(booking.payableCents != null ? Math.round(booking.payableCents / 100) : calc.subtotal)}</span></div>
           <p style={{ fontSize: 10, opacity: 0.8, fontStyle: 'italic', margin: '6px 0 0 0', lineHeight: 1.3 }}>
             {lang === 'es' 
               ? (mustPayIVA
@@ -1352,7 +1379,7 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
       )}
       <div className="be-confirm-card">
         <div className="be-confirm-row">
-          <span className="be-eyebrow">{t.stepRoom}</span>
+          <span className="be-eyebrow">{t.stepRooms}</span>
           <p className="be-confirm-val">{lang === 'es' ? 'Tipología' : 'Typology'} {booking.room.num} — {roomName} · {booking.room.area} m²</p>
         </div>
         <div className="be-confirm-row two">
@@ -1372,7 +1399,7 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
         {calc && (
           <div className="be-confirm-row">
             <span className="be-eyebrow">{lang === 'es' ? 'Pagado Hoy (Online)' : 'Paid Today (Online)'}</span>
-            <p className="be-confirm-total" style={{ fontSize: 20 }}>{formatCOP(calc.subtotal)}</p>
+            <p className="be-confirm-total" style={{ fontSize: 20 }}>{formatCOP(booking.payableCents != null ? Math.round(booking.payableCents / 100) : calc.subtotal)}</p>
           </div>
         )}
         {calc && mustPayIVA && (
@@ -1737,6 +1764,10 @@ function BookingEngine() {
   const [bookingCode, setBookingCode] = useState(null);
   const [paymentDetails, setPaymentDetails] = useState(null);
   const [creatingReservation, setCreatingReservation] = useState(false);
+  /* Cupón aplicado (elevado desde PaymentPanel): así el resumen, la barra móvil,
+     la confirmación y el correo muestran el monto REALMENTE cobrado (con descuento)
+     y no el subtotal. El descuento se re-valida/re-precia server-side igual. */
+  const [discountApplied, setDiscountApplied] = useState(null); /* { code, discountCents } */
 
   /* Persist a snapshot of the draft on every meaningful change. Guest data
      can include email/phone — we accept that risk on a session-scoped store
@@ -1747,10 +1778,23 @@ function BookingEngine() {
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
         savedAt: Date.now(),
         search,
+        /* Persistir los campos de PRECIO y display, no solo id/roomTypeId/name:
+           sin priceFlexible, calcTotal daba Math.round(undefined*1.10) = NaN y el
+           resumen/pago mostraban "$ NaN", "undefined m²", "Tipología undefined" si
+           el fetch de disponibilidad fallaba al restaurar. Al cargar disponibilidad
+           la habitación se refresca; el precio se re-verifica server-side igual. */
         selectedRoom: selectedRoom ? {
           id: selectedRoom.id,
           roomTypeId: selectedRoom.roomTypeId,
-          name: selectedRoom.name
+          name: selectedRoom.name,
+          priceFlexible: selectedRoom.priceFlexible,
+          num: selectedRoom.num,
+          area: selectedRoom.area,
+          capacity: selectedRoom.capacity,
+          bed: selectedRoom.bed,
+          view: selectedRoom.view,
+          image: selectedRoom.image,
+          images: selectedRoom.images
         } : null,
         selectedRate,
         currentStep,
@@ -1881,7 +1925,17 @@ function BookingEngine() {
     return () => { delete window.enterManageMode; };
   }, []);
 
-  const booking = { room: selectedRoom, rate: selectedRate, extras, guest: guestData, payment: paymentMethod };
+  /* Descuento aplicado (cupón): se pasa por booking para que el resumen, la barra
+     móvil y la confirmación muestren el monto REALMENTE cobrado (payableCents) y
+     no el subtotal sin descuento. */
+  const bookingCalc = calcTotal(selectedRoom, selectedRate, extras, search);
+  const baseSubtotalCents = bookingCalc ? Math.round(bookingCalc.subtotal * 100) : 0;
+  const discountCents = discountApplied ? Math.min(discountApplied.discountCents || 0, baseSubtotalCents) : 0;
+  const payableCents = Math.max(0, baseSubtotalCents - discountCents);
+  const booking = {
+    room: selectedRoom, rate: selectedRate, extras, guest: guestData, payment: paymentMethod,
+    discountCents, payableCents, discountCode: discountApplied ? discountApplied.code : null
+  };
   const stepOrder = ['rooms', 'extras', 'guest', 'payment'];
   const t = i18nEngine[lang];
 
@@ -1950,7 +2004,8 @@ function BookingEngine() {
         beTrack('purchase', {
           transaction_id: finalCode,
           currency: 'COP',
-          value: calc ? calc.subtotal : 0,
+          /* Ingreso real cobrado online = con descuento aplicado (no el subtotal). */
+          value: payableCents != null ? Math.round(payableCents / 100) : (calc ? calc.subtotal : 0),
           items: gi ? [gi] : []
         });
         setBookingCode(finalCode);
@@ -1961,7 +2016,9 @@ function BookingEngine() {
         setPaymentDetails(prev => ({ ...(prev || details || {}), reservationPending: true }));
         setBookingCode(finalCode);
       }
-      sendConfirmationEmailIfPossible(finalCode, roomPriceVal, calc.subtotal);
+      /* paidAmount = lo REALMENTE cobrado online (con descuento), no el subtotal:
+         antes el correo reportaba un "pagado" mayor al cargo real de Wompi. */
+      sendConfirmationEmailIfPossible(finalCode, roomPriceVal, payableCents != null ? Math.round(payableCents / 100) : calc.subtotal);
     };
 
     const pollOnce = () => {
@@ -2227,6 +2284,8 @@ function BookingEngine() {
                 booking={booking}
                 search={search}
                 onConfirm={handleConfirmBooking}
+                discountApplied={discountApplied}
+                setDiscountApplied={setDiscountApplied}
                 lang={lang}
               />
             </StepWrapper>

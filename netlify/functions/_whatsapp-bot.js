@@ -128,11 +128,19 @@ function toIso(y, m, d) {
   return `${y}-${pad2(m)}-${pad2(d)}`;
 }
 
+/* Fecha civil de HOY en Colombia (UTC-5) como 'YYYY-MM-DD'. Usar la fecha UTC
+   (toISOString) corría el "hoy" un día hacia adelante entre las 7 p.m. y la
+   medianoche locales, y con ello el bot cotizaba disponibilidad y armaba el link
+   de reserva para el AÑO siguiente en plena franja de reservas de última hora. */
+function bogotaDateIso(now) {
+  return (now || new Date()).toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+}
+
 /* If the parsed date already passed, the guest almost certainly means next
    year (people write "15/01" in December). */
 function rollForward(iso, now) {
   if (!iso) return null;
-  const today = now.toISOString().split('T')[0];
+  const today = bogotaDateIso(now);
   if (iso >= today) return iso;
   const y = parseInt(iso.slice(0, 4), 10) + 1;
   return `${y}${iso.slice(4)}`;
@@ -144,7 +152,7 @@ function rollForward(iso, now) {
 function parseDateRange(text, nowDate) {
   const now = nowDate || new Date();
   const t = String(text || '').toLowerCase().trim();
-  const year = now.getUTCFullYear();
+  const year = parseInt(bogotaDateIso(now).slice(0, 4), 10);
 
   /* ISO pair — validar fechas reales (rechaza 2026-02-31) y checkout>checkin,
      igual que las otras ramas, en vez de solo comparar strings. */

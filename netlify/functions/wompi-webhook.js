@@ -521,21 +521,35 @@ async function handleGuestServicePayment(transaction, corsHeaders, overrides = {
     return reply({ message: 'Amount mismatch; logged for manual follow-up' });
   }
 
+  /* Se separan los dos pasos para NO confundir "falló el folio" con "falló el
+     marcado": si postOrderToFolio tiene éxito pero markIntentStatus lanza, marcar
+     paid_folio_failed haría que el reintento (staff-ops retry-folio) recargue el
+     folio — y add_extra/add_payment NO son idempotentes en OTASync (doble cargo).
+     El folio SÍ se cargó ⇒ estado distinto (paid_mark_failed) que no reintenta. */
+  let result;
   try {
-    const result = await deps.postOrderToFolio({
+    result = await deps.postOrderToFolio({
       idReservations: intent.bookingCode,
       items: intent.items,
       payment: { amount: expectedCents / 100, method: 'card', note: `Pago en línea Wompi ${transaction.id}` }
     });
-    await deps.markIntentStatus(reference, 'paid', {
-      transactionId: transaction.id, paidAt: new Date().toISOString(), folio: result
-    });
-    return reply({ received: true, folio: result });
   } catch (e) {
     console.error(`[wompi-webhook] guest order ${reference} folio posting failed for paid transaction ${transaction.id}: ${e.message}. MANUAL follow-up required.`);
     await deps.markIntentStatus(reference, 'paid_folio_failed', { transactionId: transaction.id, error: e.message });
     return reply({ message: 'Paid but folio posting failed; logged for manual follow-up' });
   }
+  try {
+    await deps.markIntentStatus(reference, 'paid', {
+      transactionId: transaction.id, paidAt: new Date().toISOString(), folio: result
+    });
+  } catch (e) {
+    /* El folio YA se cargó; solo falló persistir el estado. NO reintentar el folio. */
+    console.error(`[wompi-webhook] guest order ${reference} folio OK pero markIntentStatus falló: ${e.message}. NO reintentar el folio (doble cargo).`);
+    try {
+      await deps.markIntentStatus(reference, 'paid_mark_failed', { transactionId: transaction.id, folio: result, error: e.message });
+    } catch (_) { /* best-effort */ }
+  }
+  return reply({ received: true, folio: result });
 }
 
 // Handle a Wompi payment whose reference is a stored quote id (COT-...).
@@ -597,6 +611,13 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
      manual handling — better than double-booking in OTASync. */
   const lock = await deps.acquireQuoteLock(quoteId, transaction.id);
   if (!lock.acquired) {
+    /* Si el lock lo tiene el MISMO tx, es una entrega concurrente del mismo evento
+       (no un segundo pago): no-op silencioso, sin la alerta de "doble pago" que
+       pediría reembolsar un cargo legítimo con el id repetido. */
+    if (String(lock.ownerTx) === String(transaction.id)) {
+      console.warn(`[wompi-webhook] quote ${quoteId}: entrega concurrente del mismo tx ${transaction.id}; se ignora.`);
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ received: true, duplicate: true, ownerTx: lock.ownerTx }) };
+    }
     console.error(`[wompi-webhook] quote ${quoteId} is already being processed by tx ${lock.ownerTx} (started ${lock.startedAt}). Refusing tx ${transaction.id}.`);
     try {
       await deps.sendEmail({
@@ -638,8 +659,32 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
   const channelName = process.env.OTASYNC_CHANNEL_NAME || 'Pagina web';
   const hasCredentials = token && username && password;
 
-  // Without PMS credentials we still mark the quote paid (mock / local).
+  // Without PMS credentials the reservation cannot be created.
   if (!hasCredentials) {
+    /* En un deploy real (NETLIFY) la falta de credenciales es un ERROR de config:
+       el pago se cobró pero no hay reserva. Marcar aceptada+bookingCodes:[] SIN
+       reservationPending dejaba la cotización como "reconciliada" para
+       reconcile-payments → pérdida silenciosa. Se marca pendiente + alerta para
+       que la reconciliación y el panel lo capten. En local sigue siendo mock. */
+    if (process.env.NETLIFY === 'true') {
+      quote.status = 'aceptada';
+      quote.paidAt = now;
+      quote.transactionId = transaction.id;
+      quote.bookingCodes = [];
+      quote.reservationPending = true;
+      quote.availabilityOk = false;
+      quote.updatedAt = now;
+      try { await deps.saveQuote(store, quote); } catch (e) { /* non-fatal */ }
+      try {
+        await deps.sendEmail({
+          to: deps.adminEmail(),
+          subject: `⚠ Pago sin reserva (sin credenciales PMS) — ${quoteId}`,
+          html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [{ reason: 'otasync_credentials_missing' }] })
+        });
+      } catch (e) { console.error('[wompi-webhook] admin alert email failed:', e.message); }
+      console.error(`[wompi-webhook] quote ${quoteId} PAGADA sin credenciales OTASync en producción; marcada reservationPending.`);
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
+    }
     quote.status = 'aceptada';
     quote.paidAt = now;
     quote.transactionId = transaction.id;
@@ -654,10 +699,20 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
   // Release any tentative hold first so the units free up for the confirmed
   // reservation (and so the availability check below doesn't see our own hold).
   if (hasHold) {
+    /* Conserva los holds que NO se pudieron liberar: limpiar la lista aunque
+       releaseHold falle dejaba un hold zombi vivo en OTASync sin referencia en
+       ninguna quote, imposible de liberar después (doble-bloqueo de inventario).
+       Los ids que fallan quedan para reintento/traza; los liberados se quitan. */
+    const stillHeld = [];
     for (const holdId of quote.holdReservationIds) {
-      try { await deps.releaseHold(holdId); } catch (e) { console.error('[wompi-webhook] releaseHold failed for', quoteId, holdId, e.message); }
+      try {
+        await deps.releaseHold(holdId);
+      } catch (e) {
+        console.error('[wompi-webhook] releaseHold failed for', quoteId, holdId, e.message);
+        stillHeld.push(holdId);
+      }
     }
-    quote.holdReservationIds = [];
+    quote.holdReservationIds = stillHeld;
   }
 
   // Final availability check before booking (skipped when a hold guaranteed the
@@ -889,6 +944,30 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
     }
 
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, bookingCode }) };
+  } catch (err) {
+    /* Red de seguridad: el pago ya se capturó y este tx está deduplicado, así que
+       una excepción inesperada (p.ej. quote.items corrupto, buildQuoteRooms) NO
+       puede devolver 500 y perderse en el reintento de Wompi. Marca la cotización
+       pagada+pendiente, alerta, y responde 200 para que reconcile/panel la tomen. */
+    console.error(`[wompi-webhook] handleQuotePayment excepción inesperada para ${quoteId}, tx ${transaction && transaction.id}:`, err && err.message);
+    try {
+      const nowIso = new Date().toISOString();
+      quote.status = 'aceptada';
+      quote.paidAt = quote.paidAt || nowIso;
+      quote.transactionId = transaction.id;
+      if (!Array.isArray(quote.bookingCodes)) quote.bookingCodes = [];
+      quote.reservationPending = true;
+      quote.updatedAt = nowIso;
+      try { await deps.saveQuote(store, quote); } catch (e) { /* non-fatal */ }
+      try {
+        await deps.sendEmail({
+          to: deps.adminEmail(),
+          subject: `⚠ Pago sin reserva (error inesperado) — ${quoteId}`,
+          html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [{ reason: 'unexpected_error', detail: err && err.message }] })
+        });
+      } catch (e) { /* alerta best-effort */ }
+    } catch (e2) { console.error('[wompi-webhook] no se pudo marcar pendiente tras excepción:', e2 && e2.message); }
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
   } finally {
     if (!lock.blobsUnavailable) await deps.releaseQuoteLock(quoteId);
   }
@@ -1090,6 +1169,19 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ message: 'Reference was not an encoded reservation payload' })
     };
   }
+
+  /* Single-writer lock (M3): el dedup get-then-set de arriba NO es atómico, así
+     que dos entregas casi simultáneas del MISMO evento (reintento de Wompi
+     solapado, o "reenviar" desde el panel) podían pasar ambas el check y crear
+     dos reservas / doble cargo al folio. El lock por bookingCode (CAS onlyIfNew)
+     cierra esa ventana, igual que el camino directo de Mercado Pago. Se libera
+     en el finally al cierre del handler. */
+  const directLock = await acquireQuoteLock(decoded.bookingCode, transaction.id);
+  if (!directLock.acquired) {
+    console.error(`[wompi-webhook] reserva directa ${decoded.bookingCode} ya está siendo procesada por tx ${directLock.ownerTx}. Se rechaza tx ${transaction.id}.`);
+    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, bookingCode: decoded.bookingCode, duplicate: true, ownerTx: directLock.ownerTx }) };
+  }
+  try {
 
   // Mark as processed in both in-memory and persistent store
   addProcessedTransaction(transaction.id);
@@ -1688,6 +1780,10 @@ exports.handler = async (event, context) => {
       headers: corsHeaders,
       body: JSON.stringify({ error: 'Failed to create booking in PMS; admin alerted for manual follow-up.' })
     };
+  }
+  } finally {
+    /* Libera el lock de escritor único de la reserva directa (M3). */
+    if (!directLock.blobsUnavailable) await releaseQuoteLock(decoded.bookingCode);
   }
 };
 

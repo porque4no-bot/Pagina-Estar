@@ -34,6 +34,6 @@ exports.handler = async (event, context) => {
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ quotes }) };
   } catch (err) {
     console.error('[list-quotes] error:', err);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error interno del servidor', details: err.message }) };
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error interno del servidor' }) };
   }
 };

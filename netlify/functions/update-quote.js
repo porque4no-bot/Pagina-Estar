@@ -68,6 +68,12 @@ exports.handler = async (event, context) => {
       return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ quoteId, status: 'cancelada' }) };
     }
     if (body.action === 'reactivate') {
+      /* Una cotización ya PAGADA no se puede reactivar: volverla activa/vista
+         permitiría re-firmar el pago (doble cobro), una segunda reserva por el
+         dedupe del webhook, y rompería retry-quote-booking. Misma guarda que cancel/edit. */
+      if (effectiveStatus(existing) === 'aceptada') {
+        return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ error: 'No se puede reactivar una cotización ya pagada. Gestiona la reserva directamente en Kunas.' }) };
+      }
       const beforeReact = { ...existing };
       existing.status = (existing.firstViewedAt) ? 'vista' : 'activa';
       delete existing.cancelledAt;
@@ -174,6 +180,6 @@ exports.handler = async (event, context) => {
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ quoteId, shareUrl: `${base}/cotizacion.html?id=${quoteId}&t=${updated.publicToken}` }) };
   } catch (err) {
     console.error('[update-quote] error:', err);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error interno del servidor', details: err.message }) };
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Error interno del servidor' }) };
   }
 };

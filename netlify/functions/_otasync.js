@@ -403,6 +403,25 @@ const INSERT_MAX_ATTEMPTS = 3;
 const INSERT_BACKOFF_MS = [1000, 2000];
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+/* Tras un timeout o error de red en insert/reservation, OTASync PUDO haber creado
+   la reserva aunque la respuesta no nos llegó. Consulta si ya existe una reserva
+   con esta reference en la fecha de llegada. Best-effort: si la consulta falla,
+   devuelve null y el reintento sigue su curso. */
+async function findReservationByReference(reference, dateArrival) {
+  const ref = String(reference || '');
+  const arr = String(dateArrival || '').slice(0, 10);
+  if (!ref || !arr) return null;
+  try {
+    const { reservations } = await getReservationsByDate({
+      filterBy: 'date_arrival', dfrom: arr, dto: arr, arrivals: 1
+    });
+    return (reservations || []).find(r => r.reference === ref) || null;
+  } catch (e) {
+    console.warn('[otasync] post-timeout reference lookup failed (non-fatal):', e.message);
+    return null;
+  }
+}
+
 async function insertReservation(payload) {
   const makeRequest = async (pkey) => {
     const body = { ...payload, key: pkey };
@@ -422,14 +441,28 @@ async function insertReservation(payload) {
   };
 
   let lastErr = null;
+  /* Un timeout/error de red en un intento previo pudo dejar la reserva creada
+     en OTASync sin que lo sepamos: antes de reintentar hay que descartar el
+     duplicado consultando por reference. */
+  let mayHaveCommitted = false;
   try {
     for (let attempt = 1; attempt <= INSERT_MAX_ATTEMPTS; attempt++) {
+      if (mayHaveCommitted) {
+        const existing = await findReservationByReference(payload && payload.reference, payload && payload.date_arrival);
+        if (existing) {
+          console.warn(`[otasync] insert/reservation: reserva ya existe para reference ${payload.reference} (id ${existing.idReservations}); no se reintenta para evitar duplicado.`);
+          return { id_reservations: existing.idReservations };
+        }
+      }
       let res;
       try {
         res = await withSessionRetry(makeRequest);
       } catch (err) {
-        /* fetch/network error or timeout — transient, retry with backoff */
+        /* fetch/network error or timeout — transient, retry with backoff.
+           Marca que la reserva pudo haberse creado: el próximo intento verifica
+           por reference antes de reinsertar. */
         lastErr = err;
+        mayHaveCommitted = true;
         if (attempt === INSERT_MAX_ATTEMPTS) throw lastErr;
         console.warn(`[otasync] insert/reservation attempt ${attempt}/${INSERT_MAX_ATTEMPTS} failed (${err.message}); retrying in ${INSERT_BACKOFF_MS[attempt - 1]}ms`);
         await sleep(INSERT_BACKOFF_MS[attempt - 1]);
@@ -447,6 +480,16 @@ async function insertReservation(payload) {
     /* Unreachable (the last attempt always returns or throws) — kept for safety. */
     throw lastErr || new Error('insert/reservation failed');
   } catch (err) {
+    /* Antes de declarar el fallo: si el último intento fue un timeout, la reserva
+       pudo quedar creada. Una última verificación por reference evita alertar (y
+       dejar en pendiente) una reserva que en realidad sí existe. */
+    if (mayHaveCommitted) {
+      const existing = await findReservationByReference(payload && payload.reference, payload && payload.date_arrival);
+      if (existing) {
+        console.warn(`[otasync] insert/reservation: tras el fallo se encontró la reserva ya creada para reference ${payload.reference} (id ${existing.idReservations}).`);
+        return { id_reservations: existing.idReservations };
+      }
+    }
     /* Pago cobrado pero la reserva no se pudo crear: alerta crítica (A3). */
     try {
       await require('./_alert').reportAlert({

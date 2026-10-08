@@ -11,6 +11,15 @@ const {
 } = require('./_quotes-store');
 const { verifyDirectBookingAmount } = require('./_direct-pricing');
 const { GUEST_ORDER_REF_RE } = require('./_guest-payments');
+const crypto = require('crypto');
+
+/* Comparación de tokens en tiempo constante (evita timing oracle sobre publicToken). */
+function timingSafeEqual(a, b) {
+  const ba = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
 
 function corsHeaders() {
   const headers = {
@@ -105,6 +114,14 @@ async function preferenceForQuote(body, event) {
     return json(503, { error: 'Quote store unavailable' });
   }
   if (!quote) return json(404, { error: 'Quote not found' });
+
+  /* Mismo gate que la ruta Wompi: sin el publicToken correcto no se abre checkout.
+     Antes MP no lo exigía, así que enumerar COT-YYYY-XXXXX devolvía amountCents y
+     una página de pago con el nombre de la empresa (fuga de datos B2B). */
+  const publicToken = clean(body.publicToken || body.t, 80);
+  if (quote.publicToken && !timingSafeEqual(publicToken, quote.publicToken)) {
+    return json(403, { error: 'Invalid access token' });
+  }
 
   const status = effectiveStatus(quote);
   if (status === 'aceptada') return json(409, { error: 'Quote already paid' });

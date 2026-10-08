@@ -174,10 +174,16 @@ exports.handler = async (event, context) => {
       dto: checkout,
       currency: "COP",
       id_language: "es",
+      /* SIEMPRE 1 adulto, IGUAL que el verificador del servidor
+         (_otasync.getDynamicPricing). El huésped adicional lo cobramos nosotros
+         con EXTRA_GUEST_SURCHARGE más abajo. Pedir `adults: guests` hacía que
+         Kunas ya incluyera su recargo por ocupación y le sumáramos el nuestro
+         encima → +$62k/noche en vez de +$31k, y el servidor rechazaba TODO pago
+         de 2+ huéspedes con price_mismatch (producción, oct-2026). */
       guests: [
         {
           guest_filter_id: 1,
-          adults: guests,
+          adults: 1,
           children: 0,
           children_age: []
         }
@@ -257,10 +263,14 @@ exports.handler = async (event, context) => {
       const extraGuestSurcharge = Math.max(0, guests - 1) * EXTRA_GUEST_SURCHARGE;
 
       if (count > 0) {
-        avgPrice = totalAmount / count + extraGuestSurcharge;
+        /* Redondear el promedio a peso entero, IGUAL que el verificador
+           autoritativo del servidor (_otasync.js getDynamicPricing). Si aquí se
+           dejaba fraccionario, la tarjeta mostraba "$223.333.333" y en estadías
+           largas la deriva superaba la tolerancia y bloqueaba el pago. */
+        avgPrice = Math.round(totalAmount / count) + extraGuestSurcharge;
         totalPrice = avgPrice * nights;
       } else if (otaRoom.price) {
-        avgPrice = parseFloat(otaRoom.price) + extraGuestSurcharge;
+        avgPrice = Math.round(parseFloat(otaRoom.price)) + extraGuestSurcharge;
         totalPrice = avgPrice * nights;
 
         // Populate dummy daily prices for display consistency
