@@ -624,3 +624,81 @@ module.exports = {
   cancellationAckHtml, cancellationConfirmedHtml, adminCancellationHtml,
   paymentPendingHtml, paymentRejectedHtml
 };
+
+/* Frente codes */
+/* Correo al huésped con su CÓDIGO DE DESCUENTO personal (emitido desde una regla
+   en /admin → Códigos) o de agradecimiento por una RESEÑA aprobada. Plantilla
+   ES/EN bajo la marca (emailShell). kind: 'review' | 'personal'.
+   blackoutDates = [{from,to}] (fechas en que el código no aplica). */
+function discountCodeBookUrl(code, lang) {
+  const base = lang === 'en' ? `${SITE}/en/reservar.html` : `${SITE}/reservar.html`;
+  return `${base}?codigo=${encodeURIComponent(String(code || ''))}`;
+}
+
+function discountCodeEmailSubject({ kind, lang } = {}) {
+  const en = lang === 'en';
+  if (kind === 'review') {
+    return en ? 'Thank you for your review: your estar discount code' : 'Gracias por tu reseña: tu código de descuento en estar';
+  }
+  return en ? 'Your personal estar discount code' : 'Tu código de descuento personal en estar';
+}
+
+function discountCodeEmailHtml({ kind, lang, guestName, code, discountText, validTo, minNights, blackoutDates, boundEmail, singleUse } = {}) {
+  const en = lang === 'en';
+  const fmt = en ? formatDateEN : formatDateES;
+  const isReview = kind === 'review';
+  const row = (html) => `<tr><td style="padding:0 18px 10px;font-family:${SERIF};font-size:14px;line-height:1.55;color:${C.ink};">${html}</td></tr>`;
+  const ranges = (Array.isArray(blackoutDates) ? blackoutDates : [])
+    .map(b => (typeof b === 'string' ? { from: b, to: b } : b))
+    .filter(b => b && b.from)
+    .map(b => (b.to && b.to !== b.from) ? `${fmt(b.from)} → ${fmt(b.to)}` : fmt(b.from));
+  const t = en ? {
+    eyebrow: isReview ? 'Thank you for your review' : 'A gift for you',
+    intro: isReview
+      ? `Thank you for taking the time to share how your stay at estar went. As a thank-you, here is a code with <strong>${esc(discountText)}</strong> for your next direct booking on our website.`
+      : `Here is a personal code with <strong>${esc(discountText)}</strong> for your next direct booking at estar.`,
+    label: 'Your code',
+    until: (d) => `Valid until <strong>${esc(fmt(d))}</strong>.`,
+    min: (n) => `Minimum stay: <strong>${esc(String(n))} ${Number(n) === 1 ? 'night' : 'nights'}</strong>.`,
+    single: 'Single use.',
+    bound: (e) => `Linked to your email <strong>${esc(e)}</strong>: use this same email when you book.`,
+    blackout: (l) => `Not valid on: ${esc(l)}.`,
+    cta: 'Book with my code',
+    fine: 'Valid only for bookings made on estar.com.co. Not combinable with other promotions and not redeemable for cash. Enter the code in the payment step.',
+    wa: 'Questions about your code?'
+  } : {
+    eyebrow: isReview ? 'Gracias por tu reseña' : 'Un regalo para ti',
+    intro: isReview
+      ? `Gracias por tomarte el tiempo de contar cómo fue tu estadía en estar. Como agradecimiento, te regalamos un código con <strong>${esc(discountText)}</strong> para tu próxima reserva directa en nuestra web.`
+      : `Te compartimos un código personal con <strong>${esc(discountText)}</strong> para tu próxima reserva directa en estar.`,
+    label: 'Tu código',
+    until: (d) => `Válido hasta el <strong>${esc(fmt(d))}</strong>.`,
+    min: (n) => `Estadía mínima: <strong>${esc(String(n))} ${Number(n) === 1 ? 'noche' : 'noches'}</strong>.`,
+    single: 'Un solo uso.',
+    bound: (e) => `Ligado a tu correo <strong>${esc(e)}</strong>: usa este mismo correo al reservar.`,
+    blackout: (l) => `No aplica en: ${esc(l)}.`,
+    cta: 'Reservar con mi código',
+    fine: 'Aplica solo a reservas hechas en estar.com.co. No es acumulable con otras promociones ni canjeable por dinero. Ingresa el código en el paso de pago.',
+    wa: '¿Dudas con tu código?'
+  };
+  const rows = [
+    `<div style="font-family:${SANS};font-size:22px;font-weight:700;letter-spacing:.14em;color:${C.ink};">${esc(code)}</div>`,
+    validTo ? t.until(validTo) : '',
+    minNights ? t.min(minNights) : '',
+    singleUse ? t.single : '',
+    boundEmail ? t.bound(boundEmail) : '',
+    ranges.length ? t.blackout(ranges.join(' · ')) : ''
+  ].filter(Boolean).map(row).join('');
+  const body = `
+    ${greeting(guestName, en ? 'en' : 'es')}
+    ${para(t.intro)}
+    ${box(t.label, rows + '<tr><td style="height:6px;font-size:0;line-height:0;">&nbsp;</td></tr>')}
+    ${ctaCenter(ctaButton(discountCodeBookUrl(code, en ? 'en' : 'es'), t.cta))}
+    ${fineprint(t.fine)}
+    ${whatsappLine(en ? 'en' : 'es', t.wa)}`;
+  return emailShell({ lang: en ? 'en' : 'es', band: { color: C.olive, eyebrow: t.eyebrow, code }, bodyHtml: body });
+}
+
+module.exports.discountCodeEmailHtml = discountCodeEmailHtml;
+module.exports.discountCodeEmailSubject = discountCodeEmailSubject;
+module.exports.discountCodeBookUrl = discountCodeBookUrl;
