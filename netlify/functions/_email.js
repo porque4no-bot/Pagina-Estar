@@ -81,7 +81,23 @@ function htmlToText(html) {
     .trim();
 }
 
+/* Resend exige `to`/`cc` como UNA dirección o un ARREGLO. Las variables de
+   entorno (ADMIN_NOTIFY_EMAIL, ALERT_EMAIL…) traen varias separadas por coma:
+   mandadas como un solo texto, Resend responde 422 "Invalid `to` field" y NINGÚN
+   aviso llegaba. Normaliza texto con comas/punto y coma → arreglo limpio. */
+function normalizeRecipients(v) {
+  if (v == null || v === '') return undefined;
+  const list = (Array.isArray(v) ? v : [v])
+    .flatMap(x => String(x || '').split(/[,;]/))
+    .map(x => x.trim())
+    .filter(Boolean);
+  if (!list.length) return undefined;
+  return list.length === 1 ? list[0] : list;
+}
+
 async function sendEmail({ to, cc, subject, html, text, attachments }) {
+  to = normalizeRecipients(to);
+  cc = normalizeRecipients(cc);
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     if (process.env.DEBUG) console.log('[email] RESEND_API_KEY missing; skipping send');
@@ -595,6 +611,7 @@ function adminAvailabilityLostHtml({ quote, shortfalls }) {
 }
 
 module.exports = {
+  normalizeRecipients,
   sendEmail, adminEmail, esc, formatCOP, formatDateES, formatDateEN, htmlToText,
   // shared shell + components (used by send-confirmation.js and others)
   emailShell, internalShell, greeting, para, fineprint, ctaButton, ctaCenter,
