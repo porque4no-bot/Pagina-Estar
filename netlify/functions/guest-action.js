@@ -230,7 +230,9 @@ const defaultDeps = {
   notifyOrderTeam,
   upsertPartner: _upsertPartner,
   createHelpdeskTicket: _createHelpdeskTicket,
-  reportAlert: _reportAlert
+  reportAlert: _reportAlert,
+  /* Frente Hoy: tarea en la cola de recepción (lazy, best-effort). */
+  enqueueOps: (task) => require('./_ops-queue').enqueue(task)
 };
 
 /* Decide which provider settles an online service order. The env mode is the
@@ -638,6 +640,38 @@ exports.handler = async event => {
         }
         /* Re-sella el evento con el estado del cargo para reintento idempotente
            por eventId (conciliación futura). Best-effort: nunca tumba el pedido. */
+        try {
+          await deps.guestStore('guest-events').setJSON(record.eventId, deps.protectRecord(record));
+        } catch (persistErr) {
+          console.error('[guest-action] folio status persist failed:', persistErr.message);
+        }
+      }
+
+      /* Frente Hoy: con el folio APAGADO (GUEST_SERVICE_FOLIO_ENABLED off) un pedido
+         "cargar a la cuenta" no llega solo a Kunas — antes únicamente salía el
+         correo al equipo y el cargo se podía perder. Ahora además queda una TAREA
+         en la cola de recepción (panel Hoy) hasta que alguien lo cargue a mano y
+         la resuelva. Sin PII del huésped en la tarea. Best-effort: nunca tumba el
+         pedido (ya guardado arriba). */
+      if (record.paymentPreference === 'account' && !record.folioStatus) {
+        record.folioStatus = 'manual';
+        try {
+          await deps.enqueueOps({
+            kind: 'folio_manual_charge',
+            severity: 'warn',
+            title: `Cargar a la cuenta en Kunas: pedido de la reserva ${record.bookingCode} por ${formatCOP(record.total)}`,
+            context: {
+              bookingCode: record.bookingCode,
+              eventId: record.eventId,
+              total: record.total,
+              items: (record.items || []).map(it => `${it.name} × ${it.quantity}`).join(', '),
+              deliveryTime: record.deliveryTime || ''
+            },
+            dedupeKey: `folio_manual_charge:${record.eventId}`
+          });
+        } catch (queueErr) {
+          console.error('[guest-action] ops task enqueue failed:', queueErr.message);
+        }
         try {
           await deps.guestStore('guest-events').setJSON(record.eventId, deps.protectRecord(record));
         } catch (persistErr) {
