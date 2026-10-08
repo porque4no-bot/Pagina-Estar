@@ -1861,11 +1861,32 @@
     }
   }
 
+  /* Enlace del correo de confirmación: guest.html?code=<reserva>. Prellena el
+     código en el formulario de ingreso (el apellido sigue siendo obligatorio:
+     el código solo no abre la reserva) y lo quita de la URL. */
+  function prefillBookingCodeFromUrl(showingLogin) {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('code')) return;
+    const code = String(params.get('code') || '').trim();
+    const input = $('#bookingCode');
+    if (showingLogin && input && !input.value && /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(code)) {
+      input.value = code;
+      const key = $('#accessKey');
+      if (key && !key.value) key.focus();
+    }
+    if (window.history && window.history.replaceState) {
+      params.delete('code');
+      const q = params.toString();
+      window.history.replaceState({}, '', window.location.pathname + (q ? `?${q}` : ''));
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     bindEvents();
     applyGuestI18n();
     renderCart();
     updateExpirationRequirement();
+    let showingLogin = false;
     if (restoreSession()) {
       showApp();
     } else if (
@@ -1876,7 +1897,9 @@
       showApp();
     } else {
       showLogin();
+      showingLogin = true;
     }
+    prefillBookingCodeFromUrl(showingLogin);
     handlePaymentReturn();
     if (window.lucide) window.lucide.createIcons();
     window.addEventListener('load', () => {
