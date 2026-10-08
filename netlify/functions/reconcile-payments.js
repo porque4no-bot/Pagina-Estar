@@ -53,6 +53,11 @@ const WOMPI_API = process.env.WOMPI_SANDBOX === 'true'
    durante 48 h, cada huérfano se alerta UNA sola vez (marca por tx en el store
    'reconcile-notified'); la tarea queda abierta en el panel hasta resolverla. */
 const LOOKBACK_HOURS = 48;
+/* Gracia para el webhook: un pago aprobado hace segundos puede estar todavía
+   creando su reserva. Sin esto, una corrida que coincide con ese instante
+   alertaba un falso "pago sin reserva" (y ahora, con la alerta UNA vez por tx,
+   esa tarea falsa quedaría abierta). */
+const MIN_AGE_MS = 10 * 60 * 1000;
 const MAX_TRANSACTIONS = 100;    /* hard cap to avoid runaway pagination       */
 
 function getProcessedStore() {
@@ -283,6 +288,9 @@ exports.handler = async (event, context, overrides = {}) => {
     const ref = String(tx.reference || '');
     const isQuote = /^COT-\d{4}-[A-Z0-9]{5}$/.test(ref);
 
+    const createdMs = tx.createdAt ? new Date(tx.createdAt).getTime() : 0;
+    if (createdMs && deps.now() - createdMs < MIN_AGE_MS) continue; /* el webhook aún puede estar trabajando */
+
     if (isQuote) {
       /* ── Corporate quote path ── su lock/estado la protege: si ya está
          procesada se omite. */
@@ -365,4 +373,4 @@ exports.handler = async (event, context, overrides = {}) => {
 };
 
 /* Exportado para tests (mock de fetch/blobs). */
-exports._test = { fetchRecentApprovedMP, fetchRecentApproved, directBookingReconciled, alertOrphan, LOOKBACK_HOURS };
+exports._test = { fetchRecentApprovedMP, fetchRecentApproved, directBookingReconciled, alertOrphan, LOOKBACK_HOURS, MIN_AGE_MS };

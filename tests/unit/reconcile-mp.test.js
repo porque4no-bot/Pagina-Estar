@@ -59,7 +59,7 @@ function load({ seed = {}, fetchImpl, env = {} } = {}) {
 }
 
 function mpPayment(extRef, id, amount) {
-  return { id, external_reference: extRef, transaction_amount: amount, status: 'approved', date_created: new Date(Date.now() - 60000).toISOString() };
+  return { id, external_reference: extRef, transaction_amount: amount, status: 'approved', date_created: new Date(Date.now() - 20 * 60000).toISOString() };
 }
 
 test('fetchRecentApprovedMP: sin token → skip limpio', async () => {
@@ -156,7 +156,7 @@ test('handler: fallo del fetch MP NO impide reportar huérfanos de Wompi (try/ca
     const s = String(url);
     if (s.includes('mercadopago')) throw new Error('MP API down');
     if (s.includes('wompi') || s.includes('/transactions')) {
-      return new Response(JSON.stringify({ data: [{ id: 'W-1', reference: wRef, amount_in_cents: 20000000, created_at: new Date(Date.now() - 60000).toISOString() }], meta: {} }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ data: [{ id: 'W-1', reference: wRef, amount_in_cents: 20000000, created_at: new Date(Date.now() - 20 * 60000).toISOString() }], meta: {} }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     throw new Error('unexpected ' + url);
   };
@@ -207,5 +207,24 @@ test('reconcile: el huérfano se alerta vía reportAlert UNA vez; la corrida sig
     assert.equal(second.orphans, 1, 'sigue contándose como huérfano');
     assert.equal(second.alerted, 0, 'pero no se vuelve a alertar');
     assert.equal(alerts.length, 1);
+  } finally { ctx.cleanup(); }
+});
+
+test('reconcile: un pago de hace 2 minutos (webhook aún trabajando) NO se alerta como huérfano', async () => {
+  const ref = payments.createDirectReference({ checkin: '2026-11-05', checkout: '2026-11-06', guestsCount: 1, roomTypeId: '31348', firstName: 'Ana', lastName: 'R', email: 'a@x.co', phone: '300', extrasMask: '0000000', bookingCode: 'EST-MP-10', amountCents: 20000000 });
+  const fresh = { id: 'MP-10', external_reference: ref, transaction_amount: 200000, status: 'approved', date_created: new Date(Date.now() - 2 * 60000).toISOString() };
+  const fetchImpl = async (url) => {
+    if (String(url).includes('mercadopago')) {
+      return new Response(JSON.stringify({ results: [fresh], paging: { total: 1 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  };
+  const ctx = load({ env: { MERCADOPAGO_ACCESS_TOKEN: 'tok' }, fetchImpl });
+  const alerts = [];
+  try {
+    const res = await ctx.recon.handler(undefined, undefined, { reportAlert: async (a) => { alerts.push(a); return {}; } });
+    assert.match(res.body, /no orphans/);
+    assert.equal(alerts.length, 0);
+    assert.ok(ctx.recon._test.MIN_AGE_MS >= 5 * 60000);
   } finally { ctx.cleanup(); }
 });
