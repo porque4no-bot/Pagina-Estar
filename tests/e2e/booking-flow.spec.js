@@ -105,3 +105,36 @@ test('extras: late check-out and a pet update the summary', async ({ page }) => 
   await expect(summary).toContainText('$ 37.500');   // late = 15% of 250.000
   await expect(summary).toContainText('$ 200.000');  // pet flat charge
 });
+
+/* Producción oct-2026: al volver de Mercado Pago el huésped quedaba en el motor
+   con un aviso técnico ("…con Kunas… webhook…"). Debe ver la confirmación. */
+test('returning from Mercado Pago shows the booking confirmation', async ({ page }) => {
+  await page.addInitScript(([ci, co]) => {
+    try {
+      sessionStorage.setItem('estar-booking-draft', JSON.stringify({
+        savedAt: Date.now(),
+        search: { checkin: ci, checkout: co, guests: 2 },
+        selectedRoom: { id: 'clasica', roomTypeId: '31348', name: 'Clásica', priceFlexible: 250000, num: '01', area: 32, capacity: 2 },
+        selectedRate: 'best',
+        currentStep: 'payment',
+        extras: {},
+        guestData: { nombre: 'Ana', apellido: 'Prueba', email: 'ana@example.com', tel: '3000000000', pais: 'Colombia' },
+        paymentMethod: 'mercadopago'
+      }));
+      sessionStorage.setItem('estar-mp-pending', JSON.stringify({ code: 'EST-TEST1', savedAt: Date.now() }));
+    } catch (e) {}
+  }, [D1, D4]);
+  await page.route('**/api/booking-status**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ status: 'confirmed', ref: 'EST-TEST1', bookingCode: 'EST-TEST1', otasyncId: 123, reservationPending: false })
+  }));
+  await page.route('**/api/send-confirmation**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{"sent":true}' }));
+
+  await page.goto('/reservar.html?payment=success&payment_id=999&status=approved');
+  await expect(page.locator('.be-confirmation')).toBeVisible();
+  await expect(page.locator('.be-confirm-hero h2')).toHaveText('¡Reserva confirmada!');
+  await expect(page.locator('body')).not.toContainText('webhook');
+  await expect(page.locator('body')).not.toContainText('Kunas');
+  await expect(page).not.toHaveURL(/payment=success/);
+});

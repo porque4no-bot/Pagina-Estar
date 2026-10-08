@@ -172,3 +172,18 @@ test('flag OFF: comportamiento previo (fetch crudo, sin lock ni idempotencia por
     assert.equal(ctx.blobs.buckets.has('booking-idempotency') ? ctx.blobs.buckets.get('booking-idempotency').size : 0, 0, 'sin idempotencia por estadía');
   } finally { global.fetch = origFetch; ctx.cleanup(); }
 });
+
+/* Producción oct-2026: MP reenvió la notificación del MISMO pago mientras la
+   primera seguía en curso. No es doble pago → sin alerta, sin insertar. */
+test('flag ON: re-entrega del MISMO tx con el lock tomado → duplicate silencioso (sin alerta de doble pago)', async () => {
+  const ctx = load({ lock: { acquired: false, ownerTx: 'MP-SAME' } });
+  try {
+    const ref = refFor(ctx.payments, 'EST-D9', 30000000);
+    const res = await ctx.payments.processApprovedPayment(mpTx(ref, 'MP-SAME', 30000000), {});
+    const body = JSON.parse(res.body);
+    assert.equal(body.duplicate, true);
+    assert.equal(body.inProgress, true);
+    assert.equal(ctx.calls.insert, 0);
+    assert.equal(ctx.calls.emails.length, 0, 'no alerta de doble pago por una re-entrega');
+  } finally { ctx.cleanup(); }
+});

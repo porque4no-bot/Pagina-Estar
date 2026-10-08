@@ -388,6 +388,13 @@ async function processDirectPayment(transaction, corsHeaders) {
   const stayIdemKey = `booking_${decoded.roomTypeId}_${decoded.checkin}_${decoded.checkout}_${String(decoded.email || '').toLowerCase().trim()}`;
   if (resilient) {
     lock = await acquireQuoteLock(decoded.bookingCode, transaction.id);
+    if (!lock.acquired && String(lock.ownerTx) === String(transaction.id)) {
+      /* Mercado Pago reenvía la notificación del MISMO pago mientras la primera
+         sigue en curso (visto en producción, oct-2026). No es doble pago: se
+         ignora en silencio — la entrega original crea la reserva. */
+      console.log(`[payments] duplicate delivery of tx ${transaction.id} for ${decoded.bookingCode} while in progress; ignoring.`);
+      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, bookingCode: decoded.bookingCode, duplicate: true, inProgress: true }) };
+    }
     if (!lock.acquired) {
       console.error(`[payments] direct booking ${decoded.bookingCode} already being processed by tx ${lock.ownerTx}. Refusing tx ${transaction.id}.`);
       try {
