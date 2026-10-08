@@ -7,25 +7,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#28292b">
   <meta name="robots" content="noindex,nofollow,noarchive">
+  <!-- build.js genera dist/en/guest.html a partir de este archivo: cambia el
+       <title> y la descripción, ajusta las rutas a ../ y quita los .lang-es.
+       Todo texto visible va en pares .lang-es / .lang-en (o con una clave de
+       i18n/guest.*.json vía data-guest-i18n*). -->
   <title>Mi estadía · estar</title>
   <meta name="description" content="Guest app de Estar para gestionar la reserva, completar el check-in y solicitar servicios durante la estadía.">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="colors_and_type.css?v=2">
   <link rel="stylesheet" href="styles.css?v=4">
-  <link rel="stylesheet" href="guest-app.css?v=3">
+  <link rel="stylesheet" href="guest-app.css?v=4">
   <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <script src="https://unpkg.com/lucide@0.484.0/dist/umd/lucide.min.js" defer></script>
-  <script src="guest-app.js?v=3" defer></script>
+  <script src="guest-app.js?v=4" defer></script>
 </head>
 <body class="guest-app-page">
   <header class="guest-header">
-    <a href="index.html" class="guest-brand" aria-label="Estar, volver al inicio">
+    <a href="index.html" class="guest-brand" aria-label="Estar, volver al inicio" data-guest-i18n-aria="ariaHome">
       <img src="assets/logo-stacked-charcoal.png" alt="estar" width="74" height="66">
     </a>
     <div class="guest-header-actions">
-      <span class="guest-secure-label"><i data-lucide="shield-check"></i> Área segura</span>
-      <button class="guest-text-button" id="guestLogout" type="button" hidden>Cerrar sesión</button>
-      <a class="guest-home-link" href="index.html">Volver al hotel</a>
+      <span class="guest-secure-label"><i data-lucide="shield-check"></i> <span class="lang-es">Área segura</span><span class="lang-en" lang="en">Secure area</span></span>
+      <a class="guest-lang-link lang-es" href="en/guest.html" lang="en" hreflang="en">English</a>
+      <a class="guest-lang-link lang-en" href="../guest.html" lang="es" hreflang="es">Español</a>
+      <button class="guest-text-button" id="guestLogout" type="button" hidden><span class="lang-es">Cerrar sesión</span><span class="lang-en" lang="en">Sign out</span></button>
+      <a class="guest-home-link" href="index.html"><span class="lang-es">Volver al hotel</span><span class="lang-en" lang="en">Back to the hotel</span></a>
     </div>
   </header>
 
@@ -34,9 +40,11 @@
       <div class="guest-access-art" aria-hidden="true">
         <img src="assets/photos/interior_detalle.webp" alt="">
         <div class="guest-access-copy">
-          <p class="eyebrow on-dark">Estar contigo</p>
-          <h1>Tu estadía,<br><span class="serif-italic">en un solo lugar.</span></h1>
-          <p>Completa tu check-in, pide servicios y descubre Manizales antes de llegar.</p>
+          <p class="eyebrow on-dark"><span class="lang-es">Estar contigo</span><span class="lang-en" lang="en">Estar with you</span></p>
+          <h1 class="lang-es">Tu estadía,<br><span class="serif-italic">en un solo lugar.</span></h1>
+          <h1 class="lang-en" lang="en">Your stay,<br><span class="serif-italic">all in one place.</span></h1>
+          <p class="lang-es">Completa tu check-in, pide servicios y descubre Manizales antes de llegar.</p>
+          <p class="lang-en" lang="en">Complete your check-in, order services and discover Manizales before you arrive.</p>
         </div>
       </div>
 
@@ -44,20 +52,20 @@
         <div class="guest-access-form-wrap">
           <span class="guest-star-mark" aria-hidden="true"></span>
           <p class="eyebrow terracotta">Guest app</p>
-          <h2>Encuentra tu reserva</h2>
-          <p class="guest-muted">Usa el código de confirmación y el apellido del titular.</p>
+          <h2><span class="lang-es">Encuentra tu reserva</span><span class="lang-en" lang="en">Find your booking</span></h2>
+          <p class="guest-muted"><span class="lang-es">Usa el código de confirmación y el apellido del titular.</span><span class="lang-en" lang="en">Use the confirmation code and the booking holder's last name.</span></p>
 
           <form id="guestLoginForm" class="guest-form">
             <label class="guest-field">
-              <span>Código de reserva</span>
-              <input id="bookingCode" name="bookingCode" type="text" autocomplete="off" placeholder="Ej. 45821 o EST-12345" required>
+              <span><span class="lang-es">Código de reserva</span><span class="lang-en" lang="en">Booking code</span></span>
+              <input id="bookingCode" name="bookingCode" type="text" autocomplete="off" placeholder="Ej. 45821 o EST-12345" data-guest-i18n-placeholder="bookingCodePlaceholder" required>
             </label>
             <label class="guest-field">
-              <span>Apellido del titular</span>
-              <input id="accessKey" name="accessKey" type="text" autocomplete="family-name" placeholder="Ej. Restrepo" required>
+              <span><span class="lang-es">Apellido del titular</span><span class="lang-en" lang="en">Holder's last name</span></span>
+              <input id="accessKey" name="accessKey" type="text" autocomplete="family-name" placeholder="Ej. Restrepo" data-guest-i18n-placeholder="accessKeyPlaceholder" required>
             </label>
             <button class="btn btn-ink guest-submit" type="submit">
-              <span>Entrar a mi estadía</span>
+              <span><span class="lang-es">Entrar a mi estadía</span><span class="lang-en" lang="en">Open my stay</span></span>
               <i data-lucide="arrow-right"></i>
             </button>
             <p class="guest-form-status" id="loginStatus" role="status"></p>
@@ -65,7 +73,8 @@
 
           <div class="guest-access-help">
             <i data-lucide="message-circle"></i>
-            <p>¿No encuentras el código? <a href="https://wa.me/573102490414?text=Hola%2C%20necesito%20ayuda%20para%20encontrar%20mi%20reserva." target="_blank" rel="noopener noreferrer">Escríbenos por WhatsApp</a>.</p>
+            <p class="lang-es">¿No encuentras el código? <a href="https://wa.me/573102490414?text=Hola%2C%20necesito%20ayuda%20para%20encontrar%20mi%20reserva." target="_blank" rel="noopener noreferrer">Escríbenos por WhatsApp</a>.</p>
+            <p class="lang-en" lang="en">Can't find the code? <a href="https://wa.me/573102490414?text=Hi%2C%20I%20need%20help%20finding%20my%20booking." target="_blank" rel="noopener noreferrer">Message us on WhatsApp</a>.</p>
           </div>
         </div>
       </div>
@@ -74,32 +83,32 @@
     <section class="guest-shell" id="guestShell" hidden>
       <div class="guest-welcome">
         <div>
-          <p class="eyebrow on-dark">Bienvenido a Manizales</p>
-          <h1>Hola, <span class="serif-italic" id="guestFirstName">huésped.</span></h1>
-          <p id="guestWelcomeCopy">Todo está listo para tu próxima estadía.</p>
+          <p class="eyebrow on-dark"><span class="lang-es">Bienvenido a Manizales</span><span class="lang-en" lang="en">Welcome to Manizales</span></p>
+          <h1><span class="lang-es">Hola,</span><span class="lang-en" lang="en">Hi,</span> <span class="serif-italic" id="guestFirstName">huésped.</span></h1>
+          <p id="guestWelcomeCopy"><span class="lang-es">Todo está listo para tu próxima estadía.</span><span class="lang-en" lang="en">Everything is ready for your upcoming stay.</span></p>
         </div>
         <div class="guest-stay-chip">
-          <span id="guestStayCountdown">Próxima estadía</span>
+          <span id="guestStayCountdown"><span class="lang-es">Próxima estadía</span><span class="lang-en" lang="en">Upcoming stay</span></span>
           <strong id="guestStayDates">—</strong>
         </div>
       </div>
 
       <div class="guest-layout">
-        <nav class="guest-sidebar" aria-label="Navegación de la estadía">
+        <nav class="guest-sidebar" aria-label="Navegación de la estadía" data-guest-i18n-aria="ariaStayNav">
           <button class="guest-nav-button is-active" type="button" data-guest-tab="home">
-            <i data-lucide="house"></i><span>Inicio</span>
+            <i data-lucide="house"></i><span><span class="lang-es">Inicio</span><span class="lang-en" lang="en">Home</span></span>
           </button>
           <button class="guest-nav-button" type="button" data-guest-tab="checkin">
             <i data-lucide="scan-line"></i><span>Check-in</span>
           </button>
           <button class="guest-nav-button" type="button" data-guest-tab="services">
-            <i data-lucide="concierge-bell"></i><span>Servicios</span>
+            <i data-lucide="concierge-bell"></i><span><span class="lang-es">Servicios</span><span class="lang-en" lang="en">Services</span></span>
           </button>
           <button class="guest-nav-button" type="button" data-guest-tab="concierge">
             <i data-lucide="map-pinned"></i><span>Concierge</span>
           </button>
           <button class="guest-nav-button" type="button" data-guest-tab="booking">
-            <i data-lucide="calendar-range"></i><span>Mi reserva</span>
+            <i data-lucide="calendar-range"></i><span><span class="lang-es">Mi reserva</span><span class="lang-en" lang="en">My booking</span></span>
           </button>
         </nav>
 
@@ -107,26 +116,27 @@
           <section class="guest-panel is-active" data-guest-panel="home">
             <div class="guest-panel-head">
               <div>
-                <p class="eyebrow terracotta">Tu próxima visita</p>
-                <h2>Todo para <span class="serif-italic">estar bien.</span></h2>
+                <p class="eyebrow terracotta"><span class="lang-es">Tu próxima visita</span><span class="lang-en" lang="en">Your next visit</span></p>
+                <h2 class="lang-es">Todo para <span class="serif-italic">estar bien.</span></h2>
+                <h2 class="lang-en" lang="en">Everything to <span class="serif-italic">feel at home.</span></h2>
               </div>
-              <span class="guest-status-badge" id="bookingStatusBadge">Confirmada</span>
+              <span class="guest-status-badge" id="bookingStatusBadge"><span class="lang-es">Confirmada</span><span class="lang-en" lang="en">Confirmed</span></span>
             </div>
 
             <article class="guest-booking-card">
               <div class="guest-booking-image">
-                <img src="assets/photos/seleccion.webp" alt="Apartaestudio Estar">
+                <img src="assets/photos/seleccion.webp" alt="Apartaestudio Estar" data-guest-i18n-alt="altStudio">
               </div>
               <div class="guest-booking-summary">
                 <div>
-                  <p class="eyebrow">Tu apartaestudio</p>
-                  <h3 id="homeRoomName">Apartaestudio</h3>
-                  <p class="guest-muted" id="homeBookingCode">Reserva —</p>
+                  <p class="eyebrow"><span class="lang-es">Tu apartaestudio</span><span class="lang-en" lang="en">Your studio</span></p>
+                  <h3 id="homeRoomName"><span class="lang-es">Apartaestudio</span><span class="lang-en" lang="en">Studio</span></h3>
+                  <p class="guest-muted" id="homeBookingCode">—</p>
                 </div>
                 <dl class="guest-booking-facts">
-                  <div><dt>Llegada</dt><dd id="homeCheckIn">—</dd></div>
-                  <div><dt>Salida</dt><dd id="homeCheckOut">—</dd></div>
-                  <div><dt>Noches</dt><dd id="homeNights">—</dd></div>
+                  <div><dt><span class="lang-es">Llegada</span><span class="lang-en" lang="en">Arrival</span></dt><dd id="homeCheckIn">—</dd></div>
+                  <div><dt><span class="lang-es">Salida</span><span class="lang-en" lang="en">Departure</span></dt><dd id="homeCheckOut">—</dd></div>
+                  <div><dt><span class="lang-es">Noches</span><span class="lang-en" lang="en">Nights</span></dt><dd id="homeNights">—</dd></div>
                 </dl>
               </div>
             </article>
@@ -134,28 +144,28 @@
             <div class="guest-quick-grid">
               <button class="guest-quick-card" type="button" data-open-tab="checkin">
                 <span class="guest-icon-box olive"><i data-lucide="badge-check"></i></span>
-                <span><strong>Completar check-in</strong><small>Sube tu documento y ahorra tiempo al llegar.</small></span>
+                <span><strong><span class="lang-es">Completar check-in</span><span class="lang-en" lang="en">Complete check-in</span></strong><small><span class="lang-es">Sube tu documento y ahorra tiempo al llegar.</span><span class="lang-en" lang="en">Upload your document and save time on arrival.</span></small></span>
                 <i data-lucide="chevron-right"></i>
               </button>
               <button class="guest-quick-card" type="button" data-open-tab="services">
                 <span class="guest-icon-box terracotta"><i data-lucide="coffee"></i></span>
-                <span><strong>Agregar servicios</strong><small>Desayuno, lavandería y más.</small></span>
+                <span><strong><span class="lang-es">Agregar servicios</span><span class="lang-en" lang="en">Add services</span></strong><small><span class="lang-es">Desayuno, lavandería y más.</span><span class="lang-en" lang="en">Breakfast, laundry and more.</span></small></span>
                 <i data-lucide="chevron-right"></i>
               </button>
               <button class="guest-quick-card" type="button" data-open-tab="concierge">
                 <span class="guest-icon-box sand"><i data-lucide="map"></i></span>
-                <span><strong>Explorar la ciudad</strong><small>Nuestra selección de lugares cerca de Estar.</small></span>
+                <span><strong><span class="lang-es">Explorar la ciudad</span><span class="lang-en" lang="en">Explore the city</span></strong><small><span class="lang-es">Nuestra selección de lugares cerca de Estar.</span><span class="lang-en" lang="en">Our picks of places near Estar.</span></small></span>
                 <i data-lucide="chevron-right"></i>
               </button>
             </div>
 
             <div class="guest-arrival-card">
               <div>
-                <p class="eyebrow on-dark">Antes de llegar</p>
-                <h3>Check-in desde las 3:00 p. m.</h3>
-                <p>Cuando completes el registro te mostraremos las instrucciones de llegada y acceso.</p>
+                <p class="eyebrow on-dark"><span class="lang-es">Antes de llegar</span><span class="lang-en" lang="en">Before you arrive</span></p>
+                <h3><span class="lang-es">Check-in desde las 3:00 p. m.</span><span class="lang-en" lang="en">Check-in from 3:00 p.m.</span></h3>
+                <p><span class="lang-es">Cuando completes el registro te mostraremos las instrucciones de llegada y acceso.</span><span class="lang-en" lang="en">Once you complete the registration we will show you the arrival and access instructions.</span></p>
               </div>
-              <button class="btn btn-ghost-light" type="button" data-open-tab="checkin">Empezar check-in</button>
+              <button class="btn btn-ghost-light" type="button" data-open-tab="checkin"><span class="lang-es">Empezar check-in</span><span class="lang-en" lang="en">Start check-in</span></button>
             </div>
           </section>
 
@@ -163,16 +173,19 @@
             <div class="guest-panel-head">
               <div>
                 <p class="eyebrow terracotta">Pre check-in</p>
-                <h2>Llega y simplemente <span class="serif-italic">empieza a estar.</span></h2>
-                <p class="guest-muted">Validaremos el documento y te pediremos confirmar los datos extraídos.</p>
+                <h2 class="lang-es">Llega y simplemente <span class="serif-italic">empieza a estar.</span></h2>
+                <h2 class="lang-en" lang="en">Arrive and simply <span class="serif-italic">start feeling at home.</span></h2>
+                <p class="guest-muted"><span class="lang-es">Validaremos el documento y te pediremos confirmar los datos extraídos.</span><span class="lang-en" lang="en">We will validate the document and ask you to confirm the extracted details.</span></p>
               </div>
-              <div class="guest-progress-pill" id="checkinProgress">Paso 1 de 3</div>
+              <div class="guest-progress-pill" id="checkinProgress"><span class="lang-es">Paso 1 de 3</span><span class="lang-en" lang="en">Step 1 of 3</span></div>
             </div>
 
             <div class="guest-checkin-layout">
-              <form id="checkinForm" class="guest-checkin-form">
+              <!-- novalidate: la validación la hace guest-app.js (mensaje claro en el
+                   idioma del huésped + reportValidity), alineada con el servidor. -->
+              <form id="checkinForm" class="guest-checkin-form" novalidate>
                 <fieldset class="guest-form-card">
-                  <legend><span>1</span> Huéspedes</legend>
+                  <legend><span class="guest-step">1</span> <span class="lang-es">Huéspedes</span><span class="lang-en" lang="en">Guests</span></legend>
                   <label class="guest-field">
                     <span data-guest-i18n="occupantCountLabel">¿Cuántas personas se hospedan?</span>
                     <select id="occupantCount" name="occupantCount">
@@ -187,10 +200,11 @@
                 </fieldset>
 
                 <fieldset class="guest-form-card">
-                  <legend><span>2</span> Documento de identidad</legend>
-                  <p class="guest-muted" data-guest-i18n="cameraOnlyHint">Por seguridad, el documento se captura solo con la cámara.</p>
-                  <!-- Hidden fallback input kept in the DOM so guest-app.js binds
-                       without error; camera capture is the primary path. -->
+                  <legend><span class="guest-step">2</span> <span class="lang-es">Documento de identidad</span><span class="lang-en" lang="en">Identity document</span></legend>
+                  <p class="guest-muted" data-guest-i18n="cameraOnlyHint">Toma una foto del documento con la cámara. Desde un computador también puedes subir una foto o un PDF.</p>
+                  <!-- #identityDocument: subida de archivo (visible vía #uploadDocument en
+                       computador o cuando la cámara no abre). #cameraFileCapture: cámara
+                       nativa del celular como respaldo de la captura guiada. -->
                   <input id="identityDocument" type="file" accept="image/jpeg,image/png,application/pdf" hidden>
                   <input id="cameraFileCapture" type="file" accept="image/*" capture="environment" hidden>
                   <div class="guest-inline-actions">
@@ -198,8 +212,12 @@
                       <i data-lucide="camera"></i>
                       <span data-guest-i18n="cameraButton">Tomar foto</span>
                     </button>
+                    <button class="btn btn-ghost-dark" id="uploadDocument" type="button" hidden>
+                      <i data-lucide="file-text"></i>
+                      <span data-guest-i18n="uploadButton">Subir archivo</span>
+                    </button>
                     <button class="btn btn-ghost-dark" id="analyzeDocument" type="button" disabled>
-                      <i data-lucide="sparkles"></i> Leer documento
+                      <i data-lucide="sparkles"></i> <span class="lang-es">Leer documento</span><span class="lang-en" lang="en">Read document</span>
                     </button>
                     <span class="guest-ocr-status" id="ocrStatus"></span>
                   </div>
@@ -222,7 +240,7 @@
                       <input id="minorRcnFile" type="file" accept="image/jpeg,image/png,application/pdf">
                       <span class="guest-upload-icon"><i data-lucide="file-text"></i></span>
                       <strong id="minorRcnTitle" data-guest-i18n="minorRcnLabel">Registro civil de nacimiento</strong>
-                      <small id="minorRcnMeta">JPG, PNG o PDF. Máximo 4.5 MB.</small>
+                      <small id="minorRcnMeta" data-guest-i18n="docFormatsHint">JPG, PNG o PDF. Máximo 4.5 MB.</small>
                     </label>
                     <input id="minorRcnCamera" type="file" accept="image/*" capture="environment" hidden>
                     <div class="guest-inline-actions">
@@ -245,30 +263,30 @@
                       <input id="minorAuthFile" type="file" accept="image/jpeg,image/png,application/pdf">
                       <span class="guest-upload-icon"><i data-lucide="file-signature"></i></span>
                       <strong id="minorAuthTitle" data-guest-i18n="minorAuthorizationLabel">Carta de autorización</strong>
-                      <small id="minorAuthMeta">JPG, PNG o PDF. Máximo 4.5 MB.</small>
+                      <small id="minorAuthMeta" data-guest-i18n="docFormatsHint">JPG, PNG o PDF. Máximo 4.5 MB.</small>
                     </label>
                     <span class="guest-ocr-status" id="minorAuthStatus"></span>
                   </div>
                 </fieldset>
 
                 <fieldset class="guest-form-card">
-                  <legend><span>3</span> Confirma tus datos</legend>
+                  <legend><span class="guest-step">3</span> <span class="lang-es">Confirma tus datos</span><span class="lang-en" lang="en">Confirm your details</span></legend>
                   <div class="guest-form-grid">
-                    <label class="guest-field"><span>Nombres *</span><input name="firstName" autocomplete="given-name" required></label>
-                    <label class="guest-field"><span>Apellidos *</span><input name="lastName" autocomplete="family-name" required></label>
-                    <label class="guest-field"><span>Tipo de documento *</span>
+                    <label class="guest-field"><span><span class="lang-es">Nombres</span><span class="lang-en" lang="en">First names</span> *</span><input name="firstName" autocomplete="given-name" required></label>
+                    <label class="guest-field"><span><span class="lang-es">Apellidos</span><span class="lang-en" lang="en">Last names</span> *</span><input name="lastName" autocomplete="family-name" required></label>
+                    <label class="guest-field"><span><span class="lang-es">Tipo de documento</span><span class="lang-en" lang="en">Document type</span> *</span>
                       <select name="documentType" required>
-                        <option value="">Selecciona</option>
+                        <option value="" data-guest-i18n="documentTypeSelect">Selecciona</option>
                         <option value="CC">CC</option>
                         <option value="TI">TI</option>
                         <option value="CE">CE</option>
-                        <option value="Pasaporte">Pasaporte</option>
+                        <option value="Pasaporte" data-guest-i18n="documentTypePassport">Pasaporte</option>
                       </select>
                     </label>
-                    <label class="guest-field"><span>Número de documento *</span><input name="documentNumber" autocomplete="off" required></label>
-                    <label class="guest-field"><span>Fecha de nacimiento *</span><input name="birthDate" type="date" required></label>
-                    <label class="guest-field"><span>Vencimiento <small data-guest-i18n="expirationDateOptionalHint">(opcional, solo pasaportes)</small></span><input name="expirationDate" type="date"></label>
-                    <label class="guest-field"><span>Nacionalidad *</span><input name="nationality" list="nationalityOptions" autocomplete="country-name" placeholder="Ej. Colombia" data-guest-i18n-placeholder="nationalityPlaceholder" required></label>
+                    <label class="guest-field"><span><span class="lang-es">Número de documento</span><span class="lang-en" lang="en">Document number</span> *</span><input name="documentNumber" autocomplete="off" required></label>
+                    <label class="guest-field"><span><span class="lang-es">Fecha de nacimiento</span><span class="lang-en" lang="en">Date of birth</span> *</span><input name="birthDate" type="date" required></label>
+                    <label class="guest-field"><span><span class="lang-es">Vencimiento</span><span class="lang-en" lang="en">Expiration date</span> <small data-guest-i18n="expirationDateOptionalHint">(opcional, solo pasaportes)</small></span><input name="expirationDate" type="date"></label>
+                    <label class="guest-field"><span><span class="lang-es">Nacionalidad</span><span class="lang-en" lang="en">Nationality</span> *</span><input name="nationality" list="nationalityOptions" autocomplete="country-name" placeholder="Ej. Colombia" data-guest-i18n-placeholder="nationalityPlaceholder" required></label>
                     <datalist id="nationalityOptions">
                       <option value="Colombia"></option>
                       <option value="Venezuela"></option>
@@ -310,11 +328,12 @@
                     </label>
                     <label class="guest-field"><span data-guest-i18n="occupationLabel">Ocupación</span><input name="occupation" autocomplete="off" placeholder="Ej. Ingeniera, estudiante, comerciante" data-guest-i18n-placeholder="occupationPlaceholder"></label>
                     <label class="guest-field guest-field-wide"><span data-guest-i18n="birthPlaceLabel">Lugar de nacimiento</span><input name="birthPlace" autocomplete="off" placeholder="Ciudad y país de nacimiento" data-guest-i18n-placeholder="birthPlacePlaceholder"></label>
-                    <label class="guest-field"><span>Hora aproximada de llegada</span><input name="arrivalTime" type="time"></label>
-                    <label class="guest-field"><span>Correo *</span><input name="email" type="email" autocomplete="email" required></label>
-                    <label class="guest-field"><span>WhatsApp *</span><input name="phone" type="tel" autocomplete="tel" required></label>
-                    <label class="guest-field guest-field-wide"><span>Dirección de residencia</span><input name="address" autocomplete="street-address"></label>
+                    <label class="guest-field"><span><span class="lang-es">Hora aproximada de llegada</span><span class="lang-en" lang="en">Estimated arrival time</span></span><input name="arrivalTime" type="time"></label>
+                    <label class="guest-field"><span><span class="lang-es">Correo</span><span class="lang-en" lang="en">Email</span><span class="guest-adult-required"> *</span></span><input name="email" type="email" autocomplete="email" required></label>
+                    <label class="guest-field"><span>WhatsApp<span class="guest-adult-required"> *</span></span><input name="phone" type="tel" autocomplete="tel" required></label>
+                    <label class="guest-field guest-field-wide"><span><span class="lang-es">Dirección de residencia</span><span class="lang-en" lang="en">Home address</span></span><input name="address" autocomplete="street-address"></label>
                   </div>
+                  <p class="guest-muted guest-minor-contact-hint" id="minorContactHint" data-guest-i18n="minorContactHint" hidden>Para menores de edad, el correo, el WhatsApp y la aceptación de la política los da el adulto responsable.</p>
 
                   <p class="eyebrow" data-guest-i18n="residenceSectionTitle">Lugar de residencia</p>
                   <div class="guest-form-grid">
@@ -332,12 +351,13 @@
 
                   <div class="guest-form-grid">
                     <label class="guest-field guest-field-wide"><span data-guest-i18n="destinationLabel">Destino al salir (solo extranjeros)</span><input name="destination" autocomplete="off" placeholder="Ciudad y país al continuar tu viaje" data-guest-i18n-placeholder="destinationPlaceholder"></label>
-                    <label class="guest-field guest-field-wide"><span>Notas para el equipo</span><textarea name="notes" rows="3" placeholder="Alergias, requerimientos de movilidad o información útil para tu llegada."></textarea></label>
+                    <label class="guest-field guest-field-wide"><span><span class="lang-es">Notas para el equipo</span><span class="lang-en" lang="en">Notes for the team</span></span><textarea name="notes" rows="3" placeholder="Alergias, requerimientos de movilidad o información útil para tu llegada." data-guest-i18n-placeholder="notesPlaceholder"></textarea></label>
                   </div>
 
                   <label class="guest-consent">
                     <input name="privacyAccepted" type="checkbox" required>
-                    <span>Acepto el tratamiento de mis datos y documentos conforme a la <a href="privacidad.html" target="_blank">Política de Privacidad</a>.</span>
+                    <span class="lang-es">Acepto el tratamiento de mis datos y documentos conforme a la <a href="privacidad.html" target="_blank">Política de Privacidad</a>.</span>
+                    <span class="lang-en" lang="en">I accept the processing of my data and documents under the <a href="privacidad.html" target="_blank">Privacy Policy</a>.</span>
                   </label>
                   <label class="guest-consent">
                     <input name="marketingAccepted" type="checkbox">
@@ -347,7 +367,7 @@
                 </fieldset>
 
                 <button class="btn btn-ink guest-submit" type="submit">
-                  Validar y completar check-in <i data-lucide="check"></i>
+                  <span><span class="lang-es">Validar y completar check-in</span><span class="lang-en" lang="en">Validate and complete check-in</span></span> <i data-lucide="check"></i>
                 </button>
                 <p class="guest-form-status" id="checkinStatus" role="status"></p>
               </form>
@@ -355,23 +375,24 @@
               <aside class="guest-checkin-aside">
                 <div class="guest-trust-card">
                   <i data-lucide="shield-check"></i>
-                  <h3>Tus datos están protegidos</h3>
-                  <p>El documento se procesa del lado del servidor. No publicamos llaves de Azure ni de OTASync en el navegador.</p>
+                  <h3><span class="lang-es">Tus datos están protegidos</span><span class="lang-en" lang="en">Your data is protected</span></h3>
+                  <p><span class="lang-es">El documento se procesa en nuestros servidores, no en tu navegador, y solo el equipo del hotel lo usa para el registro de huéspedes que exige la ley.</span><span class="lang-en" lang="en">The document is processed on our servers, not in your browser, and only the hotel team uses it for the guest registration required by law.</span></p>
                 </div>
 
                 <div class="guest-contract-card">
-                  <p class="eyebrow">Firma digital</p>
-                  <h3>Contrato de hospedaje</h3>
-                  <p>Firma después de confirmar tus datos. Guardaremos la evidencia de aceptación junto con el expediente de la reserva.</p>
+                  <p class="eyebrow"><span class="lang-es">Firma digital</span><span class="lang-en" lang="en">Digital signature</span></p>
+                  <h3><span class="lang-es">Contrato de hospedaje</span><span class="lang-en" lang="en">Hospitality agreement</span></h3>
+                  <p><span class="lang-es">Firma después de completar el check-in. Guardaremos la evidencia de aceptación junto con el expediente de la reserva y te enviaremos una copia en PDF a tu correo.</span><span class="lang-en" lang="en">Sign after completing the check-in. We will keep the acceptance evidence with the booking file and email you a PDF copy.</span></p>
                   <button class="guest-contract-view" id="openContract" type="button" data-guest-i18n="viewContractLink">Ver contrato completo</button>
-                  <label class="guest-field"><span>Nombre completo del firmante</span><input id="signedName" type="text"></label>
+                  <label class="guest-field"><span><span class="lang-es">Nombre completo del firmante</span><span class="lang-en" lang="en">Signer's full name</span></span><input id="signedName" type="text" autocomplete="name"></label>
                   <label class="guest-consent">
                     <input id="contractAccepted" type="checkbox" disabled>
-                    <span>Leí y acepto el contrato, las políticas de convivencia y cancelación.</span>
+                    <span><span class="lang-es">Leí y acepto el contrato de hospedaje, incluidas sus normas de convivencia y uso del apartaestudio.</span><span class="lang-en" lang="en">I have read and accept the hospitality agreement, including its house rules and studio use terms.</span></span>
                   </label>
                   <p class="guest-form-status" id="contractGate" role="status" data-guest-i18n="contractAcknowledgeBlocked">Lee el contrato antes de firmar.</p>
-                  <button class="btn btn-primary" id="signContract" type="button" disabled>Firmar contrato</button>
+                  <button class="btn btn-primary" id="signContract" type="button" disabled><span class="lang-es">Firmar contrato</span><span class="lang-en" lang="en">Sign contract</span></button>
                   <p class="guest-form-status" id="contractStatus" role="status"></p>
+                  <button class="btn btn-ghost-dark" id="downloadSignedContract" type="button" hidden data-guest-i18n="contractDownloadSigned">Descargar contrato firmado (PDF)</button>
                 </div>
               </aside>
             </div>
@@ -380,9 +401,10 @@
           <section class="guest-panel" data-guest-panel="services">
             <div class="guest-panel-head">
               <div>
-                <p class="eyebrow terracotta">Servicios adicionales</p>
-                <h2>Haz tu estadía <span class="serif-italic">más tuya.</span></h2>
-                <p class="guest-muted">Selecciona servicios para antes o durante tu visita.</p>
+                <p class="eyebrow terracotta"><span class="lang-es">Servicios adicionales</span><span class="lang-en" lang="en">Additional services</span></p>
+                <h2 class="lang-es">Haz tu estadía <span class="serif-italic">más tuya.</span></h2>
+                <h2 class="lang-en" lang="en">Make your stay <span class="serif-italic">your own.</span></h2>
+                <p class="guest-muted"><span class="lang-es">Selecciona servicios para antes o durante tu visita.</span><span class="lang-en" lang="en">Choose services for before or during your visit.</span></p>
               </div>
               <button class="guest-cart-button" id="openCart" type="button">
                 <i data-lucide="shopping-bag"></i>
@@ -399,57 +421,58 @@
             <div class="guest-service-grid">
               <article class="guest-service-card" data-service-id="breakfast" data-service-price="20000">
                 <span class="guest-service-icon"><i data-lucide="coffee"></i></span>
-                <div><p class="eyebrow">Alimentos</p><h3>Desayuno local</h3><p>Fruta, huevos, pan artesanal, café y jugo.</p></div>
-                <footer><strong>$20.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+                <div><p class="eyebrow"><span class="lang-es">Alimentos</span><span class="lang-en" lang="en">Food</span></p><h3><span class="lang-es">Desayuno local</span><span class="lang-en" lang="en">Local breakfast</span></h3><p><span class="lang-es">Fruta, huevos, pan artesanal, café y jugo.</span><span class="lang-en" lang="en">Fruit, eggs, artisan bread, coffee and juice.</span></p></div>
+                <footer><strong>$20.000</strong><button type="button" class="guest-add-service"><span class="lang-es">Agregar</span><span class="lang-en" lang="en">Add</span></button></footer>
               </article>
               <article class="guest-service-card" data-service-id="laundry" data-service-price="35000">
                 <span class="guest-service-icon"><i data-lucide="shirt"></i></span>
-                <div><p class="eyebrow">Comodidad</p><h3>Lavandería express</h3><p>Bolsa de hasta 3 kg, entrega en 24 horas.</p></div>
-                <footer><strong>$35.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+                <div><p class="eyebrow"><span class="lang-es">Comodidad</span><span class="lang-en" lang="en">Comfort</span></p><h3><span class="lang-es">Lavandería express</span><span class="lang-en" lang="en">Express laundry</span></h3><p><span class="lang-es">Bolsa de hasta 3 kg, entrega en 24 horas.</span><span class="lang-en" lang="en">Bag of up to 3 kg, returned within 24 hours.</span></p></div>
+                <footer><strong>$35.000</strong><button type="button" class="guest-add-service"><span class="lang-es">Agregar</span><span class="lang-en" lang="en">Add</span></button></footer>
               </article>
               <article class="guest-service-card" data-service-id="late_checkout" data-service-pct="0.15">
                 <span class="guest-service-icon"><i data-lucide="clock-3"></i></span>
-                <div><p class="eyebrow">Tiempo</p><h3>Late check-out</h3><p>Extiende tu salida hasta las 2:00 p. m. (15% de la noche).</p></div>
-                <footer><strong data-service-price-display>15% de la noche</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+                <div><p class="eyebrow"><span class="lang-es">Tiempo</span><span class="lang-en" lang="en">Time</span></p><h3>Late check-out</h3><p><span class="lang-es">Extiende tu salida hasta las 2:00 p. m. (15% de la noche).</span><span class="lang-en" lang="en">Extend your departure until 2:00 p.m. (15% of the night).</span></p></div>
+                <footer><strong data-service-price-display>15%</strong><button type="button" class="guest-add-service"><span class="lang-es">Agregar</span><span class="lang-en" lang="en">Add</span></button></footer>
               </article>
               <article class="guest-service-card" data-service-id="early_checkin" data-service-pct="0.25" data-service-round="5000">
                 <span class="guest-service-icon"><i data-lucide="sunrise"></i></span>
-                <div><p class="eyebrow">Tiempo</p><h3>Early check-in</h3><p>Adelanta tu llegada desde las 6:00 a. m. (25% de la noche).</p></div>
-                <footer><strong data-service-price-display>25% de la noche</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+                <div><p class="eyebrow"><span class="lang-es">Tiempo</span><span class="lang-en" lang="en">Time</span></p><h3>Early check-in</h3><p><span class="lang-es">Adelanta tu llegada desde las 6:00 a. m. (25% de la noche).</span><span class="lang-en" lang="en">Arrive early, from 6:00 a.m. (25% of the night).</span></p></div>
+                <footer><strong data-service-price-display>25%</strong><button type="button" class="guest-add-service"><span class="lang-es">Agregar</span><span class="lang-en" lang="en">Add</span></button></footer>
               </article>
               <article class="guest-service-card" data-service-id="airport_transfer" data-service-price="120000">
                 <span class="guest-service-icon"><i data-lucide="plane"></i></span>
-                <div><p class="eyebrow">Traslado</p><h3>Aeropuerto</h3><p>Recogida o traslado privado a La Nubia.</p></div>
-                <footer><strong>$120.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+                <div><p class="eyebrow"><span class="lang-es">Traslado</span><span class="lang-en" lang="en">Transfer</span></p><h3><span class="lang-es">Aeropuerto</span><span class="lang-en" lang="en">Airport</span></h3><p><span class="lang-es">Recogida o traslado privado a La Nubia.</span><span class="lang-en" lang="en">Private pick-up or drop-off at La Nubia.</span></p></div>
+                <footer><strong>$120.000</strong><button type="button" class="guest-add-service"><span class="lang-es">Agregar</span><span class="lang-en" lang="en">Add</span></button></footer>
               </article>
               <article class="guest-service-card" data-service-id="city_experience" data-service-price="95000">
                 <span class="guest-service-icon"><i data-lucide="mountain-snow"></i></span>
-                <div><p class="eyebrow">Experiencia</p><h3>Ruta cafetera</h3><p>Experiencia local coordinada por nuestro concierge.</p></div>
-                <footer><strong>$95.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+                <div><p class="eyebrow"><span class="lang-es">Experiencia</span><span class="lang-en" lang="en">Experience</span></p><h3><span class="lang-es">Ruta cafetera</span><span class="lang-en" lang="en">Coffee route</span></h3><p><span class="lang-es">Experiencia local coordinada por nuestro concierge.</span><span class="lang-en" lang="en">Local experience arranged by our concierge.</span></p></div>
+                <footer><strong>$95.000</strong><button type="button" class="guest-add-service"><span class="lang-es">Agregar</span><span class="lang-en" lang="en">Add</span></button></footer>
               </article>
               <article class="guest-service-card" data-service-id="mascota" data-service-price="200000">
                 <span class="guest-service-icon"><i data-lucide="paw-print"></i></span>
-                <div><p class="eyebrow">Comodidad</p><h3>Mascota</h3><p>Trae a tu mascota durante tu estadía (IVA incluido).</p></div>
-                <footer><strong>$200.000</strong><button type="button" class="guest-add-service">Agregar</button></footer>
+                <div><p class="eyebrow"><span class="lang-es">Comodidad</span><span class="lang-en" lang="en">Comfort</span></p><h3><span class="lang-es">Mascota</span><span class="lang-en" lang="en">Pet</span></h3><p><span class="lang-es">Trae a tu mascota durante tu estadía (IVA incluido).</span><span class="lang-en" lang="en">Bring your pet during your stay (VAT included).</span></p></div>
+                <footer><strong>$200.000</strong><button type="button" class="guest-add-service"><span class="lang-es">Agregar</span><span class="lang-en" lang="en">Add</span></button></footer>
               </article>
             </div>
 
             <aside class="guest-cart" id="guestCart" hidden>
               <div class="guest-cart-head">
-                <div><p class="eyebrow terracotta">Tu pedido</p><h3>Servicios seleccionados</h3></div>
-                <button id="closeCart" type="button" aria-label="Cerrar carrito"><i data-lucide="x"></i></button>
+                <div><p class="eyebrow terracotta"><span class="lang-es">Tu pedido</span><span class="lang-en" lang="en">Your order</span></p><h3><span class="lang-es">Servicios seleccionados</span><span class="lang-en" lang="en">Selected services</span></h3></div>
+                <button id="closeCart" type="button" aria-label="Cerrar carrito" data-guest-i18n-aria="ariaCloseCart"><i data-lucide="x"></i></button>
               </div>
               <div id="cartItems" class="guest-cart-items"></div>
-              <label class="guest-field"><span>¿Cuándo lo necesitas?</span><input id="deliveryTime" type="text" placeholder="Ej. Día de llegada, 7:30 a. m."></label>
-              <label class="guest-field"><span>Notas</span><textarea id="orderNotes" rows="3"></textarea></label>
-              <label class="guest-field"><span>Forma de pago</span>
+              <label class="guest-field"><span><span class="lang-es">¿Cuándo lo necesitas?</span><span class="lang-en" lang="en">When do you need it?</span></span><input id="deliveryTime" type="text" placeholder="Ej. Día de llegada, 7:30 a. m." data-guest-i18n-placeholder="deliveryPlaceholder"></label>
+              <label class="guest-field"><span><span class="lang-es">Notas</span><span class="lang-en" lang="en">Notes</span></span><textarea id="orderNotes" rows="3"></textarea></label>
+              <!-- Las opciones las arma guest-app.js: "Pagar en línea" solo aparece si la
+                   sesión dice que el modo de pago de servicios lo soporta. -->
+              <label class="guest-field" id="paymentPreferenceField"><span><span class="lang-es">Forma de pago</span><span class="lang-en" lang="en">Payment method</span></span>
                 <select id="paymentPreference">
-                  <option value="account">Cargar a mi cuenta</option>
-                  <option value="online">Pagar en línea</option>
+                  <option value="account" data-guest-i18n="payAccount">Cargar a mi cuenta</option>
                 </select>
               </label>
               <div class="guest-cart-total"><span>Total</span><strong id="cartTotal">$0</strong></div>
-              <button class="btn btn-ink guest-submit" id="submitOrder" type="button">Enviar pedido</button>
+              <button class="btn btn-ink guest-submit" id="submitOrder" type="button"><span class="lang-es">Enviar pedido</span><span class="lang-en" lang="en">Send order</span></button>
               <p class="guest-form-status" id="orderStatus" role="status"></p>
             </aside>
           </section>
@@ -457,56 +480,62 @@
           <section class="guest-panel" data-guest-panel="concierge">
             <div class="guest-panel-head">
               <div>
-                <p class="eyebrow terracotta">Concierge local</p>
-                <h2>Manizales, <span class="serif-italic">como la vivimos nosotros.</span></h2>
-                <p class="guest-muted">Recomendaciones cercanas y respuestas para moverte con facilidad.</p>
+                <p class="eyebrow terracotta"><span class="lang-es">Concierge local</span><span class="lang-en" lang="en">Local concierge</span></p>
+                <h2 class="lang-es">Manizales, <span class="serif-italic">como la vivimos nosotros.</span></h2>
+                <h2 class="lang-en" lang="en">Manizales, <span class="serif-italic">the way we live it.</span></h2>
+                <p class="guest-muted"><span class="lang-es">Recomendaciones cercanas y respuestas para moverte con facilidad.</span><span class="lang-en" lang="en">Nearby recommendations and answers to get around easily.</span></p>
               </div>
-              <a class="btn btn-ghost-dark" href="explora.html">Ver guía completa</a>
+              <a class="btn btn-ghost-dark" href="explora.html"><span class="lang-es">Ver guía completa</span><span class="lang-en" lang="en">See the full guide</span></a>
             </div>
 
             <div class="guest-recommendation-grid">
               <a class="guest-place-card featured" href="https://maps.google.com/?q=5.059565,-75.488098" target="_blank" rel="noopener noreferrer">
-                <img src="assets/photos/yarumos.webp" alt="Bosque Popular El Prado y naturaleza de Manizales">
-                <span class="guest-place-overlay"><small>Naturaleza</small><strong>Recinto del Pensamiento</strong><em>Plan de medio día</em></span>
+                <img src="assets/photos/yarumos.webp" alt="Bosque Popular El Prado y naturaleza de Manizales" data-guest-i18n-alt="altPark">
+                <span class="guest-place-overlay"><small><span class="lang-es">Naturaleza</span><span class="lang-en" lang="en">Nature</span></small><strong>Recinto del Pensamiento</strong><em><span class="lang-es">Plan de medio día</span><span class="lang-en" lang="en">Half-day plan</span></em></span>
               </a>
               <a class="guest-place-card" href="https://maps.google.com/?q=El+Cable+Manizales" target="_blank" rel="noopener noreferrer">
-                <img src="assets/photos/cable.webp" alt="Sector El Cable en Manizales">
-                <span class="guest-place-overlay"><small>A 8 min caminando</small><strong>El Cable</strong><em>Restaurantes y vida urbana</em></span>
+                <img src="assets/photos/cable.webp" alt="Sector El Cable en Manizales" data-guest-i18n-alt="altCable">
+                <span class="guest-place-overlay"><small><span class="lang-es">A 8 min caminando</span><span class="lang-en" lang="en">8 min walk</span></small><strong>El Cable</strong><em><span class="lang-es">Restaurantes y vida urbana</span><span class="lang-en" lang="en">Restaurants and city life</span></em></span>
               </a>
               <a class="guest-place-card" href="https://maps.google.com/?q=Monumento+a+los+Colonizadores+Manizales" target="_blank" rel="noopener noreferrer">
-                <img src="assets/photos/bolivar.webp" alt="Vista urbana de Manizales">
-                <span class="guest-place-overlay"><small>Mirador</small><strong>Chipre</strong><em>Atardecer y panorámica</em></span>
+                <img src="assets/photos/bolivar.webp" alt="Vista urbana de Manizales" data-guest-i18n-alt="altCity">
+                <span class="guest-place-overlay"><small><span class="lang-es">Mirador</span><span class="lang-en" lang="en">Viewpoint</span></small><strong>Chipre</strong><em><span class="lang-es">Atardecer y panorámica</span><span class="lang-en" lang="en">Sunset and panoramic views</span></em></span>
               </a>
             </div>
 
             <div class="guest-concierge-columns">
               <div>
-                <p class="eyebrow terracotta">Preguntas frecuentes</p>
+                <p class="eyebrow terracotta"><span class="lang-es">Preguntas frecuentes</span><span class="lang-en" lang="en">Frequently asked questions</span></p>
                 <div class="guest-faq">
-                  <details><summary>¿Cuál es el horario de check-in y check-out?</summary><p>La llegada es desde las 3:00 p. m. y la salida hasta las 11:00 a. m. Puedes solicitar ingreso anticipado o salida tarde (hasta las 2:00 p. m.) desde la sección Servicios, con costo según la tarifa de la noche y sujeto a disponibilidad.</p></details>
-                  <details><summary>¿Cómo funciona el acceso al apartaestudio?</summary><p>Después de completar el check-in recibirás las instrucciones de llegada. El equipo confirmará la entrega o activación de tu acceso.</p></details>
-                  <details><summary>¿Puedo recibir domicilios o visitas?</summary><p>Sí. Las visitas deben registrarse con recepción y presentar documento. Para domicilios, recomendamos recibirlos en el acceso principal.</p></details>
-                  <details><summary>¿Hay servicio de limpieza?</summary><p>Las estancias incluyen el servicio indicado en la tarifa. Puedes solicitar limpiezas adicionales desde la sección Servicios.</p></details>
-                  <details><summary>¿El WiFi sirve para videollamadas?</summary><p>Sí. Contamos con conexión de fibra óptica diseñada para trabajo remoto y videollamadas.</p></details>
+                  <details class="lang-es"><summary>¿Cuál es el horario de check-in y check-out?</summary><p>La llegada es desde las 3:00 p. m. y la salida hasta las 11:00 a. m. Puedes solicitar ingreso anticipado o salida tarde (hasta las 2:00 p. m.) desde la sección Servicios, con costo según la tarifa de la noche y sujeto a disponibilidad.</p></details>
+                  <details class="lang-en" lang="en"><summary>What are the check-in and check-out times?</summary><p>Arrival is from 3:00 p.m. and departure is until 11:00 a.m. You can request early check-in or late check-out (until 2:00 p.m.) from the Services section, priced according to the night rate and subject to availability.</p></details>
+                  <details class="lang-es"><summary>¿Cómo funciona el acceso al apartaestudio?</summary><p>Después de completar el check-in recibirás las instrucciones de llegada. El equipo confirmará la entrega o activación de tu acceso.</p></details>
+                  <details class="lang-en" lang="en"><summary>How does access to the studio work?</summary><p>After completing the check-in you will receive the arrival instructions. The team will confirm the handover or activation of your access.</p></details>
+                  <details class="lang-es"><summary>¿Puedo recibir domicilios o visitas?</summary><p>Sí. Las visitas deben registrarse con recepción y presentar documento. Para domicilios, recomendamos recibirlos en el acceso principal.</p></details>
+                  <details class="lang-en" lang="en"><summary>Can I receive deliveries or visitors?</summary><p>Yes. Visitors must register with reception and show an ID. For deliveries, we recommend receiving them at the main entrance.</p></details>
+                  <details class="lang-es"><summary>¿Hay servicio de limpieza?</summary><p>Las estancias incluyen el servicio indicado en la tarifa. Puedes solicitar limpiezas adicionales desde la sección Servicios.</p></details>
+                  <details class="lang-en" lang="en"><summary>Is there a cleaning service?</summary><p>Stays include the service stated in the rate. You can request extra cleaning from the Services section.</p></details>
+                  <details class="lang-es"><summary>¿El WiFi sirve para videollamadas?</summary><p>Sí. Contamos con conexión de fibra óptica diseñada para trabajo remoto y videollamadas.</p></details>
+                  <details class="lang-en" lang="en"><summary>Is the WiFi good for video calls?</summary><p>Yes. We have a fiber-optic connection designed for remote work and video calls.</p></details>
                 </div>
               </div>
 
               <form class="guest-support-card" id="supportForm">
                 <span class="guest-icon-box olive"><i data-lucide="headphones"></i></span>
-                <p class="eyebrow">Habla con nosotros</p>
-                <h3>Concierge digital</h3>
-                <p>¿Necesitas una recomendación o ayuda durante tu estadía?</p>
-                <p class="guest-sla-note"><i data-lucide="clock"></i> Respondemos en máximo 10 minutos dentro de nuestro horario de atención: 6:00 a 10:00 a. m. y 4:00 a 10:00 p. m.</p>
-                <label class="guest-field"><span>Tipo de solicitud</span>
+                <p class="eyebrow"><span class="lang-es">Habla con nosotros</span><span class="lang-en" lang="en">Talk to us</span></p>
+                <h3><span class="lang-es">Concierge digital</span><span class="lang-en" lang="en">Digital concierge</span></h3>
+                <p><span class="lang-es">¿Necesitas una recomendación o ayuda durante tu estadía?</span><span class="lang-en" lang="en">Need a recommendation or help during your stay?</span></p>
+                <p class="guest-sla-note"><i data-lucide="clock"></i> <span class="lang-es">Respondemos en máximo 10 minutos dentro de nuestro horario de atención: 6:00 a 10:00 a. m. y 4:00 a 10:00 p. m.</span><span class="lang-en" lang="en">We reply within 10 minutes during our service hours: 6:00 to 10:00 a.m. and 4:00 to 10:00 p.m.</span></p>
+                <label class="guest-field"><span><span class="lang-es">Tipo de solicitud</span><span class="lang-en" lang="en">Request type</span></span>
                   <select name="category">
-                    <option value="concierge">Recomendación local</option>
-                    <option value="housekeeping">Limpieza o mantenimiento</option>
-                    <option value="transport">Transporte</option>
-                    <option value="other">Otro</option>
+                    <option value="concierge" data-guest-i18n="supportConcierge">Recomendación local</option>
+                    <option value="housekeeping" data-guest-i18n="supportHousekeeping">Limpieza o mantenimiento</option>
+                    <option value="transport" data-guest-i18n="supportTransport">Transporte</option>
+                    <option value="other" data-guest-i18n="supportOther">Otro</option>
                   </select>
                 </label>
-                <label class="guest-field"><span>Mensaje</span><textarea name="message" rows="4" required></textarea></label>
-                <button class="btn btn-ink guest-submit" type="submit">Enviar al equipo</button>
+                <label class="guest-field"><span><span class="lang-es">Mensaje</span><span class="lang-en" lang="en">Message</span></span><textarea name="message" rows="4" required></textarea></label>
+                <button class="btn btn-ink guest-submit" type="submit"><span class="lang-es">Enviar al equipo</span><span class="lang-en" lang="en">Send to the team</span></button>
                 <p class="guest-form-status" id="supportStatus" role="status"></p>
               </form>
             </div>
@@ -515,8 +544,9 @@
           <section class="guest-panel" data-guest-panel="booking">
             <div class="guest-panel-head">
               <div>
-                <p class="eyebrow terracotta">Mi reserva</p>
-                <h2>Consulta y solicita <span class="serif-italic">cambios.</span></h2>
+                <p class="eyebrow terracotta"><span class="lang-es">Mi reserva</span><span class="lang-en" lang="en">My booking</span></p>
+                <h2 class="lang-es">Consulta y solicita <span class="serif-italic">cambios.</span></h2>
+                <h2 class="lang-en" lang="en">Review and request <span class="serif-italic">changes.</span></h2>
               </div>
             </div>
 
@@ -524,40 +554,34 @@
               <article class="guest-detail-card">
                 <div class="guest-detail-card-head">
                   <span class="guest-icon-box olive"><i data-lucide="calendar-check-2"></i></span>
-                  <div><p class="eyebrow">Reserva</p><h3 id="manageBookingCode">—</h3></div>
+                  <div><p class="eyebrow"><span class="lang-es">Reserva</span><span class="lang-en" lang="en">Booking</span></p><h3 id="manageBookingCode">—</h3></div>
                 </div>
                 <dl class="guest-detail-list">
-                  <div><dt>Huésped</dt><dd id="manageGuestName">—</dd></div>
-                  <div><dt>Alojamiento</dt><dd id="manageRoomName">—</dd></div>
-                  <div><dt>Fechas</dt><dd id="manageDates">—</dd></div>
-                  <div><dt>Total registrado</dt><dd id="manageTotal">—</dd></div>
+                  <div><dt><span class="lang-es">Huésped</span><span class="lang-en" lang="en">Guest</span></dt><dd id="manageGuestName">—</dd></div>
+                  <div><dt><span class="lang-es">Alojamiento</span><span class="lang-en" lang="en">Accommodation</span></dt><dd id="manageRoomName">—</dd></div>
+                  <div><dt><span class="lang-es">Fechas</span><span class="lang-en" lang="en">Dates</span></dt><dd id="manageDates">—</dd></div>
+                  <div><dt><span class="lang-es">Total registrado</span><span class="lang-en" lang="en">Recorded total</span></dt><dd id="manageTotal">—</dd></div>
                 </dl>
-                <a class="guest-document-link" href="#" aria-disabled="true">
-                  <i data-lucide="file-text"></i><span>Confirmación de reserva</span><small>Disponible próximamente</small>
-                </a>
-                <a class="guest-document-link" href="#" aria-disabled="true">
-                  <i data-lucide="receipt-text"></i><span>Facturas y documentos</span><small>Se mostrarán al sincronizar el archivo</small>
-                </a>
               </article>
 
               <form class="guest-form-card guest-change-form" id="changeForm">
-                <p class="eyebrow terracotta">Solicitud</p>
-                <h3>¿Qué quieres cambiar?</h3>
-                <label class="guest-field"><span>Tipo de solicitud</span>
+                <p class="eyebrow terracotta"><span class="lang-es">Solicitud</span><span class="lang-en" lang="en">Request</span></p>
+                <h3><span class="lang-es">¿Qué quieres cambiar?</span><span class="lang-en" lang="en">What would you like to change?</span></h3>
+                <label class="guest-field"><span><span class="lang-es">Tipo de solicitud</span><span class="lang-en" lang="en">Request type</span></span>
                   <select name="requestKind" id="requestKind">
-                    <option value="dates">Cambiar fechas</option>
-                    <option value="guests">Cambiar huéspedes</option>
-                    <option value="invoice">Solicitar factura</option>
-                    <option value="cancel">Solicitar cancelación</option>
-                    <option value="other">Otra solicitud</option>
+                    <option value="dates" data-guest-i18n="requestDates">Cambiar fechas</option>
+                    <option value="guests" data-guest-i18n="requestGuests">Cambiar huéspedes</option>
+                    <option value="invoice" data-guest-i18n="requestInvoice">Solicitar factura</option>
+                    <option value="cancel" data-guest-i18n="requestCancel">Solicitar cancelación</option>
+                    <option value="other" data-guest-i18n="requestOther">Otra solicitud</option>
                   </select>
                 </label>
                 <div class="guest-form-grid" id="requestedDates">
-                  <label class="guest-field"><span>Nueva llegada</span><input name="requestedCheckIn" type="date"></label>
-                  <label class="guest-field"><span>Nueva salida</span><input name="requestedCheckOut" type="date"></label>
+                  <label class="guest-field"><span><span class="lang-es">Nueva llegada</span><span class="lang-en" lang="en">New arrival</span></span><input name="requestedCheckIn" type="date"></label>
+                  <label class="guest-field"><span><span class="lang-es">Nueva salida</span><span class="lang-en" lang="en">New departure</span></span><input name="requestedCheckOut" type="date"></label>
                 </div>
-                <label class="guest-field"><span>Detalles</span><textarea name="message" rows="5" placeholder="Cuéntanos qué necesitas. El equipo confirmará disponibilidad, condiciones y posibles diferencias de tarifa."></textarea></label>
-                <button class="btn btn-ink guest-submit" type="submit">Enviar solicitud</button>
+                <label class="guest-field"><span><span class="lang-es">Detalles</span><span class="lang-en" lang="en">Details</span></span><textarea name="message" rows="5" placeholder="Cuéntanos qué necesitas. El equipo confirmará disponibilidad, condiciones y posibles diferencias de tarifa." data-guest-i18n-placeholder="changeMessagePlaceholder"></textarea></label>
+                <button class="btn btn-ink guest-submit" type="submit"><span class="lang-es">Enviar solicitud</span><span class="lang-en" lang="en">Send request</span></button>
                 <p class="guest-form-status" id="changeStatus" role="status"></p>
               </form>
             </div>
@@ -565,12 +589,12 @@
         </div>
       </div>
 
-      <nav class="guest-mobile-nav" aria-label="Navegación móvil">
-        <button class="is-active" type="button" data-guest-tab="home"><i data-lucide="house"></i><span>Inicio</span></button>
+      <nav class="guest-mobile-nav" aria-label="Navegación móvil" data-guest-i18n-aria="ariaMobileNav">
+        <button class="is-active" type="button" data-guest-tab="home"><i data-lucide="house"></i><span><span class="lang-es">Inicio</span><span class="lang-en" lang="en">Home</span></span></button>
         <button type="button" data-guest-tab="checkin"><i data-lucide="scan-line"></i><span>Check-in</span></button>
-        <button type="button" data-guest-tab="services"><i data-lucide="concierge-bell"></i><span>Servicios</span></button>
-        <button type="button" data-guest-tab="concierge"><i data-lucide="map-pinned"></i><span>Guía</span></button>
-        <button type="button" data-guest-tab="booking"><i data-lucide="calendar-range"></i><span>Reserva</span></button>
+        <button type="button" data-guest-tab="services"><i data-lucide="concierge-bell"></i><span><span class="lang-es">Servicios</span><span class="lang-en" lang="en">Services</span></span></button>
+        <button type="button" data-guest-tab="concierge"><i data-lucide="map-pinned"></i><span><span class="lang-es">Guía</span><span class="lang-en" lang="en">Guide</span></span></button>
+        <button type="button" data-guest-tab="booking"><i data-lucide="calendar-range"></i><span><span class="lang-es">Reserva</span><span class="lang-en" lang="en">Booking</span></span></button>
       </nav>
     </section>
   </main>
@@ -579,10 +603,10 @@
     <div class="guest-camera-dialog">
       <header class="guest-camera-head">
         <div>
-          <p class="eyebrow terracotta">OCR</p>
+          <p class="eyebrow terracotta"><span class="lang-es">Documento</span><span class="lang-en" lang="en">Document</span></p>
           <h3 id="cameraTitle" data-guest-i18n="cameraButton">Tomar foto</h3>
         </div>
-        <button class="guest-camera-close" id="closeCamera" type="button" aria-label="Cerrar cámara">×</button>
+        <button class="guest-camera-close" id="closeCamera" type="button" aria-label="Cerrar cámara" data-guest-i18n-aria="ariaCloseCamera">×</button>
       </header>
       <div class="guest-camera-stage">
         <video id="cameraPreview" autoplay muted playsinline></video>
@@ -590,7 +614,7 @@
           <rect x="43" y="30" width="774" height="486" rx="38"></rect>
           <line class="guest-camera-scan" x1="82" x2="778" y1="270" y2="270"></line>
         </svg>
-        <p class="guest-camera-instruction" data-guest-i18n="cameraInstruction">Encuadrá el documento dentro del marco</p>
+        <p class="guest-camera-instruction" data-guest-i18n="cameraInstruction">Encuadra el documento dentro del marco</p>
         <!-- Live quality guidance: updated in real time from frame analysis
              (brightness/blur/glare/framing) while the camera is open, before the
              photo is taken, to reduce OCR failures. -->
@@ -613,7 +637,7 @@
           <h3 id="contractModalTitle" data-guest-i18n="contractModalTitle">Contrato de Hospedaje</h3>
           <p class="guest-muted" data-guest-i18n="contractModalIntro">Lee el contrato completo. Para habilitar la firma, marca la casilla o desplázate hasta el final.</p>
         </div>
-        <button class="guest-contract-close" id="closeContract" type="button" aria-label="Cerrar contrato">×</button>
+        <button class="guest-contract-close" id="closeContract" type="button" aria-label="Cerrar contrato" data-guest-i18n-aria="ariaCloseContract">×</button>
       </header>
       <div class="guest-contract-body" id="contractBody" tabindex="0"></div>
       <p class="guest-contract-hint" id="contractHint" data-guest-i18n="contractModalScrollHint">Desplázate hasta el final para habilitar la firma.</p>

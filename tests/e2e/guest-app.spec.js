@@ -26,14 +26,24 @@ const booking = {
   nights: 3,
   totalAmount: 795000,
   canCancel: true,
-  canModify: true
+  canModify: true,
+  onlinePayment: false
 };
 
-async function mockGuestApis(page, captured = []) {
+const CONTRACT_HTML = '<!DOCTYPE html><html><body><h1>Contrato de Hospedaje</h1>' +
+  '<p>Selección · 402</p><p class="guest-contract-end" id="contractEnd">— Fin del contrato —</p></body></html>';
+const CONTRACT_HASH = 'a'.repeat(64);
+
+async function mockLucide(page) {
   await page.route('https://unpkg.com/lucide@*/**', route => route.fulfill({
     contentType: 'application/javascript',
     body: 'window.lucide={createIcons:function(){}};'
   }));
+}
+
+async function mockGuestApis(page, captured = [], options = {}) {
+  const sessionBooking = { ...booking, ...(options.booking || {}) };
+  await mockLucide(page);
 
   await page.route('**/api/guest-session', async route => {
     const request = route.request();
@@ -42,7 +52,7 @@ async function mockGuestApis(page, captured = []) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ ok: true, token: 'test-guest-token', booking })
+      body: JSON.stringify({ ok: true, token: 'test-guest-token', booking: sessionBooking })
     });
   });
 
@@ -54,37 +64,49 @@ async function mockGuestApis(page, captured = []) {
       payload,
       authorization: request.headers().authorization
     });
-    const response = payload.mode === 'analyze'
-      ? {
-          ok: true,
-          source: 'azure',
-          slotIndex: payload.slotIndex ?? null,
-          documentRef: {
-            key: `EST-TEST-100/${payload.slotIndex ?? 0}-doc.json`,
-            name: payload.file && payload.file.name,
-            contentType: payload.file && payload.file.type,
-            size: payload.file && payload.file.size
-          },
-          confidence: 97,
-          extracted: {
-            firstName: 'Andrea',
-            lastName: 'Restrepo',
-            documentType: 'Pasaporte',
-            documentNumber: 'PA123456',
-            birthDate: '1992-05-16',
-            expirationDate: '2030-05-16',
-            nationality: 'Colombiana'
-          },
-          validation: { valid: false, missing: ['email', 'phone'], warnings: [] }
-        }
-      : {
-          ok: true,
-          checkinId: 'CHK-TEST-100',
-          validation: { valid: true, missing: [], warnings: [] },
-          documentAnalysis: 'azure'
-        };
+    let response;
+    if (payload.mode === 'analyze') {
+      response = {
+        ok: true,
+        source: 'azure',
+        slotIndex: payload.slotIndex ?? null,
+        documentRef: {
+          key: `EST-TEST-100/${payload.slotIndex ?? 0}-doc.json`,
+          name: payload.file && payload.file.name,
+          contentType: payload.file && payload.file.type,
+          size: payload.file && payload.file.size
+        },
+        confidence: 97,
+        extracted: options.extracted || {
+          firstName: 'Andrea',
+          lastName: 'Restrepo',
+          documentType: 'Pasaporte',
+          documentNumber: 'PA123456',
+          birthDate: '1992-05-16',
+          expirationDate: '2030-05-16',
+          nationality: 'Colombiana'
+        },
+        validation: { valid: false, missing: ['email', 'phone'], warnings: [] }
+      };
+    } else if (payload.mode === 'analyze-minor-doc') {
+      response = {
+        ok: true,
+        docKind: payload.docKind,
+        source: 'azure',
+        slotIndex: payload.slotIndex ?? null,
+        documentRef: { key: `EST-TEST-100/${payload.docKind}/${payload.slotIndex}.json`, name: payload.file && payload.file.name },
+        extracted: { fatherName: '', motherName: 'Andrea Restrepo' }
+      };
+    } else {
+      response = {
+        ok: true,
+        checkinId: 'CHK-TEST-100',
+        validation: { valid: true, missing: [], warnings: [] },
+        documentAnalysis: 'azure'
+      };
+    }
     await route.fulfill({
-      status: payload.mode === 'analyze' ? 200 : 201,
+      status: payload.mode === 'submit' ? 201 : 200,
       contentType: 'application/json',
       body: JSON.stringify(response)
     });
@@ -98,25 +120,57 @@ async function mockGuestApis(page, captured = []) {
       payload,
       authorization: request.headers().authorization
     });
+    if (options.actionStatus) {
+      await route.fulfill({
+        status: options.actionStatus,
+        contentType: 'application/json',
+        body: JSON.stringify(options.actionBody || {})
+      });
+      return;
+    }
+    if (payload.type === 'contract_preview') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, html: CONTRACT_HTML, contractHash: CONTRACT_HASH, checkinId: payload.checkinId })
+      });
+      return;
+    }
     await route.fulfill({
       status: 201,
       contentType: 'application/json',
       body: JSON.stringify({
         ok: true,
         eventId: `GST-${payload.type.toUpperCase()}-100`,
-        total: payload.type === 'order' ? 20000 : undefined
+        total: payload.type === 'order' ? 20000 : undefined,
+        contractHash: payload.type === 'contract' ? CONTRACT_HASH : undefined,
+        pdfBase64: payload.type === 'contract' ? Buffer.from('%PDF-1.3 test').toString('base64') : undefined,
+        pdfFilename: payload.type === 'contract' ? 'contrato-hospedaje-EST-TEST-100.pdf' : undefined,
+        emailed: payload.type === 'contract' ? true : undefined
       })
     });
   });
 }
 
-async function login(page) {
-  await page.goto('/guest.html');
+async function login(page, path = '/guest.html') {
+  await page.goto(path);
   await page.locator('#bookingCode').fill('EST-TEST-100');
   await page.locator('#accessKey').fill('Restrepo');
   await page.locator('#guestLoginForm button[type="submit"]').click();
   await expect(page.locator('#guestShell')).toBeVisible();
   await expect(page.locator('#homeBookingCode')).toContainText('EST-TEST-100');
+}
+
+async function openCheckin(page) {
+  await page.locator('[data-guest-tab="checkin"]:visible').first().click();
+}
+
+async function uploadDocument(page, name = 'pasaporte.png') {
+  await page.locator('#identityDocument').setInputFiles({
+    name,
+    mimeType: 'image/png',
+    buffer: Buffer.from('89504e470d0a1a0a', 'hex')
+  });
 }
 
 test('guest can authenticate and restore the session after reload', async ({ page }) => {
@@ -131,17 +185,15 @@ test('guest can authenticate and restore the session after reload', async ({ pag
   await page.reload();
   await expect(page.locator('#guestShell')).toBeVisible();
   await expect(page.locator('#manageGuestName')).toHaveText('Andrea Restrepo');
+  await expect(page.locator('#manageRoomName')).toHaveText('Apartaestudio Seleccion · 402');
 });
 
 test('invalid reservation displays the API error without opening the app', async ({ page }) => {
-  await page.route('https://unpkg.com/lucide@*/**', route => route.fulfill({
-    contentType: 'application/javascript',
-    body: 'window.lucide={createIcons:function(){}};'
-  }));
+  await mockLucide(page);
   await page.route('**/api/guest-session', route => route.fulfill({
     status: 404,
     contentType: 'application/json',
-    body: JSON.stringify({ error: 'No encontramos una reserva que coincida con esos datos.' })
+    body: JSON.stringify({ error: 'No encontramos una reserva que coincida con esos datos.', code: 'booking_not_found' })
   }));
 
   await page.goto('/guest.html');
@@ -152,18 +204,33 @@ test('invalid reservation displays the API error without opening the app', async
   await expect(page.locator('#guestShell')).toBeHidden();
 });
 
+test('a cancelled booking cannot open the guest app', async ({ page }) => {
+  await mockLucide(page);
+  await page.route('**/api/guest-session', route => route.fulfill({
+    status: 403,
+    contentType: 'application/json',
+    body: JSON.stringify({ error: 'Esta reserva fue cancelada…', code: 'booking_cancelled' })
+  }));
+  await page.goto('/guest.html');
+  await page.locator('#bookingCode').fill('3273564');
+  await page.locator('#accessKey').fill('Restrepo');
+  await page.locator('#guestLoginForm button[type="submit"]').click();
+  await expect(page.locator('#loginStatus')).toContainText('fue cancelada');
+  await expect(page.locator('#guestShell')).toBeHidden();
+});
+
 test('guest completes document analysis, check-in and contract signature', async ({ page }) => {
   const captured = [];
   await mockGuestApis(page, captured);
   await login(page);
-  await page.locator('[data-guest-tab="checkin"]:visible').first().click();
+  await openCheckin(page);
   await page.locator('#occupantCount').selectOption('1');
 
-  await page.locator('#identityDocument').setInputFiles({
-    name: 'pasaporte.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from('89504e470d0a1a0a', 'hex')
-  });
+  /* El contrato no se puede abrir ni firmar antes del check-in. */
+  await expect(page.locator('#openContract')).toBeDisabled();
+  await expect(page.locator('#contractGate')).toContainText('Completa el check-in');
+
+  await uploadDocument(page);
   await expect(page.locator('#ocrStatus')).toContainText('Documento cargado');
   await page.locator('#analyzeDocument').click();
   await expect(page.locator('[name="documentNumber"]')).toHaveValue('PA123456');
@@ -183,13 +250,18 @@ test('guest completes document analysis, check-in and contract signature', async
 
   /* Contract preview gate: user must open the contract modal and either
      scroll to the end OR explicitly tick "I have read" before signing. */
+  await expect(page.locator('#openContract')).toBeEnabled();
   await page.locator('#openContract').click();
   await expect(page.locator('#contractModal')).toBeVisible();
+  await expect(page.frameLocator('#contractBody iframe').locator('h1')).toHaveText('Contrato de Hospedaje');
   await page.locator('#contractAcknowledge').check();
   await page.locator('#closeContract').click();
   await page.locator('#contractAccepted').check();
   await page.locator('#signContract').click();
   await expect(page.locator('#contractStatus')).toContainText('Contrato firmado');
+  await expect(page.locator('#contractStatus')).toContainText('copia en PDF');
+  await expect(page.locator('#downloadSignedContract')).toBeVisible();
+  await expect(page.locator('#checkinProgress')).toHaveText('Proceso completo');
 
   const checkinRequests = captured.filter(item => item.endpoint === 'checkin');
   expect(checkinRequests).toHaveLength(2);
@@ -197,48 +269,204 @@ test('guest completes document analysis, check-in and contract signature', async
   expect(checkinRequests[1].payload.guests).toHaveLength(1);
   expect(checkinRequests[1].payload.guests[0].guest.firstName).toBe('Andrea');
   expect(checkinRequests[1].payload.guests[0].isPrimary).toBe(true);
+  expect(checkinRequests[1].payload.lang).toBe('es');
+  const preview = captured.find(item => item.endpoint === 'action' && item.payload.type === 'contract_preview');
+  expect(preview.payload.checkinId).toBe('CHK-TEST-100');
   const contract = captured.find(item => item.endpoint === 'action' && item.payload.type === 'contract');
   expect(contract.payload.acceptedTerms).toBe(true);
-  expect(contract.payload.guests).toHaveLength(1);
+  expect(contract.payload.checkinId).toBe('CHK-TEST-100');
+  expect(contract.payload.previewHash).toBe(CONTRACT_HASH);
   expect(contract.payload.contractVersion).toBe('ESTAR-HOSPEDAJE-2026-01');
   expect(contract.payload.acknowledgedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  expect(contract.payload.guests).toBeUndefined();
+
+  const download = page.waitForEvent('download');
+  await page.locator('#downloadSignedContract').click();
+  expect((await download).suggestedFilename()).toBe('contrato-hospedaje-EST-TEST-100.pdf');
 });
 
-test('guest opens the camera modal with the document guide frame', async ({ page, context }) => {
-  await context.grantPermissions(['camera'], { origin: `http://127.0.0.1:${parseInt(process.env.E2E_PORT, 10) || 3401}` });
+test('a changed contract asks the guest to read it again before signing', async ({ page }) => {
+  const captured = [];
+  await mockGuestApis(page, captured);
+  await page.addInitScript(() => {
+    sessionStorage.setItem('estar-guest-session', JSON.stringify({
+      token: 'test-guest-token',
+      checkinId: 'CHK-TEST-100',
+      booking: {
+        bookingCode: 'EST-TEST-100', status: 'confirmed', guestName: 'Andrea Restrepo', capacity: 1,
+        checkIn: '2026-08-10', checkOut: '2026-08-13', nights: 3, totalAmount: 795000, checkinId: 'CHK-TEST-100'
+      }
+    }));
+  });
+  await page.goto('/guest.html');
+  await openCheckin(page);
+  await expect(page.locator('#checkinStatus')).toContainText('Ya completaste el check-in');
+  await page.locator('#openContract').click();
+  await page.locator('#contractAcknowledge').check();
+  await page.locator('#closeContract').click();
+  await page.locator('#contractAccepted').check();
+  await page.unroute('**/api/guest-action');
+  await page.route('**/api/guest-action', route => route.fulfill({
+    status: 409,
+    contentType: 'application/json',
+    body: JSON.stringify({ error: 'El contrato cambió…', code: 'contract_changed' })
+  }));
+  await page.locator('#signContract').click();
+  await expect(page.locator('#contractStatus')).toContainText('Ábrelo de nuevo');
+  await expect(page.locator('#signContract')).toBeDisabled();
+});
+
+test('desktop shows a visible upload button; phones keep the guided camera', async ({ page, isMobile }) => {
+  await mockGuestApis(page);
+  await login(page);
+  await openCheckin(page);
+  if (isMobile) {
+    await expect(page.locator('#uploadDocument')).toBeHidden();
+    return;
+  }
+  await expect(page.locator('#uploadDocument')).toBeVisible();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('#uploadDocument').click();
+  await (await chooser).setFiles({ name: 'cedula.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 fake') });
+  await expect(page.locator('#uploadTitle')).toHaveText('cedula.pdf');
+  await expect(page.locator('#analyzeDocument')).toBeEnabled();
+});
+
+test('the upload button appears when the camera cannot open', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
-      value: {
-        getUserMedia: async () => new MediaStream()
-      }
+      value: { getUserMedia: async () => { throw new Error('NotFoundError'); } }
     });
-    HTMLMediaElement.prototype.play = () => Promise.resolve();
   });
   await mockGuestApis(page);
   await login(page);
-  await page.locator('[data-guest-tab="checkin"]:visible').first().click();
-
+  await openCheckin(page);
+  await page.evaluate(() => {
+    /* En el celular el navegador abriría la cámara nativa: lo neutralizamos. */
+    document.querySelector('#cameraFileCapture').click = () => {};
+  });
   await page.locator('#openCamera').click();
-  await expect(page.locator('#cameraModal')).toBeVisible();
-  await expect(page.locator('#cameraPreview')).toBeVisible();
-  await expect(page.locator('.guest-camera-frame rect')).toBeVisible();
-  await expect(page.locator('.guest-camera-instruction')).toContainText('Encuadrá');
+  await expect(page.locator('#uploadDocument')).toBeVisible();
+});
+
+test('a foreign guest without destination gets a friendly message (no raw field names)', async ({ page }) => {
+  const captured = [];
+  await mockGuestApis(page, captured, {
+    extracted: {
+      firstName: 'John', lastName: 'Doe', documentType: 'Pasaporte', documentNumber: 'X1',
+      birthDate: '1985-02-02', expirationDate: '2031-01-01', nationality: 'Estados Unidos'
+    }
+  });
+  await login(page);
+  await openCheckin(page);
+  await page.locator('#occupantCount').selectOption('1');
+  await uploadDocument(page);
+  await page.locator('#analyzeDocument').click();
+  await expect(page.locator('[name="documentNumber"]')).toHaveValue('X1');
+  await expect(page.locator('[name="destination"]')).toHaveJSProperty('required', true);
+  await page.locator('[name="email"]').fill('john@example.com');
+  await page.locator('[name="phone"]').fill('+1 555 0100');
+  await page.locator('[name="privacyAccepted"]').check();
+  await page.locator('#checkinForm button[type="submit"]').click();
+  await expect(page.locator('#checkinStatus')).toContainText('destino al salir');
+  await expect(page.locator('#checkinStatus')).not.toContainText('guests.0');
+  expect(captured.filter(item => item.endpoint === 'checkin' && item.payload.mode === 'submit')).toHaveLength(0);
+
+  await page.locator('[name="destination"]').fill('Bogotá, Colombia');
+  await page.locator('#checkinForm button[type="submit"]').click();
+  await expect(page.locator('#checkinStatus')).toContainText('CHK-TEST-100');
+});
+
+test('server validation errors are shown with readable field names', async ({ page }) => {
+  await mockGuestApis(page);
+  await login(page);
+  await page.unroute('**/api/guest-checkin');
+  await page.route('**/api/guest-checkin', async route => {
+    const payload = route.request().postDataJSON();
+    if (payload.mode === 'analyze') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, source: 'azure', documentRef: { key: 'EST-TEST-100/0-doc.json' }, extracted: {}, confidence: 90 })
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 422,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Revisa los campos requeridos antes de completar el check-in.', code: 'validation_failed', validation: { missing: ['guests.0.destination'] } })
+    });
+  });
+  await openCheckin(page);
+  await page.locator('#occupantCount').selectOption('1');
+  await uploadDocument(page);
+  await page.locator('#analyzeDocument').click();
+  await page.locator('[name="firstName"]').fill('Andrea');
+  await page.locator('[name="lastName"]').fill('Restrepo');
+  await page.locator('[name="documentType"]').selectOption('CC');
+  await page.locator('[name="documentNumber"]').fill('1001');
+  await page.locator('[name="birthDate"]').fill('1990-01-01');
+  await page.locator('[name="nationality"]').fill('Colombia');
+  await page.locator('[name="email"]').fill('andrea@example.com');
+  await page.locator('[name="phone"]').fill('+57 300 111 1111');
+  await page.locator('[name="privacyAccepted"]').check();
+  await page.locator('#checkinForm button[type="submit"]').click();
+  await expect(page.locator('#checkinStatus')).toContainText('Andrea Restrepo: destino al salir');
+  await expect(page.locator('#checkinStatus')).not.toContainText('guests.0.destination');
+});
+
+test('a minor can be checked in without email, WhatsApp or privacy acceptance', async ({ page }) => {
+  const captured = [];
+  await mockGuestApis(page, captured);
+  await login(page);
+  await openCheckin(page);
+  await page.locator('#occupantCount').selectOption('2');
+
+  await uploadDocument(page, 'adulto.png');
+  await page.locator('#analyzeDocument').click();
+  await expect(page.locator('[name="documentNumber"]')).toHaveValue('PA123456');
+  await page.locator('[name="email"]').fill('andrea@example.com');
+  await page.locator('[name="phone"]').fill('+57 300 111 1111');
+  await page.locator('[name="privacyAccepted"]').check();
+
+  await page.locator('[data-select-guest="1"]').click();
+  await uploadDocument(page, 'menor.png');
+  await page.locator('#analyzeDocument').click();
+  await expect(page.locator('#ocrStatus')).toContainText('97%');
+  await page.locator('[name="firstName"]').fill('Sofía');
+  await page.locator('[name="lastName"]').fill('Restrepo');
+  await page.locator('[name="documentType"]').selectOption('TI');
+  await page.locator('[name="documentNumber"]').fill('1099');
+  await page.locator('[name="expirationDate"]').fill('');
+  await page.locator('[name="birthDate"]').fill('2016-04-04');
+  await page.locator('[name="email"]').fill('');
+  await page.locator('[name="phone"]').fill('');
+  await expect(page.locator('[name="email"]')).toHaveJSProperty('required', false);
+  await expect(page.locator('[name="privacyAccepted"]')).toHaveJSProperty('required', false);
+  await expect(page.locator('#minorContactHint')).toBeVisible();
+  await expect(page.locator('#minorDocsCard')).toBeVisible();
+  await page.locator('#minorRcnFile').setInputFiles({ name: 'registro.png', mimeType: 'image/png', buffer: Buffer.from('89504e470d0a1a0a', 'hex') });
+  await expect(page.locator('#minorParentMessage')).toContainText('Padre o madre detectado');
+
+  await page.locator('#checkinForm button[type="submit"]').click();
+  await expect(page.locator('#checkinStatus')).toContainText('CHK-TEST-100');
+  const submit = captured.find(item => item.endpoint === 'checkin' && item.payload.mode === 'submit');
+  expect(submit.payload.guests).toHaveLength(2);
+  expect(submit.payload.guests[1].guest.email).toBe('');
+  expect(submit.payload.guests[1].guest.privacyAccepted).toBe(false);
+  expect(submit.payload.guests[1].registroCivilDocumentRef.key).toContain('registro-civil');
 });
 
 test('guest submits multiple occupants in the check-in payload', async ({ page }) => {
   const captured = [];
   await mockGuestApis(page, captured);
   await login(page);
-  await page.locator('[data-guest-tab="checkin"]:visible').first().click();
+  await openCheckin(page);
   await expect(page.locator('#occupantCount option[value="3"]')).toHaveJSProperty('disabled', true);
   await page.locator('#occupantCount').selectOption('2');
 
-  await page.locator('#identityDocument').setInputFiles({
-    name: 'guest-1.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from('89504e470d0a1a0a', 'hex')
-  });
+  await uploadDocument(page, 'guest-1.png');
   await page.locator('#analyzeDocument').click();
   await page.locator('[name="firstName"]').fill('Andrea');
   await page.locator('[name="lastName"]').fill('Restrepo');
@@ -251,11 +479,7 @@ test('guest submits multiple occupants in the check-in payload', async ({ page }
   await page.locator('[name="privacyAccepted"]').check();
 
   await page.locator('[data-select-guest="1"]').click();
-  await page.locator('#identityDocument').setInputFiles({
-    name: 'guest-2.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from('89504e470d0a1a0a', 'hex')
-  });
+  await uploadDocument(page, 'guest-2.png');
   await page.locator('#analyzeDocument').click();
   await page.locator('[name="firstName"]').fill('Mateo');
   await page.locator('[name="lastName"]').fill('Restrepo');
@@ -279,15 +503,40 @@ test('guest submits multiple occupants in the check-in payload', async ({ page }
   expect(submit.payload.guests[0].isPrimary).toBe(true);
 });
 
+test('guest opens the camera modal with the document guide frame', async ({ page, context }) => {
+  await context.grantPermissions(['camera'], { origin: `http://127.0.0.1:${parseInt(process.env.E2E_PORT, 10) || 3401}` });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: async () => new MediaStream()
+      }
+    });
+    HTMLMediaElement.prototype.play = () => Promise.resolve();
+  });
+  await mockGuestApis(page);
+  await login(page);
+  await openCheckin(page);
+
+  await page.locator('#openCamera').click();
+  await expect(page.locator('#cameraModal')).toBeVisible();
+  await expect(page.locator('#cameraPreview')).toBeVisible();
+  await expect(page.locator('.guest-camera-frame rect')).toBeVisible();
+  await expect(page.locator('.guest-camera-instruction')).toContainText('Encuadra el documento');
+});
+
 test('guest orders an additional service and contacts concierge', async ({ page }) => {
   const captured = [];
   await mockGuestApis(page, captured);
   await login(page);
 
   await page.locator('[data-guest-tab="services"]:visible').first().click();
+  /* room_charge (producción): solo "Cargar a mi cuenta". */
+  await expect(page.locator('#paymentPreference option')).toHaveCount(1);
   await page.locator('[data-service-id="breakfast"] .guest-add-service').click();
   await expect(page.locator('#cartCount')).toHaveText('1');
   await expect(page.locator('#cartTotal')).toContainText('20');
+  await expect(page.locator('#cartItems')).toContainText('Desayuno local');
   await page.locator('#deliveryTime').fill('Al llegar');
   await page.locator('#submitOrder').click();
   await expect(page.locator('#orderStatus')).toContainText('Pedido recibido');
@@ -300,6 +549,70 @@ test('guest orders an additional service and contacts concierge', async ({ page 
   const order = captured.find(item => item.endpoint === 'action' && item.payload.type === 'order');
   expect(order.authorization).toBe('Bearer test-guest-token');
   expect(order.payload.items).toEqual([{ id: 'breakfast', quantity: 1 }]);
+  expect(order.payload.paymentPreference).toBe('account');
   const support = captured.find(item => item.endpoint === 'action' && item.payload.type === 'support');
   expect(support.payload.message).toContain('aeropuerto');
+});
+
+test('"Pagar en línea" appears only when online payment is enabled', async ({ page }) => {
+  await mockGuestApis(page, [], { booking: { onlinePayment: true } });
+  await login(page);
+  await page.locator('[data-guest-tab="services"]:visible').first().click();
+  await expect(page.locator('#paymentPreference option[value="online"]')).toHaveCount(1);
+});
+
+test('an expired session sends the guest back to the login with a clear message', async ({ page }) => {
+  await mockGuestApis(page, [], {
+    actionStatus: 401,
+    actionBody: { error: 'Tu sesión expiró o no es válida.', code: 'session_expired' }
+  });
+  await login(page);
+  await page.locator('[data-guest-tab="concierge"]:visible').first().click();
+  await page.locator('#supportForm textarea[name="message"]').fill('Hola');
+  await page.locator('#supportForm button[type="submit"]').click();
+  await expect(page.locator('#guestAccess')).toBeVisible();
+  await expect(page.locator('#loginStatus')).toContainText('Tu sesión expiró');
+});
+
+test('the English guest app is fully in English, including API errors', async ({ page }) => {
+  const captured = [];
+  await mockGuestApis(page, captured);
+  await page.goto('/en/guest.html');
+  await expect(page).toHaveTitle('My stay · estar');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('.guest-access-form-wrap h2')).toHaveText('Find your booking');
+  await expect(page.locator('#guestLoginForm')).toContainText('Booking code');
+  await expect(page.locator('body')).not.toContainText('Encuentra tu reserva');
+
+  await login(page, '/en/guest.html');
+  await expect(page.locator('#homeBookingCode')).toHaveText('Booking EST-TEST-100');
+  await openCheckin(page);
+  await expect(page.locator('#checkinProgress')).toHaveText('Step 1 of 3');
+  await expect(page.locator('#contractGate')).toContainText('Complete the check-in');
+  await expect(page.locator('[data-guest-i18n="cameraOnlyHint"]')).toContainText('Take a photo');
+
+  /* Un error del servidor en español llega traducido por código. */
+  await page.unroute('**/api/guest-checkin');
+  await page.route('**/api/guest-checkin', route => route.fulfill({
+    status: 413,
+    contentType: 'application/json',
+    body: JSON.stringify({ error: 'La solicitud es demasiado grande.', code: 'payload_too_large' })
+  }));
+  await uploadDocument(page);
+  await page.locator('#analyzeDocument').click();
+  await expect(page.locator('#ocrStatus')).toContainText('The file is too large');
+});
+
+test('the English login shows API errors in English', async ({ page }) => {
+  await mockLucide(page);
+  await page.route('**/api/guest-session', route => route.fulfill({
+    status: 404,
+    contentType: 'application/json',
+    body: JSON.stringify({ error: 'No encontramos una reserva que coincida con esos datos.', code: 'booking_not_found' })
+  }));
+  await page.goto('/en/guest.html');
+  await page.locator('#bookingCode').fill('NOPE');
+  await page.locator('#accessKey').fill('Nobody');
+  await page.locator('#guestLoginForm button[type="submit"]').click();
+  await expect(page.locator('#loginStatus')).toHaveText('We could not find a booking matching those details.');
 });
