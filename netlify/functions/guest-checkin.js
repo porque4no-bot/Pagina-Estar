@@ -14,6 +14,23 @@ const {
   syncGuestEvent
 } = require('./_guest-app');
 const { flag } = require('./_settings');
+const {
+  upsertPartner: _upsertPartner,
+  addToMailingList: _addToMailingList
+} = require('./_odoo');
+
+/* Límites de uso SEPARADOS por tipo de llamada (antes 12/10 min compartidos: un
+   huésped que reintentaba la lectura del documento varias veces se quedaba sin
+   cupo para ENVIAR el check-in). Leer documentos (OCR, registro civil, carta)
+   tiene su cupo y enviar el check-in el suyo, por IP. */
+const RATE_LIMITS = {
+  analyze: { name: 'guest-checkin-analyze', limit: 24, windowMs: 10 * 60 * 1000 },
+  submit: { name: 'guest-checkin-submit', limit: 10, windowMs: 10 * 60 * 1000 }
+};
+
+function rateLimitForMode(mode) {
+  return mode === 'submit' ? RATE_LIMITS.submit : RATE_LIMITS.analyze;
+}
 
 const MAX_RAW_FILE_BYTES = 4.5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
@@ -40,7 +57,10 @@ const defaultDeps = {
   protectRecord,
   requireGuest,
   sealBinaryForStore,
-  syncGuestEvent
+  syncGuestEvent,
+  checkRateLimit,
+  upsertPartner: _upsertPartner,
+  addToMailingList: _addToMailingList
 };
 const deps = { ...defaultDeps };
 
@@ -138,14 +158,14 @@ function minorDocumentFileName(guestIndex, docKind, contentType) {
 function decodeFile(file) {
   if (!file || !file.dataUrl) return null;
   const match = String(file.dataUrl).match(/^data:([^;,]+);base64,([a-zA-Z0-9+/=\s]+)$/);
-  if (!match) throw Object.assign(new Error('El archivo no tiene un formato válido.'), { statusCode: 400 });
+  if (!match) throw Object.assign(new Error('El archivo no tiene un formato válido.'), { statusCode: 400, code: 'invalid_file' });
   const contentType = String(file.type || match[1]).toLowerCase();
   if (!ALLOWED_TYPES.has(contentType)) {
-    throw Object.assign(new Error('Usa una imagen JPG, PNG o un archivo PDF.'), { statusCode: 400 });
+    throw Object.assign(new Error('Usa una imagen JPG, PNG o un archivo PDF.'), { statusCode: 400, code: 'unsupported_type' });
   }
   const buffer = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
   if (!buffer.length || buffer.length > MAX_RAW_FILE_BYTES) {
-    throw Object.assign(new Error('El documento debe pesar menos de 4.5 MB.'), { statusCode: 413 });
+    throw Object.assign(new Error('El documento debe pesar menos de 4.5 MB.'), { statusCode: 413, code: 'file_too_large' });
   }
   return {
     buffer,
@@ -363,7 +383,74 @@ function parseAzureResult(result) {
   };
 }
 
+/* Consentimiento de marketing del check-in → Odoo (Ley 1581: SOLO con opt-in
+   explícito). Antes se guardaba en el expediente y nunca llegaba al CRM. Se usa
+   el huésped principal (o el primer adulto con correo): partner con la etiqueta
+   'Opt-in marketing' + suscripción a la lista 'Newsletter', igual que el motor
+   de reservas (wompi-webhook). Best-effort: nunca tumba el check-in; sin
+   credenciales de Odoo es un no-op (mock). Devuelve el resultado para la
+   respuesta y las pruebas. */
+async function syncMarketingConsent({ marketingConsent, entries, bookingCode, lang }) {
+  if (!marketingConsent || marketingConsent.accepted !== true) {
+    return { attempted: false };
+  }
+  const list = Array.isArray(entries) ? entries : [];
+  const primary = list.find(entry => entry && entry.isPrimary) || list[0];
+  const withEmail = [primary, ...list].find(entry =>
+    entry && entry.guest && !entry.isMinor && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(entry.guest.email || ''))
+  );
+  if (!withEmail) return { attempted: false, reason: 'no-email' };
+  const guest = withEmail.guest;
+  const name = `${guest.firstName || ''} ${guest.lastName || ''}`.trim() || guest.email;
+  const result = { attempted: true, partner: false, mailing: false };
+  try {
+    const partner = await deps.upsertPartner({
+      name,
+      email: guest.email,
+      phone: guest.phone || undefined,
+      isCompany: false,
+      tags: ['Huésped', 'Opt-in marketing'],
+      country: guest.residenceCountry || guest.nationality || undefined,
+      lang: lang === 'en' ? 'en' : 'es',
+      comment: `Opt-in de marketing en el check-in digital (guest app) el ${marketingConsent.acceptedAt || new Date().toISOString()}. Reserva ${bookingCode || ''}.`.trim()
+    });
+    result.partner = Boolean(partner && (partner.id || partner.isMock));
+    result.isMock = Boolean(partner && partner.isMock);
+  } catch (error) {
+    console.error('[guest-checkin] Odoo upsertPartner (opt-in) no fatal:', error.message);
+    result.error = 'partner';
+  }
+  try {
+    const mailing = await deps.addToMailingList({ email: guest.email, name, listName: 'Newsletter' });
+    result.mailing = Boolean(mailing && (mailing.contactId || mailing.isMock));
+  } catch (error) {
+    console.error('[guest-checkin] Odoo addToMailingList (opt-in) no fatal:', error.message);
+    result.error = result.error ? 'both' : 'mailing';
+  }
+  return result;
+}
+
+/* Índice reserva → último check-in (store aparte, sin PII: solo ids y fecha).
+   Lo usan guest-session (para que la app sepa que ya hubo check-in) y el
+   contrato (guest-action), que se arma con los huéspedes de ese check-in.
+   Best-effort. */
+async function writeCheckinIndex(bookingCode, checkinId, createdAt) {
+  try {
+    const store = deps.guestStore('guest-checkin-index');
+    if (!store || typeof store.setJSON !== 'function') return false;
+    await store.setJSON(String(bookingCode), { checkinId, createdAt });
+    return true;
+  } catch (error) {
+    console.warn('[guest-checkin] checkin index write failed (non-fatal):', error.message);
+    return false;
+  }
+}
+
 exports._test = {
+  RATE_LIMITS,
+  rateLimitForMode,
+  syncMarketingConsent,
+  writeCheckinIndex,
   parseAzureResult,
   calculateAge: birthDate => calculateAge(birthDate),
   matchProgenitor: (name, adults) => matchProgenitor(name, adults),
@@ -683,7 +770,7 @@ function calculateAge(birthDate) {
 async function normalizeGuestEntry(entry, index, session) {
   const file = decodeFile(entry && entry.file) || await fileFromDraftRef(session, entry && entry.documentRef);
   if (!file) {
-    throw Object.assign(new Error(`Selecciona una foto o PDF del documento para el huésped ${index + 1}.`), { statusCode: 400 });
+    throw Object.assign(new Error(`Selecciona una foto o PDF del documento para el huésped ${index + 1}.`), { statusCode: 400, code: 'missing_document' });
   }
   const guest = normalizeGuest({ guest: (entry && entry.guest) || {} }, {});
   const analysisSource = cleanText(
@@ -726,14 +813,14 @@ function guestArchiveName(guest) {
 async function normalizeSubmitGuests(body, session) {
   const rawGuests = Array.isArray(body.guests) ? body.guests : [];
   if (!rawGuests.length) {
-    throw Object.assign(new Error('Registra al menos un huésped para completar el check-in.'), { statusCode: 400 });
+    throw Object.assign(new Error('Registra al menos un huésped para completar el check-in.'), { statusCode: 400, code: 'missing_document' });
   }
   const capacityLimit = Number(session && session.capacity);
   const maxGuests = Number.isFinite(capacityLimit) && capacityLimit > 0
     ? Math.min(MAX_GUESTS, capacityLimit)
     : 1;
   if (rawGuests.length > maxGuests) {
-    throw Object.assign(new Error(`Puedes registrar máximo ${maxGuests} huéspedes para esta reserva.`), { statusCode: 400 });
+    throw Object.assign(new Error(`Puedes registrar máximo ${maxGuests} huéspedes para esta reserva.`), { statusCode: 400, code: 'too_many_guests' });
   }
   const entries = await Promise.all(rawGuests.map((entry, index) => normalizeGuestEntry(entry, index, session)));
   if (!entries.some(entry => entry.isPrimary)) entries[0].isPrimary = true;
@@ -898,14 +985,7 @@ exports.handler = async event => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders(), body: '' };
   }
-  if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
-
-  const limited = await checkRateLimit(event, {
-    name: 'guest-checkin',
-    limit: 12,
-    windowMs: 10 * 60 * 1000
-  });
-  if (!limited.ok) return rateLimitResponse(corsHeaders(), limited.retryAfter);
+  if (event.httpMethod !== 'POST') return json(405, { error: 'Método no permitido.' });
 
   try {
     const session = deps.requireGuest(event);
@@ -915,9 +995,22 @@ exports.handler = async event => {
     else if (body.mode === 'analyze-minor-doc') mode = 'analyze-minor-doc';
     else mode = 'analyze';
 
+    /* El cupo depende del tipo de llamada (ver RATE_LIMITS). Se evalúa después
+       de validar la sesión: una llamada sin sesión válida ya salió con 401 sin
+       hacer trabajo costoso. */
+    const limited = await deps.checkRateLimit(event, rateLimitForMode(mode));
+    if (!limited.ok) {
+      const response = rateLimitResponse(corsHeaders(), limited.retryAfter);
+      try {
+        const parsed = JSON.parse(response.body || '{}');
+        response.body = JSON.stringify({ ...parsed, code: 'rate_limited' });
+      } catch (_) { /* keep original body */ }
+      return response;
+    }
+
     if (mode === 'analyze-minor-doc') {
       const file = decodeFile(body.file);
-      if (!file) return json(400, { error: 'Selecciona una foto o PDF del documento del menor.' });
+      if (!file) return json(400, { error: 'Selecciona una foto o PDF del documento del menor.', code: 'missing_document' });
       const docKind = body.docKind === 'autorizacion' ? 'autorizacion' : 'registro-civil';
       const documentRef = await stageDraftDocument(session, file, body.slotIndex, docKind);
       const slotIndex = Number.isInteger(body.slotIndex) ? body.slotIndex : null;
@@ -973,6 +1066,7 @@ exports.handler = async event => {
       if (!validation.valid) {
         return json(422, {
           error: 'Revisa los campos requeridos antes de completar el check-in.',
+          code: 'validation_failed',
           validation
         });
       }
@@ -990,7 +1084,7 @@ exports.handler = async event => {
         if (!rcnFile) {
           throw Object.assign(
             new Error(`No fue posible recuperar el registro civil del menor ${index + 1}. Vuelve a subirlo.`),
-            { statusCode: 400 }
+            { statusCode: 400, code: 'minor_document_missing' }
           );
         }
         return { index, rcnFile, authFile };
@@ -1071,6 +1165,7 @@ exports.handler = async event => {
       };
 
       await deps.guestStore('guest-checkins').setJSON(checkinId, deps.protectRecord(record));
+      await writeCheckinIndex(session.sub, checkinId, createdAt);
 
       let stagedDocument = false;
       if (await flag('GUEST_APP_STORE_DOCUMENTS')) {
@@ -1183,13 +1278,21 @@ exports.handler = async event => {
       /* Check-in completed: optionally emit smart-lock codes (gated + lazy). */
       const doorCodes = await maybeIssueDoorCodes(record, session);
 
+      /* Opt-in de marketing → Odoo (partner + lista Newsletter). Best-effort. */
+      const marketingSync = await syncMarketingConsent({
+        marketingConsent,
+        entries,
+        bookingCode: session.sub,
+        lang: body.lang
+      });
+
       return json(201, {
         ok: true,
         checkinId,
         status: 'received',
         validation,
         manualReview,
-        marketingConsent: { accepted: marketingConsent.accepted },
+        marketingConsent: { accepted: marketingConsent.accepted, synced: Boolean(marketingSync.partner || marketingSync.mailing) },
         archive: archiveResults,
         minorArchive: minorArchiveResults,
         sync,
@@ -1199,7 +1302,7 @@ exports.handler = async event => {
     }
 
     const file = decodeFile(body.file);
-    if (!file) return json(400, { error: 'Selecciona una foto o PDF del documento.' });
+    if (!file) return json(400, { error: 'Selecciona una foto o PDF del documento.', code: 'missing_document' });
 
     let analysis;
     try {
@@ -1236,6 +1339,16 @@ exports.handler = async event => {
     }
     return json(400, { error: 'Modo no soportado.' });
   } catch (error) {
+    if (error.statusCode === 401 || error.statusCode === 503) {
+      /* Sesión vencida / servicio sin configurar: respuesta con código estable
+         para que la app muestre el mensaje en el idioma del huésped. */
+      return json(error.statusCode, {
+        error: error.statusCode === 401
+          ? error.message
+          : 'El servicio no está disponible en este momento. Intenta más tarde.',
+        code: error.code || (error.statusCode === 401 ? 'session_expired' : 'service_unavailable')
+      });
+    }
     console.error('[guest-checkin]', error.message);
     /* Alert only on unexpected server errors (no statusCode = internal, e.g.
        Blobs save / Drive archive failed). Client 4xx are expected and noisy. */
@@ -1250,7 +1363,8 @@ exports.handler = async event => {
       } catch (_) { /* alert best-effort */ }
     }
     return json(error.statusCode || 500, {
-      error: error.statusCode ? error.message : 'No fue posible procesar el check-in.'
+      error: error.statusCode ? error.message : 'No fue posible procesar el check-in.',
+      code: error.statusCode ? (error.code || undefined) : undefined
     });
   }
 };
