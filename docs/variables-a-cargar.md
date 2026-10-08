@@ -64,7 +64,7 @@ las credenciales.
 | `TTLOCK_ENABLED` **(panel)** | `true` para emitir/enviar códigos de chapa por reserva |
 | `TTLOCK_CLIENT_ID` / `TTLOCK_CLIENT_SECRET` | Credenciales de la app en la plataforma abierta de TTLock |
 | `TTLOCK_USERNAME` / `TTLOCK_PASSWORD_MD5` | Usuario de TTLock y su clave en formato MD5 |
-| `TTLOCK_LOCKS_JSON` | Mapa de qué chapa corresponde a cada apartaestudio (JSON) |
+| `TTLOCK_LOCKS_JSON` **(panel)** | Mapa de qué chapa corresponde a cada apartaestudio (JSON). No es secreto: se puede completar desde /admin → Configuración con el botón **Probar conexión TTLock** (lista los lockId de la cuenta y propone el mapa) |
 | `TTLOCK_API_BASE` / `TTLOCK_TIMEOUT_MS` / `TTLOCK_PASSCODE_TYPE` | Opcionales (tienen valor por defecto) |
 
 ### Odoo (CRM / operación) — ya está LIVE el maestro de clientes
