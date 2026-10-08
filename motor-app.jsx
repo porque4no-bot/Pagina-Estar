@@ -70,6 +70,30 @@ function parseQueryParams() {
   return { checkin, checkout, guests, roomParam, payment };
 }
 
+/* Retorno de Mercado Pago: código de reserva guardado antes del redirect, o
+   leído de external_reference (MP lo agrega a la back_url). La referencia es
+   `MPDIR-` + base64url de `2|checkin|checkout|guests|room|nombre|apellido|email|tel|extras|CODIGO|…`
+   (_payments.createDirectReference). */
+const MP_PENDING_KEY = 'estar-mp-pending';
+function mpReturnBookingCode() {
+  try {
+    const raw = sessionStorage.getItem(MP_PENDING_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && p.code && Date.now() - (p.savedAt || 0) < 2 * 60 * 60 * 1000) return String(p.code);
+    }
+  } catch (e) { /* noop */ }
+  try {
+    const ref = new URLSearchParams(window.location.search).get('external_reference') || '';
+    if (ref.indexOf('MPDIR-') !== 0) return null;
+    let b64 = ref.slice(6).replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const parts = decodeURIComponent(escape(atob(b64))).split('|');
+    if (parts[10]) return parts[10];
+  } catch (e) { /* referencia ilegible: se muestra el aviso genérico */ }
+  return null;
+}
+
 function PaymentReturnNotice({ status, lang }) {
   if (!status) return null;
   const copy = {
@@ -77,8 +101,8 @@ function PaymentReturnNotice({ status, lang }) {
       icon: 'check-circle',
       title: lang === 'es' ? 'Pago recibido' : 'Payment received',
       text: lang === 'es'
-        ? 'Estamos confirmando tu reserva con Kunas. Recibirás la confirmación por correo cuando el webhook termine el proceso.'
-        : 'We are confirming your booking with Kunas. You will receive an email confirmation once the webhook finishes processing.'
+        ? 'Tu reserva está confirmada. En unos minutos te llegará al correo el detalle de tu estadía.'
+        : 'Your booking is confirmed. You will receive your stay details by email in a few minutes.'
     },
     pending: {
       icon: 'clock',
@@ -833,6 +857,11 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
           const publicMessage = data.message || data.error || 'Mercado Pago preference failed';
           throw new Error(publicMessage);
         }
+        /* Al volver de Mercado Pago (?payment=success) el motor retoma este código
+           para consultar booking-status y mostrar la confirmación (como Wompi). */
+        try {
+          sessionStorage.setItem(MP_PENDING_KEY, JSON.stringify({ code: data.bookingCode || code, savedAt: Date.now() }));
+        } catch (e) { /* noop: se recupera también desde external_reference */ }
         window.location.href = data.init_point;
       } catch (e) {
         console.error('[PaymentPanel] Mercado Pago error:', e.message);
@@ -1389,7 +1418,7 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
           </div>
           <div>
             <span className="be-eyebrow">{t.checkout}</span>
-            <p className="be-confirm-val">{fmtDate(search.checkout)} · 12:00 pm</p>
+            <p className="be-confirm-val">{fmtDate(search.checkout)} · 11:00 am</p>
           </div>
         </div>
         <div className="be-confirm-row">
@@ -1432,14 +1461,14 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
         )}
         {paymentDetails && (
           <div className="be-confirm-row" style={{ backgroundColor: 'var(--paper-200)', borderTop: '1px solid var(--paper-400)' }}>
-            <span className="be-eyebrow" style={{ color: 'var(--olive)' }}>{lang === 'es' ? 'Detalles de Pago (Wompi)' : 'Payment Details (Wompi)'}</span>
+            <span className="be-eyebrow" style={{ color: 'var(--olive)' }}>{lang === 'es' ? 'Detalles del pago' : 'Payment details'}</span>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, flexWrap: 'wrap', gap: 10 }}>
               <div>
                 <p className="be-confirm-val" style={{ fontSize: 13, margin: 0 }}>
-                  <strong>ID Transacción:</strong> {paymentDetails.id}
+                  <strong>{lang === 'es' ? 'ID de transacción:' : 'Transaction ID:'}</strong> {paymentDetails.id}
                 </p>
                 <p className="be-confirm-val" style={{ fontSize: 13, margin: '4px 0 0 0', opacity: 0.85 }}>
-                  <strong>Medio de pago:</strong> {paymentDetails.paymentMethod || 'Wompi'}
+                  <strong>{lang === 'es' ? 'Medio de pago:' : 'Payment method:'}</strong> {paymentDetails.paymentMethod || 'Wompi'}
                 </p>
               </div>
               <span style={{
@@ -2059,6 +2088,9 @@ function BookingEngine() {
        cliente-side redirect, so the first poll often returns confirmed. */
     pollOnce();
 
+    /* NOTE: la confirmación de Mercado Pago (retorno ?payment=success) entra por
+       el efecto `mpReturnHandled` más abajo, que llama a esta misma función. */
+
     /* The setup of the polling loop captured `cancelled` via closure; if a
        follow-up action (manage / back) needs to abort early, future work can
        expose a ref to set cancelled=true. For now the page is a hard reload
@@ -2098,6 +2130,30 @@ function BookingEngine() {
     }
   }
 
+  /* Retorno de Mercado Pago con pago aprobado (o pendiente): en vez de dejar al
+     huésped en el motor con un aviso, consultamos booking-status igual que en
+     Wompi y mostramos la confirmación (resumen + "antes de llegar"). Necesita el
+     borrador de la reserva (sessionStorage); sin él, queda el aviso genérico. */
+  const mpReturnHandled = useRef(false);
+  const mpReturnCode = (initialParams.payment === 'success' || initialParams.payment === 'pending')
+    ? mpReturnBookingCode() : null;
+  const mpAutoConfirm = !!(mpReturnCode && selectedRoom);
+  useEffect(() => {
+    if (!mpAutoConfirm || mpReturnHandled.current) return;
+    mpReturnHandled.current = true;
+    try { sessionStorage.removeItem(MP_PENDING_KEY); } catch (e) { /* noop */ }
+    const qs = new URLSearchParams(window.location.search);
+    const paymentId = qs.get('payment_id') || qs.get('collection_id') || '';
+    /* Limpia ?payment=… para que un refresh no repita el flujo. */
+    try { window.history.replaceState(null, '', window.location.pathname); } catch (e) { /* noop */ }
+    handleConfirmBooking(mpReturnCode, {
+      provider: 'mercadopago',
+      id: paymentId || mpReturnCode,
+      paymentMethod: 'Mercado Pago',
+      status: initialParams.payment === 'success' ? 'APPROVED' : 'PENDING'
+    });
+  }, [mpAutoConfirm]);
+
   function goToStep(id) {
     const ci = stepOrder.indexOf(currentStep);
     const ti = stepOrder.indexOf(id);
@@ -2107,7 +2163,7 @@ function BookingEngine() {
   const extraCount = Object.values(extras).filter(Boolean).length;
 
   /* ── Creating reservation loading screen ── */
-  if (creatingReservation && !bookingCode) {
+  if ((creatingReservation || mpAutoConfirm) && !bookingCode) {
     return (
       <div className="be-app" data-theme="editorial">
         <div className="be-page-inner" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 340, gap: 24, textAlign: 'center', padding: '48px 24px' }}>
@@ -2175,7 +2231,7 @@ function BookingEngine() {
   return (
     <div className="be-app" data-theme="editorial">
       <div className="be-page-inner">
-        <PaymentReturnNotice status={initialParams.payment} lang={lang} />
+        {!mpAutoConfirm && <PaymentReturnNotice status={initialParams.payment} lang={lang} />}
         <SearchBar search={search} onSearch={handleSearch} lang={lang} />
         <StepProgress currentStep={currentStep} lang={lang} />
         <MobileSummaryBar booking={booking} search={search} lang={lang} />
