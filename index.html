@@ -76,7 +76,7 @@
         "@type": "HotelRoom",
         "name": "Clásica",
         "description": "Cama doble, cocina equipada con menaje completo y baño privado con ducha. La esencia de estar, en 29 m².",
-        "url": "https://estar.com.co/clasica",
+        "url": "https://estar.com.co/clasica.html",
         "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
         "bed": [{"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1}],
         "floorSize": {"@type": "QuantitativeValue", "value": 29, "unitCode": "MTK"}
@@ -85,7 +85,7 @@
         "@type": "HotelRoom",
         "name": "Selección",
         "description": "Apartaestudio con vista a la ciudad y tres camas — king, doble y sencilla — para hasta 5 huéspedes.",
-        "url": "https://estar.com.co/seleccion",
+        "url": "https://estar.com.co/seleccion.html",
         "occupancy": {"@type": "QuantitativeValue", "maxValue": 5},
         "bed": [
           {"@type": "BedDetails", "typeOfBed": "King size", "numberOfBeds": 1},
@@ -98,7 +98,7 @@
         "@type": "HotelRoom",
         "name": "Reserva",
         "description": "Apartaestudio íntimo con vista a la ciudad. Cama doble, cocina equipada y baño privado en 24 m² bien resueltos.",
-        "url": "https://estar.com.co/reserva",
+        "url": "https://estar.com.co/reserva.html",
         "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
         "bed": [{"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1}],
         "floorSize": {"@type": "QuantitativeValue", "value": 24, "unitCode": "MTK"}
@@ -107,7 +107,7 @@
         "@type": "HotelRoom",
         "name": "Origen",
         "description": "Apartaestudio con vista a la ciudad. Cama doble más cama sencilla para hasta 3 huéspedes, cocina completa y baño privado.",
-        "url": "https://estar.com.co/origen",
+        "url": "https://estar.com.co/origen.html",
         "occupancy": {"@type": "QuantitativeValue", "maxValue": 3},
         "bed": [
           {"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1},
@@ -119,18 +119,12 @@
         "@type": "HotelRoom",
         "name": "Especial",
         "description": "Apartaestudio con vista a la ciudad. Cama doble, cocina equipada y baño privado en 27 m².",
-        "url": "https://estar.com.co/especial",
+        "url": "https://estar.com.co/especial.html",
         "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
         "bed": [{"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1}],
         "floorSize": {"@type": "QuantitativeValue", "value": 27, "unitCode": "MTK"}
       }
-    ],
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "9.0",
-      "reviewCount": "126",
-      "bestRating": "10"
-    }
+    ]
   },
   {
     "@context": "https://schema.org",
@@ -1122,7 +1116,7 @@
   </div>
 </footer>
 
-<!-- ============================== PRICE & REVIEWS FETCH ============================== -->
+<!-- ============================== PRICE FETCH ============================== -->
 <script>
 (function(){
   var idToSlug={'31348':'clasica','31349':'seleccion','31350':'reserva','31351':'origen','31352':'especial'};
@@ -1130,23 +1124,6 @@
   var t=new Date(),t2=new Date();t2.setDate(t2.getDate()+1);
   function fmt(d){return d.toISOString().split('T')[0];}
   function cop(n){return '$'+Math.round(n).toLocaleString('es-CO');}
-  fetch('/api/get-booking-rating')
-    .then(function(r){return r.ok?r.json():Promise.reject();})
-    .then(function(d){
-      if(!d.rating||!d.reviewsCount)return;
-      var ld=document.querySelector('script[type="application/ld+json"]');
-      if(!ld)return;
-      try{
-        var schema=JSON.parse(ld.textContent);
-        var biz=Array.isArray(schema)?schema.find(function(s){return s['@type']==='LodgingBusiness';}):schema;
-        if(biz&&biz.aggregateRating){
-          biz.aggregateRating.ratingValue=d.rating;
-          biz.aggregateRating.reviewCount=d.reviewsCount;
-          ld.textContent=JSON.stringify(schema);
-        }
-      }catch(e){}
-    })
-    .catch(function(){});
   fetch('/api/check-availability?checkin='+fmt(t)+'&checkout='+fmt(t2)+'&guests=1')
     .then(function(r){return r.ok?r.json():Promise.reject();})
     .then(function(d){
