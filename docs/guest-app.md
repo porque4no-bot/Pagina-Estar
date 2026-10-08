@@ -13,9 +13,26 @@ La primera versión vive en `guest.html` y cubre:
 - Validación de campos requeridos y documento vencido.
 - **Captura de datos SIRE/TRA** (género, ocupación, residencia, procedencia,
   destino) + **consentimiento de marketing** (opt-in Ley 1581).
-- Firma electrónica simple del contrato (ver `docs/firma-electronica-colombia.md`).
+- Firma electrónica simple del contrato (ver `docs/firma-electronica-colombia.md`)
+  y sección "Contrato" abajo.
 - Catálogo y pedido de servicios adicionales, con **pago en línea** (Wompi o
-  Mercado Pago) o cargo a la cuenta (folio Kunas).
+  Mercado Pago) o cargo a la cuenta (folio Kunas). "Pagar en línea" solo se
+  ofrece si `GUEST_SERVICE_PAYMENT_MODE` lo soporta (la sesión trae
+  `booking.onlinePayment`); con `room_charge` solo aparece "Cargar a mi cuenta".
+- **Versión en inglés** en `/en/guest.html`, generada por `build.js`
+  (`build-guest-en.js`) desde el `guest.html` bilingüe (`.lang-es`/`.lang-en`)
+  + `i18n/guest.{es,en}.json`. Los errores del servidor llevan un `code` estable
+  y la app los traduce (nunca muestra "Payload too large" ni similares).
+- Reservas **canceladas** no abren la app (`guest-session` → 403
+  `booking_cancelled`).
+- Documento: cámara guiada en el celular; en computador (o si la cámara no abre)
+  botón visible **Subir archivo** (las imágenes se reescalan antes de enviarse).
+- Validación en el cliente alineada con el servidor: destino al salir para
+  extranjeros, y a los **menores** no se les exige correo/WhatsApp/aceptación.
+- Cupos de uso separados: leer documentos (`guest-checkin-analyze`, 24/10 min) y
+  enviar el check-in (`guest-checkin-submit`, 10/10 min).
+- El opt-in de marketing del check-in llega a Odoo (partner con etiqueta
+  `Opt-in marketing` + lista `Newsletter`), solo con consentimiento.
 - Concierge con recomendaciones, preguntas frecuentes y solicitudes.
 - Solicitudes de cambio, factura o cancelación (pueden abrir ticket en Odoo
   Helpdesk, gateado por `HELPDESK_ENABLED`).
@@ -95,6 +112,25 @@ Variables adicionales:
 - `GOOGLE_DRIVE_APPS_SCRIPT_SECRET`
 
 El ID de la carpeta raíz no se guarda en Netlify. Se configura como propiedad `ROOT_FOLDER_ID` dentro del proyecto de Google Apps Script.
+
+## Contrato de hospedaje
+
+1. Se ve y se firma **después del check-in**. `guest-checkin` guarda el
+   expediente y un índice reserva → check-in (`guest-checkin-index`, sin PII);
+   `guest-action` arma el contrato con los huéspedes de ese check-in y con los
+   datos firmados en el token (fechas, apartaestudio, total), no con lo que
+   mande el navegador.
+2. `contract_preview` devuelve el HTML exacto que el huésped lee y su SHA-256.
+   El render es determinista (sin hora actual: "Pendiente de firma").
+3. Al firmar, el navegador envía ese hash (`previewHash`); el servidor vuelve a
+   renderizar el mismo documento y exige que coincida (si no, 409
+   `contract_changed` y se pide leerlo de nuevo). El `contractHash` guardado es
+   el del texto leído (`contractHashScope: preview-html`).
+4. Se genera el PDF con `_pdf-render` (ES/EN, cláusulas de
+   `_contract-template`, bloque de evidencia con la huella), se guarda su SHA-256
+   (`pdfSha256`), se ofrece para descargar y se envía una copia al correo del
+   huésped (`_email.contractCopyHtml`, best-effort).
+5. "Descargar PDF" en la vista previa genera un **borrador** en el servidor.
 
 ## Decisiones importantes
 
