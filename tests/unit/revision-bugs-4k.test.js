@@ -49,3 +49,15 @@ test('guest-checkin-drafts is included in the retention purge scope', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, '../../netlify/functions/purge-guest-data.js'), 'utf8');
   assert.ok(src.includes("'guest-checkin-drafts'"), 'guest-checkin-drafts must be in PII_STORES');
 });
+
+/* price_mismatch en producción (oct-2026): la página pedía a Kunas el precio
+   para N adultos (Kunas ya suma su recargo por ocupación) y además sumaba el
+   nuestro; el verificador del servidor pide 1 adulto. Ambos deben pedir lo mismo. */
+test('check-availability y getDynamicPricing piden a OTASync el mismo número de adultos (1)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const fn = name => fs.readFileSync(path.join(__dirname, '..', '..', 'netlify', 'functions', name), 'utf8');
+  const adults = src => [...src.matchAll(/guest_filter_id:\s*1,\s*adults:\s*([^,\s}]+)/g)].map(m => m[1]);
+  assert.deepEqual(adults(fn('check-availability.js')), ['1']);
+  assert.ok(adults(fn('_otasync.js')).includes('1'));
+});
