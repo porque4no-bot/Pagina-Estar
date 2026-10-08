@@ -20,6 +20,15 @@ require('./_env');
    - `contacto` → upsertPartner + oportunidad CRM ('Web-Contacto'). Es
      TRANSACCIONAL: NO entra a la lista de marketing salvo opt-in explícito.
 
+   Frente site (oct-2026) — formularios que quedaban solo en Netlify:
+   - `convenios-empresas` (empresas.html, ES/EN) → partner EMPRESA + oportunidad
+     CRM "Convenio empresarial" (con el contacto y si pide crédito a 30 días).
+   - `estancias-largas-en` (en/vivir.html) → alias del handler de larga estadía
+     (el form inglés se llama distinto y antes se ignoraba).
+   - `vacantes-empleo` (trabaja.html, ES/EN) → NO va al maestro de clientes (un
+     postulante no es cliente y su dato tiene otra finalidad: selección de
+     personal). Se avisa al equipo por correo (adminEmail()).
+
    No fatal y siempre responde 200: un error de Odoo nunca debe hacer que Netlify
    reintente ni que se pierda el lead. Sin credenciales de Odoo es un no-op mock. */
 
@@ -48,13 +57,19 @@ function optInNote(channel) {
   return `Opt-in marketing aceptado (${channel}) el ${new Date().toISOString().slice(0, 10)}.`;
 }
 
-/* Mapea los formularios nativos del sitio a cómo se crean en Odoo. Cada handler
-   devuelve los valores de partner; opcionalmente, `lead` (asunto de la
-   oportunidad CRM) y `marketing` (si el envío trae opt-in de marketing y, por
-   tanto, debe entrar a la lista de Email Marketing). Añadir aquí otros forms
-   (p. ej. el de convenios de empresas.html) es trivial. */
-const FORM_HANDLERS = {
-  'estancias-largas': (data) => {
+/* Texto de un campo del form: recortado y acotado (los datos vienen del público). */
+function field(data, ...keys) {
+  for (const k of keys) {
+    const v = data && data[k];
+    if (v != null && String(v).trim() !== '') return String(v).trim().slice(0, 2000);
+  }
+  return '';
+}
+
+/* Larga estadía (vivir.html y en/vivir.html). `page` solo cambia la etiqueta de
+   origen en la nota; el form inglés además marca el idioma del partner. */
+function longStayHandler(page, lang) {
+  return (data) => {
     const email = (data.correo || '').trim();
     const name = (data.nombre || '').trim() || email;
     const optInMarketing = hasMarketingOptIn(data);
@@ -66,19 +81,70 @@ const FORM_HANDLERS = {
       /* El motivo, tiempo, tipología y mudanza ya van en la nota (`comment`); no se
          duplican como campos estándar sueltos para no repetir "Motivo: …" cuando
          _odoo.js enriquece el comentario. */
-      comment: 'Solicitud de larga estadía (vivir.html). ' + [
+      comment: `Solicitud de larga estadía (${page}). ` + [
         data.motivo_viaje ? `Motivo: ${data.motivo_viaje}` : '',
         data.tiempo_estimado ? `Tiempo: ${data.tiempo_estimado}` : '',
         data.tipologia ? `Tipología: ${data.tipologia}` : '',
         data.fecha_mudanza ? `Mudanza: ${data.fecha_mudanza}` : '',
         data.mensaje ? `Nota: ${data.mensaje}` : '',
-        optInMarketing ? optInNote('vivir.html') : ''
+        optInMarketing ? optInNote(page) : ''
       ].filter(Boolean).join('. '),
       lead: (v) => `Larga estadía — ${v.name}`
     };
+    /* `en_US` siempre existe en Odoo; al form español NO se le fuerza idioma
+       (es_CO podría no estar activo en la instancia). */
+    if (lang) values.lang = lang;
     /* Marketing SOLO con opt-in explícito (el form trae su propio checkbox de
        privacidad obligatorio, que NO es consentimiento de marketing). */
     if (optInMarketing && email) values.marketing = { listName: 'Newsletter', name };
+    return values;
+  };
+}
+
+/* Mapea los formularios nativos del sitio a cómo se crean en Odoo. Cada handler
+   devuelve los valores de partner; opcionalmente, `lead` (asunto de la
+   oportunidad CRM), `leadContact` (nombre de la persona de contacto del lead,
+   cuando el partner es una empresa) y `marketing` (si el envío trae opt-in de
+   marketing y, por tanto, debe entrar a la lista de Email Marketing). */
+const FORM_HANDLERS = {
+  'estancias-largas': longStayHandler('vivir.html'),
+
+  /* El form de en/vivir.html se llama `estancias-largas-en` (Netlify registra
+     cada nombre por separado). Antes no tenía handler y esos leads no llegaban
+     a Odoo: es el mismo formulario, así que se reutiliza el handler. */
+  'estancias-largas-en': longStayHandler('en/vivir.html', 'en'),
+
+  /* Convenios empresariales (empresas.html / en/empresas.html, sección
+     "Solicita tu convenio empresarial"). El partner es la EMPRESA; el contacto
+     va como persona de contacto del lead y en la nota. `credito_30_dias` viene
+     marcado por defecto en el form: se registra tal cual para que el comercial
+     lo vea (no aprueba nada — el crédito es siempre decisión humana). */
+  'convenios-empresas': (data) => {
+    const email = field(data, 'email', 'correo');
+    const empresa = field(data, 'empresa');
+    const contacto = field(data, 'contacto', 'nombre');
+    const phone = field(data, 'whatsapp', 'telefono', 'phone');
+    const credito = isChecked(data.credito_30_dias);
+    const optInMarketing = hasMarketingOptIn(data);
+    const name = (empresa || contacto || email).slice(0, 200);
+    const values = {
+      name,
+      email,
+      phone,
+      isCompany: true,
+      tags: optInMarketing
+        ? ['Corporativo', 'Convenio empresarial', 'Opt-in marketing']
+        : ['Corporativo', 'Convenio empresarial'],
+      comment: 'Solicitud de convenio empresarial (empresas.html). ' + [
+        contacto ? `Contacto: ${contacto}` : '',
+        phone ? `WhatsApp: ${phone}` : '',
+        `Solicita crédito a 30 días: ${credito ? 'sí' : 'no'}`,
+        optInMarketing ? optInNote('empresas.html') : ''
+      ].filter(Boolean).join('. '),
+      lead: (v) => `Convenio empresarial — ${v.name}`,
+      leadContact: contacto
+    };
+    if (optInMarketing && email) values.marketing = { listName: 'Newsletter', name: contacto || name };
     return values;
   },
 
@@ -159,7 +225,92 @@ const FORM_HANDLERS = {
   }
 };
 
-exports.handler = async (event) => {
+/* ── Formularios que van al EQUIPO (correo), no al maestro de clientes ── */
+
+/* Etiquetas legibles del <select name="area"> de trabaja.html (mismos value en
+   ES y EN). */
+const AREA_LABELS = {
+  operations: 'Operaciones / Huéspedes',
+  housekeeping: 'Limpieza / Mantenimiento',
+  admin: 'Administración / Marketing',
+  other: 'Otro'
+};
+
+/* Solo http(s): un `javascript:`/`data:` pegado en el campo de la hoja de vida
+   nunca se convierte en enlace del correo. */
+function safeHttpUrl(value) {
+  try {
+    const u = new URL(String(value || '').trim());
+    return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+/* Netlify añade `referrer` (URL de la página) a los datos del envío: sirve para
+   saber si la persona usó la versión en inglés. */
+function langFromReferrer(data) {
+  return /\/en\//.test(field(data, 'referrer')) ? 'en' : 'es';
+}
+
+/* Postulación de "Trabaja con nosotros". Devuelve null si no hay con qué
+   identificar a la persona (ni nombre ni correo). */
+function buildJobApplication(data) {
+  const nombre = field(data, 'nombre', 'name').slice(0, 200);
+  const email = field(data, 'email', 'correo').slice(0, 254);
+  if (!nombre && !email) return null;
+  const areaKey = field(data, 'area');
+  const hojaVida = field(data, 'hoja_vida', 'cv').slice(0, 500);
+  return {
+    nombre,
+    email,
+    area: AREA_LABELS[areaKey] || areaKey || '—',
+    hojaVida,
+    hojaVidaUrl: safeHttpUrl(hojaVida),
+    mensaje: field(data, 'mensaje'),
+    lang: langFromReferrer(data),
+    aceptaPolitica: isChecked(data.habeas_data)
+  };
+}
+
+const TEAM_NOTIFY_FORMS = {
+  'vacantes-empleo': {
+    build: buildJobApplication,
+    subject: (a) => `Nueva postulación — ${a.nombre || a.email} (${a.area})`,
+    html: (a, email) => email.jobApplicationHtml({ application: a })
+  }
+};
+
+function defaultDeps() {
+  return {
+    odoo: () => require('./_odoo'),
+    email: () => require('./_email')
+  };
+}
+
+async function notifyTeam(formName, data, deps) {
+  const spec = TEAM_NOTIFY_FORMS[formName];
+  const item = spec.build(data);
+  if (!item) return { statusCode: 200, body: 'ignored (sin nombre ni correo)' };
+  try {
+    const email = deps.email();
+    const res = await email.sendEmail({
+      to: email.adminEmail(),
+      subject: spec.subject(item),
+      html: spec.html(item, email)
+    });
+    if (res && res.sent) return { statusCode: 200, body: 'ok' };
+    /* Sin RESEND_API_KEY o con Resend caído el envío queda igual en Netlify
+       Forms: se registra y se responde 200 (un reintento no ayudaría). */
+    console.error(`[submission-created] aviso al equipo (${formName}) no enviado:`, (res && res.reason) || 'error de envío');
+    return { statusCode: 200, body: 'ok (correo no enviado)' };
+  } catch (err) {
+    console.error(`[submission-created] aviso al equipo (${formName}) no fatal:`, err.message);
+    return { statusCode: 200, body: 'ok (correo no enviado)' };
+  }
+}
+
+async function handle(event, deps) {
   let payload;
   try {
     payload = JSON.parse(event.body || '{}').payload;
@@ -170,6 +321,8 @@ exports.handler = async (event) => {
 
   const formName = payload.form_name || (payload.data && payload.data['form-name']) || '';
   const data = payload.data || {};
+
+  if (TEAM_NOTIFY_FORMS[formName]) return notifyTeam(formName, data, deps);
 
   const buildValues = FORM_HANDLERS[formName];
   if (!buildValues) return { statusCode: 200, body: `ignored (form ${formName})` };
@@ -182,17 +335,21 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: 'ignored (sin nombre ni correo)' };
   }
 
-  /* `lead` (asunto de la oportunidad) y `marketing` (datos de la lista de Email
-     Marketing) son metadatos de enrutado, no campos de res.partner: se sacan de
-     los valores antes de llamar a upsertPartner. */
-  const { lead: leadSubject, marketing, ...partnerValues } = values;
+  /* `lead` (asunto de la oportunidad), `leadContact` (persona de contacto del
+     lead) y `marketing` (datos de la lista de Email Marketing) son metadatos de
+     enrutado, no campos de res.partner: se sacan de los valores antes de llamar
+     a upsertPartner. */
+  const { lead: leadSubject, leadContact, marketing, ...partnerValues } = values;
 
   try {
-    const { upsertPartner, createLead, addToMailingList } = require('./_odoo');
+    const { upsertPartner, createLead, addToMailingList } = deps.odoo();
     const partner = await upsertPartner(partnerValues);
     if (process.env.DEBUG) console.log(`[submission-created] Odoo upsert (${formName}):`, partner && (partner.id || (partner.isMock ? 'mock' : '')));
     if (partner && partner.id && leadSubject) {
-      await createLead({ subject: leadSubject(partnerValues), partnerId: partner.id, email: partnerValues.email, description: partnerValues.comment });
+      const leadData = { subject: leadSubject(partnerValues), partnerId: partner.id, email: partnerValues.email, description: partnerValues.comment };
+      if (leadContact) leadData.contactName = leadContact;
+      if (partnerValues.phone) leadData.phone = partnerValues.phone;
+      await createLead(leadData);
     }
     /* Email Marketing: SOLO con opt-in de marketing (Ley 1581). Se intenta aun en
        modo mock (no-op) para que el flujo sea idéntico con y sin credenciales. */
@@ -209,6 +366,11 @@ exports.handler = async (event) => {
   }
 
   return { statusCode: 200, body: 'ok' };
-};
+}
 
-exports._test = { FORM_HANDLERS, isChecked, hasMarketingOptIn };
+exports.handler = (event) => handle(event, defaultDeps());
+
+exports._test = {
+  FORM_HANDLERS, TEAM_NOTIFY_FORMS, isChecked, hasMarketingOptIn,
+  buildJobApplication, safeHttpUrl, langFromReferrer, handle
+};
