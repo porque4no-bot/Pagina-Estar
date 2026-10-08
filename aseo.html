@@ -115,7 +115,11 @@
     </div>
 
     <div class="wrap">
-      <div class="panel">
+      <div class="panel" id="noAccess" style="display:none;">
+        <h2>Sin acceso</h2>
+        <p class="err" style="margin:0;">Tu usuario no tiene permiso para el control de aseo. Pide al administrador que te asigne el rol <b>Aseo</b> en el panel /admin (Usuarios).</p>
+      </div>
+      <div class="panel" id="aptPanel">
         <h2>Apartamento</h2>
         <div class="field">
           <label for="apartment">Identifícalo (ej. 101, Clásica 2)</label>
@@ -164,8 +168,15 @@
       var res = await fetch('/api/' + path, opts);
       var data = {};
       try { data = await res.json(); } catch (e) { /* respuesta no-JSON */ }
-      if (!res.ok) throw new Error(data.error || ('Error ' + res.status));
+      if (!res.ok) { var err = new Error(data.error || ('Error ' + res.status)); err.httpStatus = res.status; throw err; }
       return data;
+    }
+
+    /* Sin el permiso cleaning.audit: mensaje claro en vez de un error técnico. */
+    function showNoAccess() {
+      $('aptPanel').style.display = 'none';
+      $('items').innerHTML = '';
+      $('noAccess').style.display = 'block';
     }
 
     /* Comprime una imagen a JPEG (máx. 1280px lado mayor) para subirla liviana. */
@@ -230,7 +241,7 @@
       } else if (res.decision === 'advertida') {
         el.innerHTML = '<div class="vbox vbox--warn"><div class="vhead">' + ICON_WARN + 'Registrada con observaciones</div>' +
           (problemas ? '<ul>' + problemas + '</ul>' : '') + sug +
-          '<div style="font-size:12px;margin-top:8px;">Se registró igual. Corrige si puedes y vuelve a tomar la foto para actualizarla.</div></div>';
+          '<div style="font-size:12px;margin-top:8px;">Se registró igual' + (res.followUp ? ' y recepción recibió el aviso para revisarlo' : '') + '. Corrige si puedes y vuelve a tomar la foto para actualizarla.</div></div>';
       } else { /* rechazada */
         el.innerHTML = '<div class="vbox vbox--no"><div class="vhead">' + ICON_NO + 'Rechazada — repite la foto</div>' +
           (problemas ? '<ul>' + problemas + '</ul>' : '') + sug + '</div>';
@@ -356,11 +367,23 @@
     }
 
     async function init() {
+      /* Permisos efectivos del usuario (rol 'aseo' del panel /admin, o env de
+         respaldo). La autorización real es del servidor; esto solo evita
+         mostrar un formulario que va a fallar. Si whoami falla, se sigue y el
+         backend decide. */
+      var me = null;
+      try { me = await api('whoami', {}); } catch (e) { me = null; }
+      if (me && Array.isArray(me.permissions) && !me.isEnvAdmin &&
+          me.permissions.indexOf('cleaning.audit') === -1) {
+        showNoAccess();
+        return;
+      }
       try {
         var data = await api('cleaning-checklist', null, 'GET');
         items = data.items || [];
         if (data.aiEnabled === false) $('mockNote').style.display = 'block';
       } catch (e) {
+        if (e.httpStatus === 403) { showNoAccess(); return; }
         $('items').innerHTML = '<div class="panel"><p class="err" style="margin:0;">No se pudo cargar la lista: ' + escapeHtml(e.message) + '</p></div>';
         return;
       }
