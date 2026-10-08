@@ -174,10 +174,16 @@ exports.handler = async (event, context) => {
       dto: checkout,
       currency: "COP",
       id_language: "es",
+      /* SIEMPRE 1 adulto, IGUAL que el verificador del servidor
+         (_otasync.getDynamicPricing). El huésped adicional lo cobramos nosotros
+         con EXTRA_GUEST_SURCHARGE más abajo. Pedir `adults: guests` hacía que
+         Kunas ya incluyera su recargo por ocupación y le sumáramos el nuestro
+         encima → +$62k/noche en vez de +$31k, y el servidor rechazaba TODO pago
+         de 2+ huéspedes con price_mismatch (producción, oct-2026). */
       guests: [
         {
           guest_filter_id: 1,
-          adults: guests,
+          adults: 1,
           children: 0,
           children_age: []
         }
