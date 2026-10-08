@@ -199,18 +199,24 @@ async function fileFromDraftRef(session, documentRef) {
     draft = await store.get(key, { type: 'json' });
   }
   if (!draft) return null;
-  /* Recupera el buffer: sobre cifrado nuevo (dataSealed) o base64 en claro legado
-     (dataBase64, drafts anteriores al cifrado). */
+  /* Recupera el buffer según cómo se guardó:
+       - dataSealed + encrypted:true  → sobre cifrado (openBinaryFromStore)
+       - dataSealed + encrypted:false → base64 del buffer crudo (bóveda sin
+         configurar: NO pasa por openBinaryFromStore, que trataría el texto como
+         bytes crudos sin decodificar y corrompería el documento)
+       - dataBase64 (legado)          → base64 en claro anterior al cifrado
+     NO se borra el draft aquí: si el submit falla la validación DESPUÉS, el
+     reintento debe poder releerlo (el cliente solo reenvía el documentRef, no
+     el buffer). La limpieza ocurre tras persistir el check-in con éxito
+     (deleteConsumedDrafts). Blobs no expira solo, pero la purga de retención y
+     el borrado post-éxito cubren la acumulación. */
   let buffer;
   if (draft.dataSealed != null) {
-    buffer = deps.openBinaryFromStore(draft.dataSealed, `${session.sub}|checkin-draft`);
+    buffer = draft.encrypted
+      ? deps.openBinaryFromStore(draft.dataSealed, `${session.sub}|checkin-draft`)
+      : Buffer.from(String(draft.dataSealed), 'base64');
   } else {
     buffer = Buffer.from(String(draft.dataBase64 || ''), 'base64');
-  }
-  /* El draft ya se consumió: bórralo para no dejar copias del documento de
-     identidad acumulándose en reposo (Blobs no expira solo). Best-effort. */
-  if (typeof store.delete === 'function') {
-    try { await store.delete(key); } catch (e) { /* non-fatal */ }
   }
   return {
     buffer: Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || ''),
@@ -218,6 +224,23 @@ async function fileFromDraftRef(session, documentRef) {
     name: cleanText(draft.name || 'documento', 120),
     size: Number(draft.size || 0)
   };
+}
+
+/* Borra los drafts ya consumidos por un submit EXITOSO (identidad + registro
+   civil + autorización de cada ocupante). Se llama solo tras persistir el
+   check-in, para que un 422 de validación no deje al huésped sin poder reintentar
+   (los buffers ya están en el registro; el draft solo era el material de paso). */
+async function deleteConsumedDrafts(session, entries) {
+  const store = deps.guestStore('guest-checkin-drafts');
+  if (typeof store.delete !== 'function') return;
+  const keys = new Set();
+  for (const entry of (entries || [])) {
+    for (const ref of [entry && entry.documentRef, entry && entry.registroCivilDocumentRef, entry && entry.authorizationDocumentRef]) {
+      const key = cleanText(ref && ref.key, 220);
+      if (key && key.startsWith(`${session.sub}/`)) keys.add(key);
+    }
+  }
+  await Promise.all([...keys].map(key => store.delete(key).catch(() => { /* non-fatal */ })));
 }
 
 function fieldValue(field) {
@@ -1151,6 +1174,11 @@ exports.handler = async event => {
       }
 
       const sync = await deps.syncGuestEvent(record);
+
+      /* Check-in persistido con éxito: ahora sí se pueden borrar los drafts
+         consumidos (no antes: un 422 de validación previo dejaría al huésped sin
+         poder reintentar). Best-effort. */
+      await deleteConsumedDrafts(session, entries);
 
       /* Check-in completed: optionally emit smart-lock codes (gated + lazy). */
       const doorCodes = await maybeIssueDoorCodes(record, session);

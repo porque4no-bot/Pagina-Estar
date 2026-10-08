@@ -199,3 +199,38 @@ test('isConfigured() refleja las credenciales inyectadas', () => {
   assert.equal(numera.isConfigured({ config: { username: 'u', password: 'p', companyId: '9' } }), true);
   assert.equal(numera.isConfigured({ config: { username: '', password: 'p', companyId: '9' } }), false);
 });
+
+/* ── describeError(): los tres formatos de error que devuelve la cadena ────────
+   Confirmados sondeando el endpoint real (21-ago-2026). El del proveedor es el
+   que nos costó ver: llega en ProblemDetails .NET, con los nombres del ERP
+   intermedio, y antes lo mostrábamos como un bloque de JSON crudo. */
+test('describeError() lee el `detail` string de Numera', () => {
+  assert.equal(numera.describeError({ detail: 'encabezado es obligatorio' }), 'encabezado es obligatorio');
+});
+
+test('describeError() lee los errores de validación 422 de Numera', () => {
+  const out = numera.describeError({
+    detail: [{ loc: ['body', 'company_id'], msg: 'Field required' }]
+  });
+  assert.equal(out, 'body.company_id: Field required');
+});
+
+test('describeError() lee el ProblemDetails del proveedor y lo marca como tal', () => {
+  const out = numera.describeError({
+    title: 'One or more validation errors occurred.',
+    status: 400,
+    errors: {
+      'Customer.Name': ['Falta campo Name'],
+      'InvcHead.InvoiceType': ['Falta campo InvoiceType']
+    }
+  });
+  assert.match(out, /^proveedor: /);
+  assert.match(out, /Customer\.Name: Falta campo Name/);
+  assert.match(out, /InvcHead\.InvoiceType: Falta campo InvoiceType/);
+});
+
+test('describeError() no revienta con cuerpos vacíos o raros', () => {
+  assert.equal(numera.describeError(null), '');
+  assert.equal(numera.describeError({}), '');
+  assert.equal(numera.describeError({ message: 'algo' }), 'algo');
+});
