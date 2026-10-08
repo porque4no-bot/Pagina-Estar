@@ -655,7 +655,14 @@
             i18n.es.loc_location_score = data.locationRating;
             i18n.en.loc_location_score = data.locationRating;
           }
-          applyI18n();
+          /* Solo las claves del rating: re-aplicar TODO el i18n pisaba el estado
+             de los formularios (p. ej. el botón "Recibido ✶" del convenio volvía
+             a "Enviar solicitud" si el visitante enviaba antes de este fetch). */
+          ['fact_2_num', 'loc_booking_score', 'loc_booking_reviews', 'loc_location_score'].forEach((k) => {
+            const v = i18n[pageLang] && i18n[pageLang][k];
+            if (!v) return;
+            document.querySelectorAll(`[data-i18n="${k}"]`).forEach((el) => { el.textContent = v; });
+          });
         }
       })
       .catch(err => {
