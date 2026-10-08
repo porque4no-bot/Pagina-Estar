@@ -979,7 +979,7 @@ module.exports = {
   getReservationsByDate, normalizeReservation, isHoldReservation, inferLang, reservaTieneDesayuno,
   otasyncCreds, hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
   buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, cancelReservation, createConfirmedReservation,
-  insertReservation,
+  insertReservation, findReservationByReference,
   getDynamicPricing, EXTRA_GUEST_SURCHARGE,
   getExtras, insertExtra, ensureGuestServiceExtra, getReservationFirstRoom,
   addReservationExtra, addReservationPayment, postOrderExtrasToFolio

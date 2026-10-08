@@ -51,13 +51,41 @@ function extractWompiPaymentDetails(transaction) {
   };
 }
 
+/* Mercado Pago: same shape as the Wompi snapshot, read off the NORMALIZED
+   transaction built by _payments.normalizeTransaction('mercadopago', raw)
+   (which keeps the refund fields of the raw MP payment). The transaction id is
+   the MP payment id — the key _mp-refund needs for POST /v1/payments/{id}/refunds.
+   The long MPDIR- reference (encodes guest PII) is NOT stored: the booking code
+   already identifies the stay. */
+function extractMercadoPagoPaymentDetails(transaction) {
+  const t = transaction || {};
+  return {
+    provider: 'mercadopago',
+    transactionId: t.id != null && t.id !== '' ? String(t.id) : null,
+    reference: null,
+    method: t.paymentMethod || null,          /* visa | master | pse | account_money … (ruteo de reembolso) */
+    paymentType: t.paymentType || null,       /* credit_card | debit_card | bank_transfer | ticket | account_money */
+    amountInCents: t.amountCents != null ? Number(t.amountCents) : null,
+    currency: t.currency || null,
+    cardBrand: t.cardBrand || null,
+    cardLast4: t.cardLast4 || null,
+    authCode: t.authorizationCode || null,
+    installments: t.installments != null ? Number(t.installments) : null,
+    paymentDate: t.paymentDate || null
+  };
+}
+
 /* Snapshot the payment details for a booking. Never throws. `extra` carries
    refund-relevant context not present on the raw transaction (e.g. the rate
-   plan, which lives in the booking reference) so it survives just as long. */
+   plan, which lives in the booking reference) so it survives just as long.
+   Accepts a raw Wompi transaction OR a normalized Mercado Pago one
+   (provider === 'mercadopago'). */
 async function savePaymentDetails(bookingCode, transaction, extra) {
   if (!bookingCode) return { saved: false };
   try {
-    const details = extractWompiPaymentDetails(transaction);
+    const details = (transaction && transaction.provider === 'mercadopago')
+      ? extractMercadoPagoPaymentDetails(transaction)
+      : extractWompiPaymentDetails(transaction);
     if (extra && typeof extra === 'object') Object.assign(details, extra);
     details.bookingCode = String(bookingCode);
     details.savedAt = new Date().toISOString();
@@ -80,5 +108,5 @@ async function getPaymentDetails(bookingCode) {
 }
 
 module.exports = {
-  extractWompiPaymentDetails, savePaymentDetails, getPaymentDetails, paymentDetailsStore
+  extractWompiPaymentDetails, extractMercadoPagoPaymentDetails, savePaymentDetails, getPaymentDetails, paymentDetailsStore
 };
