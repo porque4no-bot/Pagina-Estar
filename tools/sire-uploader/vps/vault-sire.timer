@@ -1,0 +1,10 @@
+[Unit]
+Description=Hotel Estar - SIRE a las 10:00 de Colombia
+
+[Timer]
+OnCalendar=*-*-* 10:00:00 America/Bogota
+# Si el VPS estaba apagado a esa hora, corre al arrancar.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

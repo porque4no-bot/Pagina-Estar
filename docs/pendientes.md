@@ -100,6 +100,16 @@ si el NIT se valida contra el RUES/DIAN al crear cotizaciones.
 
 ## 2. SIRE y TRA — evaluar la vía Kunas vs. integración directa
 
+> **Actualización 2026-10-08 (SIRE):** decidido y construido por la **opción B**.
+> La fuente es nuestro check-in en línea (la API de Kunas no trae documento ni
+> nacionalidad). `netlify/functions/sire-export.js` arma el archivo plano (solo
+> extranjeros, E/S) y el subidor del VPS del grupo (`tools/sire-uploader/`,
+> Python + Playwright, timer 10:00) lo sube al portal. **Falta:** instalarlo en
+> el VPS, `SIRE_EXPORT_TOKEN` + `SIRE_HOTEL_CODE` + `SIRE_ENABLED` en Netlify, el
+> ensayo, confirmar formato y códigos contra la guía del portal, y el visto bueno
+> del dueño antes de la primera subida real (paso a paso en
+> `tools/sire-uploader/SIRE.md`). TRA sigue aparte (`_tra.js`).
+
 **Contexto:** el reporte a SIRE (Migración Colombia, huéspedes extranjeros) y
 la TRA (Tarjeta de Registro de Alojamiento, MinCIT) se está manejando desde el
 lado de Kunas. Kunas tiene integración nativa: se activa en

@@ -1,0 +1,10 @@
+# Estos ficheros se copian al VPS (Debian): finales de linea Unix siempre.
+*.sh      text eol=lf
+*.py      text eol=lf
+*.service text eol=lf
+*.timer   text eol=lf
+*.json    text eol=lf
+*.ejemplo text eol=lf
+*.md      text eol=lf
+*.txt     text eol=lf
+*.html    text eol=lf

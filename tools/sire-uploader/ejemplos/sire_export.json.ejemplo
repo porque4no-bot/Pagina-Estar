@@ -1,0 +1,4 @@
+{
+  "url": "https://estar.com.co/api/sire-export",
+  "token": "<el mismo valor de SIRE_EXPORT_TOKEN en Netlify (32+ caracteres)>"
+}
