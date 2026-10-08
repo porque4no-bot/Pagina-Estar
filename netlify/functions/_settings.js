@@ -16,11 +16,15 @@ const STORE = 'app-settings';
 const CACHE_TTL_MS = 30000; /* override surte efecto en <=30s sin redeploy */
 
 /* Catálogo editable. type: bool | enum | number | text. group para la UI.
+   `default` (opcional) = el valor que el CÓDIGO asume cuando la clave no está
+   definida ni en el panel ni en Netlify (p.ej. ALERT_ENABLED: sin definir =
+   activo). Solo es informativo para la UI (getAllEffective): las funciones
+   siguen leyendo con su propio fallback. Mantenerlo igual al fallback real.
    NUNCA agregar aquí secretos/llaves/credenciales. */
 const MANAGEABLE = {
   // Operación / correos
-  ALERT_ENABLED:                 { type: 'bool', group: 'Operación', label: 'Alertas operativas',
-                                   desc: 'Envía un correo al equipo cuando algo falla en el sistema (un pago que no cuadra, un correo que no salió, etc.). Recomendado dejarlo activo.' },
+  ALERT_ENABLED:                 { type: 'bool', group: 'Operación', label: 'Alertas operativas', default: 'true',
+                                   desc: 'Envía un correo al equipo cuando algo falla en el sistema (un pago que no cuadra, un correo que no salió, etc.). Recomendado dejarlo activo. Sin definir = ACTIVO (solo se apaga con un "false" explícito).' },
   ADMIN_NOTIFY_EMAIL:            { type: 'text', group: 'Operación', label: 'Correo de avisos del equipo',
                                    desc: 'Dirección donde llegan los correos operativos y de escalamiento (alertas, pedidos del huésped, cancelaciones, etc.). NO es un correo de acceso al panel — eso se gestiona en Usuarios.' },
   STAY_EMAILS_ENABLED:           { type: 'bool', group: 'Operación', label: 'Correos pre-llegada / post-estadía',
@@ -63,10 +67,12 @@ const MANAGEABLE = {
                                    desc: 'Permite al comedor AGREGAR desayuno a una reserva que no lo tenía; se cobra al folio de la reserva.' },
   TTLOCK_ENABLED:                { type: 'bool', group: 'Desayuno / chapas', label: 'Emitir códigos de chapa (TTLock)',
                                    desc: 'Genera y envía al huésped los códigos temporales de las chapas por reserva. Requiere cargar las credenciales de TTLock.' },
+  TTLOCK_LOCKS_JSON:             { type: 'text', group: 'Desayuno / chapas', label: 'Mapa apartamento → chapa (TTLock)',
+                                   desc: 'Qué chapa (lockId de TTLock) corresponde a cada apartamento, en JSON. Ej: {"101":1234567,"102":1234568,"main":7654321} ("main" = puerta principal). Las claves deben ser el número del apartamento tal como aparece en Kunas. Usa "Probar conexión TTLock" (abajo) para ver los lockId de tu cuenta y copiar un mapa sugerido. No es un secreto: un lockId solo no abre nada.' },
   // WhatsApp
   WHATSAPP_BOT_ENABLED:          { type: 'bool', group: 'WhatsApp', label: 'Bot de WhatsApp responde',
                                    desc: 'El bot contesta automáticamente los mensajes de WhatsApp. Apágalo para que nadie reciba respuestas automáticas.' },
-  WHATSAPP_GUARD_ENABLED:        { type: 'bool', group: 'WhatsApp', label: 'Guardián de seguridad del bot',
+  WHATSAPP_GUARD_ENABLED:        { type: 'bool', group: 'WhatsApp', label: 'Guardián de seguridad del bot', default: 'true',
                                    desc: 'Filtro que revisa cada mensaje antes de que el bot responda, para bloquear intentos de fraude o de engañar al bot.' },
   WHATSAPP_AI_MODEL:             { type: 'enum', group: 'WhatsApp', label: 'Modelo de IA del bot',
                                    options: ['claude-haiku-4-5', 'claude-sonnet-4-6', 'claude-opus-4-8'],
@@ -215,18 +221,24 @@ async function setSetting(key, value, deps = {}) {
   return current;
 }
 
-/* Para la UI: valor efectivo + de dónde viene + metadata, por clave gestionable. */
+/* Para la UI: valor efectivo + de dónde viene + metadata, por clave gestionable.
+   Si la clave no está en el panel ni en Netlify y el catálogo declara un
+   `default`, se reporta ESE valor (source 'por defecto') — así la UI no muestra
+   "apagado" algo que en realidad está activo (caso ALERT_ENABLED). */
 async function getAllEffective(deps = {}) {
   const ov = await loadOverrides(deps);
   const out = {};
   for (const [key, meta] of Object.entries(MANAGEABLE)) {
     const hasOverride = ov && ov[key] !== undefined && ov[key] !== null && String(ov[key]) !== '';
     const envVal = process.env[key];
-    out[key] = {
-      meta,
-      value: hasOverride ? ov[key] : (envVal !== undefined ? envVal : ''),
-      source: hasOverride ? 'panel' : (envVal !== undefined && envVal !== '' ? 'netlify' : 'sin definir')
-    };
+    const hasEnv = envVal !== undefined && envVal !== '';
+    const hasDefault = meta.default !== undefined;
+    let value, source;
+    if (hasOverride) { value = ov[key]; source = 'panel'; }
+    else if (hasEnv) { value = envVal; source = 'netlify'; }
+    else if (hasDefault) { value = String(meta.default); source = 'por defecto'; }
+    else { value = envVal !== undefined ? envVal : ''; source = 'sin definir'; }
+    out[key] = { meta, value, source };
   }
   return out;
 }
