@@ -1,6 +1,9 @@
 {
   "expirationDateOptionalHint": "(opcional, solo pasaportes)",
   "nationalityPlaceholder": "Ej. Colombia",
+  "arrivalCardCopy": "Completa el registro antes de llegar. Te enviamos las instrucciones de llegada por correo y en recepción te acompañamos con tu ingreso.",
+  "accessFaqQuestion": "¿Cómo ingreso a mi apartaestudio?",
+  "accessFaqAnswer": "Antes de tu estadía te enviamos por correo las instrucciones de llegada. En recepción (de 6:00 a 10:00 a. m. y de 4:00 a 10:00 p. m.) te acompañamos con tu ingreso. Si llegas fuera de ese horario, escríbenos por WhatsApp con anticipación y coordinamos tu llegada.",
   "cameraButton": "Tomar foto",
   "cameraInstruction": "Encuadrá el documento dentro del marco",
   "captureBtn": "Capturar",
