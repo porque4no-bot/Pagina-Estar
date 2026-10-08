@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+# Nunca secretos ni archivos de SIRE en el repo
+.secrets/
+sire.json
+sire_export.json
+sire_autorizacion.txt
+sire_*.txt

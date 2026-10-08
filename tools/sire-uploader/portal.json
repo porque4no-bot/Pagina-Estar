@@ -1,0 +1,76 @@
+{
+  "_nota": "Selectores y textos del portal SIRE. NINGUNO esta confirmado: se calibran con el ensayo (capturas + ensayo_*.json) antes de la primera subida real. Se prueban en orden y gana el primero visible.",
+  "url_login": "https://apps.migracioncolombia.gov.co/sire/public/login.jsf",
+  "login": {
+    "tipo_documento": [
+      "select[id='formLogin:tipoDocumento']",
+      "select[name='formLogin:tipoDocumento']",
+      "select[id='formLogin:tipoDoc']",
+      "select[id^='formLogin'][id*='tipo' i]",
+      "select[id*='tipoDoc' i]"
+    ],
+    "numero_documento": [
+      "[id='formLogin:numeroDocumento']",
+      "[name='formLogin:numeroDocumento']",
+      "input[id*='numeroDoc' i]"
+    ],
+    "password": [
+      "[id='formLogin:password']",
+      "[name='formLogin:password']",
+      "input[type='password']"
+    ],
+    "boton": [
+      "[id^='formLogin'][type='submit']",
+      "button[type='submit']",
+      "input[type='submit']",
+      "text=/^\\s*(ingresar|iniciar sesi[oó]n|entrar|aceptar)\\s*$/i"
+    ],
+    "ok_textos": ["Cerrar sesión", "Salir", "Cargar información"],
+    "salir_textos": ["Cerrar sesión", "Salir"],
+    "error_selectores": [
+      ".rf-msgs-err",
+      ".rf-msg-err",
+      ".rich-messages",
+      ".rich-message",
+      ".ui-messages-error",
+      "[id^='formLogin'][id*='mensaje' i]",
+      "[class*='error' i]"
+    ]
+  },
+  "navegacion": {
+    "pasos": [
+      { "texto": "Cargar información", "hover_primero": true },
+      { "texto": "Alojamiento y hospedaje" },
+      { "texto": "Cargar archivo" }
+    ]
+  },
+  "carga": {
+    "input_archivo": ["input[type='file']"],
+    "boton_subir": [
+      ".rf-fu-btn-upl",
+      ".rich-fileupload-button",
+      "text=/^\\s*(subir|cargar|enviar|procesar|upload)(\\s+archivo)?\\s*$/i"
+    ],
+    "resultado": [
+      ".rf-pp-cntr",
+      ".rich-mpnl-body",
+      ".rich-modalpanel",
+      "[role='dialog']",
+      ".ui-dialog-content",
+      "[id*='popup' i]",
+      "[id*='modal' i]",
+      ".rf-msgs",
+      ".rich-messages"
+    ],
+    "guia_textos": ["Guía", "Formato", "Estructura del archivo", "Instructivo", "Manual", "Ayuda"],
+    "campos_extra": []
+  },
+  "archivo": {
+    "codificacion": "utf-8",
+    "fin_de_linea": "\r\n"
+  },
+  "tiempos_ms": {
+    "navegacion": 45000,
+    "resultado": 120000
+  }
+}

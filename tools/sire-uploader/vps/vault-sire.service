@@ -1,0 +1,23 @@
+# La subida diaria al SIRE (Migracion Colombia) de los huespedes extranjeros
+# del Hotel Estar. La lanza vault-sire.timer; a mano: systemctl start vault-sire
+# El aviso si falla lo manda el propio programa (rele SMTP, como la ingesta) y
+# el registro queda en "/opt/vault/90 - Datos/sire.log".
+[Unit]
+Description=Hotel Estar - subida diaria al SIRE (Migracion Colombia)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=vault
+Group=vault
+WorkingDirectory=/opt/vault
+Environment=TZ=America/Bogota
+UMask=0077
+ExecStart=/bin/bash "/opt/vault/99 - Herramientas/vps/sire_vps.sh" --subir
+TimeoutStartSec=30min
+Nice=10
+# No necesita privilegios ni escribir fuera de lo suyo.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
