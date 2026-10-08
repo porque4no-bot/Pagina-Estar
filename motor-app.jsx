@@ -837,7 +837,10 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
           body: JSON.stringify({
             type: 'direct',
             bookingCode: code,
-            amountCents: Math.round(calc.subtotal * 100),
+            /* Monto con el descuento ya aplicado (igual que Wompi); el servidor
+               revalida el código y el precio contra OTASync. */
+            amountCents: payableCents,
+            discountCode: discountApplied ? discountApplied.code : '',
             checkin: search.checkin,
             checkout: search.checkout,
             guestsCount: search.guests,
@@ -849,7 +852,14 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
             phone: booking.guest?.tel || '',
             extrasMask,
             isColombian,
-            isBusiness: isBusinessTrip
+            isBusiness: isBusinessTrip,
+            ratePlan: booking.rate === 'flexible' ? 'flexible' : 'best',
+            /* Nota libre y opt-in de marketing (Ley 1581): viajan en el body, el
+               servidor los guarda y el webhook los usa al crear la reserva. */
+            notes: ((booking.guest && booking.guest.notas) || '').trim().slice(0, 500),
+            marketingOptIn: Boolean(booking.guest && booking.guest.marketingOptIn),
+            /* Para volver a /en/reservar.html si el huésped reservó en inglés. */
+            lang
           })
         });
         const data = await response.json();
