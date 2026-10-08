@@ -3,12 +3,35 @@
  * Recibe el token de pase firmado, lo valida y devuelve un pase por persona
  * (`bookingCode:guestIndex`) + el estado de desayuno de la reserva, para que la
  * página pública (pase-desayuno.html) renderice los QR SIN login. El token no da
- * acceso a la guest-app; solo identifica la reserva para mostrar sus pases. */
+ * acceso a la guest-app; solo identifica la reserva para mostrar sus pases.
+ *
+ * PII (Frente confirm, 2026-10): los datos del huésped (nombre, apartamento,
+ * fechas) SOLO se devuelven con un token v2, que únicamente emite el servidor
+ * (send-confirmation, desde los webhooks de pago, para reservas ya creadas).
+ * Un token v1 legado pudo ser firmado por el antiguo endpoint público para
+ * cualquier código, así que con él se entregan los pases (QR) pero NO la PII —
+ * sin esto, un token v1 era un atajo al 2º factor de get-booking. */
 
 const { json, corsHeaders, parseJsonBody } = require('./_guest-app');
 const { verifyPassToken } = require('./_breakfast-pass');
 const { resolveBreakfastStatus, BREAKFAST_SCHEDULE } = require('./_breakfast');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
+
+/* Datos de la reserva que ve el portador del pase. Con un token que no está
+   ligado a una reserva verificada (legacy) solo el código, que ya conoce. */
+function bookingView(status, claims) {
+  if (!claims || claims.legacy) {
+    return { bookingCode: status.bookingCode };
+  }
+  return {
+    bookingCode: status.bookingCode,
+    guestName: status.guestName,
+    roomName: status.roomName,
+    roomNumber: status.roomNumber,
+    checkIn: status.checkIn,
+    checkOut: status.checkOut
+  };
+}
 
 exports.handler = async event => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders(), body: '' };
@@ -41,14 +64,8 @@ exports.handler = async event => {
 
     return json(200, {
       ok: true,
-      booking: {
-        bookingCode: status.bookingCode,
-        guestName: status.guestName,
-        roomName: status.roomName,
-        roomNumber: status.roomNumber,
-        checkIn: status.checkIn,
-        checkOut: status.checkOut
-      },
+      booking: bookingView(status, claims),
+      limited: Boolean(claims.legacy),
       hasBreakfast: status.hasBreakfast,
       perDay: status.perDay,
       servedToday: status.servedToday,
@@ -63,3 +80,5 @@ exports.handler = async event => {
     });
   }
 };
+
+exports._test = { bookingView };
