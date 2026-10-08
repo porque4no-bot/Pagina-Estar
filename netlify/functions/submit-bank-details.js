@@ -62,15 +62,27 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: JSON.stringify(UNIFORM) };
   }
 
-  /* Notify treasury (best-effort; never blocks the guest's confirmation). */
+  /* Notify treasury (best-effort; never blocks the guest's confirmation).
+     Frente cancel: los datos bancarios quedaron CIFRADOS; el correo (que puede
+     llegar a un buzón compartido) lleva los números ENMASCARADOS. Los completos
+     se ven en /admin → Reembolsos solo con el permiso refunds.mark_done. */
   try {
     const { sendEmail, adminEmail, treasuryBankDetailsHtml } = require('./_email');
+    const { openBankDetails, maskBankDetails } = require('./_refunds-store');
+    const masked = { ...result.refund, bankDetails: maskBankDetails(openBankDetails(result.refund) || result.refund.bankDetailsSummary || {}) };
+    delete masked.bankDetailsSealed;
     await sendEmail({
       to: adminEmail(),
       subject: `Datos bancarios para reembolso — ${code}`,
-      html: treasuryBankDetailsHtml({ refund: result.refund })
+      html: treasuryBankDetailsHtml({ refund: masked })
     });
   } catch (e) { console.error('[submit-bank-details] treasury email failed (non-fatal):', e.message); }
+
+  /* Tarea en la cola (pestaña Hoy): ya se puede transferir. */
+  try {
+    const flow = require('./_refund-flow');
+    await flow.enqueueTask(flow.payTask(result.refund, result.refund.refundAmountCents, 'bank_details_ready'));
+  } catch (e) { /* best-effort */ }
 
   return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
 };

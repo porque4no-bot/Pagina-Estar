@@ -41,13 +41,13 @@ const MANAGEABLE = {
                                    desc: 'Teléfonos que el bot llama cuando un caso es urgente, en formato internacional y separados por coma. Ej: +573218598686,+573057465544,+573163292157. Recepción primero, luego dueños. (Los números NO son secretos; las credenciales de Twilio sí, y esas viven solo en Netlify.)' },
   // Pagos / reembolsos
   REFUND_GATEWAY_AUTO_ENABLED:   { type: 'bool', group: 'Pagos', label: 'Auto-reembolso Mercado Pago al aprobar',
-                                   desc: 'Cuando apruebas un reembolso de Mercado Pago en el panel, se ejecuta solo. Wompi NO tiene API → sigue siendo ticket manual.' },
+                                   desc: 'Cuando apruebas un reembolso de Mercado Pago en el panel, se ejecuta solo. Apagado: queda una tarea en "Hoy" para devolverlo desde el panel de Mercado Pago. Wompi NO tiene API → siempre es tarea (anular en su dashboard el mismo día o ticket a soporte).' },
   REFUND_BANK_FORM_ENABLED:      { type: 'bool', group: 'Pagos', label: 'Formulario de cuenta para reembolso manual',
                                    desc: 'Habilita el formulario donde el huésped indica su cuenta bancaria para reembolsos por transferencia.' },
   DISCOUNT_CODES_ENABLED:        { type: 'bool', group: 'Pagos', label: 'Motor de códigos de descuento',
                                    desc: 'Muestra el campo "código de descuento" en el motor de reservas y activa la validación de los cupones.' },
   OTASYNC_AUTO_CANCEL_ENABLED:   { type: 'bool', group: 'Pagos', label: 'Cancelar la reserva en OTASync al procesar el reembolso',
-                                   desc: 'Cuando apruebas o deniegas la cancelación en el panel, la reserva se marca como cancelada en OTASync (libera el inventario). Sin esto, hay que cancelarla a mano. Probar con una reserva real antes de encender.' },
+                                   desc: 'Cuando apruebas o deniegas la cancelación en el panel, la reserva se marca como cancelada en OTASync (libera el inventario). Sin esto, queda una tarea en "Hoy" para cancelarla a mano en Kunas. Probar con una reserva real antes de encender.' },
   MP_DIRECT_RESILIENT_ENABLED:   { type: 'bool', group: 'Pagos', label: 'Ruta directa de Mercado Pago resiliente (igual que Wompi)',
                                    desc: 'Activa lock anti-doble-reserva, idempotencia por estadía, reintentos y "pago sin reserva" recuperable en la ruta directa de Mercado Pago. Solo aplica si cobras con Mercado Pago (rollback). Probar en sandbox MP antes de encender.' },
   // Guest app
