@@ -1,5 +1,10 @@
 const { test, expect } = require('@playwright/test');
 
+/* Fechas siempre en el futuro: las fijas (ago-2026) quedaron en el pasado y el
+   motor las rechaza con razón. */
+const futureDate = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+const D1 = futureDate(30), D4 = futureDate(33);
+
 async function mockSharedDependencies(page) {
   await page.route('https://unpkg.com/lucide@*/**', route => route.fulfill({
     contentType: 'application/javascript',
@@ -77,19 +82,19 @@ test('home page exposes the main booking and guest journeys', async ({ page }) =
 
 test('booking bar carries dates and guests into the booking engine', async ({ page }) => {
   await page.goto('/');
-  await page.locator('#checkin-input').evaluate(element => {
-    element.value = '2026-08-10';
-  });
-  await page.locator('#checkout-input').evaluate(element => {
-    element.value = '2026-08-13';
-  });
+  await page.locator('#checkin-input').evaluate((element, value) => {
+    element.value = value;
+  }, D1);
+  await page.locator('#checkout-input').evaluate((element, value) => {
+    element.value = value;
+  }, D4);
   await page.locator('#guests-input').evaluate(element => {
     element.value = '2';
     element.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await page.locator('#reservar').evaluate(form => form.requestSubmit());
 
-  await expect(page).toHaveURL(/reservar\.html\?checkin=2026-08-10&checkout=2026-08-13&guests=2/);
+  await expect(page).toHaveURL(new RegExp(`reservar\\.html\\?checkin=${D1}&checkout=${D4}&guests=2`));
 });
 
 const publicPages = [

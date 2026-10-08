@@ -837,7 +837,20 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       } catch (e) {
         console.error('[PaymentPanel] Mercado Pago error:', e.message);
         setLoading(false);
-        setPaymentError(e.message || t.paymentErrorFailed);
+        /* Nunca mostrar el código interno (p. ej. "price_mismatch") al huésped. */
+        let mpError;
+        if (e.message === 'sold_out') {
+          mpError = lang === 'es'
+            ? 'Lo sentimos, la habitación seleccionada ya no tiene disponibilidad para las fechas elegidas.'
+            : 'Sorry, the selected room is no longer available for the chosen dates.';
+        } else if (e.message === 'price_mismatch') {
+          mpError = lang === 'es'
+            ? 'Hubo un cambio en la tarifa de la habitación. Por favor, recarga la página para ver los precios actualizados.'
+            : 'There was a change in the room rate. Please refresh the page to view the updated pricing.';
+        } else {
+          mpError = t.paymentErrorFailed;
+        }
+        setPaymentError(mpError);
       }
       return;
     }
