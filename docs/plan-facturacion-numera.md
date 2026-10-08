@@ -265,6 +265,14 @@ Reembolso/cancelación aprobado en el panel (refund-admin-action, ya existe)
 Críticas: consecutivo · `company_id`+sandbox · **número legal/CUFE/PDF de vuelta** ·
 ¿la API crea en Odoo? · aceptación DIAN · exención extranjero · concepto de nota crédito.
 
+**Sondeo en vivo del endpoint (21-ago, `node scripts/numera-test.js`, sin emitir):**
+el servicio responde; la cabecera es `Auth: <access_token>`; `company_id` es un
+**UUID** (no el company 5 de Odoo); y el encabezado **exige `invoiceNum` +
+`legalNumber`** ⇒ **la numeración la enviamos nosotros** (queda pendiente sólo qué
+resolución/prefijo DIAN usamos para ventas web). Detalle en
+[`preguntas-numera.md`](preguntas-numera.md) §G. **Bloqueante:** usuario/clave de
+API + `company_id`.
+
 **Estado (1-jul, Jorge García/Numera por WhatsApp):**
 - **Consecutivo:** DIAN por resolución, **auto-incremental**, visible en Odoo. Falta
   confirmar si la API lo **asigna** o lo **enviamos**, y si hay/necesitamos **rango

@@ -68,4 +68,93 @@
 - **Concepto nota crédito (22):** → **TICKET**, te cuenta.
 - **Usuario de la API (26):** **mejor un usuario distinto, rol "cliente".** Preguntó ¿es para **BTW o Numera**? → respuesta nuestra: **Numera** (consumimos `esnumera.com/api/v1`).
 
+### Datos que YA tenemos (rescatados del chat de WhatsApp del grupo, 21-ago-2026)
+
+- **`company_id` de Mirada en Numera: ENTREGADO.** Jorge lo dio el **3-jul-2026** en
+  el grupo ("De compañía en numera?" → "Es este …"). Es un **UUID**, coincide con lo
+  que exige la API. Cargado en `NUMERA_COMPANY_ID` del `.env` local — **no se
+  transcribe aquí** (va en variables de entorno, no en el repo). → **cierra la
+  pregunta 16** (el `company_id`; el sandbox sigue aparte).
+- **Usuario de API: TODAVÍA NO.** En el chat solo está la recomendación de Jorge
+  (1-jul): *"mejor uno distinto, rol cliente"*. Nunca lo crearon ni lo enviaron. **Es
+  el único bloqueante duro** para probar login y emisión.
+- **BTW habilitado** (Ingrid, 1-jul: *"ya están habilitados para BTW"*), pero sin
+  usuario de API no sirve de nada todavía.
+- **Resolución DIAN vigente de Mirada** (adjunta en el chat, formalizada 16-feb-2026):
+  formato 1876 nº 18764105982427 · NIT 902032515-0 · modalidad *Factura electrónica de
+  venta* · **prefijo `FEV`, rango 1 – 10.000, vigencia 24 meses** (hasta feb-2028) ·
+  establecimiento MIRADA S.A.S, Calle 61 23-36, Manizales. **Esta es la que usa
+  contabilidad ⇒ la web NO debe tocarla.**
+
+### Respuesta de Jorge (21-ago-2026)
+
+> "Rafael buenos días, sí tenemos estos datos, estamos trabajando en la documentación
+> de las respuestas. La nota te la vamos a documentar también, el equipo está
+> trabajando en esto esta semana. **Nosotros recomendamos sí una resolución
+> independiente para las ventas de la web y que la controlen ustedes.** Te mantenemos
+> informado de los avances."
+
+Traducción a decisiones:
+
+| Pregunta | Estado |
+|---|---|
+| 17 (número legal / CUFE / PDF de vuelta) | **Tienen el dato**, lo están documentando (esta semana) |
+| 22 (concepto DIAN de la nota crédito) | Lo documentan esta semana |
+| 15 (consecutivo) | **CERRADA: la numeración es NUESTRA.** Confirma el sondeo del endpoint (`invoiceNum` + `legalNumber` obligatorios) |
+| **NUEVO — resolución propia para la web** | Hay que **tramitar ante la DIAN una segunda autorización de numeración** (prefijo y rango distintos de `FEV`) sólo para ventas web, y **nosotros llevamos el consecutivo**. Es un trámite de contabilidad/representante legal, no de código |
+
+**Lo que implica que la numeración sea nuestra (tarea de ingeniería):** el store
+`invoices` tiene que llevar un **contador transaccional** (una sola factura por
+número, sin huecos ni repetidos, a prueba de reintentos concurrentes) y **alertar
+antes de agotar el rango o vencer la vigencia**. Mismo patrón de compare-and-set que
+usa `_discount-store`.
+
+### Sondeo del endpoint real (21-ago-2026, sin credenciales)
+
+Probamos `https://esnumera.com/api/v1` en vivo con `node scripts/numera-test.js`
+(cuerpos incompletos a propósito: los rechaza la validación del servidor, **no se
+emitió nada**). Lo que quedó confirmado sin necesidad de preguntar:
+
+| Hallazgo | Detalle | Impacto |
+|---|---|---|
+| La API está viva | FastAPI; errores en `detail` (string) o arreglo de validación (422) | Nuestro cliente leía `message` → nunca veíamos el motivo real. **Corregido** (`describeError`) |
+| Cabecera de autenticación | `Auth: <access_token>` (403 `Auth required`); `Authorization: Bearer` se ignora | Confirma lo que hace `_numera.js` |
+| `company_id` es un **UUID** | 422 `UUID input should be a string…` | **No** es el `company 5` de Odoo → hay que pedir el UUID de Mirada (pregunta 16) |
+| El encabezado exige `invoiceNum` **y** `legalNumber` | 400 `invoiceNum es obligatorio` / `legalNumber es obligatorio`, **antes** de validar el token | **Responde la pregunta 15: el número lo enviamos NOSOTROS.** Falta solo saber **qué resolución/prefijo DIAN** usamos para ventas web |
+| Valida totales del lado servidor | Exige `subtotal_documento`, `valor_impuesto_documento`, `retenciones_documento` | Es exactamente lo que ya replicamos en `validate()` |
+| Orden de validación | Primero el cuerpo, **después** el token (`403 Usuario no autorizado` con token inválido) | Podemos seguir mapeando el contrato sin credenciales, pero **nada más se puede probar sin usuario** |
+
+**Sondeo AUTENTICADO (21-ago-2026, con el usuario ya cargado).** Login correcto
+(JWT `iss: esnumera.com`, **vigencia ~24 h**, sin claim de empresa ⇒ el `company_id`
+del cuerpo es lo ÚNICO que decide a nombre de quién sale la factura → fijarlo por
+variable de entorno, jamás desde el cliente). Un POST con cuerpo vacío devolvió:
+
+```
+500 { "title":"One or more validation errors occurred.", "status":400,
+      "errors": { "Customer.Name":["Falta campo Name"],
+                  "Customer.ResaleID":["Falta campo ResaleID"],
+                  "InvcHead.InvoiceType":["Falta campo InvoiceType"] } }
+```
+
+Dos cosas importantes:
+
+- **El cuerpo vacío SÍ viajó hasta el proveedor** (el error es ProblemDetails .NET,
+  no de Numera). No creó documento, pero ⇒ **no se sigue mapeando el contrato a punta
+  de sondeos**: lo que falte sale de la documentación de Numera o de un `company_id`
+  de pruebas.
+- **Mapeo real al ERP intermedio (nombres tipo Epicor, no documentados):**
+  `encabezado.tipo_factura` → `InvcHead.InvoiceType` · `cliente` exige `Name` y
+  **`ResaleID`** (el identificador tributario: NIT/cédula).
+- Los errores del proveedor llegan en un **tercer formato** (objeto `errors`, no
+  `detail`). `describeError()` ya lo entiende y lo prefija `proveedor:` para que en el
+  panel se vea de dónde salió el rechazo.
+
+**No se puede saber el ambiente desde la API:** la superficie es sólo `login` +
+`send-electronic-invoice` (9 rutas de solo lectura probadas → 404) y el token no trae
+claim de ambiente. **Hay que preguntárselo a Ingrid.**
+
+**Bloqueante para seguir:** confirmar con Ingrid si el `company_id` de Mirada apunta
+a **BTW pruebas o a producción DIAN**, y si está en producción pedir uno de pruebas.
+Hasta entonces no se manda ningún payload completo.
+
 **Acciones:** (1) abrir **ticket** con 17, 18 (docs), 21, 22 + confirmar 15; (2) responder a Jorge lo del usuario (Numera, rol cliente, distinto); (3) esperar a Ingrid (sandbox BTW).
