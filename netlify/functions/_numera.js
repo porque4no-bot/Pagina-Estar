@@ -57,6 +57,40 @@ function num(v) {
 }
 function round2(n) { return Math.round((num(n) + Number.EPSILON) * 100) / 100; }
 
+/* Extrae el motivo legible de un cuerpo de error. Hay TRES formatos distintos en
+   juego (confirmado sondeando el endpoint real el 21-ago-2026), porque la petición
+   atraviesa dos sistemas:
+
+     1. Numera (FastAPI) rechaza el cuerpo   → { detail: "encabezado es obligatorio" }
+     2. Numera valida el esquema (422)       → { detail: [ { loc, msg }, … ] }
+     3. El PROVEEDOR de más abajo lo rechaza → ProblemDetails .NET (RFC 9110):
+        { title, status, errors: { "Customer.Name": ["Falta campo Name"], … } }
+        Ojo: los nombres del caso 3 vienen en el vocabulario del ERP intermedio
+        (`InvcHead.*`, `Customer.*`), NO en el nuestro — por eso se prefijan como
+        `proveedor:` para que en el panel se note de dónde salió el rechazo.
+
+   Nunca lanza. */
+function describeError(body) {
+  if (!body) return '';
+
+  /* Caso 3 — errores de validación del proveedor. */
+  if (body.errors && typeof body.errors === 'object') {
+    const partes = Object.keys(body.errors).map((campo) => {
+      const msgs = body.errors[campo];
+      return `${campo}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`;
+    });
+    if (partes.length) return `proveedor: ${partes.join(' | ')}`;
+  }
+
+  const d = body.detail;
+  if (!d) return body.title || body.message || '';
+  if (typeof d === 'string') return d;
+  if (Array.isArray(d)) {
+    return d.map((e) => `${Array.isArray(e.loc) ? e.loc.join('.') : ''}: ${e.msg || ''}`.trim()).join(' | ');
+  }
+  return JSON.stringify(d);
+}
+
 /* ── Login ──────────────────────────────────────────────────────────────────
    POST {base}/login/ (form-urlencoded username/password) → { access_token }.
    deps.fetch / deps.config inyectables para tests. Best-effort: nunca lanza. */
@@ -80,7 +114,10 @@ async function login(deps = {}) {
     clearTimeout(tid);
     if (!res.ok) {
       let detail = '';
-      try { detail = (await res.json()).message || ''; } catch (e) { /* sin cuerpo */ }
+      /* Numera (FastAPI) devuelve el motivo en `detail` — string, o arreglo de
+         errores de validación cuando es 422. `message` no existe: leerlo dejaba
+         el error real fuera del log. */
+      try { detail = describeError(await res.json()); } catch (e) { /* sin cuerpo */ }
       return { ok: false, status: res.status, error: detail || `Numera login returned ${res.status}` };
     }
     const data = await res.json().catch(() => ({}));
@@ -141,7 +178,14 @@ function buildInvoicePayload({ reserva = {}, huesped = {}, lineas = [], impuesto
 
   const encabezado = {
     tipo_factura: tipo,
-    /* Hook para el consecutivo: solo se propaga si viene dado; NO lo inventamos. */
+    /* Numeración. SONDEO 2026-08-21 contra el endpoint real: la API EXIGE
+       `invoiceNum` y `legalNumber` en el encabezado (400 "invoiceNum es
+       obligatorio" / "legalNumber es obligatorio" antes incluso de validar el
+       token) ⇒ el número lo enviamos NOSOTROS, no lo asigna Numera.
+       Sigue pendiente con el proveedor qué resolución/prefijo DIAN usamos para
+       ventas web (pregunta 15) — por eso se propagan pero NO se inventan. */
+    ...(reserva.invoiceNum ? { invoiceNum: String(reserva.invoiceNum) } : {}),
+    ...(reserva.legalNumber ? { legalNumber: String(reserva.legalNumber) } : {}),
     ...(reserva.numero_documento ? { numero_documento: reserva.numero_documento } : {}),
     /* Referencia interna trazable (nuestro código de reserva), no es el número legal. */
     referencia_interna: reserva.referencia || reserva.codigo || reserva.bookingCode || null,
@@ -281,7 +325,10 @@ async function sendInvoice(payload, deps = {}) {
     clearTimeout(tid);
     if (!res.ok) {
       let detail = '';
-      try { detail = (await res.json()).message || ''; } catch (e) { /* sin cuerpo */ }
+      /* Numera (FastAPI) devuelve el motivo en `detail` — string, o arreglo de
+         errores de validación cuando es 422. `message` no existe: leerlo dejaba
+         el error real fuera del log. */
+      try { detail = describeError(await res.json()); } catch (e) { /* sin cuerpo */ }
       return { ok: false, status: res.status, error: detail || `Numera returned ${res.status}` };
     }
     const data = await res.json().catch(() => ({}));
@@ -305,4 +352,4 @@ async function sendInvoice(payload, deps = {}) {
   }
 }
 
-module.exports = { isConfigured, login, buildInvoicePayload, validate, sendInvoice, numeraConfig, round2 };
+module.exports = { isConfigured, login, buildInvoicePayload, validate, sendInvoice, numeraConfig, round2, describeError };
