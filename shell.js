@@ -13,6 +13,72 @@
   /* ----- SITE-WIDE CONSTANTS ----- */
   const WHATSAPP_NUMBER = '573102490414'; // Change here to update all floating WhatsApp buttons
 
+  /* ----- ANALYTICS: conversiones GA4 (Frente site, oct-2026) ----- */
+  /* gtag lo inyecta build.js con Consent Mode v2 (por defecto DENEGADO): hasta
+     que el visitante acepta, GA4 solo recibe pings sin cookies. Los parámetros
+     nunca llevan datos personales (ni nombre, ni correo, ni teléfono). El píxel
+     de Meta (solo existe si META_PIXEL_ID está configurado) recibe el evento
+     únicamente tras un opt-in explícito (window.EstarConsent, consent.js).
+     Sin gtag (páginas privadas, bloqueadores) es un no-op silencioso. */
+  function track(eventName, params, pixelEvent) {
+    try {
+      if (typeof window.gtag === 'function') window.gtag('event', eventName, params || {});
+      if (pixelEvent && typeof window.fbq === 'function' &&
+          window.EstarConsent && window.EstarConsent.granted()) {
+        window.fbq('track', pixelEvent);
+      }
+    } catch (e) { /* la analítica nunca rompe la página */ }
+  }
+  /* Expuesto para los scripts propios de cada página (p. ej. la solicitud de
+     cotización de empresas.html, que no es un form de Netlify). */
+  window.estarTrack = track;
+
+  /* Formularios nativos (Netlify) → evento al enviarse CON ÉXITO. Solo los de
+     intención comercial cuentan como lead (generate_lead); el newsletter y las
+     postulaciones de empleo se miden aparte para no inflar las conversiones. */
+  const FORM_EVENTS = {
+    'contacto': { event: 'generate_lead', leadType: 'contacto', pixel: 'Lead' },
+    'cotizacion-grupos': { event: 'generate_lead', leadType: 'grupos', pixel: 'Lead' },
+    'estancias-largas': { event: 'generate_lead', leadType: 'larga_estadia', pixel: 'Lead' },
+    'estancias-largas-en': { event: 'generate_lead', leadType: 'larga_estadia', pixel: 'Lead' },
+    'convenios-empresas': { event: 'generate_lead', leadType: 'convenio_empresarial', pixel: 'Lead' },
+    'newsletter': { event: 'newsletter_signup' },
+    'vacantes-empleo': { event: 'job_application' }
+  };
+
+  function trackFormSuccess(form) {
+    const name = form.getAttribute('name') || '';
+    const spec = FORM_EVENTS[name];
+    if (!spec) return;
+    const params = { form_name: name, page_language: pageLang };
+    if (spec.leadType) params.lead_type = spec.leadType;
+    track(spec.event, params, spec.pixel);
+  }
+
+  /* Clic en WhatsApp (botón flotante, enlaces de las páginas, footer…) → evento
+     `contact`. También teléfono y correo. Delegado en fase de CAPTURA porque el
+     menú flotante detiene la propagación de sus clics. */
+  function contactMethod(href) {
+    if (/^https?:\/\/(api\.whatsapp\.com|wa\.me|web\.whatsapp\.com)(\/|$)/i.test(href) || /^whatsapp:/i.test(href)) return 'whatsapp';
+    if (/^tel:/i.test(href)) return 'phone';
+    if (/^mailto:/i.test(href)) return 'email';
+    return '';
+  }
+
+  function setupContactTracking() {
+    document.addEventListener('click', (e) => {
+      const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      const method = contactMethod(a.getAttribute('href') || '');
+      if (!method) return;
+      const where = a.closest('.contact-float') ? 'boton_flotante'
+        : a.closest('footer') ? 'footer'
+        : a.closest('header') ? 'header'
+        : 'pagina';
+      track('contact', { method: method, link_location: where, page_language: pageLang }, 'Contact');
+    }, true);
+  }
+
   /* ----- HEADER SCROLL ----- */
   const header = document.querySelector('.site-header');
   if (header) {
@@ -699,41 +765,9 @@
     onScroll();
   }
 
-  /* ----- COOKIE CONSENT BANNER ----- */
-  function setupCookieConsent() {
-    const consent = localStorage.getItem('estar-cookie-consent');
-    if (consent) return; // Consent already given/refused
-
-    const banner = document.createElement('div');
-    banner.className = 'cookie-banner';
-    banner.id = 'cookieBanner';
-    banner.innerHTML = `
-      <h4 data-i18n="cookie_title">Control de Cookies</h4>
-      <p>
-        <span data-i18n="cookie_desc">Utilizamos cookies esenciales para recordar tus preferencias y analíticas para optimizar el sitio. Puedes aceptar o rechazar las de análisis.</span>
-        <a href="cookies.html" target="_blank" data-i18n="cookie_policy">Política de Cookies</a>.
-      </p>
-      <div class="cookie-banner-actions">
-        <button class="btn-accept" data-i18n="cookie_accept">Aceptar</button>
-        <button class="btn-reject" data-i18n="cookie_reject">Rechazar</button>
-      </div>
-    `;
-    
-    document.body.appendChild(banner);
-    banner.style.display = 'flex';
-
-    banner.querySelector('.btn-accept').addEventListener('click', () => {
-      localStorage.setItem('estar-cookie-consent', 'accepted');
-      banner.style.opacity = '0';
-      setTimeout(() => banner.remove(), 400);
-    });
-
-    banner.querySelector('.btn-reject').addEventListener('click', () => {
-      localStorage.setItem('estar-cookie-consent', 'rejected');
-      banner.style.opacity = '0';
-      setTimeout(() => banner.remove(), 400);
-    });
-  }
+  /* ----- COOKIE CONSENT -----
+     El banner y "Configurar cookies" viven en consent.js (Consent Mode v2), que
+     build.js inyecta en las páginas públicas. Aquí no hay otro banner. */
 
   /* ----- ROOM LIST CAROUSEL ----- */
   function setupRoomListCarousel() {
@@ -839,7 +873,9 @@
           if (!response.ok) {
             throw new Error(`Server returned status ${response.status}`);
           }
-          
+
+          trackFormSuccess(form);
+
           const lang = pageLang || 'es';
           
           if (form.classList.contains('contact-form')) {
@@ -952,6 +988,7 @@
       setupBookingBarScroll();
       fetchDynamicRating();
       setupNetlifyForms();
+      setupContactTracking();
       setupShareButtons();
       setupManageButton();
     });
@@ -967,6 +1004,7 @@
     setupBookingBarScroll();
     fetchDynamicRating();
     setupNetlifyForms();
+    setupContactTracking();
     setupShareButtons();
     setupManageButton();
   }

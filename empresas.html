@@ -246,6 +246,15 @@
           </div>
           <div class="field checkbox-field">
             <label class="checkbox-label">
+              <input type="checkbox" id="rqPolitica" name="aceptar_politica" required>
+              <span>
+                <span class="lang-es">Acepto la <a href="privacidad.html" target="_blank" rel="noopener">Política de Tratamiento de Datos</a> y el uso de mis datos para preparar esta cotización.</span>
+                <span class="lang-en">I accept the <a href="privacidad.html" target="_blank" rel="noopener">Privacy Policy</a> and the processing of my data to prepare this quote.</span>
+              </span>
+            </label>
+          </div>
+          <div class="field checkbox-field">
+            <label class="checkbox-label">
               <input type="checkbox" name="marketingOptIn">
               <span>
                 <span class="lang-es">Quiero recibir ofertas, novedades y recomendaciones de Estar por correo o WhatsApp. <span style="display:block;opacity:.75;">Opcional. Puedes darte de baja cuando quieras.</span></span>
@@ -491,6 +500,7 @@
         numHabitaciones: document.getElementById('rqNumHab').value,
         tipoEstadia: document.getElementById('rqTipo').value,
         comentarios: document.getElementById('rqComentarios').value.trim(),
+        marketingOptIn: !!(form.querySelector('input[name="marketingOptIn"]') || {}).checked,
         website: ''
       };
       try {
@@ -500,6 +510,10 @@
           body: JSON.stringify(data)
         });
         if (!res.ok) throw new Error('Error');
+        /* Conversión (GA4 con Consent Mode, sin datos personales) — shell.js. */
+        if (typeof window.estarTrack === 'function') {
+          window.estarTrack('generate_lead', { form_name: 'cotizacion-corporativa', lead_type: 'cotizacion_corporativa', page_language: 'es' }, 'Lead');
+        }
         form.style.display = 'none';
         document.getElementById('requestQuoteSuccess').style.display = 'block';
       } catch (err) {
