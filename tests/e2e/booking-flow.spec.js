@@ -1,5 +1,10 @@
 const { test, expect } = require('@playwright/test');
 
+/* Fechas siempre en el futuro: las fijas (ago-2026) quedaron en el pasado y el
+   motor las rechaza con razón. */
+const futureDate = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+const D1 = futureDate(30), D2 = futureDate(31), D4 = futureDate(33), D5 = futureDate(34);
+
 test.beforeEach(async ({ page }) => {
   /* Seed a consent choice so the cookie banner doesn't overlay the booking UI
      (it intercepts taps on mobile). The banner itself is tested in site.spec. */
@@ -40,20 +45,20 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('booking flow reaches the Wompi payment step', async ({ page }) => {
-  await page.goto('/reservar.html?checkin=2026-08-10&checkout=2026-08-13&guests=2');
+  await page.goto(`/reservar.html?checkin=${D1}&checkout=${D4}&guests=2`);
   await expect(page.locator('.be-room-card')).toBeVisible();
 
   await page.locator('.be-searchbar-edit').click();
   const dateInputs = page.locator('.be-searchform-fields input[type="date"]');
-  await dateInputs.nth(0).fill('2026-08-11');
-  await dateInputs.nth(1).fill('2026-08-14');
+  await dateInputs.nth(0).fill(D2);
+  await dateInputs.nth(1).fill(D5);
   await page.locator('.be-searchform-fields select').selectOption('2');
 
   const refreshedAvailability = page.waitForRequest(request => {
     const url = request.url();
     return url.includes('/api/check-availability')
-      && url.includes('checkin=2026-08-11')
-      && url.includes('checkout=2026-08-14')
+      && url.includes(`checkin=${D2}`)
+      && url.includes(`checkout=${D5}`)
       && url.includes('guests=2');
   });
   await page.locator('.be-searchform-fields button[type="submit"]').click();
@@ -82,7 +87,7 @@ test('booking flow reaches the Wompi payment step', async ({ page }) => {
 test('extras: late check-out and a pet update the summary', async ({ page }) => {
   // Mock room avgPrice = 250.000 → late 15% = 37.500, pet = 200.000 (flat).
   // Early check-in ya NO se vende en el motor (solo en el check-in) → no aparece aquí.
-  await page.goto('/reservar.html?checkin=2026-08-10&checkout=2026-08-13&guests=2');
+  await page.goto(`/reservar.html?checkin=${D1}&checkout=${D4}&guests=2`);
   await expect(page.locator('.be-room-card')).toBeVisible();
   await page.locator('.be-room-select-btn').first().click();
   await expect(page.locator('.be-step-active .be-step-title')).toHaveText('Extras y servicios');
