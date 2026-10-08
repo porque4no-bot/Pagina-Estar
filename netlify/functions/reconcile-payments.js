@@ -78,7 +78,17 @@ async function fetchRecentApproved() {
   }
   const cutoff = Date.now() - LOOKBACK_HOURS * 3600 * 1000;
   const all = [];
-  let next = `${WOMPI_API}/transactions?status=APPROVED`;
+  /* Wompi exige from_date, until_date, page y page_size en la búsqueda de
+     transacciones: sin ellos responde 422 (visto en producción cada 30 min →
+     la detección de pagos huérfanos de Wompi estaba ciega). Ventana en días
+     (formato YYYY-MM-DD, until_date = mañana para no perder lo de hoy en UTC). */
+  const ymd = ms => new Date(ms).toISOString().slice(0, 10);
+  const PAGE_SIZE = 50;
+  const pageUrl = page => `${WOMPI_API}/transactions?status=APPROVED`
+    + `&from_date=${ymd(cutoff)}&until_date=${ymd(Date.now() + 24 * 3600 * 1000)}`
+    + `&page=${page}&page_size=${PAGE_SIZE}&order_by=created_at&order=DESC`;
+  let page = 1;
+  let next = pageUrl(page);
 
   while (next && all.length < MAX_TRANSACTIONS) {
     const ctrl = new AbortController();
@@ -104,7 +114,14 @@ async function fetchRecentApproved() {
       all.push(tx);
     }
     if (crossedCutoff) break;
-    next = data.meta && data.meta.next_page ? data.meta.next_page : null;
+    if (data.meta && data.meta.next_page) {
+      next = data.meta.next_page;
+    } else if (batch.length === PAGE_SIZE) {
+      page += 1;
+      next = pageUrl(page);
+    } else {
+      next = null;
+    }
   }
   return { transactions: all };
 }

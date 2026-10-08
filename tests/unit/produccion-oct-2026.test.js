@@ -35,3 +35,23 @@ test('sendEmail manda a Resend un arreglo cuando la variable trae comas', async 
     if (prevKey === undefined) delete process.env.RESEND_API_KEY; else process.env.RESEND_API_KEY = prevKey;
   }
 });
+
+/* Producción oct-2026: reconcile-payments llamaba a Wompi sin from_date/until_date/
+   page/page_size → 422 cada 30 min (detección de huérfanos Wompi ciega). */
+test('reconcile-payments consulta Wompi con fechas y paginación', async () => {
+  const prevKey = process.env.WOMPI_PRIVATE_KEY;
+  const prevFetch = global.fetch;
+  process.env.WOMPI_PRIVATE_KEY = 'prv_test_x';
+  const urls = [];
+  global.fetch = async url => { urls.push(url); return { ok: true, json: async () => ({ data: [] }) }; };
+  try {
+    const recon = require('../../netlify/functions/reconcile-payments');
+    await recon._test.fetchRecentApproved();
+    const u = new URL(urls[0]);
+    for (const p of ['from_date', 'until_date', 'page', 'page_size']) assert.ok(u.searchParams.get(p), `falta ${p}`);
+    assert.match(u.searchParams.get('from_date'), /^\d{4}-\d{2}-\d{2}$/);
+  } finally {
+    global.fetch = prevFetch;
+    if (prevKey === undefined) delete process.env.WOMPI_PRIVATE_KEY; else process.env.WOMPI_PRIVATE_KEY = prevKey;
+  }
+});
