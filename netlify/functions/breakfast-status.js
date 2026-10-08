@@ -7,6 +7,23 @@
 const { json, corsHeaders, parseJsonBody } = require('./_guest-app');
 const { authorize } = require('./_authz');
 const { resolveBreakfastStatus } = require('./_breakfast');
+const { flag } = require('./_settings');
+const { hasOtasyncCreds } = require('./_otasync');
+
+/* ¿Puede ESTE usuario agregar desayuno (upgrade, cobra al folio) AHORA?
+   Misma regla que breakfast-upgrade: permiso `breakfast.upgrade` y, con
+   credenciales reales de OTASync, el flag BREAKFAST_UPGRADE_ENABLED encendido
+   (sin credenciales = demo local, el upgrade se registra sin tocar folio).
+   El panel del comedor usa esto para NO mostrar "Agregar desayuno" a quien no
+   puede usarlo (p.ej. el tercero de desayunos, o con el flag apagado). */
+async function canUpgradeNow(auth, d = {}) {
+  const perms = Array.isArray(auth && auth.permissions) ? auth.permissions : [];
+  if (!perms.includes('breakfast.upgrade')) return false;
+  const creds = (d.hasOtasyncCreds || hasOtasyncCreds)();
+  if (!creds) return true;
+  try { return await (d.flag || flag)('BREAKFAST_UPGRADE_ENABLED'); }
+  catch (e) { return false; }
+}
 
 /* "EST-123:2" → { code:"EST-123", guestIndex:2 }; "EST-123" → { code, guestIndex:undefined } */
 function parseQr(input) {
@@ -36,7 +53,8 @@ exports.handler = async event => {
 
     const status = await resolveBreakfastStatus(code, { guestIndex });
     if (!status) return json(404, { error: 'No encontramos una reserva con ese código.' });
-    return json(200, { ok: true, status });
+    const canUpgrade = status.hasBreakfast ? false : await canUpgradeNow(auth);
+    return json(200, { ok: true, status, canUpgrade });
   } catch (error) {
     console.error('[breakfast-status]', error.message);
     return json(error.statusCode || 500, {
@@ -44,3 +62,5 @@ exports.handler = async event => {
     });
   }
 };
+
+exports._test = { canUpgradeNow, parseQr };

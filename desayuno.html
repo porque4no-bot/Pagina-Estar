@@ -125,7 +125,11 @@
           <div><div class="cnum" id="cntCycle">—</div><div class="clbl">en el ciclo (mes)</div></div>
         </div>
       </div>
-      <div class="panel">
+      <div class="panel" id="noAccess" style="display:none;">
+        <h2>Sin acceso</h2>
+        <p class="err" style="margin:0;">Tu usuario no tiene permiso para verificar desayunos. Pide al administrador que te asigne el rol <b>Desayunos (tercero)</b> o <b>Recepción</b> en el panel /admin (Usuarios).</p>
+      </div>
+      <div class="panel" id="scanPanel">
         <h2>Escanear o buscar</h2>
         <button id="scanBtn" class="btn btn-ghost">Escanear QR del huésped</button>
         <div id="scanArea">
@@ -152,6 +156,10 @@
   (function () {
     var lastQuery = null;       // { code, guestIndex } de la última consulta
     var scanning = false, scanTimer = null, stream = null, detector = null;
+    /* "Agregar desayuno" (upgrade, cobra al folio) solo si el servidor dice que
+       ESTE usuario puede hacerlo ahora (permiso breakfast.upgrade + flag
+       BREAKFAST_UPGRADE_ENABLED). Lo decide breakfast-status (canUpgrade). */
+    var canUpgrade = false;
 
     function $(id) { return document.getElementById(id); }
 
@@ -199,8 +207,10 @@
             '<div class="res-row"><span class="k">Huésped</span><span class="v">' + who + '</span></div>' +
             '<div class="res-row"><span class="k">Apartamento</span><span class="v">' + room + '</span></div>' +
             stayWarn +
-            '<p class="hint">Esta tarifa no incluye desayuno. Puedes agregarlo y se carga a la cuenta.</p>' +
-            '<div class="actions"><button class="btn" id="upgradeBtn">Agregar desayuno</button></div>' +
+            (canUpgrade
+              ? '<p class="hint">Esta tarifa no incluye desayuno. Puedes agregarlo y se carga a la cuenta.</p>' +
+                '<div class="actions"><button class="btn" id="upgradeBtn">Agregar desayuno</button></div>'
+              : '<p class="hint">Esta tarifa no incluye desayuno. Si el huésped quiere desayunar, remítelo a recepción para agregarlo a su cuenta.</p>') +
           '</div>';
         var ub = $('upgradeBtn');
         if (ub) ub.addEventListener('click', function () { upgrade(status.bookingCode); });
@@ -251,6 +261,7 @@
       try {
         var payload = (typeof query === 'string') ? { qr: query } : query;
         var data = await api('breakfast-status', payload);
+        canUpgrade = data.canUpgrade === true;
         render(data.status);
       } catch (e) { showError(e.message); }
     }
@@ -338,7 +349,18 @@
       } catch (e) { /* informativo: si falla, no estorba el flujo de servir */ }
     }
 
-    function init() {
+    async function init() {
+      /* Permisos efectivos (whoami). Solo ajusta la UI: la autorización real es
+         del servidor. Si whoami falla, se sigue y el backend decide. */
+      var me = null;
+      try { me = await api('whoami', {}); } catch (e) { me = null; }
+      var perms = (me && Array.isArray(me.permissions)) ? me.permissions : null;
+      var envAdmin = !!(me && me.isEnvAdmin);
+      if (perms && !envAdmin && perms.indexOf('breakfast.status') === -1) {
+        $('scanPanel').style.display = 'none';
+        $('noAccess').style.display = 'block';
+        return;
+      }
       $('scanBtn').addEventListener('click', startScan);
       $('stopScanBtn').addEventListener('click', stopScan);
       $('lookupBtn').addEventListener('click', function () {
@@ -352,7 +374,9 @@
         $('scanBtn').style.display = 'none';
         $('scanHint').textContent = 'Escaneo no disponible en este navegador — usa el código de reserva.';
       }
-      loadCounts();
+      /* El conteo del día (breakfast-day) es para quien tenga ese permiso
+         (recepción/admin); el tercero de desayunos no lo ve. */
+      if (!perms || envAdmin || perms.indexOf('breakfast.day') !== -1) loadCounts();
     }
 
     window.__breakfastPanelInit = init;   // el módulo de auth lo llama al mostrar la app
