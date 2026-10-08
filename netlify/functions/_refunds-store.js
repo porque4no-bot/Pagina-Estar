@@ -277,12 +277,28 @@ async function listRefunds(statusFilter) {
 
 /* Applies a status transition with an append-only audit entry. `patch` carries
    extra fields to merge (refundAmountCents, approvedBy, deniedReason, etc.). */
-async function transitionStatus(bookingCode, newStatus, actor, notes, patch) {
+async function transitionStatus(bookingCode, newStatus, actor, notes, patch, opts) {
   const store = getRefundStore();
-  const raw = await store.get(String(bookingCode));
+  /* opts.expectStatus: compare-and-set. Solo escribe si el estado actual es el
+     esperado y nadie lo cambió entre la lectura y la escritura (etag). Evita que
+     dos aprobaciones concurrentes ejecuten dos reembolsos. */
+  const expect = opts && opts.expectStatus;
+  let raw;
+  let etag = null;
+  if (expect && typeof store.getWithMetadata === 'function') {
+    const cur = await store.getWithMetadata(String(bookingCode), { type: 'text' });
+    raw = cur ? cur.data : null;
+    etag = cur ? cur.etag || null : null;
+  } else {
+    raw = await store.get(String(bookingCode));
+  }
   if (!raw) return { ok: false, reason: 'not_found' };
   const refund = JSON.parse(raw);
   const oldStatus = refund.status;
+  if (expect) {
+    const allowed = Array.isArray(expect) ? expect : [expect];
+    if (!allowed.includes(oldStatus)) return { ok: false, reason: 'status_changed', refund };
+  }
   Object.assign(refund, patch || {});
   refund.status = newStatus;
   refund.updatedAt = nowIso();
@@ -291,7 +307,12 @@ async function transitionStatus(bookingCode, newStatus, actor, notes, patch) {
   /* Frente cancel: registros viejos con datos bancarios EN CLARO se cifran en la
      siguiente escritura (migración perezosa). Sin clave, se dejan como están. */
   migrateLegacyBankDetails(refund);
-  await store.set(String(bookingCode), JSON.stringify(refund));
+  if (etag) {
+    const res = await store.set(String(bookingCode), JSON.stringify(refund), { onlyIfMatch: etag });
+    if (res && res.modified === false) return { ok: false, reason: 'status_changed' };
+  } else {
+    await store.set(String(bookingCode), JSON.stringify(refund));
+  }
   return { ok: true, refund };
 }
 

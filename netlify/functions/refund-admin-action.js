@@ -73,7 +73,7 @@ async function executeGatewayRefund(refund, actor, amountCents) {
     paymentId: refund.transactionId,
     amountCents,
     originalAmountCents: verifiedOriginal,
-    idempotencyKey: `${refund.refundId || refund.bookingCode}-${amountCents}`
+    idempotencyKey: `${refund.refundId || refund.bookingCode}-refund`
   });
 
   const execRecord = {
@@ -401,7 +401,8 @@ exports.handler = async (event) => {
       const guestReason = sanitizeText(body.reason, 600);
       const res = await transitionStatus(bookingCode, STATUS.DENIED, actor, notes || 'Reembolso denegado', {
         deniedAt: new Date().toISOString(), deniedBy: actor, deniedReason: guestReason || notes || null
-      });
+      }, { expectStatus: STATUS.NEEDS_REVIEW });
+      if (!res.ok) return reply(409, { error: 'La solicitud cambió mientras la revisabas; recarga.' });
       let current = res.refund || refund;
       const pms = await closeReservationInPms(current, actor);
       if (pms.mode === 'auto') current = (await getRefund(bookingCode)) || current;
@@ -419,23 +420,32 @@ exports.handler = async (event) => {
       return reply(200, { ok: true, refund: viewOf(res.refund, auth) });
     }
 
+    /* mark-processing / mark-done solo después de una aprobación (nunca sobre una
+       solicitud por revisar: cerraría sin decisión ni monto y avisaría al huésped). */
+    const MARKABLE = [STATUS.APPROVED, STATUS.NEEDS_BANK_DETAILS, STATUS.BANK_DETAILS_READY, STATUS.PROCESSING, STATUS.PENDING_PROVIDER, STATUS.FAILED].filter(Boolean);
+    if ((action === 'mark-processing' || action === 'mark-done') && !MARKABLE.includes(refund.status)) {
+      return reply(409, { error: 'Primero hay que aprobar el reembolso.' });
+    }
+
     if (action === 'mark-processing') {
       const res = await transitionStatus(bookingCode, STATUS.PROCESSING, actor,
         notes || `Reembolso en proceso (${actor})`,
-        { processingAt: new Date().toISOString(), processingBy: actor });
+        { processingAt: new Date().toISOString(), processingBy: actor }, { expectStatus: MARKABLE });
+      if (!res.ok) return reply(409, { error: 'La solicitud cambió; recarga.' });
       return reply(200, { ok: true, refund: viewOf(res.refund, auth) });
     }
 
     if (action === 'mark-done') {
       const res = await transitionStatus(bookingCode, STATUS.DONE, actor,
         notes || `Reembolso completado por ${actor}${payoutRef ? ` · ref ${payoutRef}` : ''}`,
-        { completedAt: new Date().toISOString(), completedBy: actor, payoutRef: payoutRef || null });
+        { completedAt: new Date().toISOString(), completedBy: actor, payoutRef: payoutRef || null }, { expectStatus: MARKABLE });
+      if (!res.ok) return reply(409, { error: 'La solicitud cambió; recarga.' });
       await maybeRestoreDiscount(bookingCode); /* A-14: devolver el cupón al pool */
       await flow.resolveTask(flow.TASK_KEYS.pay(bookingCode), actor);
       await flow.resolveTask(flow.TASK_KEYS.gatewayFail(bookingCode), actor);
       let current = res.refund || refund;
       let notice = null;
-      if (!flow.alreadyNotified(current, 'done')) {
+      if (current.refundAmountCents != null && !flow.alreadyNotified(current, 'done')) {
         notice = await flow.notifyGuest('done', current);
         current = await recordNotice(bookingCode, current, notice);
       }
@@ -508,7 +518,8 @@ exports.handler = async (event) => {
     }
 
     const res = await transitionStatus(bookingCode, target, actor,
-      notes || `Aprobado por ${actor} (${route})`, patch);
+      notes || `Aprobado por ${actor} (${route})`, patch, { expectStatus: STATUS.NEEDS_REVIEW });
+    if (!res.ok) return reply(409, { error: 'La solicitud ya fue aprobada o cambió mientras la revisabas; recarga.' });
     let current = res.refund || { ...refund, ...patch, status: target };
 
     /* (b) La plata. Mercado Pago: automático con REFUND_GATEWAY_AUTO_ENABLED y un

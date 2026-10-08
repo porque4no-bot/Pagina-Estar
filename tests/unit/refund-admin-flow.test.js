@@ -19,6 +19,7 @@ delete process.env.REFUND_BANK_FORM_ENABLED;
 
 /* ── Blobs en memoria ── */
 const registry = new Map();
+const etagOf = (v) => require('crypto').createHash('sha1').update(String(v)).digest('hex');
 function memStore(name) {
   if (!registry.has(name)) {
     const m = new Map();
@@ -26,10 +27,18 @@ function memStore(name) {
       _m: m,
       async set(key, value, opts = {}) {
         if (opts.onlyIfNew && m.has(key)) return { modified: false };
+        if (opts.onlyIfMatch && (!m.has(key) || etagOf(m.get(key)) !== opts.onlyIfMatch)) return { modified: false };
         m.set(key, value);
         return { modified: true };
       },
       async get(key) { return m.has(key) ? m.get(key) : null; },
+      async getWithMetadata(key) {
+        if (!m.has(key)) return null;
+        const data = m.get(key);
+        /* cede el turno: deja que dos peticiones concurrentes lean el mismo etag */
+        await new Promise(r => setImmediate(r));
+        return { data, etag: etagOf(data) };
+      },
       async list(opts = {}) { return { blobs: Array.from(m.keys()).filter(k => !opts.prefix || k.startsWith(opts.prefix)).map(key => ({ key })) }; },
       async delete(key) { m.delete(key); }
     });
@@ -356,4 +365,31 @@ test('la respuesta nunca trae el sobre cifrado; los datos completos solo con ref
   assert.equal(r.status, 200);
   assert.equal(r.body.refund.bankDetailsSealed, undefined);
   assert.equal(r.body.refund.bankDetails.accountNumber, '99887766');
+});
+
+/* ── Hallazgos de revisión ── */
+test('Dos aprobaciones concurrentes con montos distintos: un solo reembolso en MP y un solo correo', async () => {
+  reset();
+  process.env.REFUND_GATEWAY_AUTO_ENABLED = 'true';
+  seed(MP_REFUND);
+  const [a, b] = await Promise.all([
+    call({ bookingCode: '3273564', action: 'approve', amountCents: 30000000 }),
+    call({ bookingCode: '3273564', action: 'approve', amountCents: 25000000 })
+  ]);
+  const statuses = [a.status, b.status].sort();
+  assert.deepEqual(statuses, [200, 409]);
+  assert.equal(mp.calls.length, 1, 'un solo reembolso real');
+  assert.match(mp.calls[0].idempotencyKey, /-refund$/, 'clave de idempotencia sin el monto');
+  assert.equal(sent.length, 1);
+});
+
+test('Marcar reembolsado sobre una solicitud POR REVISAR se rechaza (sin correo ni cierre)', async () => {
+  reset();
+  seed({ ...MP_REFUND, refundAmountCents: null });
+  for (const action of ['mark-done', 'mark-processing']) {
+    const r = await call({ bookingCode: '3273564', action, payoutRef: 'X' });
+    assert.equal(r.status, 409);
+  }
+  assert.equal(sent.length, 0);
+  assert.equal((await stored('3273564')).status, 'NEEDS_REVIEW');
 });
