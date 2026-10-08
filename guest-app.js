@@ -782,6 +782,20 @@
     document.body.classList.remove('guest-is-authenticated');
   }
 
+  /* Frente motor: la confirmación de la reserva enlaza aquí con
+     ?code=<número de reserva> para hacer el check-in en línea. Prellenamos el
+     código (nunca el apellido: el segundo factor lo escribe el huésped). */
+  function prefillLoginFromUrl() {
+    try {
+      const code = (new URLSearchParams(window.location.search).get('code') || '').trim();
+      if (!/^[A-Za-z0-9-]{3,40}$/.test(code)) return;
+      const input = $('#bookingCode');
+      if (input && !input.value) input.value = code;
+      const key = $('#accessKey');
+      if (key) key.focus();
+    } catch (e) { /* noop */ }
+  }
+
   function openTab(tabName) {
     $$('[data-guest-panel]').forEach(panel => {
       panel.classList.toggle('is-active', panel.dataset.guestPanel === tabName);
@@ -1876,6 +1890,7 @@
       showApp();
     } else {
       showLogin();
+      prefillLoginFromUrl();
     }
     handlePaymentReturn();
     if (window.lucide) window.lucide.createIcons();
