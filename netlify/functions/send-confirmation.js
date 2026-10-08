@@ -365,7 +365,7 @@ async function sendConfirmationEmail(params, deps = {}) {
   if (breakfast) {
     try {
       const base = (process.env.GUEST_APP_BASE_URL || process.env.URL || process.env.DEPLOY_URL || 'https://estar.com.co').replace(/\/$/, '');
-      passUrl = `${base}/pase-desayuno?t=${d.signPassToken(bookingCode)}`;
+      passUrl = `${base}/pase-desayuno?t=${d.signPassToken(bookingCode, { checkOut })}`; // vence con la estadía
     } catch (e) {
       if (process.env.DEBUG) console.warn('[send-confirmation] no se pudo firmar el pase:', e.message);
     }
