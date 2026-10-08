@@ -67,7 +67,11 @@ function parseQueryParams() {
   if (roomParam === 'clasic') roomParam = 'clasica'; // compatibility mapping
   
   const payment = params.get('payment') || '';
-  return { checkin, checkout, guests, roomParam, payment };
+  /* Frente codes: el correo del código personal/reseña enlaza a
+     reservar.html?codigo=XXXX para dejarlo prellenado en el paso de pago (el
+     servidor lo valida igual; esto solo ahorra escribirlo). */
+  const promoCode = String(params.get('codigo') || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 40);
+  return { checkin, checkout, guests, roomParam, payment, promoCode };
 }
 
 /* Retorno de Mercado Pago: código de reserva guardado antes del redirect, o
@@ -714,7 +718,7 @@ function SandboxBanner({ lang }) {
 }
 
 /* ── PaymentPanel ─────────────────────────────────── */
-function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, discountApplied, setDiscountApplied, lang }) {
+function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, discountApplied, setDiscountApplied, initialDiscountCode, lang }) {
   const t = i18nEngine[lang];
   const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
   const [loading, setLoading] = useState(false);
@@ -726,7 +730,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
      re-validated and re-priced server-side at signing time; this is only the
      in-line UX. `applied` holds the server's confirmed { code, discountCents }. */
   const [discountEnabledUi, setDiscountEnabledUi] = useState(false);
-  const [discountInput, setDiscountInput] = useState('');
+  const [discountInput, setDiscountInput] = useState(initialDiscountCode || '');
   const [discountChecking, setDiscountChecking] = useState(false);
   /* discountApplied/setDiscountApplied ahora vienen de BookingEngine (estado
      elevado) para que el resumen/confirmación/correo vean el descuento. */
@@ -746,6 +750,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       case 'min_nights': return t.discountMinNights;
       case 'room_not_eligible': return t.discountRoom;
       case 'blackout': return t.discountBlackout;
+      case 'email_mismatch': return t.discountEmailMismatch;
       default: return t.discountInvalid;
     }
   };
@@ -2342,6 +2347,7 @@ function BookingEngine() {
                 onConfirm={handleConfirmBooking}
                 discountApplied={discountApplied}
                 setDiscountApplied={setDiscountApplied}
+                initialDiscountCode={initialParams.promoCode}
                 lang={lang}
               />
             </StepWrapper>

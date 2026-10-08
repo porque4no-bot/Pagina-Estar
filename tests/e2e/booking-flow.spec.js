@@ -138,3 +138,52 @@ test('returning from Mercado Pago shows the booking confirmation', async ({ page
   await expect(page.locator('body')).not.toContainText('Kunas');
   await expect(page).not.toHaveURL(/payment=success/);
 });
+
+/* Frente codes: el correo del código personal/reseña enlaza a
+   reservar.html?codigo=XXXX. El campo llega prellenado; si el código está
+   ligado a otro correo el huésped ve un mensaje claro; con su correo aplica. */
+test('discount code from the email link is prefilled and email-bound codes explain the mismatch', async ({ page }) => {
+  await page.addInitScript(([ci, co]) => {
+    try {
+      sessionStorage.setItem('estar-booking-draft', JSON.stringify({
+        savedAt: Date.now(),
+        search: { checkin: ci, checkout: co, guests: 2 },
+        selectedRoom: { id: 'clasica', roomTypeId: '31348', name: 'Clásica', priceFlexible: 250000, num: '01', area: 32, capacity: 2 },
+        selectedRate: 'best',
+        currentStep: 'payment',
+        extras: {},
+        guestData: { nombre: 'Ana', apellido: 'Prueba', email: 'otra@example.com', tel: '3000000000', pais: 'Colombia' },
+        paymentMethod: 'wompi'
+      }));
+    } catch (e) {}
+  }, [D1, D4]);
+  let validated = 0;
+  const sentEmails = [];
+  await page.route('**/api/validate-discount-code**', route => {
+    const url = new URL(route.request().url());
+    const code = url.searchParams.get('code');
+    if (code === '__probe__') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ valid: false, reason: 'invalid', enabled: true }) });
+    }
+    validated++;
+    sentEmails.push(url.searchParams.get('email'));
+    const body = validated === 1
+      ? { valid: false, reason: 'email_mismatch', enabled: true }
+      : { valid: true, code, type: 'percent', value: 10, discountCents: 7500000, enabled: true };
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+
+  await page.goto('/reservar.html?codigo=gracias-ab23cd45');
+  await expect(page.locator('.be-step-active .be-step-title')).toHaveText('Resumen y pago');
+  const input = page.getByPlaceholder('Ingresa tu código');
+  await expect(input).toHaveValue('GRACIAS-AB23CD45');
+
+  await page.getByRole('button', { name: 'Aplicar' }).click();
+  await expect(page.locator('.be-step-active')).toContainText('Este código está ligado a otro correo');
+  /* el servidor valida con el correo que el huésped escribió en el paso 3 */
+  expect(sentEmails[0]).toBe('otra@example.com');
+
+  await page.getByRole('button', { name: 'Aplicar' }).click();
+  await expect(page.locator('.be-step-active')).toContainText('Código aplicado');
+  await expect(page.locator('.be-step-active')).toContainText('GRACIAS-AB23CD45');
+});
