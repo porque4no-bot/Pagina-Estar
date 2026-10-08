@@ -180,7 +180,7 @@ test('dedupe: la clave sale del código de reserva; params.dedupeKey se ignora',
     assert.equal(r.sent, true);
   });
   assert.equal(captured.calls, 1, 'una clave sembrada por el cliente no suprime el correo legítimo');
-  assert.ok(store.map.has('RES-100'));
+  assert.ok(store.map.has('srv:RES-100'));
   assert.equal(confirmationDedupeKey(' RES-100 '), 'RES-100');
   assert.equal(confirmationDedupeKey(98765), '98765');
 });
@@ -332,6 +332,8 @@ test('motor-app.jsx ya no llama a /api/send-confirmation ni dice "Kunas" al hué
   assert.doesNotMatch(src, /sendConfirmationEmailIfPossible/);
   assert.doesNotMatch(src, /Kunas no creo/);
   assert.doesNotMatch(src, /Tu reserva está confirmada\. En unos minutos/);
+  assert.match(src, /Estamos verificando tu pago/);
+  assert.match(src, /We are verifying your payment/);
   /* El bundle solo se revisa si está al día con la fuente (npm run test:unit
      compila antes; un dist viejo no debe dar un falso rojo). */
   const built = path.join(ROOT, 'dist', 'motor-app.js');
@@ -352,4 +354,59 @@ test('ningún HTML del sitio llama al endpoint retirado', () => {
   for (const f of htmls) {
     assert.doesNotMatch(fs.readFileSync(path.join(ROOT, f), 'utf8'), /send-confirmation/, f);
   }
+});
+
+/* ── Hallazgos de revisión: alertas por reserva y espacio de claves srv: ── */
+
+function captureAlerts() {
+  const alertPath = require.resolve('../../netlify/functions/_alert');
+  const prev = require.cache[alertPath];
+  const alerts = [];
+  require.cache[alertPath] = { id: alertPath, filename: alertPath, loaded: true, exports: { reportAlert: async (a) => { alerts.push(a); } } };
+  return { alerts, restore: () => { if (prev) require.cache[alertPath] = prev; else delete require.cache[alertPath]; } };
+}
+
+test('dedupe: una clave legada sin prefijo (sembrada por el endpoint viejo) no suprime', async () => {
+  const store = fakeStore();
+  store.map.set('3273650', '1');
+  const captured = {};
+  await withEnv({ RESEND_API_KEY: 're_key' }, async () => {
+    const r = await sendConfirmationEmail(params({ bookingCode: '3273650' }), { fetch: okFetch(captured), getStore: () => store });
+    assert.equal(r.sent, true);
+  });
+  assert.equal(captured.calls, 1);
+  assert.ok(store.map.has('srv:3273650'));
+  assert.equal(sendConfirmation.confirmationStoreKey(' 3273650 '), 'srv:3273650');
+});
+
+test('timeout de Resend: alerta por reserva y queda reintentable', async () => {
+  const cap = captureAlerts();
+  const store = fakeStore();
+  try {
+    await withEnv({ RESEND_API_KEY: 're_key' }, async () => {
+      const abortFetch = async () => { const e = new Error('aborted'); e.name = 'AbortError'; throw e; };
+      const r = await sendConfirmationEmail(params({ bookingCode: '3300001' }), { fetch: abortFetch, getStore: () => store });
+      assert.equal(r.reason, 'timeout');
+    });
+  } finally { cap.restore(); }
+  assert.equal(cap.alerts.length, 1);
+  assert.equal(cap.alerts[0].kind, 'confirmation_email_failed');
+  assert.equal(cap.alerts[0].dedupeKey, 'confirmation-email-failed:3300001');
+  assert.ok(!store.map.has('srv:3300001'), 'el reclamo se libera');
+});
+
+test('error de red no lanza y alerta; dos reservas que fallan generan dos alertas distintas', async () => {
+  const cap = captureAlerts();
+  try {
+    await withEnv({ RESEND_API_KEY: 're_key' }, async () => {
+      const netFetch = async () => { throw new Error('ECONNRESET'); };
+      const r = await sendConfirmationEmail(params({ bookingCode: '3300002' }), { fetch: netFetch, getStore: () => fakeStore() });
+      assert.equal(r.sent, false);
+      assert.equal(r.reason, 'network-error');
+      const badFetch = async () => ({ ok: false, status: 422, json: async () => ({ message: 'x' }) });
+      const r2 = await sendConfirmationEmail(params({ bookingCode: '3300003' }), { fetch: badFetch, getStore: () => fakeStore() });
+      assert.equal(r2.reason, 'resend-error');
+    });
+  } finally { cap.restore(); }
+  assert.deepEqual(cap.alerts.map(a => a.dedupeKey), ['confirmation-email-failed:3300002', 'confirmation-email-failed:3300003']);
 });

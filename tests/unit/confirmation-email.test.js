@@ -92,12 +92,12 @@ test('sends the confirmation, embeds the breakfast pass link, and marks the dedu
   assert.match(captured.body.subject, /RES-100/);
   assert.match(captured.body.html, /pase-desayuno\?t=PASS123/);
   assert.match(captured.body.html, /Ver mis pases de desayuno/);
-  assert.ok(store.map.has('RES-100'), 'dedup key should be marked after a successful send');
+  assert.ok(store.map.has('srv:RES-100'), 'dedup key should be marked after a successful send');
 });
 
 test('a second send for the same booking is suppressed (idempotent)', async () => {
   const store = fakeStore();
-  store.map.set('RES-100', '1'); // a prior trigger already sent it
+  store.map.set('srv:RES-100', '1'); // a prior trigger already sent it
   let fetched = 0;
   await withResendKey('re_key', async () => {
     const result = await sendConfirmationEmail(

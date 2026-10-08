@@ -117,6 +117,28 @@ function confirmationDedupeKey(bookingCode) {
   return String(bookingCode == null ? '' : bookingCode).trim();
 }
 
+/* Clave de ALMACENAMIENTO en el store de dedupe: espacio de nombres propio
+   del servidor ('srv:'). Las claves sin prefijo pudieron ser sembradas por el
+   antiguo endpoint público (el atacante elegía el código) y Netlify Blobs no
+   las caduca; con el prefijo, esas claves viejas ya no suprimen nada. */
+function confirmationStoreKey(bookingCode) {
+  const code = confirmationDedupeKey(bookingCode);
+  return code ? `srv:${code}` : '';
+}
+
+/* Alerta por reserva (dedupeKey por código) para que cada fallo tenga su
+   propia tarea en el ops-queue. Best-effort, nunca lanza. */
+async function alertConfirmationFailure(bookingCode, reason, detail) {
+  try {
+    await require('./_alert').reportAlert({
+      kind: 'confirmation_email_failed', severity: 'error',
+      message: 'No se pudo enviar el correo de confirmación de reserva al huésped. Reenviarlo a mano.',
+      context: { bookingCode, reason, detail: String(detail || '').slice(0, 200) },
+      dedupeKey: `confirmation-email-failed:${bookingCode}`
+    });
+  } catch (_) { /* alert best-effort */ }
+}
+
 const BOOKING_CODE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/;
 const EMAIL_RE = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
 
@@ -502,17 +524,18 @@ async function sendConfirmationEmail(params, deps = {}) {
   // que dos ejecuciones concurrentes no envíen ambas. Si el envío falla, se libera
   // el reclamo (releaseDedupe) para que siga siendo reintentable.
   const store = d.dedupe ? d.getStore() : null;
+  const storeKey = confirmationStoreKey(dedupeKey);
   let claimedDedupe = false;
   const releaseDedupe = async () => {
     if (claimedDedupe && store && dedupeKey) {
-      try { await store.delete(dedupeKey); } catch (_) { /* best-effort */ }
+      try { await store.delete(storeKey); } catch (_) { /* best-effort */ }
     }
   };
   if (store && dedupeKey) {
     try {
-      const claim = await store.set(dedupeKey, JSON.stringify({ claimedAt: new Date().toISOString() }), { onlyIfNew: true });
+      const claim = await store.set(storeKey, JSON.stringify({ claimedAt: new Date().toISOString() }), { onlyIfNew: true });
       if (claim && claim.modified === false) {
-        if (process.env.DEBUG) console.log(`[send-confirmation] duplicate suppressed for booking ${dedupeKey}`);
+        console.log(`[send-confirmation] duplicate suppressed for booking ${dedupeKey}`);
         return { sent: false, reason: 'duplicate', duplicate: true };
       }
       claimedDedupe = true;
@@ -581,21 +604,19 @@ async function sendConfirmationEmail(params, deps = {}) {
   } catch (err) {
     clearTimeout(resendTimeoutId);
     await releaseDedupe();
-    if (err.name === 'AbortError') return { sent: false, reason: 'timeout' };
-    throw err;
+    if (err && err.name === 'AbortError') {
+      await alertConfirmationFailure(dedupeKey, 'timeout', 'Resend no respondió en 10 s');
+      return { sent: false, reason: 'timeout' };
+    }
+    console.error('[send-confirmation] network error calling Resend:', err && err.message);
+    await alertConfirmationFailure(dedupeKey, 'network-error', err && err.message);
+    return { sent: false, reason: 'network-error' };
   }
 
   const resendData = await resendResponse.json().catch(() => ({}));
   if (!resendResponse.ok) {
     console.error('[send-confirmation] Resend API error status:', resendResponse.status, (resendData && resendData.message) || '');
-    try {
-      await require('./_alert').reportAlert({
-        kind: 'confirmation_email_failed', severity: 'error',
-        message: 'No se pudo enviar el correo de confirmación de reserva al huésped (Resend rechazó el envío).',
-        context: { bookingCode: dedupeKey, status: resendResponse.status, detail: String((resendData && resendData.message) || '').slice(0, 200) },
-        dedupeKey: 'send-confirmation-resend'
-      });
-    } catch (_) { /* alert best-effort */ }
+    await alertConfirmationFailure(dedupeKey, `resend-error-${resendResponse.status}`, (resendData && resendData.message) || '');
     await releaseDedupe();
     return { sent: false, reason: 'resend-error', status: resendResponse.status };
   }
@@ -603,9 +624,9 @@ async function sendConfirmationEmail(params, deps = {}) {
   // Mark sent only AFTER success, so a failed send stays retryable.
   if (store && dedupeKey) {
     try {
-      await store.set(dedupeKey, JSON.stringify({
+      await store.set(storeKey, JSON.stringify({
         bookingCode: dedupeKey, resendId: resendData.id, via: p.via || 'unknown', lang, at: new Date().toISOString()
-      }), { ttl: 86400 * 30 });
+      }));
     } catch (e) {
       if (process.env.DEBUG) console.warn('[send-confirmation] dedup mark failed:', e.message);
     }
@@ -649,6 +670,7 @@ exports.handler = async (event) => {
 
 exports.sendConfirmationEmail = sendConfirmationEmail;
 exports.confirmationDedupeKey = confirmationDedupeKey;
+exports.confirmationStoreKey = confirmationStoreKey;
 exports._test = {
   buildEmailHtml, sendConfirmationEmail, getConfirmationStore,
   confirmationDedupeKey, guestAppUrl, formatDate, formatDateES, normalizeLang, COPY

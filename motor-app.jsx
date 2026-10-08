@@ -2152,7 +2152,9 @@ function BookingEngine() {
               {lang === 'es' ? 'Estamos confirmando tu reserva' : 'Confirming your reservation'}
             </p>
             <p className="t-body-sm" style={{ margin: 0, color: 'var(--fg-muted)' }}>
-              {lang === 'es' ? 'Tu pago fue aprobado. Esto puede tomar unos segundos…' : 'Your payment was approved. This may take a few seconds…'}
+              {(initialParams.payment === 'pending' || (paymentDetails && paymentDetails.status === 'PENDING'))
+                ? (lang === 'es' ? 'Estamos verificando tu pago. Esto puede tomar unos segundos…' : 'We are verifying your payment. This may take a few seconds…')
+                : (lang === 'es' ? 'Tu pago fue aprobado. Esto puede tomar unos segundos…' : 'Your payment was approved. This may take a few seconds…')}
             </p>
             <p className="t-body-sm" style={{ margin: '4px 0 0 0', color: 'var(--fg-muted)' }}>
               {lang === 'es'
