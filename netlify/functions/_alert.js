@@ -45,34 +45,45 @@ function alertHtml({ kind, severity, message, context, at }) {
   </body></html>`;
 }
 
-/* Returns true if this fingerprint hasn't alerted within ttlMs (so we should
-   send), false if it was recently alerted. Fail-OPEN: any Blobs error returns
-   true (prefer a duplicate alert over a missed one). */
-async function shouldSend(getStore, key, ttlMs, now, logger) {
-  let store;
-  try {
-    store = getStore({ name: 'alert-dedup', consistency: 'strong' });
-  } catch (e) {
-    return true; /* no Blobs — don't suppress */
-  }
-  const value = JSON.stringify({ at: now });
-  try {
-    const created = await store.set(key, value, { onlyIfNew: true });
-    if (!created || created.modified !== false) return true; /* first time */
-  } catch (e) {
-    return true;
-  }
-  /* Key exists — suppress unless older than ttl (then re-arm and send). */
+function dedupStore(getStore) {
+  try { return getStore({ name: 'alert-dedup', consistency: 'strong' }); }
+  catch (e) { return null; }
+}
+
+/* Returns true if this fingerprint was SUCCESSFULLY alerted within ttlMs (so we
+   should NOT send again). READ-ONLY: nothing is marked here. The mark is written
+   only after the email actually went out (markAlerted) — before, the key was
+   claimed BEFORE sending, so a failed send (Resend down, no key) silenced the
+   same alert for the whole TTL. Fail-OPEN: any Blobs error returns false
+   (prefer a duplicate alert over a missed one). */
+async function recentlyAlerted(getStore, key, ttlMs, now) {
+  const store = dedupStore(getStore);
+  if (!store) return false; /* no Blobs — don't suppress */
   try {
     const cur = await store.getWithMetadata(key, { type: 'json' });
     const at = (cur && cur.data && cur.data.at) || 0;
-    if (now - at <= ttlMs) return false; /* recently alerted */
-    const opts = cur && cur.etag ? { onlyIfMatch: cur.etag } : { onlyIfNew: true };
-    const rearmed = await store.set(key, value, opts);
-    return !rearmed || rearmed.modified !== false;
+    return Boolean(at) && now - at <= ttlMs;
   } catch (e) {
-    return true;
+    return false;
   }
+}
+
+/* Marks the fingerprint as alerted at `now`. Called ONLY after a successful
+   send. Best-effort: a Blobs failure just means the next alert isn't deduped. */
+async function markAlerted(getStore, key, now) {
+  const store = dedupStore(getStore);
+  if (!store) return false;
+  try {
+    await store.set(key, JSON.stringify({ at: now }));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/* Compat (tests/consumidores antiguos): "¿debo enviar?" = no alertado hace poco. */
+async function shouldSend(getStore, key, ttlMs, now) {
+  return !(await recentlyAlerted(getStore, key, ttlMs, now));
 }
 
 async function reportAlert({ kind, severity = 'error', message, context = {}, dedupeKey, ttlSec, deps = {} } = {}) {
@@ -108,13 +119,19 @@ async function reportAlert({ kind, severity = 'error', message, context = {}, de
     const ttlMs = 1000 * (ttlSec || parseInt(process.env.ALERT_DEDUPE_TTL_SEC, 10) || DEFAULT_TTL_SEC);
     const fp = dedupeKey || `${kind}:${stableHash(message + '|' + JSON.stringify(context))}`;
 
-    const ok = await shouldSend(getStore, fp, ttlMs, now, logger);
-    if (!ok) return { alerted: false, reason: 'deduped' };
+    if (await recentlyAlerted(getStore, fp, ttlMs, now)) return { alerted: false, reason: 'deduped' };
 
     const to = process.env.ALERT_EMAIL || adminEmail();
     const at = new Date(now).toISOString();
     const subject = `${severityMark(severity)} [Estar alerta] ${kind} — ${String(message || '').slice(0, 80)}`;
-    await sendEmail({ to, subject, html: alertHtml({ kind, severity, message, context, at }) });
+    const sent = await sendEmail({ to, subject, html: alertHtml({ kind, severity, message, context, at }) });
+    /* sendEmail no lanza: devuelve { sent:false } si Resend falla o no hay
+       llave. En ese caso NO se marca el dedupe, para que el siguiente intento
+       sí avise (antes quedaba silenciado una hora sin haber salido nada). */
+    if (sent && sent.sent === false) {
+      return { alerted: false, reason: 'send_failed' };
+    }
+    await markAlerted(getStore, fp, now);
     return { alerted: true };
   } catch (e) {
     try { logger.error('[alert] reportAlert threw (swallowed):', e.message); } catch (_) {}
@@ -123,4 +140,4 @@ async function reportAlert({ kind, severity = 'error', message, context = {}, de
 }
 
 module.exports = { reportAlert };
-module.exports._test = { stableHash, alertHtml, shouldSend, DEFAULT_TTL_SEC };
+module.exports._test = { stableHash, alertHtml, shouldSend, recentlyAlerted, markAlerted, DEFAULT_TTL_SEC };
