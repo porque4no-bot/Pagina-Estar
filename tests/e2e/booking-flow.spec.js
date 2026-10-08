@@ -129,12 +129,67 @@ test('returning from Mercado Pago shows the booking confirmation', async ({ page
     contentType: 'application/json',
     body: JSON.stringify({ status: 'confirmed', ref: 'EST-TEST1', bookingCode: 'EST-TEST1', otasyncId: 123, reservationPending: false })
   }));
-  await page.route('**/api/send-confirmation**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{"sent":true}' }));
+  /* Frente confirm: el correo de confirmación lo manda SOLO el servidor; el
+     navegador no debe llamar al endpoint (retirado). */
+  const confirmationCalls = [];
+  page.on('request', req => { if (req.url().includes('/api/send-confirmation')) confirmationCalls.push(req.url()); });
 
   await page.goto('/reservar.html?payment=success&payment_id=999&status=approved');
   await expect(page.locator('.be-confirmation')).toBeVisible();
   await expect(page.locator('.be-confirm-hero h2')).toHaveText('¡Reserva confirmada!');
+  expect(confirmationCalls).toEqual([]);
   await expect(page.locator('body')).not.toContainText('webhook');
   await expect(page.locator('body')).not.toContainText('Kunas');
   await expect(page).not.toHaveURL(/payment=success/);
+});
+
+/* Frente confirm: si el webhook aún no registró la reserva (pendiente / timeout),
+   el huésped ve "Pago recibido" y que le confirmaremos por correo — nunca
+   "Reserva confirmada" — y el navegador no pide ningún correo. */
+function seedMpDraft(page, code) {
+  return page.addInitScript(([ci, co, c]) => {
+    try {
+      sessionStorage.setItem('estar-booking-draft', JSON.stringify({
+        savedAt: Date.now(),
+        search: { checkin: ci, checkout: co, guests: 2 },
+        selectedRoom: { id: 'clasica', roomTypeId: '31348', name: 'Clásica', priceFlexible: 250000, num: '01', area: 32, capacity: 2 },
+        selectedRate: 'best',
+        currentStep: 'payment',
+        extras: {},
+        guestData: { nombre: 'Ana', apellido: 'Prueba', email: 'ana@example.com', tel: '3000000000', pais: 'Colombia' },
+        paymentMethod: 'mercadopago'
+      }));
+      sessionStorage.setItem('estar-mp-pending', JSON.stringify({ code: c, savedAt: Date.now() }));
+    } catch (e) {}
+  }, [D1, D4, code]);
+}
+
+test('pending reservation shows "payment received" and never claims it is confirmed', async ({ page }) => {
+  await seedMpDraft(page, 'EST-PEND1');
+  await page.route('**/api/booking-status**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ status: 'confirmed', ref: 'EST-PEND1', bookingCode: 'EST-PEND1', reservationPending: true })
+  }));
+  const confirmationCalls = [];
+  page.on('request', req => { if (req.url().includes('/api/send-confirmation')) confirmationCalls.push(req.url()); });
+
+  await page.goto('/reservar.html?payment=success&payment_id=998&status=approved');
+  await expect(page.locator('.be-confirmation')).toBeVisible();
+  await expect(page.locator('.be-confirm-hero h2')).toHaveText('Pago recibido');
+  await expect(page.locator('.be-confirm-hero')).toContainText('EST-PEND1');
+  await expect(page.locator('.be-confirm-hero')).toContainText('ana@example.com');
+  await expect(page.locator('.be-pending-box')).toContainText('te enviaremos la confirmación por correo');
+  await expect(page.locator('.be-confirmation')).not.toContainText('Reserva confirmada');
+  await expect(page.locator('.be-confirmation')).not.toContainText('confirmada');
+  await expect(page.locator('body')).not.toContainText('Kunas');
+  expect(confirmationCalls).toEqual([]);
+});
+
+test('Mercado Pago return without a draft does not claim the booking is confirmed', async ({ page }) => {
+  await page.goto(`/reservar.html?checkin=${D1}&checkout=${D4}&guests=2&payment=success`);
+  const notice = page.locator('.be-info-box').first();
+  await expect(notice).toContainText('Pago recibido');
+  await expect(notice).toContainText('Te enviaremos la confirmación de tu reserva por correo');
+  await expect(notice).not.toContainText('confirmada');
 });
