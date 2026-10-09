@@ -493,10 +493,28 @@ function bankFormTokenSecret() {
   throw error;
 }
 
+/* Audiencias separadas: el enlace del formulario bancario NO puede servir como
+   sesión de la app del huésped ni al revés. Antes los dos firmaban {sub, exp}
+   con el MISMO HMAC crudo (GUEST_APP_TOKEN_SECRET cuando REFUND_LINK_SECRET no
+   está), así que un token de sesión de guest.html (código + apellido) bastaba
+   para registrar la cuenta del reembolso. Ahora la clave del enlace se deriva
+   con namespace (HMAC(base, 'refund-bank-v1')) y el payload lleva
+   scope:'refund-bank', que se exige al verificar; verifyGuestToken rechaza
+   cualquier payload con scope. */
+const BANK_TOKEN_SCOPE = 'refund-bank';
+function bankTokenKey() {
+  return crypto.createHmac('sha256', bankFormTokenSecret()).update('refund-bank-v1').digest();
+}
+function hmacMatches(key, encoded, sig) {
+  const expected = crypto.createHmac('sha256', key).update(encoded).digest('base64url');
+  const a = Buffer.from(String(sig || '')), b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 function signBankDetailsToken(bookingCode, ttlSeconds = 7 * 24 * 60 * 60) {
-  const payload = { sub: bookingCode, exp: Math.floor(Date.now() / 1000) + ttlSeconds };
+  const payload = { sub: bookingCode, scope: BANK_TOKEN_SCOPE, exp: Math.floor(Date.now() / 1000) + ttlSeconds };
   const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const sig = crypto.createHmac('sha256', bankFormTokenSecret()).update(encoded).digest('base64url');
+  const sig = crypto.createHmac('sha256', bankTokenKey()).update(encoded).digest('base64url');
   return `${encoded}.${sig}`;
 }
 
@@ -504,16 +522,20 @@ function verifyBankDetailsToken(token) {
   const parts = String(token || '').split('.');
   if (parts.length !== 2) return null;
   const [encoded, sig] = parts;
-  let expected;
-  try { expected = crypto.createHmac('sha256', bankFormTokenSecret()).update(encoded).digest('base64url'); }
-  catch (e) { return null; }
-  const a = Buffer.from(sig), b = Buffer.from(expected);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  let p;
+  try { p = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')); } catch (e) { return null; }
+  if (!p || typeof p !== 'object' || !p.sub || !p.exp || p.exp < Math.floor(Date.now() / 1000)) return null;
   try {
-    const p = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
-    if (!p.sub || !p.exp || p.exp < Math.floor(Date.now() / 1000)) return null;
-    return p;
+    if (hmacMatches(bankTokenKey(), encoded, sig)) {
+      return p.scope === BANK_TOKEN_SCOPE ? p : null;
+    }
+    /* Enlaces ya enviados con el formato viejo (clave cruda, payload EXACTO
+       {sub, exp}): se aceptan hasta que vencen (máximo 7 días). Un token de
+       sesión del huésped trae más campos (guest, nights…) y no pasa. */
+    const keys = Object.keys(p).sort().join(',');
+    if (keys === 'exp,sub' && hmacMatches(bankFormTokenSecret(), encoded, sig)) return p;
   } catch (e) { return null; }
+  return null;
 }
 
 function sanitizeBankDetails(input) {

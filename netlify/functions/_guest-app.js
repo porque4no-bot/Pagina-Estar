@@ -369,6 +369,12 @@ function verifyGuestToken(token) {
   try {
     const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
     if (!payload.sub || !payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
+    /* Un token con scope es de OTRA audiencia (p. ej. el enlace del formulario
+       bancario de reembolso): nunca abre una sesión del huésped. */
+    if (payload.scope) return null;
+    /* Enlace bancario del formato viejo (payload EXACTO {sub, exp}, firmado con
+       la misma clave): tampoco es una sesión. Las sesiones llevan más campos. */
+    if (Object.keys(payload).sort().join(',') === 'exp,sub') return null;
     return payload;
   } catch (error) {
     return null;
@@ -550,5 +556,6 @@ module.exports = {
   sealBinaryForStore,
   signGuestToken,
   syncGuestEvent,
-  unprotectRecord
+  unprotectRecord,
+  verifyGuestToken
 };
