@@ -72,10 +72,52 @@ function ga4ConfigScript(ga4Id, googleAdsId) {
   );
 }
 
+/* Meta Pixel: fbq no deja reemplazar la URL que reporta (dl = location.href,
+   rl = document.referrer). Si la URL o el referrer traen algún parámetro
+   fuera de la lista blanca (p. ej. external_reference=MPDIR-… al volver de
+   Mercado Pago, o el token de una página privada) o un #hash con datos, el
+   píxel NO se carga en esa vista: se pierde un PageView, nunca se le envía un
+   dato personal a Meta. ES5 puro (se inyecta con Function#toString). */
+function analyticsUrlIsClean(href, base, keep) {
+  try {
+    var u = new URL(href, base);
+    var ok = true;
+    u.searchParams.forEach(function (value, key) {
+      if (!keep.test(key)) ok = false;
+    });
+    if (u.hash && u.hash.indexOf('=') !== -1) ok = false;
+    return ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+function metaPixelScript(pixelId) {
+  return (
+    `<script>\n` +
+    `(function(){var keep=new RegExp(${JSON.stringify(ANALYTICS_QUERY_ALLOWLIST_SOURCE)},'i');` +
+    `var isClean=${analyticsUrlIsClean.toString().replace(/\s*\n\s*/g, ' ')};` +
+    `if(!isClean(location.href,location.href,keep))return;` +
+    `if(document.referrer&&!isClean(document.referrer,location.href,keep))return;\n` +
+    `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?` +
+    `n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;` +
+    `n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;` +
+    `t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}` +
+    `(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');\n` +
+    `fbq('consent','revoke');\n` +
+    `fbq('init','${pixelId}');\n` +
+    `fbq('track','PageView');\n` +
+    `})();\n` +
+    `</script>`
+  );
+}
+
 module.exports = {
   GA4_EXCLUDED_PAGES,
   isGa4Excluded,
   ANALYTICS_QUERY_ALLOWLIST_SOURCE,
   cleanAnalyticsUrl,
-  ga4ConfigScript
+  analyticsUrlIsClean,
+  ga4ConfigScript,
+  metaPixelScript
 };

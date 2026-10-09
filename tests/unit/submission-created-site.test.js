@@ -59,9 +59,14 @@ test('convenios-empresas: partner EMPRESA con contacto, WhatsApp y crédito en l
     whatsapp: '+57 300 111 2233', credito_30_dias: 'on', aceptar_politica: 'on'
   });
   assert.equal(v.name, 'Hospital de Caldas');
-  assert.equal(v.email, 'm.restrepo@hc.co');
-  assert.equal(v.phone, '+57 300 111 2233');
+  /* El correo y el WhatsApp son del CONTACTO: van al lead, nunca al partner
+     empresa (evita sobrescribir la ficha de una persona que ya existe). */
+  assert.equal(v.email, undefined);
+  assert.equal(v.phone, undefined);
+  assert.equal(v.leadEmail, 'm.restrepo@hc.co');
+  assert.equal(v.leadPhone, '+57 300 111 2233');
   assert.equal(v.isCompany, true);
+  assert.equal(v.dedupeByCompanyName, true);
   assert.deepEqual(v.tags, ['Corporativo', 'Convenio empresarial']);
   assert.match(v.comment, /Contacto: María Restrepo/);
   assert.match(v.comment, /Solicita crédito a 30 días: sí/);
@@ -79,7 +84,7 @@ test('convenios-empresas con marketingOptIn: tag + nota de consentimiento + list
   const v = _test.FORM_HANDLERS['convenios-empresas']({ empresa: 'ACME', contacto: 'Ana', email: 'a@acme.co', marketingOptIn: 'on' });
   assert.deepEqual(v.tags, ['Corporativo', 'Convenio empresarial', 'Opt-in marketing']);
   assert.match(v.comment, /Opt-in marketing aceptado \(empresas\.html\) el \d{4}-\d{2}-\d{2}/);
-  assert.deepEqual(v.marketing, { listName: 'Newsletter', name: 'Ana' });
+  assert.deepEqual(v.marketing, { listName: 'Newsletter', name: 'Ana', email: 'a@acme.co' });
 });
 
 test('convenios-empresas de punta a punta: upsert empresa + lead con contacto y teléfono', async () => {
@@ -93,7 +98,10 @@ test('convenios-empresas de punta a punta: upsert empresa + lead con contacto y 
   assert.equal(odoo.calls.upsert.length, 1);
   const partner = odoo.calls.upsert[0];
   assert.equal(partner.isCompany, true);
-  assert.ok(!('lead' in partner) && !('leadContact' in partner) && !('marketing' in partner),
+  assert.equal(partner.email, undefined, 'el correo del contacto no llega al partner empresa');
+  assert.equal(partner.phone, undefined);
+  assert.equal(odoo.calls.lead[0].email, 'ana@acme.co', 'el correo del contacto va al lead');
+  assert.ok(!('lead' in partner) && !('leadContact' in partner) && !('leadEmail' in partner) && !('leadPhone' in partner) && !('marketing' in partner),
     'los metadatos de enrutado no llegan a res.partner');
   assert.equal(odoo.calls.lead.length, 1);
   assert.deepEqual(
@@ -234,4 +242,15 @@ test('todo formulario data-netlify del sitio (ES y EN) tiene handler en submissi
   assert.ok(names.size >= 6, `se esperaban varios formularios, hay ${names.size}`);
   const missing = [...names].filter(n => !_test.FORM_HANDLERS[n] && !_test.TEAM_NOTIFY_FORMS[n]);
   assert.deepEqual(missing, [], `formularios sin destino: ${missing.join(', ')}`);
+});
+
+test('convenios-empresas con opt-in: el correo del CONTACTO entra a la lista aunque el partner no lo lleve', async () => {
+  const odoo = fakeOdoo();
+  await _test.handle(ev({
+    form_name: 'convenios-empresas',
+    data: { empresa: 'ACME SAS', contacto: 'Ana Gómez', email: 'ana@acme.co', marketingOptIn: 'on' }
+  }), deps(odoo));
+  assert.equal(odoo.calls.mailing.length, 1);
+  assert.equal(odoo.calls.mailing[0].email, 'ana@acme.co');
+  assert.equal(odoo.calls.mailing[0].name, 'Ana Gómez');
 });

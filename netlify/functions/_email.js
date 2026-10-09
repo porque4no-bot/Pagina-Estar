@@ -649,7 +649,7 @@ function jobApplicationHtml({ application }) {
     <p style="margin:0 0 22px;font-family:${SANS};font-size:14px;line-height:1.65;color:${C.body};">Llegó una postulación desde <strong style="color:#28292b;">Trabaja con nosotros</strong> en el sitio.</p>
     ${dataRows(rows)}
     ${mensaje ? calloutBox(C.olive, 'Sobre la persona', mensaje) : ''}
-    <p style="margin:20px 0 0;font-family:${SANS};font-size:12px;line-height:1.6;color:${C.muted};">Dato personal para selección de personal: úsalo solo para este proceso y no lo reenvíes fuera del equipo. La copia original queda en Netlify Forms (vacantes-empleo).</p>`;
+    <p style="margin:20px 0 0;font-family:${SANS};font-size:12px;line-height:1.6;color:${C.muted};">Dato personal para selección de personal: úsalo solo para este proceso y no lo reenvíes fuera del equipo. La copia original queda en Netlify Forms (vacantes-empleo). Si la persona pide eliminar su postulación, bórrala de Netlify Forms y de este buzón (así lo promete la política de privacidad).</p>`;
   return internalShell({ accent: C.olive, kicker: 'Selección de personal', title: `Nueva postulación — ${a.nombre || a.email || 'sin nombre'}`, bodyHtml: body });
 }
 module.exports.jobApplicationHtml = jobApplicationHtml;

@@ -177,7 +177,7 @@ validateMarketingData({ rootDir });
 // Ad pixels are emitted ONLY when their IDs are configured at build time, so
 // the markup is inert until META_PIXEL_ID / GOOGLE_ADS_ID are set in Netlify.
 const GA4_ID = 'G-9PB0Z2KQJK';
-const { isGa4Excluded, ga4ConfigScript } = require('./build-ga4');
+const { isGa4Excluded, ga4ConfigScript, metaPixelScript } = require('./build-ga4');
 const META_PIXEL_ID = (process.env.META_PIXEL_ID || '').trim();
 const GOOGLE_ADS_ID = (process.env.GOOGLE_ADS_ID || '').trim();
 
@@ -204,16 +204,9 @@ let ga4Snippet =
 if (META_PIXEL_ID) {
   ga4Snippet +=
     `\n<!-- Meta Pixel (consent-gated; fires only after opt-in) -->\n` +
-    `<script>\n` +
-    `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?` +
-    `n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;` +
-    `n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;` +
-    `t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}` +
-    `(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');\n` +
-    `fbq('consent','revoke');\n` +
-    `fbq('init','${META_PIXEL_ID}');\n` +
-    `fbq('track','PageView');\n` +
-    `</script>`;
+    /* No se carga si la URL o el referrer traen parámetros fuera de la lista
+       blanca (datos personales de Mercado Pago, tokens) — ver build-ga4.js. */
+    metaPixelScript(META_PIXEL_ID);
 }
 
 // External consent manager (banner + Consent Mode update on opt-in).

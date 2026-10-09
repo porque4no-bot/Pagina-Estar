@@ -241,3 +241,69 @@ test('empresas (ES/EN): la cotización exige aceptar la política y envía el op
     assert.match(html, /window\.estarTrack\('generate_lead', \{ form_name: 'cotizacion-corporativa'/, rel);
   }
 });
+
+/* ── Revisión: Meta Pixel sin fuga de URL + plazo de postulaciones ── */
+const { metaPixelScript, analyticsUrlIsClean } = require(path.join(root, 'build-ga4.js'));
+
+function runPixel(pageUrl, referrer) {
+  const body = metaPixelScript('123456789').replace(/^<script>/, '').replace(/<\/script>$/, '');
+  const inserted = [];
+  const sandbox = {
+    URL,
+    location: new URL(pageUrl),
+    document: {
+      referrer: referrer || '',
+      createElement: () => ({}),
+      getElementsByTagName: () => [{ parentNode: { insertBefore: (t) => inserted.push(t) } }]
+    }
+  };
+  sandbox.window = sandbox;
+  vm.runInNewContext(body, sandbox);
+  return { fbq: sandbox.fbq, inserted };
+}
+
+test('analyticsUrlIsClean: solo parámetros de la lista blanca y sin #hash con datos', () => {
+  const keep = new RegExp(ANALYTICS_QUERY_ALLOWLIST_SOURCE, 'i');
+  assert.equal(analyticsUrlIsClean('https://estar.com.co/reservar.html?utm_source=x&checkin=2026-10-10', undefined, keep), true);
+  assert.equal(analyticsUrlIsClean('https://estar.com.co/reservar.html?external_reference=MPDIR-abc', undefined, keep), false);
+  assert.equal(analyticsUrlIsClean('https://estar.com.co/x.html#token=abc', undefined, keep), false);
+});
+
+test('Meta Pixel: no se carga si la URL trae external_reference de Mercado Pago', () => {
+  const r = runPixel('https://estar.com.co/reservar.html?payment=success&external_reference=MPDIR-QW5hfGFuYUBtYWlsLmNv');
+  assert.equal(r.fbq, undefined);
+  assert.equal(r.inserted.length, 0);
+});
+
+test('Meta Pixel: no se carga si el referrer trae un token', () => {
+  const r = runPixel('https://estar.com.co/index.html', 'https://estar.com.co/datos-cuenta.html?token=SECRETO');
+  assert.equal(r.fbq, undefined);
+});
+
+test('Meta Pixel: en una URL limpia se carga con consentimiento revocado por defecto', () => {
+  const r = runPixel('https://estar.com.co/index.html?utm_source=ig');
+  assert.equal(typeof r.fbq, 'function');
+  assert.equal(r.inserted.length, 1);
+  const q = r.fbq.queue.map(a => Array.from(a));
+  assert.deepEqual(q[0], ['consent', 'revoke']);
+  assert.deepEqual(q[1], ['init', '123456789']);
+});
+
+test('build.js usa el píxel protegido (no el snippet crudo con fbq init directo)', () => {
+  const src = read('build.js');
+  assert.match(src, /metaPixelScript\(META_PIXEL_ID\)/);
+  assert.ok(!/fbq\('init','\$\{META_PIXEL_ID\}'\)/.test(src));
+});
+
+test('privacidad (ES/EN): el plazo de las postulaciones es el que el sistema cumple (hasta que se pida borrar)', () => {
+  const es = read('privacidad.html');
+  const en = read('en/privacidad.html');
+  assert.ok(!/hasta por un \(1\) año/.test(es), 'no promete un borrado automático a 1 año que no existe');
+  assert.ok(!/up to one \(1\) year afterwards/.test(es + en));
+  assert.match(es, /queda registrada en el formulario del sitio \(Netlify\)/);
+  assert.match(es, /la borramos tanto del formulario como del correo del equipo/);
+  for (const html of [es, en]) {
+    assert.match(html, /is recorded in the website form \(Netlify\)/);
+    assert.match(html, /we delete it from both the form and the team's email/);
+  }
+});

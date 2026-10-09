@@ -127,11 +127,15 @@ const FORM_HANDLERS = {
     const credito = isChecked(data.credito_30_dias);
     const optInMarketing = hasMarketingOptIn(data);
     const name = (empresa || contacto || email).slice(0, 200);
+    /* El correo y el WhatsApp son de la PERSONA de contacto, no de la empresa:
+       NO se le pasan al partner empresa (upsertPartner deduplica por correo y
+       sobrescribiría la ficha de esa persona si ya existe como huésped o
+       suscriptora, o la de un tercero cuyo correo alguien escriba en el form
+       público). La empresa se deduplica por nombre; el contacto va al lead. */
     const values = {
       name,
-      email,
-      phone,
       isCompany: true,
+      dedupeByCompanyName: true,
       tags: optInMarketing
         ? ['Corporativo', 'Convenio empresarial', 'Opt-in marketing']
         : ['Corporativo', 'Convenio empresarial'],
@@ -142,9 +146,11 @@ const FORM_HANDLERS = {
         optInMarketing ? optInNote('empresas.html') : ''
       ].filter(Boolean).join('. '),
       lead: (v) => `Convenio empresarial — ${v.name}`,
-      leadContact: contacto
+      leadContact: contacto,
+      leadEmail: email,
+      leadPhone: phone
     };
-    if (optInMarketing && email) values.marketing = { listName: 'Newsletter', name: contacto || name };
+    if (optInMarketing && email) values.marketing = { listName: 'Newsletter', name: contacto || name, email };
     return values;
   },
 
@@ -339,27 +345,28 @@ async function handle(event, deps) {
      lead) y `marketing` (datos de la lista de Email Marketing) son metadatos de
      enrutado, no campos de res.partner: se sacan de los valores antes de llamar
      a upsertPartner. */
-  const { lead: leadSubject, leadContact, marketing, ...partnerValues } = values;
+  const { lead: leadSubject, leadContact, leadEmail, leadPhone, marketing, ...partnerValues } = values;
 
   try {
     const { upsertPartner, createLead, addToMailingList } = deps.odoo();
     const partner = await upsertPartner(partnerValues);
     if (process.env.DEBUG) console.log(`[submission-created] Odoo upsert (${formName}):`, partner && (partner.id || (partner.isMock ? 'mock' : '')));
     if (partner && partner.id && leadSubject) {
-      const leadData = { subject: leadSubject(partnerValues), partnerId: partner.id, email: partnerValues.email, description: partnerValues.comment };
+      const leadData = { subject: leadSubject(partnerValues), partnerId: partner.id, email: leadEmail || partnerValues.email, description: partnerValues.comment };
       if (leadContact) leadData.contactName = leadContact;
-      if (partnerValues.phone) leadData.phone = partnerValues.phone;
+      if (leadPhone || partnerValues.phone) leadData.phone = leadPhone || partnerValues.phone;
       await createLead(leadData);
     }
     /* Email Marketing: SOLO con opt-in de marketing (Ley 1581). Se intenta aun en
        modo mock (no-op) para que el flujo sea idéntico con y sin credenciales. */
-    if (marketing && partnerValues.email) {
+    const marketingEmail = (marketing && (marketing.email || partnerValues.email)) || '';
+    if (marketing && marketingEmail) {
       await addToMailingList({
-        email: partnerValues.email,
+        email: marketingEmail,
         name: marketing.name || partnerValues.name,
         listName: marketing.listName
       });
-      if (process.env.DEBUG) console.log(`[submission-created] Email Marketing (${formName}): ${partnerValues.email} → ${marketing.listName}`);
+      if (process.env.DEBUG) console.log(`[submission-created] Email Marketing (${formName}): ${marketingEmail} → ${marketing.listName}`);
     }
   } catch (err) {
     console.error(`[submission-created] Odoo (${formName}) no fatal:`, err.message);
