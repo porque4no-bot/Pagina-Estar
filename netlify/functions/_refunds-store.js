@@ -56,6 +56,11 @@ function refundRoute(provider, paymentMethod) {
   const p = String(provider || '').toLowerCase();
   const m = String(paymentMethod || '').toLowerCase();
   if (p === 'mercadopago') {
+    /* Método DESCONOCIDO (p. ej. el pago se recuperó de la nota de Kunas, que trae
+       el id pero no el método): Mercado Pago reembolsa por id de pago, así que va
+       por la pasarela. Si fuera PSE/efectivo, MP rechaza el reembolso → FAILED +
+       alerta, y el admin puede corregir el medio desde el panel. */
+    if (!m) return ROUTE.GATEWAY_AUTO;
     if (/credit|debit|account_money|visa|master|amex|diners/.test(m)) return ROUTE.GATEWAY_AUTO;
     return ROUTE.MANUAL_BANK; // pse, ticket, efecty, etc.
   }
@@ -276,23 +281,62 @@ async function listRefunds(statusFilter) {
 }
 
 /* Applies a status transition with an append-only audit entry. `patch` carries
-   extra fields to merge (refundAmountCents, approvedBy, deniedReason, etc.). */
-async function transitionStatus(bookingCode, newStatus, actor, notes, patch) {
+   extra fields to merge (refundAmountCents, approvedBy, deniedReason, etc.).
+   - newStatus null/undefined: escritura AUXILIAR (marca de Kunas, correos
+     enviados, monto…) que NO cambia el estado: se conserva el estado ACTUAL
+     leído aquí mismo, nunca uno leído al comienzo de la petición (si no, una
+     escritura lenta revertía un "Reembolsado" hecho en paralelo).
+   - patch puede ser una función (registroFresco) => objeto, para construir el
+     cambio sobre lo que hay ahora (p. ej. agregar a guestNotices sin pisar).
+   - opts.expectStatus: compare-and-set. Solo escribe si el estado actual es el
+     esperado; si otro cambio se cuela entre la lectura y la escritura (etag),
+     devuelve status_changed. Evita dos aprobaciones → dos reembolsos.
+   Sin expectStatus, un choque de etag se reintenta sobre el registro fresco. */
+async function transitionStatus(bookingCode, newStatus, actor, notes, patch, opts) {
   const store = getRefundStore();
-  const raw = await store.get(String(bookingCode));
-  if (!raw) return { ok: false, reason: 'not_found' };
-  const refund = JSON.parse(raw);
-  const oldStatus = refund.status;
-  Object.assign(refund, patch || {});
-  refund.status = newStatus;
-  refund.updatedAt = nowIso();
-  refund.auditLog = Array.isArray(refund.auditLog) ? refund.auditLog : [];
-  refund.auditLog.push({ ts: nowIso(), oldStatus, newStatus, actor: actor || 'system', notes: notes || '' });
-  /* Frente cancel: registros viejos con datos bancarios EN CLARO se cifran en la
-     siguiente escritura (migración perezosa). Sin clave, se dejan como están. */
-  migrateLegacyBankDetails(refund);
-  await store.set(String(bookingCode), JSON.stringify(refund));
-  return { ok: true, refund };
+  const key = String(bookingCode);
+  const expect = opts && opts.expectStatus;
+  const canCas = typeof store.getWithMetadata === 'function';
+  const maxTries = expect ? 1 : 4;
+  for (let attempt = 0; attempt < maxTries; attempt++) {
+    let raw;
+    let etag = null;
+    if (canCas) {
+      const cur = await store.getWithMetadata(key, { type: 'text' });
+      raw = cur ? cur.data : null;
+      etag = cur ? cur.etag || null : null;
+    } else {
+      raw = await store.get(key);
+    }
+    if (!raw) return { ok: false, reason: 'not_found' };
+    const refund = JSON.parse(raw);
+    const oldStatus = refund.status;
+    if (expect) {
+      const allowed = Array.isArray(expect) ? expect : [expect];
+      if (!allowed.includes(oldStatus)) return { ok: false, reason: 'status_changed', refund };
+    }
+    const target = newStatus == null ? oldStatus : newStatus;
+    const extra = typeof patch === 'function' ? patch(refund) : patch;
+    Object.assign(refund, extra || {});
+    refund.status = target;
+    refund.updatedAt = nowIso();
+    refund.auditLog = Array.isArray(refund.auditLog) ? refund.auditLog : [];
+    refund.auditLog.push({ ts: nowIso(), oldStatus, newStatus: target, actor: actor || 'system', notes: notes || '' });
+    /* Frente cancel: registros viejos con datos bancarios EN CLARO se cifran en la
+       siguiente escritura (migración perezosa). Sin clave, se dejan como están. */
+    migrateLegacyBankDetails(refund);
+    if (etag) {
+      const res = await store.set(key, JSON.stringify(refund), { onlyIfMatch: etag });
+      if (res && res.modified === false) {
+        if (expect) return { ok: false, reason: 'status_changed' };
+        continue; /* alguien escribió en medio: reintentar sobre lo fresco */
+      }
+    } else {
+      await store.set(key, JSON.stringify(refund));
+    }
+    return { ok: true, refund };
+  }
+  return { ok: false, reason: 'conflict' };
 }
 
 /* ── A9: bank-details capture for manual refunds ───────────────────────────

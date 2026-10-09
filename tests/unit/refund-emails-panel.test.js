@@ -183,6 +183,15 @@ test('faltan datos del pago: pide monto pagado, medio y número', () => {
   assert.match(out, /id="rfPayTx"/);
 });
 
+test('proveedor conocido pero sin método (MP de la nota de Kunas): pide el método, solo opciones de ese proveedor', () => {
+  const out = ctx.renderRefundModal({ ...REVIEW, paymentMethod: null, transactionIdSource: 'pms-note' }, ALLP, {});
+  assert.match(out, /id="rfPayMethod"/);
+  assert.match(out, /mercadopago\|credit_card/);
+  assert.doesNotMatch(out, /wompi\|CARD/);
+  const complete = ctx.renderRefundModal(REVIEW, ALLP, {});
+  assert.doesNotMatch(complete, /id="rfPayMethod"/);
+});
+
 test('plan desconocido: ofrece las dos lecturas (Estricta / Flexible)', () => {
   const out = ctx.renderRefundModal({ ...REVIEW, policy: { rule: 'unknown_plan', amountCents: null, alternatives: { strict: 18600000, flexible: 40000000 }, text: 'Plan desconocido' } }, ALLP, {});
   assert.match(out, /Si es Estricta: \$ 186\.000/);

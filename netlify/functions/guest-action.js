@@ -683,14 +683,31 @@ exports.handler = async event => {
         console.error('[guest-action] cancellation request failed:', cancelErr.message);
         response.cancellation = { submitted: false, code: 'error' };
       }
-      if (['error', 'notify_failed'].includes(response.cancellation.code)) {
-        await deps.reportAlert({
-          kind: 'guest_cancel_request_failed',
-          severity: 'error',
-          message: `Cancelación pedida desde la app del huésped sin procesar — reserva ${record.bookingCode}`,
-          context: { bookingCode: record.bookingCode, eventId: record.eventId, code: response.cancellation.code },
-          dedupeKey: `guest_cancel_request_failed:${record.bookingCode}`
-        });
+      /* Todo resultado que no sea "registrada" (submitted / already_requested)
+         significa que nadie del flujo normal se enteró: not_cancellable (p. ej.
+         reserva ya en checked_in), not_found, pms_unavailable, notify_failed o
+         error. Se alerta (→ tarea en Hoy) para que recepción lo gestione a mano;
+         la app del huésped muestra "Solicitud recibida" igual. */
+      const CANCEL_OK = ['submitted', 'already_requested'];
+      if (!CANCEL_OK.includes(response.cancellation.code)) {
+        const why = {
+          not_cancellable: 'la reserva no está en un estado cancelable en Kunas (¿ya hizo check-in?)',
+          not_found: 'no se encontró la reserva en Kunas',
+          pms_unavailable: 'Kunas no está configurado/disponible',
+          notify_failed: 'no se pudo avisar al equipo por correo',
+          error: 'error inesperado al procesarla'
+        }[response.cancellation.code] || `resultado ${response.cancellation.code}`;
+        try {
+          await deps.reportAlert({
+            kind: 'guest_cancel_request_failed',
+            severity: 'error',
+            message: `Cancelación pedida desde la app del huésped sin procesar — reserva ${record.bookingCode}: ${why}. Gestionarla a mano con el huésped.`,
+            context: { bookingCode: record.bookingCode, eventId: record.eventId, code: response.cancellation.code },
+            dedupeKey: `guest_cancel_request_failed:${record.bookingCode}`
+          });
+        } catch (alertErr) {
+          console.error('[guest-action] cancellation alert failed:', alertErr.message);
+        }
       }
     }
 

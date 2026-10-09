@@ -112,6 +112,7 @@ test('sin pago registrado, el id de la transacción sale de la nota de Kunas', a
   assert.equal(refund.transactionId, '1323456789');
   assert.equal(refund.transactionIdSource, 'pms-note');
   assert.equal(refund.originalAmountSource, 'pms_total');
+  assert.equal(refund.route, 'GATEWAY_AUTO', 'pago MP de la nota (sin método) → se devuelve por Mercado Pago');
 });
 
 test('sin preVerified se sigue exigiendo el segundo factor (anti-enumeración)', async () => {
@@ -183,9 +184,36 @@ test('guest app: si el flujo falla, la solicitud del huésped no se cae y se ale
   } finally { guestAction._test.resetDeps(); }
 });
 
+test('guest app: not_cancellable / not_found también alertan al equipo (no se pierde la solicitud)', async () => {
+  for (const code of ['not_cancellable', 'not_found']) {
+    const alerts = [];
+    baseDeps({
+      hasPmsCredentials: () => true,
+      submitCancellationRequest: async () => ({ ok: false, code }),
+      reportAlert: async (a) => { alerts.push(a); return { alerted: true }; }
+    });
+    try {
+      const res = await guestAction.handler(guestEvent({ type: 'reservation_change', requestKind: 'cancel', message: 'x' }));
+      assert.equal(res.statusCode, 201);
+      assert.equal(alerts.length, 1, code);
+      assert.equal(alerts[0].kind, 'guest_cancel_request_failed');
+      assert.equal(alerts[0].context.code, code);
+    } finally { guestAction._test.resetDeps(); }
+  }
+  /* registrada o ya pedida: sin alerta */
+  for (const code of ['submitted', 'already_requested']) {
+    const alerts = [];
+    baseDeps({ hasPmsCredentials: () => true, submitCancellationRequest: async () => ({ ok: true, code }), reportAlert: async (a) => { alerts.push(a); } });
+    try {
+      await guestAction.handler(guestEvent({ type: 'reservation_change', requestKind: 'cancel', message: 'x' }));
+      assert.equal(alerts.length, 0, code);
+    } finally { guestAction._test.resetDeps(); }
+  }
+});
+
 test('guest app sin credenciales del PMS (demo): no intenta el flujo', async () => {
   let called = 0;
-  baseDeps({ hasPmsCredentials: () => false, submitCancellationRequest: async () => { called++; } });
+  baseDeps({ hasPmsCredentials: () => false, submitCancellationRequest: async () => { called++; }, reportAlert: async () => ({ alerted: false }) });
   try {
     const res = await guestAction.handler(guestEvent({ type: 'reservation_change', requestKind: 'cancel', message: 'x' }));
     assert.equal(res.statusCode, 201);

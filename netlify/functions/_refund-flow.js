@@ -16,6 +16,9 @@
 
 const TASK_KEYS = {
   pmsCancel: (code) => `refund-pms-cancel-${code}`,
+  /* Alerta de cancelación automática fallida (refund-admin-action y
+     _otasync.cancelReservation la encolan con esta dedupeKey). */
+  pmsCancelAlert: (code) => `otasync-cancel-${code}`,
   pay: (code) => `refund-pay-${code}`,
   gatewayFail: (code) => `refund-fail-${code}`
 };

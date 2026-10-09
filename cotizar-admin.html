@@ -3210,12 +3210,18 @@ function renderRefundModal(r, perms, cfg) {
       actions = '<div class="rf-section"><div class="rf-note">Puedes ver esta solicitud, pero aprobarla o denegarla requiere permiso de tesorería/administración.</div></div>';
     } else {
       const missingPaid = !r.originalAmountCents;
-      const missingProvider = !r.paymentProvider;
+      /* El selector aparece si falta el proveedor O el método (p. ej. un pago de
+         Mercado Pago recuperado de la nota de Kunas trae proveedor e id, pero no
+         el método). Con el proveedor conocido, solo se ofrecen sus opciones. */
+      const missingProvider = !r.paymentProvider || !r.paymentMethod;
       const missingTx = !r.transactionId;
+      const payOptions = r.paymentProvider
+        ? RF_PAYMENT_OPTIONS.filter(o => !o[0] || o[0].indexOf(r.paymentProvider + '|') === 0)
+        : RF_PAYMENT_OPTIONS;
       const paidField = missingPaid ? `<div class="field"><label for="rfPaid">Monto pagado (COP) — verifícalo en Mercado Pago / Wompi</label>
           <input id="rfPaid" type="number" class="it-input" style="min-width:unset; width:100%" min="0" placeholder="Ej. 330000"></div>` : '';
-      const providerField = missingProvider ? `<div class="field"><label for="rfPayMethod">Medio de pago</label>
-          <select id="rfPayMethod" class="it-input" style="min-width:unset; width:100%">${RF_PAYMENT_OPTIONS.map(o => `<option value="${o[0]}">${escHtml(o[1])}</option>`).join('')}</select></div>` : '';
+      const providerField = missingProvider ? `<div class="field"><label for="rfPayMethod">Medio de pago${r.paymentProvider ? ' (' + escHtml(r.paymentProvider) + ': confirma el método)' : ''}</label>
+          <select id="rfPayMethod" class="it-input" style="min-width:unset; width:100%">${payOptions.map(o => `<option value="${o[0]}">${escHtml(o[1])}</option>`).join('')}</select></div>` : '';
       const txField = missingTx ? `<div class="field"><label for="rfPayTx">N.º de pago / transacción (opcional)</label>
           <input id="rfPayTx" type="text" class="it-input" style="min-width:unset; width:100%" placeholder="Del panel de Mercado Pago / Wompi"></div>` : '';
       const missingBlock = (paidField || providerField || txField)

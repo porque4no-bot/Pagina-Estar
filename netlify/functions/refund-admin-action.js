@@ -73,7 +73,11 @@ async function executeGatewayRefund(refund, actor, amountCents) {
     paymentId: refund.transactionId,
     amountCents,
     originalAmountCents: verifiedOriginal,
-    idempotencyKey: `${refund.refundId || refund.bookingCode}-${amountCents}`
+    /* Clave estable por intento: un reintento tras un TIMEOUT o error de red
+       reusa la misma clave (MP pudo haber procesado la devolución → no se
+       duplica); tras un rechazo definitivo de MP (respuesta HTTP) el intento
+       sube, para que MP no devuelva en caché el mismo error al reintentar. */
+    idempotencyKey: `${refund.refundId || refund.bookingCode}-refund-${Number(refund.gatewayAttempt) || 0}`
   });
 
   const execRecord = {
@@ -99,8 +103,12 @@ async function executeGatewayRefund(refund, actor, amountCents) {
 
   /* Failed: record it, flag the request, and alert the team — a human finishes
      it manually within the SLA. */
+  /* Rechazo definitivo = MP respondió (HTTP de error o status 'rejected'). */
+  const definitive = result.status != null && result.error !== 'timeout';
+  const failPatch = { refundExecution: execRecord };
+  if (definitive) failPatch.gatewayAttempt = (Number(refund.gatewayAttempt) || 0) + 1;
   const res = await transitionStatus(refund.bookingCode, STATUS.FAILED, 'system',
-    `Fallo al reembolsar en Mercado Pago: ${execRecord.error}`, { refundExecution: execRecord });
+    `Fallo al reembolsar en Mercado Pago: ${execRecord.error}`, failPatch);
   try {
     const { reportAlert } = require('./_alert');
     await reportAlert({
@@ -130,7 +138,9 @@ async function maybeCancelReservationInPms(refund, actor) {
   try {
     const { cancelReservation } = require('./_otasync');
     const result = await cancelReservation(id);
-    await transitionStatus(refund.bookingCode, refund.status, 'system',
+    /* null = sin cambio de estado (se conserva el ACTUAL: la llamada a Kunas
+       puede tardar y en medio alguien pudo marcar "Reembolsado"). */
+    await transitionStatus(refund.bookingCode, null, 'system',
       `Reserva cancelada en OTASync (${(result && result.status) || (result && result.alreadyGone ? 'no existía' : 'canceled')})`,
       {
         reservationCanceled: true,
@@ -181,14 +191,26 @@ function paymentFixPatch(refund, fix) {
   const provider = PAYMENT_PROVIDERS.includes(String(fix.provider || '')) ? String(fix.provider) : null;
   const method = String(fix.method || '').replace(/[^A-Za-z0-9_ -]/g, '').trim().slice(0, 40);
   const tx = String(fix.transactionId || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
+  /* Si el proveedor ya se conoce (pasarela / nota del webhook) y el admin eligió
+     OTRO, no se mezcla un método de otro proveedor. */
+  const conflict = !!(refund.paymentProvider && provider && provider !== refund.paymentProvider);
   if (!refund.paymentProvider && provider) patch.paymentProvider = provider;
-  if (!refund.paymentMethod && method) patch.paymentMethod = method;
+  if (!refund.paymentMethod && method && !conflict) patch.paymentMethod = method;
   if (!refund.transactionId && tx) { patch.transactionId = tx; patch.transactionIdSource = 'admin'; }
   if (patch.paymentProvider || patch.paymentMethod) {
     const { refundRoute } = require('./_refunds-store');
     patch.route = refundRoute(patch.paymentProvider || refund.paymentProvider, patch.paymentMethod || refund.paymentMethod);
   }
   return patch;
+}
+
+/* Cerrar en Hoy TODAS las tareas de "cancelar en Kunas" de la reserva: la de la
+   decisión con el flag apagado (refund-pms-cancel-<código>) y la de la alerta
+   cuando la cancelación automática falló (otasync-cancel-<código>, encolada por
+   reportAlert aquí y en _otasync.cancelReservation). */
+async function resolvePmsCancelTasks(flow, bookingCode, actor) {
+  await flow.resolveTask(flow.TASK_KEYS.pmsCancel(bookingCode), actor);
+  await flow.resolveTask(flow.TASK_KEYS.pmsCancelAlert(bookingCode), actor);
 }
 
 function canSeeBankDetails(auth) {
@@ -206,12 +228,12 @@ function viewOf(refund, auth) {
    idempotencia del correo "realizado". */
 async function recordNotice(bookingCode, refund, notice) {
   try {
-    const list = Array.isArray(refund && refund.guestNotices) ? refund.guestNotices.slice() : [];
-    list.push(notice);
     const label = { approved: 'aprobado', denied: 'denegado', done: 'realizado' }[notice.type] || notice.type;
-    const res = await transitionStatus(bookingCode, refund.status, 'system',
+    /* Sin cambio de estado y agregando sobre el registro FRESCO (no sobre el que
+       se leyó al comienzo de la petición). */
+    const res = await transitionStatus(bookingCode, null, 'system',
       notice.sent ? `Correo al huésped: reembolso ${label}` : `Correo al huésped (${label}) NO enviado: ${notice.reason || 'error'}`,
-      { guestNotices: list });
+      (fresh) => ({ guestNotices: (Array.isArray(fresh && fresh.guestNotices) ? fresh.guestNotices : []).concat([notice]) }));
     return (res && res.refund) || refund;
   } catch (e) {
     return refund;
@@ -335,12 +357,12 @@ exports.handler = async (event) => {
       const flow = require('./_refund-flow');
       if (refund.reservationCanceled) return reply(200, { ok: true, refund: viewOf(refund, auth), already: true });
       if (body.manual === true) {
-        const res = await transitionStatus(bookingCode, refund.status, actor, notes || `Reserva cancelada a mano en Kunas (confirmado por ${actor})`, {
+        const res = await transitionStatus(bookingCode, null, actor, notes || `Reserva cancelada a mano en Kunas (confirmado por ${actor})`, {
           reservationCanceled: true,
           reservationCanceledAt: new Date().toISOString(),
           reservationCancelResult: { ok: true, manual: true, by: actor }
         });
-        await flow.resolveTask(flow.TASK_KEYS.pmsCancel(bookingCode), actor);
+        await resolvePmsCancelTasks(flow, bookingCode, actor);
         return reply(200, { ok: true, refund: viewOf(res.refund, auth) });
       }
       if (!(await flag('OTASYNC_AUTO_CANCEL_ENABLED'))) {
@@ -348,7 +370,7 @@ exports.handler = async (event) => {
       }
       const result = await maybeCancelReservationInPms(refund, actor);
       if (!result) return reply(502, { error: 'Kunas no confirmó la cancelación. Se creó una alerta; intenta de nuevo o cancélala a mano.' });
-      await flow.resolveTask(flow.TASK_KEYS.pmsCancel(bookingCode), actor);
+      await resolvePmsCancelTasks(flow, bookingCode, actor);
       return reply(200, { ok: true, refund: viewOf(await getRefund(bookingCode), auth), reservationCancel: { ok: !!result.ok, status: result.status || null } });
     } catch (e) {
       console.error('[refund-admin-action] pms-cancel', e.message);
@@ -401,7 +423,8 @@ exports.handler = async (event) => {
       const guestReason = sanitizeText(body.reason, 600);
       const res = await transitionStatus(bookingCode, STATUS.DENIED, actor, notes || 'Reembolso denegado', {
         deniedAt: new Date().toISOString(), deniedBy: actor, deniedReason: guestReason || notes || null
-      });
+      }, { expectStatus: STATUS.NEEDS_REVIEW });
+      if (!res.ok) return reply(409, { error: 'La solicitud cambió mientras la revisabas; recarga.' });
       let current = res.refund || refund;
       const pms = await closeReservationInPms(current, actor);
       if (pms.mode === 'auto') current = (await getRefund(bookingCode)) || current;
@@ -415,27 +438,36 @@ exports.handler = async (event) => {
 
     if (action === 'set-amount') {
       if (amountCents == null) return reply(400, { error: 'Falta amountCents' });
-      const res = await transitionStatus(bookingCode, refund.status, actor, `Monto de reembolso fijado: ${amountCents} centavos${backfilledOriginal ? ` · monto pagado ${knownOriginal} (ingresado)` : ''}`, { refundAmountCents: amountCents, ...originalPatch });
+      const res = await transitionStatus(bookingCode, null, actor, `Monto de reembolso fijado: ${amountCents} centavos${backfilledOriginal ? ` · monto pagado ${knownOriginal} (ingresado)` : ''}`, { refundAmountCents: amountCents, ...originalPatch });
       return reply(200, { ok: true, refund: viewOf(res.refund, auth) });
+    }
+
+    /* mark-processing / mark-done solo después de una aprobación (nunca sobre una
+       solicitud por revisar: cerraría sin decisión ni monto y avisaría al huésped). */
+    const MARKABLE = [STATUS.APPROVED, STATUS.NEEDS_BANK_DETAILS, STATUS.BANK_DETAILS_READY, STATUS.PROCESSING, STATUS.PENDING_PROVIDER, STATUS.FAILED].filter(Boolean);
+    if ((action === 'mark-processing' || action === 'mark-done') && !MARKABLE.includes(refund.status)) {
+      return reply(409, { error: 'Primero hay que aprobar el reembolso.' });
     }
 
     if (action === 'mark-processing') {
       const res = await transitionStatus(bookingCode, STATUS.PROCESSING, actor,
         notes || `Reembolso en proceso (${actor})`,
-        { processingAt: new Date().toISOString(), processingBy: actor });
+        { processingAt: new Date().toISOString(), processingBy: actor }, { expectStatus: MARKABLE });
+      if (!res.ok) return reply(409, { error: 'La solicitud cambió; recarga.' });
       return reply(200, { ok: true, refund: viewOf(res.refund, auth) });
     }
 
     if (action === 'mark-done') {
       const res = await transitionStatus(bookingCode, STATUS.DONE, actor,
         notes || `Reembolso completado por ${actor}${payoutRef ? ` · ref ${payoutRef}` : ''}`,
-        { completedAt: new Date().toISOString(), completedBy: actor, payoutRef: payoutRef || null });
+        { completedAt: new Date().toISOString(), completedBy: actor, payoutRef: payoutRef || null }, { expectStatus: MARKABLE });
+      if (!res.ok) return reply(409, { error: 'La solicitud cambió; recarga.' });
       await maybeRestoreDiscount(bookingCode); /* A-14: devolver el cupón al pool */
       await flow.resolveTask(flow.TASK_KEYS.pay(bookingCode), actor);
       await flow.resolveTask(flow.TASK_KEYS.gatewayFail(bookingCode), actor);
       let current = res.refund || refund;
       let notice = null;
-      if (!flow.alreadyNotified(current, 'done')) {
+      if (current.refundAmountCents != null && !flow.alreadyNotified(current, 'done')) {
         notice = await flow.notifyGuest('done', current);
         current = await recordNotice(bookingCode, current, notice);
       }
@@ -508,7 +540,8 @@ exports.handler = async (event) => {
     }
 
     const res = await transitionStatus(bookingCode, target, actor,
-      notes || `Aprobado por ${actor} (${route})`, patch);
+      notes || `Aprobado por ${actor} (${route})`, patch, { expectStatus: STATUS.NEEDS_REVIEW });
+    if (!res.ok) return reply(409, { error: 'La solicitud ya fue aprobada o cambió mientras la revisabas; recarga.' });
     let current = res.refund || { ...refund, ...patch, status: target };
 
     /* (b) La plata. Mercado Pago: automático con REFUND_GATEWAY_AUTO_ENABLED y un
@@ -562,4 +595,4 @@ exports.handler = async (event) => {
   }
 };
 
-exports._test = { maybeCancelReservationInPms, closeReservationInPms, paymentFixPatch, trustedTransaction, permissionFor };
+exports._test = { maybeCancelReservationInPms, closeReservationInPms, paymentFixPatch, trustedTransaction, permissionFor, executeGatewayRefund, recordNotice, resolvePmsCancelTasks };

@@ -19,6 +19,7 @@ delete process.env.REFUND_BANK_FORM_ENABLED;
 
 /* ── Blobs en memoria ── */
 const registry = new Map();
+const etagOf = (v) => require('crypto').createHash('sha1').update(String(v)).digest('hex');
 function memStore(name) {
   if (!registry.has(name)) {
     const m = new Map();
@@ -26,10 +27,18 @@ function memStore(name) {
       _m: m,
       async set(key, value, opts = {}) {
         if (opts.onlyIfNew && m.has(key)) return { modified: false };
+        if (opts.onlyIfMatch && (!m.has(key) || etagOf(m.get(key)) !== opts.onlyIfMatch)) return { modified: false };
         m.set(key, value);
         return { modified: true };
       },
       async get(key) { return m.has(key) ? m.get(key) : null; },
+      async getWithMetadata(key) {
+        if (!m.has(key)) return null;
+        const data = m.get(key);
+        /* cede el turno: deja que dos peticiones concurrentes lean el mismo etag */
+        await new Promise(r => setImmediate(r));
+        return { data, etag: etagOf(data) };
+      },
       async list(opts = {}) { return { blobs: Array.from(m.keys()).filter(k => !opts.prefix || k.startsWith(opts.prefix)).map(key => ({ key })) }; },
       async delete(key) { m.delete(key); }
     });
@@ -356,4 +365,116 @@ test('la respuesta nunca trae el sobre cifrado; los datos completos solo con ref
   assert.equal(r.status, 200);
   assert.equal(r.body.refund.bankDetailsSealed, undefined);
   assert.equal(r.body.refund.bankDetails.accountNumber, '99887766');
+});
+
+/* ── Hallazgos de revisión ── */
+test('Dos aprobaciones concurrentes con montos distintos: un solo reembolso en MP y un solo correo', async () => {
+  reset();
+  process.env.REFUND_GATEWAY_AUTO_ENABLED = 'true';
+  seed(MP_REFUND);
+  const [a, b] = await Promise.all([
+    call({ bookingCode: '3273564', action: 'approve', amountCents: 30000000 }),
+    call({ bookingCode: '3273564', action: 'approve', amountCents: 25000000 })
+  ]);
+  const statuses = [a.status, b.status].sort();
+  assert.deepEqual(statuses, [200, 409]);
+  assert.equal(mp.calls.length, 1, 'un solo reembolso real');
+  assert.match(mp.calls[0].idempotencyKey, /-refund-0$/, 'clave de idempotencia sin el monto (intento 0)');
+  assert.equal(sent.length, 1);
+});
+
+test('Marcar reembolsado sobre una solicitud POR REVISAR se rechaza (sin correo ni cierre)', async () => {
+  reset();
+  seed({ ...MP_REFUND, refundAmountCents: null });
+  for (const action of ['mark-done', 'mark-processing']) {
+    const r = await call({ bookingCode: '3273564', action, payoutRef: 'X' });
+    assert.equal(r.status, 409);
+  }
+  assert.equal(sent.length, 0);
+  assert.equal((await stored('3273564')).status, 'NEEDS_REVIEW');
+});
+
+/* ── Hallazgos de revisión (2ª ronda) ── */
+test('MP recuperado de la nota de Kunas (sin método): va por Mercado Pago, no por transferencia', async () => {
+  reset();
+  process.env.REFUND_GATEWAY_AUTO_ENABLED = 'true';
+  const { refundRoute } = require('../../netlify/functions/_refunds-store');
+  seed({ bookingCode: 'NOTE-1', paymentProvider: 'mercadopago', paymentMethod: null, route: refundRoute('mercadopago', null),
+    transactionId: '55443322', transactionIdSource: 'pms-note', originalAmountCents: null });
+  const r = await call({ bookingCode: 'NOTE-1', action: 'approve', amountCents: 20000000, originalAmountCents: 30000000 });
+  assert.equal(r.status, 200);
+  assert.equal(mp.calls.length, 1, 'se reembolsa por MP con el id de la nota');
+  assert.equal(mp.calls[0].paymentId, '55443322');
+  assert.equal(mp.calls[0].originalAmountCents, null, 'monto pagado digitado → monto explícito');
+  assert.doesNotMatch(sent[0].html, /transferencia bancaria/);
+  assert.equal(openTasks().filter(t => t.kind === 'refund_transfer').length, 0);
+});
+
+test('registro viejo MP en MANUAL_BANK sin método: el admin elige el método y la ruta pasa a Mercado Pago', async () => {
+  reset();
+  seed({ bookingCode: 'NOTE-2', paymentProvider: 'mercadopago', paymentMethod: null, route: 'MANUAL_BANK',
+    transactionId: '55443323', transactionIdSource: 'pms-note', originalAmountCents: 30000000, originalAmountSource: 'pms_total' });
+  const r = await call({ bookingCode: 'NOTE-2', action: 'approve', amountCents: 30000000, payment: { provider: 'mercadopago', method: 'credit_card' } });
+  assert.equal(r.status, 200);
+  const rec = await stored('NOTE-2');
+  assert.equal(rec.route, 'GATEWAY_AUTO');
+  assert.equal(rec.paymentMethod, 'credit_card');
+  assert.equal(rec.status, 'APPROVED');
+  assert.equal(openTasks().filter(t => t.kind === 'refund_mercadopago').length, 1, 'tarea de MP (auto apagado), no de transferencia');
+});
+
+test('paymentFixPatch: un método de OTRO proveedor no se mezcla con el proveedor conocido', () => {
+  const { paymentFixPatch } = require('../../netlify/functions/refund-admin-action')._test;
+  const p = paymentFixPatch({ paymentProvider: 'mercadopago', paymentMethod: null }, { provider: 'wompi', method: 'CARD' });
+  assert.deepEqual(p, {});
+});
+
+test('"Ya la cancelé en Kunas" también cierra la tarea de la alerta de cancelación automática fallida', async () => {
+  reset();
+  process.env.OTASYNC_AUTO_CANCEL_ENABLED = 'true';
+  process.env.ALERT_ENABLED = 'true';
+  pms.cancelImpl = () => { throw new Error('Kunas no confirmó'); };
+  seed({ bookingCode: '3273565', route: 'MANUAL_BANK', originalAmountCents: 100 });
+  try {
+    await call({ bookingCode: '3273565', action: 'deny', reason: 'Fuera de plazo' });
+    assert.equal(openTasks().filter(t => t.id === 'otasync-cancel-3273565').length, 1, 'la alerta quedó como tarea');
+    const r = await call({ bookingCode: '3273565', action: 'pms-cancel', manual: true });
+    assert.equal(r.status, 200);
+    assert.equal(openTasks().filter(t => t.id === 'otasync-cancel-3273565').length, 0);
+  } finally { process.env.ALERT_ENABLED = 'false'; }
+});
+
+test('reintento de cancelación lento + "Reembolsado" en paralelo: el estado DONE no se revierte', async () => {
+  reset();
+  process.env.OTASYNC_AUTO_CANCEL_ENABLED = 'true';
+  seed({ ...MP_REFUND, bookingCode: 'RACE-1', status: 'APPROVED', refundAmountCents: 100 });
+  let release;
+  const gate = new Promise(r => { release = r; });
+  pms.cancelImpl = async () => { await gate; return { ok: true, status: 'canceled' }; };
+  const slow = call({ bookingCode: 'RACE-1', action: 'pms-cancel', manual: false });
+  await new Promise(r => setImmediate(r));
+  const done = await call({ bookingCode: 'RACE-1', action: 'mark-done', payoutRef: 'TR-9' });
+  assert.equal(done.status, 200);
+  release();
+  const r = await slow;
+  assert.equal(r.status, 200);
+  const rec = await stored('RACE-1');
+  assert.equal(rec.status, 'DONE', 'la marca de Kunas no revierte el estado');
+  assert.equal(rec.reservationCanceled, true);
+  assert.equal(rec.guestNotices.length, 1, 'el aviso de "realizado" no se pierde');
+});
+
+test('reintento de MP: tras un rechazo definitivo cambia la clave; tras un timeout la reusa', async () => {
+  reset();
+  process.env.REFUND_GATEWAY_AUTO_ENABLED = 'true';
+  seed({ ...MP_REFUND, bookingCode: 'IK-1' });
+  mp.result = { ok: false, error: 'timeout' };
+  await call({ bookingCode: 'IK-1', action: 'approve', amountCents: 40000000 });
+  mp.result = { ok: false, error: 'mp_error_400', detail: 'x', status: 400 };
+  await call({ bookingCode: 'IK-1', action: 'retry-gateway' });
+  mp.result = { ok: true, refundId: 'RF-3', status: 'approved' };
+  await call({ bookingCode: 'IK-1', action: 'retry-gateway' });
+  const keys = mp.calls.map(c => c.idempotencyKey);
+  assert.deepEqual(keys, ['REF-IK-1-refund-0', 'REF-IK-1-refund-0', 'REF-IK-1-refund-1']);
+  assert.equal((await stored('IK-1')).status, 'DONE');
 });
