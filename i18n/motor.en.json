@@ -71,6 +71,7 @@
   "discountRoom": "This code does not apply to the selected room.",
   "discountBlackout": "This code does not apply for the selected dates.",
   "discountEmailMismatch": "This code is linked to a different email. Use the same email address you received it at.",
+  "discountNotWithMercadoPago": "Discount codes currently only apply when paying with Wompi. Choose Wompi to use your code; Mercado Pago charges the full rate.",
   "confirmBooking": "Confirm booking →",
   "emptySummary": "Choose your apartaestudio to view the summary here.",
   "successTitle": "Booking confirmed!",

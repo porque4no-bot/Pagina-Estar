@@ -187,3 +187,59 @@ test('discount code from the email link is prefilled and email-bound codes expla
   await expect(page.locator('.be-step-active')).toContainText('Código aplicado');
   await expect(page.locator('.be-step-active')).toContainText('GRACIAS-AB23CD45');
 });
+
+/* Hallazgo de revisión: Mercado Pago (por donde pagan hoy los huéspedes web)
+   cobra el subtotal completo y no consume el código. La UI no puede mostrar un
+   descuento con MP: al elegir MP el código se retira, no se puede aplicar y el
+   monto enviado a la preferencia es el total sin descuento que se muestra. */
+test('discount code is withdrawn and blocked when paying with Mercado Pago', async ({ page }) => {
+  await page.addInitScript(([ci, co]) => {
+    try {
+      sessionStorage.setItem('estar-booking-draft', JSON.stringify({
+        savedAt: Date.now(),
+        search: { checkin: ci, checkout: co, guests: 2 },
+        selectedRoom: { id: 'clasica', roomTypeId: '31348', name: 'Clásica', priceFlexible: 250000, num: '01', area: 32, capacity: 2 },
+        selectedRate: 'best',
+        currentStep: 'payment',
+        extras: {},
+        guestData: { nombre: 'Ana', apellido: 'Prueba', email: 'ana@example.com', tel: '3000000000', pais: 'Colombia' },
+        paymentMethod: 'wompi'
+      }));
+    } catch (e) {}
+  }, [D1, D4]);
+  await page.route('**/api/validate-discount-code**', route => {
+    const code = new URL(route.request().url()).searchParams.get('code');
+    const body = code === '__probe__'
+      ? { valid: false, reason: 'invalid', enabled: true }
+      : { valid: true, code, type: 'percent', value: 10, discountCents: 7500000, enabled: true };
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  let mpBody = null;
+  await page.route('**/api/create-mercadopago-preference', route => {
+    mpBody = JSON.parse(route.request().postData() || '{}');
+    return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'test' }) });
+  });
+
+  await page.goto('/reservar.html?codigo=gracias-ab23cd45');
+  const step = page.locator('.be-step-active');
+  await expect(step.locator('.be-step-title')).toHaveText('Resumen y pago');
+  await step.getByRole('button', { name: 'Aplicar' }).click();
+  await expect(step).toContainText('Código aplicado');
+  await expect(step).toContainText('−$ 75.000');
+
+  await step.locator('.be-payment-opt', { hasText: 'Mercado Pago' }).click();
+  await expect(step).not.toContainText('Código aplicado');
+  await expect(step).not.toContainText('−$ 75.000');
+  await expect(step).toContainText('solo aplican pagando con Wompi');
+  await expect(step.getByRole('button', { name: 'Aplicar' })).toBeDisabled();
+
+  await step.locator('.be-btn-primary').click();
+  await expect.poll(() => mpBody).not.toBeNull();
+  expect(mpBody.amountCents).toBe(75000000);
+  expect(mpBody.discountCode).toBeUndefined();
+
+  /* Volver a Wompi permite aplicar el código otra vez. */
+  await step.getByRole('button', { name: 'Intentar de nuevo' }).click();
+  await step.locator('.be-payment-opt', { hasText: 'Wompi' }).click();
+  await expect(step.getByRole('button', { name: 'Aplicar' })).toBeEnabled();
+});

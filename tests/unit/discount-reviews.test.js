@@ -210,3 +210,49 @@ test('listReviews: pendientes primero', async () => {
   assert.equal(list[0].status, 'pending');
   assert.equal(list[1].status, 'approved');
 });
+
+/* Hallazgo de revisión: la deduplicación no era atómica. Dos altas
+   simultáneas (doble clic en "Agregar a pendientes") listaban antes de que la
+   otra guardara y quedaban DOS reseñas pendientes ⇒ dos códigos al aprobar. */
+test('dos altas simultáneas de la misma reseña: solo una queda registrada', async () => {
+  const { d } = setup();
+  const results = await Promise.all([
+    reviews.createReview(INPUT, { actor: 'admin@x.co' }, d),
+    reviews.createReview(INPUT, { actor: 'admin@x.co' }, d),
+    reviews.createReview(INPUT, { actor: 'admin@x.co' }, d)
+  ]);
+  assert.equal(results.filter(r => r.ok).length, 1, 'solo una alta gana');
+  assert.ok(results.filter(r => !r.ok).every(r => r.status === 409));
+  assert.equal((await reviews.listReviews(d)).length, 1);
+});
+
+test('una alta en vuelo (reclamo reciente sin reseña aún) bloquea el duplicado; un reclamo huérfano viejo se retoma', async () => {
+  const { d } = setup();
+  const { review } = reviews.buildReview(INPUT, { id: 'REV-20260101-AAAAAA', now: new Date().toISOString() });
+  const claimsStore = reviews.getClaimsStore(d);
+  const key = reviews.reviewIdentityKey(review);
+  await claimsStore.set(key, JSON.stringify({ reviewId: 'REV-20260101-AAAAAA', at: new Date().toISOString() }));
+  const blocked = await reviews.createReview(INPUT, {}, d);
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.status, 409);
+  /* El mismo reclamo, pero de hace una hora y sin reseña guardada: se retoma. */
+  await claimsStore.set(key, JSON.stringify({ reviewId: 'REV-20260101-AAAAAA', at: new Date(Date.now() - 3600e3).toISOString() }));
+  const ok = await reviews.createReview(INPUT, {}, d);
+  assert.equal(ok.ok, true);
+});
+
+test('duplicados heredados (sin reclamo): aprobar el segundo no emite otro código', async () => {
+  const { d, sent } = setup();
+  await seedReviewRule(d);
+  const a = reviews.buildReview(INPUT, { id: 'REV-20260101-AAAAAA', now: new Date().toISOString() }).review;
+  const b = reviews.buildReview(INPUT, { id: 'REV-20260101-BBBBBB', now: new Date().toISOString() }).review;
+  await reviews.saveReview(a, d);
+  await reviews.saveReview(b, d);
+  assert.equal((await reviews.approveReview(a.id, {}, d)).ok, true);
+  const second = await reviews.approveReview(b.id, {}, d);
+  assert.equal(second.ok, false);
+  assert.equal(second.status, 409);
+  assert.equal((await reviews.loadReview(b.id, d)).status, 'pending');
+  assert.equal((await store.listCodes(d)).filter(c => c.origin === 'review').length, 1);
+  assert.equal(sent.length, 1);
+});

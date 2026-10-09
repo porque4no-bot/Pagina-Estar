@@ -717,6 +717,17 @@ function SandboxBanner({ lang }) {
   );
 }
 
+/* Medios de pago que HOY aplican un código de descuento en el servidor.
+   Solo Wompi: create-wompi-signature/wompi-webhook validan y consumen el código
+   (verifyDiscountCode/consumeDiscountUse). create-mercadopago-preference cobra el
+   subtotal completo y no consume el código, así que con Mercado Pago la UI NUNCA
+   debe mostrar un descuento. Cuando el frente mp aplique el código en la
+   preferencia y lo consuma en el webhook, agregar 'mercadopago' aquí. */
+const DISCOUNT_PAYMENT_METHODS = ['wompi'];
+function discountAllowedFor(paymentMethod) {
+  return DISCOUNT_PAYMENT_METHODS.indexOf(paymentMethod) !== -1;
+}
+
 /* ── PaymentPanel ─────────────────────────────────── */
 function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, discountApplied, setDiscountApplied, initialDiscountCode, lang }) {
   const t = i18nEngine[lang];
@@ -741,6 +752,16 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
   const baseSubtotalCents = calc ? Math.round(calc.subtotal * 100) : 0;
   const discountCents = discountApplied ? Math.min(discountApplied.discountCents || 0, baseSubtotalCents) : 0;
   const payableCents = Math.max(0, baseSubtotalCents - discountCents);
+  /* El medio elegido no aplica descuentos en el servidor (Mercado Pago hoy):
+     no se puede aplicar un código y uno ya aplicado se retira. */
+  const discountBlocked = !discountAllowedFor(paymentMethod);
+
+  React.useEffect(() => {
+    if (discountBlocked && discountApplied) {
+      setDiscountApplied(null);
+      setDiscountError(null);
+    }
+  }, [discountBlocked, discountApplied]);
 
   const discountReasonText = (reason) => {
     switch (reason) {
@@ -778,7 +799,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
 
   const applyDiscount = async () => {
     const code = (discountInput || '').trim().toUpperCase();
-    if (!code) return;
+    if (!code || discountBlocked) return;
     setDiscountChecking(true);
     setDiscountError(null);
     setDiscountApplied(null);
@@ -1171,10 +1192,13 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
                 style={{ flex: '1 1 180px', minWidth: 0, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 14, textTransform: 'uppercase' }}
               />
               <button type="button" className="be-btn-secondary" style={{ padding: '10px 18px', fontSize: 13 }}
-                onClick={applyDiscount} disabled={discountChecking || loading || !discountInput.trim()}>
+                onClick={applyDiscount} disabled={discountChecking || loading || discountBlocked || !discountInput.trim()}>
                 {discountChecking ? t.discountChecking : t.discountApply}
               </button>
             </div>
+          )}
+          {discountBlocked && (
+            <p className="be-discount-method-note" style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--fg-muted)' }}>{t.discountNotWithMercadoPago}</p>
           )}
           {discountError && (
             <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--terracotta-700)' }}>{discountError}</p>

@@ -25,6 +25,12 @@ const discountStore = require('./_discount-store');
 const rules = require('./_discount-rules');
 
 const REVIEWS_STORE = 'discount-reviews';
+/* Reclamos de unicidad: una entrada por identidad de reseña (plataforma +
+   reserva, o plataforma + email sin reserva), escrita con onlyIfNew. Es lo que
+   hace ATÓMICA la regla "no dos reseñas vivas del mismo huésped": dos altas
+   simultáneas (doble clic) listan antes de que la otra guarde, pero solo una
+   gana el reclamo. Store aparte para no mezclarse con el listado de reseñas. */
+const REVIEW_CLAIMS_STORE = 'discount-review-claims';
 const PLATFORMS = ['google', 'booking', 'tripadvisor', 'otra'];
 const STATUS = { PENDING: 'pending', APPROVED: 'approved', REJECTED: 'rejected' };
 
@@ -121,6 +127,64 @@ function findDuplicate(existing, candidate) {
       : (!r.bookingCode && r.email === candidate.email))) || null;
 }
 
+function getClaimsStore(deps = {}) {
+  const get = deps.getStore || getStore;
+  const opts = { name: REVIEW_CLAIMS_STORE, consistency: 'strong' };
+  const siteID = process.env.BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token = process.env.BLOBS_TOKEN || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_BLOBS_TOKEN;
+  if (siteID && token) { opts.siteID = siteID; opts.token = token; }
+  return get(opts);
+}
+
+/* Identidad de una reseña para la unicidad (la misma que usa findDuplicate). */
+function reviewIdentityKey(review) {
+  const r = review || {};
+  const who = r.bookingCode ? 'booking:' + r.bookingCode : 'email:' + (r.email || '');
+  const digest = crypto.createHash('sha256').update(String(r.platform || '') + '|' + who).digest('hex').slice(0, 40);
+  return 'CLAIM-' + digest;
+}
+
+/* Reclama atómicamente la identidad de la reseña para review.id.
+   Devuelve { ok:true } o { ok:false, holder } (la reseña viva que ya la tiene).
+   Un reclamo cuya reseña fue descartada o ya no existe se puede retomar
+   (compare-and-set sobre su etag). Si el store no soporta escrituras
+   condicionales, cae a "sin reclamo" (queda el chequeo por listado). */
+async function claimReviewIdentity(review, deps = {}) {
+  const key = reviewIdentityKey(review);
+  const store = getClaimsStore(deps);
+  const payload = JSON.stringify({ reviewId: review.id, at: review.createdAt });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let res;
+    try { res = await store.set(key, payload, { onlyIfNew: true }); }
+    catch (e) { return { ok: true, unsupported: true }; }
+    if (!res || res.modified !== false) return { ok: true };
+    /* Ya existe: ¿la reseña que lo tiene sigue viva? */
+    let current = null;
+    try {
+      if (typeof store.getWithMetadata === 'function') {
+        const got = await store.getWithMetadata(key, { type: 'text' });
+        if (got && got.data) current = { data: JSON.parse(got.data), etag: got.etag || null };
+      }
+    } catch (e) { current = null; }
+    if (!current) continue; /* lo borraron entre medio: reintenta el alta */
+    const holder = current.data && current.data.reviewId ? await loadReview(current.data.reviewId, deps) : null;
+    /* Reclamo de una alta que aún no termina de guardar la reseña: se trata
+       como vivo (el reclamo es reciente). Solo se retoma si la reseña fue
+       descartada, o si el reclamo es viejo y su reseña nunca se guardó. */
+    const claimAgeMs = Date.parse(nowIso(deps)) - Date.parse((current.data && current.data.at) || 0);
+    const orphanStale = !holder && !(claimAgeMs < 10 * 60 * 1000);
+    const reusable = (holder && holder.status === STATUS.REJECTED) || orphanStale;
+    if (!reusable) return { ok: false, holder: holder || null };
+    if (!current.etag) return { ok: true, unsupported: true };
+    let taken;
+    try { taken = await store.set(key, payload, { onlyIfMatch: current.etag }); }
+    catch (e) { return { ok: true, unsupported: true }; }
+    if (!taken || taken.modified !== false) return { ok: true };
+    /* Otro lo retomó primero: vuelve a evaluar. */
+  }
+  return { ok: false, holder: null };
+}
+
 async function loadReview(id, deps = {}) {
   const key = normalizeReviewId(id);
   if (!key) return null;
@@ -189,9 +253,17 @@ async function createReview(input, { actor } = {}, deps = {}) {
   const id = newReviewId(deps);
   const built = buildReview(input, { actor, now: nowIso(deps), id });
   if (built.error) return { ok: false, status: 400, error: built.error };
+  const dupError = 'Ya hay una reseña registrada de ese huésped en esa plataforma.';
+  /* Chequeo por listado (cubre reseñas anteriores a los reclamos) … */
   const dup = findDuplicate(await listReviews(deps), built.review);
   if (dup) {
-    return { ok: false, status: 409, error: 'Ya hay una reseña registrada de ese huésped en esa plataforma.', duplicate: { id: dup.id, status: dup.status } };
+    return { ok: false, status: 409, error: dupError, duplicate: { id: dup.id, status: dup.status } };
+  }
+  /* … y reclamo atómico (cubre dos altas simultáneas, p. ej. doble clic). */
+  const claim = await claimReviewIdentity(built.review, deps);
+  if (!claim.ok) {
+    const h = claim.holder;
+    return { ok: false, status: 409, error: dupError, duplicate: h ? { id: h.id, status: h.status } : null };
   }
   await saveReview(built.review, deps);
   return { ok: true, review: built.review };
@@ -210,6 +282,15 @@ async function approveReview(id, opts = {}, deps = {}) {
     return { ok: true, alreadyApproved: true, review, code: review.issuedCode ? await discountStore.loadCode(review.issuedCode, deps) : null };
   }
   if (review.status === STATUS.REJECTED) return { ok: false, status: 409, error: 'La reseña fue descartada; regístrala de nuevo si corresponde.' };
+
+  /* Una sola reseña aprobada por identidad: si ya hay OTRA aprobada del mismo
+     huésped/plataforma/reserva (p. ej. duplicados creados antes de los
+     reclamos), no se emite un segundo código. */
+  const twin = (await listReviews(deps)).find(r => r && r.id !== review.id
+    && r.status === STATUS.APPROVED && findDuplicate([r], review));
+  if (twin) {
+    return { ok: false, status: 409, error: 'Ya hay una reseña aprobada de ese huésped en esa plataforma (' + twin.id + ', código ' + (twin.issuedCode || '—') + '). Descarta esta.', duplicate: { id: twin.id, status: twin.status } };
+  }
 
   let rule;
   if (opts.ruleId) {
@@ -316,8 +397,8 @@ async function rejectReview(id, { actor, reason } = {}, deps = {}) {
 }
 
 module.exports = {
-  REVIEWS_STORE, PLATFORMS, STATUS,
-  getReviewsStore, normalizeReviewId, newReviewId,
+  REVIEWS_STORE, REVIEW_CLAIMS_STORE, PLATFORMS, STATUS,
+  getReviewsStore, getClaimsStore, reviewIdentityKey, claimReviewIdentity, normalizeReviewId, newReviewId,
   buildReview, findDuplicate, loadReview, saveReview, listReviews,
   createReview, approveReview, rejectReview, resendReviewEmail
 };

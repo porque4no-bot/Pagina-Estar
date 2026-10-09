@@ -2958,7 +2958,15 @@ function approveResultText(d) {
   if (d.discountEnabled === false) t += ' Ojo: el motor de códigos está apagado en la web.';
   return t;
 }
+/* Evita el doble envío (doble clic): mientras una alta está en vuelo, los dos
+   botones del formulario quedan deshabilitados. El servidor además rechaza
+   duplicados de forma atómica (reclamo por plataforma + reserva/email). */
+let RESENA_SUBMITTING = false;
+function setResenaButtonsDisabled(disabled) {
+  ['vAddBtn', 'vApproveNowBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = disabled; });
+}
 async function submitResena(approve) {
+  if (RESENA_SUBMITTING) return;
   const msg = document.getElementById('vMsg');
   msg.style.color = 'var(--terracotta-700)';
   msg.textContent = '';
@@ -2966,12 +2974,18 @@ async function submitResena(approve) {
   if (!payload.email) { msg.textContent = 'El email del huésped es obligatorio.'; return; }
   if (approve && !confirm('¿Aprobar la reseña de ' + (payload.name || payload.email) + ' y enviarle el código por correo?' + codFlagOffNote())) return;
   payload.approve = !!approve;
+  RESENA_SUBMITTING = true;
+  setResenaButtonsDisabled(true);
   try {
     const d = await apiCodigos('review-create', payload);
     msg.style.color = 'var(--olive-700)';
     msg.textContent = approve ? approveResultText(d) : 'Reseña agregada a pendientes.';
     ['vEmail', 'vName', 'vBooking', 'vLink', 'vNote'].forEach(id => { document.getElementById(id).value = ''; });
   } catch (e) { msg.textContent = e.message; }
+  finally {
+    RESENA_SUBMITTING = false;
+    setResenaButtonsDisabled(false);
+  }
   await Promise.all([loadResenas(), loadCodigos()]);
 }
 async function approveResena(id, btn) {
