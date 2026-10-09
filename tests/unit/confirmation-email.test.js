@@ -1,8 +1,9 @@
 /* Unit tests for the robust booking-confirmation email.
  *
  * Two layers:
- *  - sendConfirmationEmail (send-confirmation.js): the shared, idempotent
- *    sender used by BOTH the client endpoint and wompi-webhook. Dedup, the
+ *  - sendConfirmationEmail (send-confirmation.js): the shared, idempotent,
+ *    SERVER-ONLY sender used by the payment webhooks (the public HTTP endpoint
+ *    is retired — see confirm-security.test.js). Dedup, the
  *    breakfast-pass link, and the mark-after-success behaviour are covered with
  *    injected deps (no network, no Blobs).
  *  - sendDirectBookingConfirmation (wompi-webhook.js): derives `breakfast` from
@@ -91,12 +92,12 @@ test('sends the confirmation, embeds the breakfast pass link, and marks the dedu
   assert.match(captured.body.subject, /RES-100/);
   assert.match(captured.body.html, /pase-desayuno\?t=PASS123/);
   assert.match(captured.body.html, /Ver mis pases de desayuno/);
-  assert.ok(store.map.has('RES-100'), 'dedup key should be marked after a successful send');
+  assert.ok(store.map.has('srv:RES-100'), 'dedup key should be marked after a successful send');
 });
 
 test('a second send for the same booking is suppressed (idempotent)', async () => {
   const store = fakeStore();
-  store.map.set('RES-100', '1'); // a prior trigger already sent it
+  store.map.set('srv:RES-100', '1'); // a prior trigger already sent it
   let fetched = 0;
   await withResendKey('re_key', async () => {
     const result = await sendConfirmationEmail(
@@ -110,7 +111,7 @@ test('a second send for the same booking is suppressed (idempotent)', async () =
   assert.equal(fetched, 0);
 });
 
-test('the client and the webhook dedup on the same booking code → one email', async () => {
+test('two server triggers for the same booking code → one email', async () => {
   // Shared store across both triggers (the real Blobs store is global too).
   const store = fakeStore();
   const captured = {};
@@ -121,9 +122,9 @@ test('the client and the webhook dedup on the same booking code → one email', 
       baseParams({ via: 'webhook' }),
       { fetch: fetchSpy, getStore: () => store }
     );
-    // Client poll then fires for the same OTASync id.
+    // A second server trigger (webhook retry / other provider) for the same OTASync id.
     const second = await sendConfirmationEmail(
-      baseParams({ via: 'client' }),
+      baseParams({ via: 'webhook-retry' }),
       { fetch: fetchSpy, getStore: () => store }
     );
     assert.equal(first.sent, true);
@@ -146,7 +147,7 @@ test('omits the breakfast pass link when the reservation has no breakfast', asyn
   assert.doesNotMatch(captured.body.html, /SHOULD-NOT-APPEAR/);
 });
 
-test('a failed Resend send is NOT marked, so it stays retryable by the other trigger', async () => {
+test('a failed Resend send is NOT marked, so it stays retryable', async () => {
   const store = fakeStore();
   await withResendKey('re_key', async () => {
     const result = await sendConfirmationEmail(
@@ -209,7 +210,7 @@ test('webhook derives breakfast=true from the extras mask and forwards the right
   assert.equal(calls.length, 1);
   const p = calls[0];
   assert.equal(p.breakfast, true);
-  // bookingCode is the OTASync id — the shared dedup key with the client send.
+  // bookingCode is the OTASync id — the server-derived dedup key.
   assert.equal(p.bookingCode, 'RES-900');
   assert.equal(p.guestEmail, 'ana@example.com');
   assert.equal(p.guestName, 'Ana Pérez');

@@ -133,6 +133,29 @@ test('guest can authenticate and restore the session after reload', async ({ pag
   await expect(page.locator('#manageGuestName')).toHaveText('Andrea Restrepo');
 });
 
+/* Frente confirm: el correo de confirmación enlaza guest.html?code=<reserva>.
+   El código llega prellenado (el apellido sigue siendo obligatorio) y sale de la URL. */
+test('confirmation-email link pre-fills the booking code and still asks for the surname', async ({ page }) => {
+  const captured = [];
+  await mockGuestApis(page, captured);
+  await page.goto('/guest.html?code=EST-TEST-100');
+  await expect(page.locator('#bookingCode')).toHaveValue('EST-TEST-100');
+  await expect(page.locator('#accessKey')).toHaveValue('');
+  await expect(page.locator('#guestShell')).toBeHidden();
+  await expect(page).not.toHaveURL(/code=/);
+
+  await page.locator('#accessKey').fill('Restrepo');
+  await page.locator('#guestLoginForm button[type="submit"]').click();
+  await expect(page.locator('#guestShell')).toBeVisible();
+  expect(captured[0].payload).toEqual({ bookingCode: 'EST-TEST-100', accessKey: 'Restrepo' });
+});
+
+test('a malformed ?code= is ignored', async ({ page }) => {
+  await mockGuestApis(page);
+  await page.goto('/guest.html?code=%3Cscript%3E');
+  await expect(page.locator('#bookingCode')).toHaveValue('');
+});
+
 test('invalid reservation displays the API error without opening the app', async ({ page }) => {
   await page.route('https://unpkg.com/lucide@*/**', route => route.fulfill({
     contentType: 'application/javascript',

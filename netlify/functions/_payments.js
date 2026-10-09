@@ -223,6 +223,41 @@ function sanitizePhone(raw) {
   return raw.replace(/[^\d+\s]/g, '').trim().substring(0, 20);
 }
 
+/* Correo de confirmación de una reserva DIRECTA pagada por Mercado Pago. El
+   servidor es el único que lo envía (el navegador ya no lo pide), así que este
+   camino lo dispara tras crear la reserva, con el id final de OTASync — espejo
+   de wompi-webhook.sendDirectBookingConfirmation. Idempotente (send-confirmation
+   deduplica por código de reserva) y NUNCA lanza: la plata ya entró y la reserva
+   existe; un fallo del correo genera la alerta confirmation_email_failed dentro
+   de sendConfirmationEmail. `require` perezoso para no cargar Resend/pases en
+   los demás usos de este módulo. */
+async function sendDirectConfirmation({ decoded, bookingCode, roomName, nights, paidAmount, totalAmount, via }, sender) {
+  try {
+    if (!decoded) return { sent: false, reason: 'no-decoded' };
+    const sendConfirmationEmail = typeof sender === 'function' ? sender : require('./send-confirmation').sendConfirmationEmail;
+    const { EXTRAS_KEYS } = require('./_pricing');
+    const breakfastIdx = EXTRAS_KEYS.indexOf('desayuno');
+    const breakfast = breakfastIdx >= 0 && String(decoded.extrasMask || '')[breakfastIdx] === '1';
+    return await sendConfirmationEmail({
+      guestEmail: decoded.email,
+      guestName: `${decoded.firstName || ''} ${decoded.lastName || ''}`.trim() || decoded.email,
+      bookingCode,
+      roomName,
+      checkIn: decoded.checkin,
+      checkOut: decoded.checkout,
+      nights,
+      totalAmount,
+      paidAmount,
+      phone: sanitizePhone(decoded.phone),
+      breakfast,
+      via: via || 'mercadopago'
+    });
+  } catch (e) {
+    console.error(`[payments] confirmation email failed (non-fatal): ${e.message}. bookingCode=${bookingCode}`);
+    return { sent: false, reason: 'error', error: e.message };
+  }
+}
+
 function escapeHtml(str) {
   if (!str || typeof str !== 'string') return '';
   return str
@@ -958,29 +993,19 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
     }
 
     /* Correo de confirmación desde el SERVIDOR (como Wompi): llega aunque el
-       huésped cierre la pestaña en Mercado Pago o no vuelva al sitio. Idempotente
-       con el envío del navegador (dedupe por código de reserva). Nunca lanza. */
-    try {
-      if (decoded.email) {
-        const { EXTRAS_KEYS } = require('./_pricing');
-        const bIdx = EXTRAS_KEYS.indexOf('desayuno');
-        await deps.sendConfirmationEmail({
-          guestEmail: decoded.email,
-          guestName: `${decoded.firstName || ''} ${decoded.lastName || ''}`.trim() || decoded.email,
-          bookingCode: String(finalBookingCode),
-          roomName,
-          checkIn: decoded.checkin,
-          checkOut: decoded.checkout,
-          nights,
-          totalAmount: roomPrice,
-          paidAmount,
-          phone: sanitizePhone(decoded.phone),
-          breakfast: bIdx >= 0 && String(decoded.extrasMask || '')[bIdx] === '1',
-          via: 'webhook-mercadopago'
-        });
-      }
-    } catch (e) {
-      console.error(`[payments] confirmation email failed (non-fatal): ${e.message}. bookingCode=${finalBookingCode}`);
+       huésped cierre la pestaña en Mercado Pago o no vuelva al sitio. Es el ÚNICO
+       envío (el navegador ya no lo pide: send-confirmation HTTP = 410); el dedupe
+       por código de reserva lo deriva el servidor. Nunca lanza. */
+    if (decoded.email) {
+      await sendDirectConfirmation({
+        decoded,
+        bookingCode: String(finalBookingCode),
+        roomName,
+        nights,
+        paidAmount,
+        totalAmount: roomPrice,
+        via: transaction.provider
+      }, deps.sendConfirmationEmail);
     }
 
     /* Snapshot durable de los datos del pago (id MP, método, últimos 4, fecha,
@@ -1111,6 +1136,7 @@ module.exports = {
   createDirectReference,
   decodeDirectReference,
   processApprovedPayment,
+  sendDirectConfirmation,
   alreadyProcessed,
   markProcessed,
   timingSafeEqualString,

@@ -100,9 +100,11 @@ function PaymentReturnNotice({ status, lang }) {
     success: {
       icon: 'check-circle',
       title: lang === 'es' ? 'Pago recibido' : 'Payment received',
+      /* Sin verificar la reserva aún: no decir "confirmada" (la confirmación la
+         manda el servidor por correo cuando la reserva queda registrada). */
       text: lang === 'es'
-        ? 'Tu reserva está confirmada. En unos minutos te llegará al correo el detalle de tu estadía.'
-        : 'Your booking is confirmed. You will receive your stay details by email in a few minutes.'
+        ? 'Te enviaremos la confirmación de tu reserva por correo en cuanto quede registrada.'
+        : 'We will email your booking confirmation as soon as it is registered.'
     },
     pending: {
       icon: 'clock',
@@ -1385,6 +1387,8 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
   const t = i18nEngine[lang];
   const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
   const reservationPending = !!(paymentDetails && paymentDetails.reservationPending);
+  /* Pago aún sin aprobar (p. ej. Mercado Pago "pending"): no decir "recibido". */
+  const paymentInProcess = reservationPending && paymentDetails.status === 'PENDING';
 
   const roomName = t.roomNames[booking.room.id] || booking.room.name;
   const rateLabel = booking.rate === 'flexible' ? `${t.flexible} — ${t.refundable}` : `${t.bestPrice} — ${t.strictCancel}`;
@@ -1397,22 +1401,30 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
     <div className="be-confirmation">
       <div className="be-confirm-hero">
         <span className="be-confirm-icon">✶</span>
-        <h2>{reservationPending ? (lang === 'es' ? 'Pago recibido' : 'Payment received') : t.successTitle}</h2>
+        <h2>{reservationPending
+          ? (paymentInProcess
+            ? (lang === 'es' ? 'Pago en proceso' : 'Payment in progress')
+            : (lang === 'es' ? 'Pago recibido' : 'Payment received'))
+          : t.successTitle}</h2>
         <p>{reservationPending ? (lang === 'es' ? 'Referencia:' : 'Reference:') : t.successCode} <strong>{code}</strong></p>
         <p style={{ marginTop: 8 }}>
           {reservationPending
-            ? (lang === 'es' ? 'Guardamos esta referencia para seguimiento manual.' : 'We saved this reference for manual follow-up.')
+            ? <>{lang === 'es' ? 'Te confirmaremos la reserva por correo a' : 'We will confirm your booking by email at'} <strong>{booking.guest?.email || (lang === 'es' ? 'tu correo' : 'your email')}</strong></>
             : <>{t.successSent} <strong>{booking.guest?.email || 'tu correo'}</strong></>}
         </p>
       </div>
       {reservationPending && (
-        <div className="be-info-box" style={{ marginBottom: 16, backgroundColor: 'var(--sand-100)', borderColor: 'var(--terracotta-300)' }}>
+        <div className="be-info-box be-pending-box" style={{ marginBottom: 16, backgroundColor: 'var(--sand-100)', borderColor: 'var(--terracotta-300)' }}>
           <Icon name="clock" size={18} />
           <p>
-            <strong>{lang === 'es' ? 'Reserva pendiente de confirmacion.' : 'Booking pending confirmation.'}</strong>{' '}
-            {lang === 'es'
-              ? 'Tu pago fue aprobado, pero Kunas no creo la reserva automaticamente. Nuestro equipo debe confirmarla manualmente y te contactara con el codigo final.'
-              : 'Your payment was approved, but Kunas did not create the booking automatically. Our team must confirm it manually and will contact you with the final code.'}
+            <strong>{lang === 'es' ? 'Estamos terminando de registrar tu reserva.' : 'We are finishing registering your booking.'}</strong>{' '}
+            {paymentInProcess
+              ? (lang === 'es'
+                ? 'Cuando el pago se apruebe te enviaremos la confirmación por correo. No es necesario pagar de nuevo.'
+                : 'Once the payment is approved we will email you the confirmation. There is no need to pay again.')
+              : (lang === 'es'
+                ? 'Tu pago quedó registrado y te enviaremos la confirmación por correo en cuanto la reserva quede lista. No es necesario pagar de nuevo. Si no te llega en la próxima hora, escríbenos por WhatsApp con esta referencia.'
+                : 'Your payment was registered and we will email you the confirmation as soon as the booking is ready. There is no need to pay again. If it does not arrive within the next hour, message us on WhatsApp with this reference.')}
           </p>
         </div>
       )}
@@ -2018,9 +2030,7 @@ function BookingEngine() {
     setPaymentDetails(details);
     setCreatingReservation(true);
 
-    const mustPayIVA = mustChargeIva(booking.guest, lang);
     const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
-    const roomPriceVal = mustPayIVA ? calc.total : calc.subtotal;
 
     /* The webhook writes booking-results['direct-<code>'] once OTASync
        confirms. Poll for up to ~60 s with backoff to give the webhook time to
@@ -2055,9 +2065,10 @@ function BookingEngine() {
         setPaymentDetails(prev => ({ ...(prev || details || {}), reservationPending: true }));
         setBookingCode(finalCode);
       }
-      /* paidAmount = lo REALMENTE cobrado online (con descuento), no el subtotal:
-         antes el correo reportaba un "pagado" mayor al cargo real de Wompi. */
-      sendConfirmationEmailIfPossible(finalCode, roomPriceVal, payableCents != null ? Math.round(payableCents / 100) : calc.subtotal);
+      /* El correo de confirmación lo envía SOLO el servidor (webhook de pago),
+         cuando la reserva ya existe en el PMS. El navegador ya no lo pide: antes
+         mandaba "Reserva confirmada" aun sin reserva (timeout/pendiente), con el
+         código EST-, y el endpoint público permitía enviar correos a cualquiera. */
     };
 
     const pollOnce = () => {
@@ -2106,38 +2117,6 @@ function BookingEngine() {
        expose a ref to set cancelled=true. For now the page is a hard reload
        after confirmation, so cancellation is not required. */
     return;
-
-    /* Helper kept inline so the same closure has access to booking, search,
-       and lang without re-derivation. */
-    function sendConfirmationEmailIfPossible(finalCode, totalAmount, paidAmount) {
-      const guestEmail = booking.guest?.email || '';
-      const guestName = `${booking.guest?.nombre || ''} ${booking.guest?.apellido || ''}`.trim();
-      const nights = dateDiff(search.checkin, search.checkout);
-      const roomName = booking.room.name || '';
-      if (!guestEmail) return;
-      fetch('/api/send-confirmation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          guestEmail,
-          guestName,
-          bookingCode: finalCode,
-          roomName,
-          checkIn: search.checkin,
-          checkOut: search.checkout,
-          nights,
-          totalAmount,
-          paidAmount,
-          phone: booking.guest?.tel || '',
-          /* Pase de desayuno (Fase 2): el correo añade el link a los pases QR
-             solo si la reserva trae desayuno. La clave del extra es 'desayuno'. */
-          breakfast: !!(booking.extras && booking.extras.desayuno)
-        })
-      })
-      .then(r => r.json())
-      .then(emailData => console.log('[send-confirmation] Result:', emailData))
-      .catch(emailErr => console.error('[send-confirmation] Error:', emailErr));
-    }
   }
 
   /* Retorno de Mercado Pago con pago aprobado (o pendiente): en vez de dejar al
@@ -2183,7 +2162,9 @@ function BookingEngine() {
               {lang === 'es' ? 'Estamos confirmando tu reserva' : 'Confirming your reservation'}
             </p>
             <p className="t-body-sm" style={{ margin: 0, color: 'var(--fg-muted)' }}>
-              {lang === 'es' ? 'Tu pago fue aprobado. Esto puede tomar unos segundos…' : 'Your payment was approved. This may take a few seconds…'}
+              {(initialParams.payment === 'pending' || (paymentDetails && paymentDetails.status === 'PENDING'))
+                ? (lang === 'es' ? 'Estamos verificando tu pago. Esto puede tomar unos segundos…' : 'We are verifying your payment. This may take a few seconds…')
+                : (lang === 'es' ? 'Tu pago fue aprobado. Esto puede tomar unos segundos…' : 'Your payment was approved. This may take a few seconds…')}
             </p>
             <p className="t-body-sm" style={{ margin: '4px 0 0 0', color: 'var(--fg-muted)' }}>
               {lang === 'es'
