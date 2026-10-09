@@ -84,7 +84,11 @@ function parseQueryParams() {
   if (roomParam === 'clasic') roomParam = 'clasica'; // compatibility mapping
   
   const payment = params.get('payment') || '';
-  return { checkin, checkout, guests, roomParam, payment };
+  /* Frente codes: el correo del código personal/reseña enlaza a
+     reservar.html?codigo=XXXX para dejarlo prellenado en el paso de pago (el
+     servidor lo valida igual; esto solo ahorra escribirlo). */
+  const promoCode = String(params.get('codigo') || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 40);
+  return { checkin, checkout, guests, roomParam, payment, promoCode };
 }
 
 /* Retorno de Mercado Pago: código de reserva leído de external_reference (MP lo
@@ -771,8 +775,19 @@ function SandboxBanner({ lang }) {
   );
 }
 
+/* Medios de pago que aplican un código de descuento en el servidor.
+   Wompi: create-wompi-signature/wompi-webhook validan y consumen el código
+   (verifyDiscountCode/consumeDiscountUse). Mercado Pago (frente mp, oct-2026):
+   create-mercadopago-preference revalida el código con el correo de la reserva
+   (verifyDirectBookingAmount → verifyDiscountCode, incluido boundEmail) y cobra el
+   monto con descuento; el webhook consume el uso tras crear la reserva. */
+const DISCOUNT_PAYMENT_METHODS = ['wompi', 'mercadopago'];
+function discountAllowedFor(paymentMethod) {
+  return DISCOUNT_PAYMENT_METHODS.indexOf(paymentMethod) !== -1;
+}
+
 /* ── PaymentPanel ─────────────────────────────────── */
-function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, discountApplied, setDiscountApplied, paymentNotice, onNoticeShown, lang }) {
+function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, discountApplied, setDiscountApplied, paymentNotice, onNoticeShown, initialDiscountCode, lang }) {
   const t = i18nEngine[lang];
   const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
   const [loading, setLoading] = useState(false);
@@ -793,7 +808,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
      re-validated and re-priced server-side at signing time; this is only the
      in-line UX. `applied` holds the server's confirmed { code, discountCents }. */
   const [discountEnabledUi, setDiscountEnabledUi] = useState(false);
-  const [discountInput, setDiscountInput] = useState('');
+  const [discountInput, setDiscountInput] = useState(initialDiscountCode || '');
   const [discountChecking, setDiscountChecking] = useState(false);
   /* discountApplied/setDiscountApplied ahora vienen de BookingEngine (estado
      elevado) para que el resumen/confirmación/correo vean el descuento. */
@@ -804,6 +819,16 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
   const baseSubtotalCents = calc ? Math.round(calc.subtotal * 100) : 0;
   const discountCents = discountApplied ? Math.min(discountApplied.discountCents || 0, baseSubtotalCents) : 0;
   const payableCents = Math.max(0, baseSubtotalCents - discountCents);
+  /* El medio elegido no aplica descuentos en el servidor (Mercado Pago hoy):
+     no se puede aplicar un código y uno ya aplicado se retira. */
+  const discountBlocked = !discountAllowedFor(paymentMethod);
+
+  React.useEffect(() => {
+    if (discountBlocked && discountApplied) {
+      setDiscountApplied(null);
+      setDiscountError(null);
+    }
+  }, [discountBlocked, discountApplied]);
 
   const discountReasonText = (reason) => {
     switch (reason) {
@@ -813,6 +838,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       case 'min_nights': return t.discountMinNights;
       case 'room_not_eligible': return t.discountRoom;
       case 'blackout': return t.discountBlackout;
+      case 'email_mismatch': return t.discountEmailMismatch;
       default: return t.discountInvalid;
     }
   };
@@ -840,7 +866,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
 
   const applyDiscount = async () => {
     const code = (discountInput || '').trim().toUpperCase();
-    if (!code) return;
+    if (!code || discountBlocked) return;
     setDiscountChecking(true);
     setDiscountError(null);
     setDiscountApplied(null);
@@ -1248,10 +1274,13 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
                 style={{ flex: '1 1 180px', minWidth: 0, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 14, textTransform: 'uppercase' }}
               />
               <button type="button" className="be-btn-secondary" style={{ padding: '10px 18px', fontSize: 13 }}
-                onClick={applyDiscount} disabled={discountChecking || loading || !discountInput.trim()}>
+                onClick={applyDiscount} disabled={discountChecking || loading || discountBlocked || !discountInput.trim()}>
                 {discountChecking ? t.discountChecking : t.discountApply}
               </button>
             </div>
+          )}
+          {discountBlocked && (
+            <p className="be-discount-method-note" style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--fg-muted)' }}>{t.discountNotWithMercadoPago}</p>
           )}
           {discountError && (
             <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--terracotta-700)' }}>{discountError}</p>
@@ -2656,6 +2685,7 @@ function BookingEngine() {
                 setDiscountApplied={setDiscountApplied}
                 paymentNotice={paymentNotice}
                 onNoticeShown={() => setPaymentNotice(null)}
+                initialDiscountCode={initialParams.promoCode}
                 lang={lang}
               />
             </StepWrapper>

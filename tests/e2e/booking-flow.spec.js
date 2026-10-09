@@ -580,3 +580,103 @@ test('Mercado Pago return without a draft does not claim the booking is confirme
   await expect(notice).toContainText('Te enviaremos la confirmación de tu reserva por correo');
   await expect(notice).not.toContainText('confirmada');
 });
+
+/* Frente codes: el correo del código personal/reseña enlaza a
+   reservar.html?codigo=XXXX. El campo llega prellenado; si el código está
+   ligado a otro correo el huésped ve un mensaje claro; con su correo aplica. */
+test('discount code from the email link is prefilled and email-bound codes explain the mismatch', async ({ page }) => {
+  await page.addInitScript(([ci, co]) => {
+    try {
+      sessionStorage.setItem('estar-booking-draft', JSON.stringify({
+        savedAt: Date.now(),
+        search: { checkin: ci, checkout: co, guests: 2 },
+        selectedRoom: { id: 'clasica', roomTypeId: '31348', name: 'Clásica', priceFlexible: 250000, num: '01', area: 32, capacity: 2 },
+        selectedRate: 'best',
+        currentStep: 'payment',
+        extras: {},
+        guestData: { nombre: 'Ana', apellido: 'Prueba', email: 'otra@example.com', tel: '3000000000', pais: 'Colombia' },
+        paymentMethod: 'wompi'
+      }));
+    } catch (e) {}
+  }, [D1, D4]);
+  let validated = 0;
+  const sentEmails = [];
+  await page.route('**/api/validate-discount-code**', route => {
+    const url = new URL(route.request().url());
+    const code = url.searchParams.get('code');
+    if (code === '__probe__') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ valid: false, reason: 'invalid', enabled: true }) });
+    }
+    validated++;
+    sentEmails.push(url.searchParams.get('email'));
+    const body = validated === 1
+      ? { valid: false, reason: 'email_mismatch', enabled: true }
+      : { valid: true, code, type: 'percent', value: 10, discountCents: 7500000, enabled: true };
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+
+  await page.goto('/reservar.html?codigo=gracias-ab23cd45');
+  await expect(page.locator('.be-step-active .be-step-title')).toHaveText('Resumen y pago');
+  const input = page.getByPlaceholder('Ingresa tu código');
+  await expect(input).toHaveValue('GRACIAS-AB23CD45');
+
+  await page.getByRole('button', { name: 'Aplicar' }).click();
+  await expect(page.locator('.be-step-active')).toContainText('Este código está ligado a otro correo');
+  /* el servidor valida con el correo que el huésped escribió en el paso 3 */
+  expect(sentEmails[0]).toBe('otra@example.com');
+
+  await page.getByRole('button', { name: 'Aplicar' }).click();
+  await expect(page.locator('.be-step-active')).toContainText('Código aplicado');
+  await expect(page.locator('.be-step-active')).toContainText('GRACIAS-AB23CD45');
+});
+
+/* Integración codes + mp: el frente codes bloqueaba el código con Mercado Pago
+   porque la preferencia cobraba el subtotal completo y no consumía el uso. El
+   frente mp ya revalida el código (con el correo de la reserva), cobra el monto
+   con descuento y consume el uso en el webhook: con MP el código se conserva y
+   viaja a la preferencia con el monto descontado. */
+test('discount code is kept and sent when paying with Mercado Pago', async ({ page }) => {
+  await page.addInitScript(([ci, co]) => {
+    try {
+      sessionStorage.setItem('estar-booking-draft', JSON.stringify({
+        savedAt: Date.now(),
+        search: { checkin: ci, checkout: co, guests: 2 },
+        selectedRoom: { id: 'clasica', roomTypeId: '31348', name: 'Clásica', priceFlexible: 250000, num: '01', area: 32, capacity: 2 },
+        selectedRate: 'best',
+        currentStep: 'payment',
+        extras: {},
+        guestData: { nombre: 'Ana', apellido: 'Prueba', email: 'ana@example.com', tel: '3000000000', pais: 'Colombia' },
+        paymentMethod: 'wompi'
+      }));
+    } catch (e) {}
+  }, [D1, D4]);
+  await page.route('**/api/validate-discount-code**', route => {
+    const code = new URL(route.request().url()).searchParams.get('code');
+    const body = code === '__probe__'
+      ? { valid: false, reason: 'invalid', enabled: true }
+      : { valid: true, code, type: 'percent', value: 10, discountCents: 7500000, enabled: true };
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  let mpBody = null;
+  await page.route('**/api/create-mercadopago-preference', route => {
+    mpBody = JSON.parse(route.request().postData() || '{}');
+    return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'test' }) });
+  });
+
+  await page.goto('/reservar.html?codigo=gracias-ab23cd45');
+  const step = page.locator('.be-step-active');
+  await expect(step.locator('.be-step-title')).toHaveText('Resumen y pago');
+  await step.getByRole('button', { name: 'Aplicar' }).click();
+  await expect(step).toContainText('Código aplicado');
+  await expect(step).toContainText('−$ 75.000');
+
+  await step.locator('.be-payment-opt', { hasText: 'Mercado Pago' }).click();
+  await expect(step).toContainText('Código aplicado');
+  await expect(step).toContainText('−$ 75.000');
+  await expect(step).not.toContainText('solo aplican pagando con Wompi');
+
+  await step.locator('.be-btn-primary').click();
+  await expect.poll(() => mpBody).not.toBeNull();
+  expect(mpBody.amountCents).toBe(75000000 - 7500000);
+  expect(mpBody.discountCode).toBe('GRACIAS-AB23CD45');
+});

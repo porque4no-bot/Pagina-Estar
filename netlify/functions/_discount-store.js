@@ -60,6 +60,49 @@ function isoDateOnly(v) {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
 }
 
+/* Frente codes — "hoy" en Colombia (UTC-5, sin horario de verano). Con UTC un
+   código que vence el 31 dejaba de servir a las 7 p. m. hora local del 31. */
+function todayBogota(nowMs) {
+  const ms = Number.isFinite(nowMs) ? nowMs : Date.now();
+  return new Date(ms - 5 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+/* Validación de forma de un email (suficiente para ligar un código; el envío
+   real lo valida Resend). */
+function isValidEmail(raw) {
+  const e = normalizeEmail(raw);
+  return e.length >= 6 && e.length <= 160 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+}
+
+/* Campos de EMISIÓN (Frente codes): de dónde salió el código. Son inmutables una
+   vez creado (un update desde el panel no los pisa). origin: 'manual' (creado a
+   mano en el panel) | 'personal' (generado desde una regla para un huésped) |
+   'review' (emitido al aprobar una reseña). */
+const ORIGINS = new Set(['manual', 'personal', 'review']);
+function issuanceFields(existing, meta) {
+  if (existing) {
+    return {
+      origin: ORIGINS.has(existing.origin) ? existing.origin : 'manual',
+      ruleId: existing.ruleId || null,
+      reviewId: existing.reviewId || null,
+      issuedAt: existing.issuedAt || null,
+      issuedToName: existing.issuedToName || null,
+      issuedToEmail: existing.issuedToEmail || null,
+      lang: existing.lang || null
+    };
+  }
+  const m = meta || {};
+  return {
+    origin: ORIGINS.has(m.origin) ? m.origin : 'manual',
+    ruleId: m.ruleId ? String(m.ruleId).slice(0, 60) : null,
+    reviewId: m.reviewId ? String(m.reviewId).slice(0, 60) : null,
+    issuedAt: m.issuedAt || null,
+    issuedToName: m.issuedToName ? String(m.issuedToName).slice(0, 120) : null,
+    issuedToEmail: m.issuedToEmail ? normalizeEmail(m.issuedToEmail) : null,
+    lang: m.lang === 'en' ? 'en' : (m.lang === 'es' ? 'es' : null)
+  };
+}
+
 /* ── CRUD de definiciones ── */
 async function loadCode(code, deps = {}) {
   const key = normalizeCode(code);
@@ -80,19 +123,35 @@ async function saveCode(def, deps = {}) {
   return def;
 }
 
+/* Frente codes — mapea con concurrencia acotada (los códigos personales y de
+   reseña crecen a cientos: leerlos uno por uno, en serie, se acerca al timeout
+   de la función). Conserva el orden de entrada. */
+async function mapLimit(items, limit, fn) {
+  const list = Array.from(items || []);
+  const out = new Array(list.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.max(1, Math.min(limit || 8, list.length)) }, async () => {
+    while (next < list.length) {
+      const i = next++;
+      out[i] = await fn(list[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 async function listCodes(deps = {}) {
   const store = getCodesStore(deps);
   let listing;
   try { listing = await store.list(); }
   catch (e) { return []; }
-  const out = [];
-  for (const b of (listing.blobs || [])) {
+  const rows = await mapLimit(listing.blobs || [], 8, async (b) => {
     try {
       const raw = await store.get(b.key);
-      if (raw) out.push(JSON.parse(raw));
-    } catch (e) { /* salta ilegibles */ }
-  }
-  return out;
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; /* salta ilegibles */ }
+  });
+  return rows.filter(Boolean);
 }
 
 /* Construye/normaliza una definición a partir de la entrada del admin. Pura:
@@ -149,6 +208,22 @@ function buildDefinition(input, opts = {}) {
     }
   }
 
+  /* Frente codes: código LIGADO a un email (personal / reseña). Solo ese email
+     puede usarlo — se exige en el MISMO camino autoritativo (checkRules) que usan
+     validate-discount-code, create-wompi-signature y wompi-webhook. Si la entrada
+     no trae la clave, se conserva la del código existente (un update parcial no
+     "desliga" el código por omisión). */
+  let boundEmail = null;
+  if (Object.prototype.hasOwnProperty.call(input, 'boundEmail')) {
+    const raw = String(input.boundEmail || '').trim();
+    if (raw) {
+      if (!isValidEmail(raw)) return { error: 'El email ligado no es válido.' };
+      boundEmail = normalizeEmail(raw);
+    }
+  } else if (opts.existing && opts.existing.boundEmail) {
+    boundEmail = normalizeEmail(opts.existing.boundEmail);
+  }
+
   const def = {
     code,
     type,
@@ -163,6 +238,8 @@ function buildDefinition(input, opts = {}) {
     blackoutDates,
     active: input.active === true || input.active === 'true',
     description: String(input.description || '').slice(0, 200),
+    boundEmail,
+    ...issuanceFields(opts.existing, opts.meta),
     /* audit */
     createdAt: opts.existing ? opts.existing.createdAt : (opts.now || new Date().toISOString()),
     createdBy: opts.existing ? opts.existing.createdBy : (opts.actor || 'system'),
@@ -195,11 +272,16 @@ function discountCentsFor(def, subtotalCents) {
    blackout. NO incluye conteo de usos ni un-uso-por-email (esos requieren leer
    el store de usage). Devuelve { valid, reason } con reason genérico (la UI no
    debe revelar por qué falla un código que no existe vs uno expirado). */
-function checkRules(def, { nights, roomTypeId, checkin, checkout, now } = {}) {
+function checkRules(def, { nights, roomTypeId, checkin, checkout, now, email } = {}) {
   if (!def) return { valid: false, reason: 'not_found' };
   if (!def.active) return { valid: false, reason: 'inactive' };
 
-  const today = isoDateOnly(now) || new Date().toISOString().slice(0, 10);
+  /* Frente codes: código ligado a un email → solo ese email (sin email = no). */
+  if (def.boundEmail && normalizeEmail(email) !== normalizeEmail(def.boundEmail)) {
+    return { valid: false, reason: 'email_mismatch' };
+  }
+
+  const today = isoDateOnly(now) || todayBogota();
   if (def.validFrom && today < def.validFrom) return { valid: false, reason: 'not_yet_valid' };
   if (def.validTo && today > def.validTo) return { valid: false, reason: 'expired' };
 
@@ -281,7 +363,7 @@ async function emailHasUsed(code, email, deps = {}) {
 async function verifyDiscountCode(input, deps = {}) {
   const { code, email, nights, roomTypeId, checkin, checkout, subtotalCents, now } = input || {};
   const def = await loadCode(code, deps);
-  const ruled = checkRules(def, { nights, roomTypeId, checkin, checkout, now });
+  const ruled = checkRules(def, { nights, roomTypeId, checkin, checkout, now, email });
   if (!ruled.valid) return { valid: false, reason: ruled.reason, discountCents: 0, def: null };
 
   /* cupo global */
@@ -422,11 +504,49 @@ async function restoreDiscountUse(code, { email, bookingCode } = {}, deps = {}) 
   return { ok: true };
 }
 
+/* ── Frente codes: alta atómica de un código nuevo ──
+   Los códigos generados (personales / reseña) no pueden pisar uno existente:
+   set con onlyIfNew. Si el store no soporta escrituras condicionales, cae a
+   leer-y-escribir (la colisión de un aleatorio de 8 chars es despreciable).
+   Devuelve { ok:true, def } o { ok:false, reason:'exists' }. */
+async function createCodeIfNew(def, deps = {}) {
+  const key = normalizeCode(def && def.code);
+  if (!key) throw new Error('código inválido');
+  def.code = key;
+  const store = getCodesStore(deps);
+  try {
+    const res = await store.set(key, JSON.stringify(def), { onlyIfNew: true });
+    if (res && res.modified === false) return { ok: false, reason: 'exists' };
+    return { ok: true, def };
+  } catch (e) {
+    if (await loadCode(key, deps)) return { ok: false, reason: 'exists' };
+    await store.set(key, JSON.stringify(def));
+    return { ok: true, def };
+  }
+}
+
+/* ── Frente codes: ¿qué reservas usaron el código? ──
+   consumeDiscountUse deja una marca `booking:<CODE>:<bookingCode>` por cada
+   reserva que lo consumió (idempotencia). Las listamos para el panel ("usado
+   en EST-…"). Best-effort: sin Blobs devuelve []. */
+async function listCodeBookings(code, deps = {}) {
+  const norm = normalizeCode(code);
+  if (!norm) return [];
+  const prefix = `booking:${norm}:`;
+  let listing;
+  try { listing = await getUsageStore(deps).list({ prefix }); }
+  catch (e) { return []; }
+  return (listing && listing.blobs ? listing.blobs : [])
+    .map(b => String(b.key || ''))
+    .filter(k => k.startsWith(prefix))
+    .map(k => k.slice(prefix.length));
+}
+
 module.exports = {
   CODES_STORE, USAGE_STORE,
   getCodesStore, getUsageStore,
-  normalizeCode, normalizeEmail,
-  loadCode, saveCode, listCodes, buildDefinition,
+  normalizeCode, normalizeEmail, isValidEmail, todayBogota, mapLimit,
+  loadCode, saveCode, listCodes, buildDefinition, createCodeIfNew, listCodeBookings,
   discountCentsFor, checkRules, stayHitsBlackout, enumerateNights,
   getUsageCount, emailHasUsed,
   verifyDiscountCode, consumeDiscountUse, restoreDiscountUse

@@ -109,6 +109,8 @@
   "discountMinNights": "Este código requiere una estadía más larga.",
   "discountRoom": "Este código no aplica a la habitación elegida.",
   "discountBlackout": "Este código no aplica en las fechas elegidas.",
+  "discountEmailMismatch": "Este código está ligado a otro correo. Usa el mismo correo con el que lo recibiste.",
+  "discountNotWithMercadoPago": "Los códigos de descuento por ahora solo aplican pagando con Wompi. Elige Wompi para usar tu código; con Mercado Pago se cobra la tarifa completa.",
   "confirmBooking": "Confirmar reserva →",
   "emptySummary": "Elige tu habitación para ver el resumen aquí.",
   "successTitle": "¡Reserva confirmada!",

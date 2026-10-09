@@ -72,8 +72,10 @@ exports.handler = async (event) => {
   if (!result.valid) {
     /* Motivo genérico salvo los casos que ayudan al usuario sin revelar nada
        sobre OTROS códigos (estadía mínima / habitación / fechas son del propio
-       intento del usuario, no enumeran códigos). */
-    const SAFE = new Set(['min_nights', 'room_not_eligible', 'blackout', 'expired', 'already_used', 'exhausted']);
+       intento del usuario, no enumeran códigos). Frente codes: email_mismatch
+       (código personal ligado a otro correo) le dice al huésped que use el
+       correo con el que lo recibió; no revela a qué correo está ligado. */
+    const SAFE = new Set(['min_nights', 'room_not_eligible', 'blackout', 'expired', 'already_used', 'exhausted', 'email_mismatch']);
     const reason = SAFE.has(result.reason) ? result.reason : 'invalid';
     return { statusCode: 200, headers, body: JSON.stringify({ valid: false, reason, enabled: true }) };
   }

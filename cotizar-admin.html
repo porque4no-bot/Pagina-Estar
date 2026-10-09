@@ -480,6 +480,32 @@
   padding: 1px 7px; font-size: 10px; min-width: 18px; text-align: center;
 }
 .rf-chip.is-active .rf-chip-count { background: rgba(255,255,255,0.25); color: var(--paper); }
+/* Frente codes — sub-secciones de la pestaña Códigos */
+.cod-subnav { margin: 0 0 18px; }
+.cod-warn {
+  margin: 0 0 16px; padding: 12px 16px; border-radius: 10px; font-size: 13px; line-height: 1.5;
+  background: var(--terracotta-100); border: 1px solid var(--terracotta-300); color: var(--ink);
+}
+.cod-ruleinfo { font-size: 13px; margin: 0 0 14px; color: var(--ink-500); }
+.cod-ruleinfo.is-missing { color: var(--terracotta-700); }
+.cod-result {
+  margin-top: 16px; padding: 14px 16px; border-radius: 10px; font-size: 13px; line-height: 1.55;
+  background: var(--olive-100); border: 1px solid var(--olive-300); color: var(--ink);
+}
+.cod-result code, .cod-code {
+  font-family: var(--font-label); font-weight: 700; letter-spacing: 0.08em; font-size: 14px;
+}
+.cod-muted { color: var(--ink-500); font-size: 12px; }
+.cod-used { color: var(--olive-700); font-weight: 700; }
+.cod-table td { vertical-align: top; }
+.cod-cell { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .cod-table td > .cod-cell { text-align: right; }
+  .cod-actions { justify-content: stretch; width: 100%; }
+  .cod-actions .btn { flex: 1 1 auto; }
+}
+.cod-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.cod-actions .btn { padding: 6px 10px; font-size: 12px; }
 /* Refund detail modal body */
 .rf-grid { display: grid; grid-template-columns: max-content 1fr; gap: 7px 18px; align-items: baseline; }
 .rf-grid dt { font-family: var(--font-label); font-size: 11px; letter-spacing: 0.05em; color: var(--ink-500); }
@@ -1171,9 +1197,23 @@
 
     <!-- ══════════════ VIEW: Códigos de descuento ══════════════ -->
     <div id="viewCodigos" style="display:none">
+      <!-- Frente codes: aviso si el motor público de códigos está apagado -->
+      <div id="codFlagWarn" class="cod-warn" style="display:none">
+        <strong>El motor de códigos está apagado en la web.</strong> Puedes crear reglas, emitir códigos y aprobar reseñas, pero el huésped no verá el campo de código al reservar hasta encender <em>Motor de códigos de descuento</em> en Configuración.
+      </div>
+
+      <div class="rf-filters cod-subnav" id="codSubnav" role="tablist" aria-label="Secciones de códigos">
+        <button type="button" class="rf-chip is-active" data-codsub="codigos" role="tab">Códigos</button>
+        <button type="button" class="rf-chip" data-codsub="reglas" role="tab">Reglas</button>
+        <button type="button" class="rf-chip" data-codsub="personal" role="tab">Código personalizado</button>
+        <button type="button" class="rf-chip" data-codsub="resenas" role="tab">Reseñas <span class="rf-chip-count" id="codRevPendingCount">0</span></button>
+      </div>
+
+      <!-- ── Sub-sección: Códigos (CRUD manual existente) ── -->
+      <div id="codSubCodigos">
       <div class="admin-card">
         <p class="admin-card-title" id="cFormTitle">Nuevo código de descuento</p>
-        <p style="font-size:13px;color:var(--ink-500);margin:-4px 0 14px">Los códigos solo aplican al motor de reserva directa (Wompi). La validación de monto y descuento es 100% server-side. Recuerda bloquear temporada alta con fechas excluidas.</p>
+        <p style="font-size:13px;color:var(--ink-500);margin:-4px 0 14px">Los códigos solo aplican al motor de reserva directa. La validación de monto y descuento es 100% server-side. Recuerda bloquear temporada alta con fechas excluidas. Para códigos de un solo huésped usa <strong>Código personalizado</strong>.</p>
         <div class="field-row">
           <div class="field"><label for="cCode">Código</label><input id="cCode" type="text" class="it-input" style="min-width:unset;text-transform:uppercase" placeholder="BIENVENIDO15"></div>
           <div class="field"><label for="cType">Tipo</label>
@@ -1192,6 +1232,7 @@
         <div class="field-row" style="margin-top:16px">
           <div class="field"><label for="cMinNights">Estadía mínima (noches)</label><input id="cMinNights" type="number" class="it-input" style="min-width:unset" min="1" placeholder=""></div>
           <div class="field"><label for="cDesc">Descripción interna</label><input id="cDesc" type="text" class="it-input" style="min-width:unset" placeholder="Campaña de re-consentimiento"></div>
+          <div class="field"><label for="cBoundEmail">Ligado a email (vacío = cualquiera)</label><input id="cBoundEmail" type="email" class="it-input" style="min-width:unset" placeholder="huesped@correo.com"></div>
         </div>
         <div style="margin-top:16px">
           <label style="font-family:var(--font-label);font-size:12px;letter-spacing:.06em;color:var(--ink)">Habitaciones (vacío = todas)</label>
@@ -1217,7 +1258,7 @@
           <label style="font-size:13px"><input type="checkbox" id="cOnePerEmail" checked> Un uso por email</label>
           <label style="font-size:13px"><input type="checkbox" id="cNotCombinable" checked> No acumulable</label>
         </div>
-        <div style="margin-top:18px;display:flex;gap:10px;align-items:center">
+        <div style="margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <button type="button" id="cSaveBtn" class="btn btn-primary">Guardar código</button>
           <button type="button" id="cClearBtn" class="btn btn-ghost-dark">Limpiar</button>
           <span id="cMsg" style="font-size:13px"></span>
@@ -1226,10 +1267,176 @@
 
       <div class="admin-card">
         <p class="admin-card-title">Códigos</p>
-        <table class="lista-table">
-          <thead><tr><th>Código</th><th>Descuento</th><th>Vigencia</th><th>Usos</th><th>Estado</th><th>Acciones</th></tr></thead>
-          <tbody id="codigosTbody"><tr><td colspan="6" style="text-align:center;color:var(--ink-400);padding:18px">Cargando…</td></tr></tbody>
+        <table class="lista-table cod-table">
+          <thead><tr><th>Código</th><th>Descuento</th><th>Vigencia</th><th>Usos</th><th>Origen</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="codigosTbody"><tr><td colspan="7" style="text-align:center;color:var(--ink-500);padding:18px">Cargando…</td></tr></tbody>
         </table>
+      </div>
+      </div>
+
+      <!-- ── Sub-sección: Reglas / plantillas (Frente codes) ── -->
+      <div id="codSubReglas" style="display:none">
+      <div class="admin-card">
+        <p class="admin-card-title" id="rFormTitle">Nueva regla</p>
+        <p style="font-size:13px;color:var(--ink-500);margin:-4px 0 14px">Una regla es la plantilla con la que se emiten códigos personales (y los de agradecimiento por reseña). Cada código emitido copia las condiciones de la regla en el momento de emitirse: cambiar la regla después no altera los códigos ya enviados.</p>
+        <div class="field-row">
+          <div class="field"><label for="rName">Nombre de la regla</label><input id="rName" type="text" class="it-input" style="min-width:unset" placeholder="Gracias por tu reseña"></div>
+          <div class="field"><label for="rPurpose">Propósito</label>
+            <select id="rPurpose" class="it-input" style="min-width:unset">
+              <option value="general">Código personal / campaña</option>
+              <option value="review">Reseña (se usa al aprobar reseñas)</option>
+            </select>
+          </div>
+          <div class="field"><label for="rPrefix">Prefijo del código</label><input id="rPrefix" type="text" class="it-input" style="min-width:unset;text-transform:uppercase" placeholder="RESENA" maxlength="12"></div>
+        </div>
+        <div class="field-row" style="margin-top:16px">
+          <div class="field"><label for="rType">Tipo</label>
+            <select id="rType" class="it-input" style="min-width:unset">
+              <option value="percent">Porcentaje (%)</option>
+              <option value="fixed">Valor fijo (COP)</option>
+            </select>
+          </div>
+          <div class="field"><label for="rValue" id="rValueLabel">Valor (%)</label><input id="rValue" type="number" class="it-input" style="min-width:unset" min="1" placeholder="10"></div>
+          <div class="field"><label for="rValidityMode">Vigencia</label>
+            <select id="rValidityMode" class="it-input" style="min-width:unset">
+              <option value="days">Días desde la emisión</option>
+              <option value="fixed">Fechas fijas</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row" style="margin-top:16px">
+          <div class="field" id="rDaysWrap"><label for="rValidityDays">Días de vigencia</label><input id="rValidityDays" type="number" class="it-input" style="min-width:unset" min="1" max="730" placeholder="90"></div>
+          <div class="field" id="rFromWrap" style="display:none"><label for="rValidFrom">Válido desde</label><input id="rValidFrom" type="date" class="it-input" style="min-width:unset"></div>
+          <div class="field" id="rToWrap" style="display:none"><label for="rValidTo">Válido hasta</label><input id="rValidTo" type="date" class="it-input" style="min-width:unset"></div>
+          <div class="field"><label for="rMinNights">Mínimo de noches</label><input id="rMinNights" type="number" class="it-input" style="min-width:unset" min="1" placeholder=""></div>
+          <div class="field"><label for="rMaxUses">Usos máximos por código (vacío = ilimitado)</label><input id="rMaxUses" type="number" class="it-input" style="min-width:unset" min="1" placeholder=""></div>
+        </div>
+        <div style="margin-top:16px">
+          <label style="font-family:var(--font-label);font-size:12px;letter-spacing:.06em;color:var(--ink)">Habitaciones (vacío = todas)</label>
+          <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:8px">
+            <label style="font-size:13px"><input type="checkbox" class="rroom" value="31348"> Clásica</label>
+            <label style="font-size:13px"><input type="checkbox" class="rroom" value="31349"> Selección</label>
+            <label style="font-size:13px"><input type="checkbox" class="rroom" value="31350"> Reserva</label>
+            <label style="font-size:13px"><input type="checkbox" class="rroom" value="31351"> Origen</label>
+            <label style="font-size:13px"><input type="checkbox" class="rroom" value="31352"> Especial</label>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <label style="font-family:var(--font-label);font-size:12px;letter-spacing:.06em;color:var(--ink)">Fechas bloqueadas (temporada alta)</label>
+          <div style="display:flex;gap:8px;align-items:flex-end;margin-top:8px;flex-wrap:wrap">
+            <div class="field"><label for="rBlackFrom" style="font-size:11px">Desde</label><input id="rBlackFrom" type="date" class="it-input" style="min-width:unset"></div>
+            <div class="field"><label for="rBlackTo" style="font-size:11px">Hasta</label><input id="rBlackTo" type="date" class="it-input" style="min-width:unset"></div>
+            <button type="button" id="rAddBlackout" class="btn btn-ghost-dark" style="padding:9px 14px;font-size:12px">Añadir rango</button>
+          </div>
+          <div id="rBlackoutList" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+        <div class="field" style="margin-top:16px"><label for="rDesc">Descripción interna</label><input id="rDesc" type="text" class="it-input" style="min-width:unset" placeholder="Agradecimiento a huéspedes que dejan reseña"></div>
+        <div style="margin-top:16px;display:flex;gap:22px;flex-wrap:wrap">
+          <label style="font-size:13px"><input type="checkbox" id="rActive"> Activa</label>
+          <label style="font-size:13px"><input type="checkbox" id="rSingleUse" checked> Un solo uso</label>
+          <label style="font-size:13px"><input type="checkbox" id="rBindEmail" checked> Ligado al email del huésped</label>
+          <label style="font-size:13px"><input type="checkbox" id="rOnePerEmail" checked> Un uso por email</label>
+        </div>
+        <div style="margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button type="button" id="rSaveBtn" class="btn btn-primary">Guardar regla</button>
+          <button type="button" id="rClearBtn" class="btn btn-ghost-dark">Limpiar</button>
+          <span id="rMsg" style="font-size:13px"></span>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">Reglas</p>
+        <table class="lista-table cod-table">
+          <thead><tr><th>Regla</th><th>Propósito</th><th>Descuento</th><th>Vigencia</th><th>Condiciones</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="rulesTbody"><tr><td colspan="7" style="text-align:center;color:var(--ink-500);padding:18px">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+      </div>
+
+      <!-- ── Sub-sección: Código personalizado (Frente codes) ── -->
+      <div id="codSubPersonal" style="display:none">
+      <div class="admin-card">
+        <p class="admin-card-title">Generar código personalizado</p>
+        <p style="font-size:13px;color:var(--ink-500);margin:-4px 0 14px">Genera un código único desde una regla activa, ligado al email del huésped. Si dejas el código vacío se genera uno aleatorio. Puedes enviárselo por correo (ES/EN) desde aquí.</p>
+        <div class="field-row">
+          <div class="field"><label for="pRule">Regla</label><select id="pRule" class="it-input" style="min-width:unset"><option value="">Cargando reglas…</option></select></div>
+          <div class="field"><label for="pEmail">Email del huésped</label><input id="pEmail" type="email" class="it-input" style="min-width:unset" placeholder="huesped@correo.com"></div>
+          <div class="field"><label for="pName">Nombre (opcional)</label><input id="pName" type="text" class="it-input" style="min-width:unset" placeholder="Ana María"></div>
+        </div>
+        <div class="field-row" style="margin-top:16px">
+          <div class="field"><label for="pCode">Código (vacío = aleatorio)</label><input id="pCode" type="text" class="it-input" style="min-width:unset;text-transform:uppercase" placeholder="ANAMARIA10"></div>
+          <div class="field"><label for="pNote">Nota interna</label><input id="pNote" type="text" class="it-input" style="min-width:unset" placeholder="Compensación por ruido en la habitación"></div>
+          <div class="field"><label for="pLang">Idioma del correo</label>
+            <select id="pLang" class="it-input" style="min-width:unset"><option value="es">Español</option><option value="en">English</option></select>
+          </div>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:22px;flex-wrap:wrap">
+          <label style="font-size:13px"><input type="checkbox" id="pSendEmail" checked> Enviar el código por correo al huésped</label>
+        </div>
+        <div style="margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button type="button" id="pIssueBtn" class="btn btn-primary">Generar código</button>
+          <span id="pMsg" style="font-size:13px"></span>
+        </div>
+        <div id="pResult" class="cod-result" style="display:none"></div>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">Códigos emitidos a huéspedes</p>
+        <table class="lista-table cod-table">
+          <thead><tr><th>Código</th><th>Huésped</th><th>Origen</th><th>Descuento</th><th>Vence</th><th>Usado</th><th>Acciones</th></tr></thead>
+          <tbody id="issuedTbody"><tr><td colspan="7" style="text-align:center;color:var(--ink-500);padding:18px">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+      </div>
+
+      <!-- ── Sub-sección: Reseñas (Frente codes) ── -->
+      <div id="codSubResenas" style="display:none">
+      <div class="admin-card">
+        <p class="admin-card-title">Registrar reseña</p>
+        <p style="font-size:13px;color:var(--ink-500);margin:-4px 0 6px">Ingresa al huésped que dejó la reseña. Al aprobarla, el sistema emite un código desde la regla de reseña activa, ligado a su email, y se lo envía por correo.</p>
+        <p id="vRuleInfo" class="cod-ruleinfo"></p>
+        <div class="field-row">
+          <div class="field"><label for="vEmail">Email del huésped</label><input id="vEmail" type="email" class="it-input" style="min-width:unset" placeholder="huesped@correo.com"></div>
+          <div class="field"><label for="vName">Nombre</label><input id="vName" type="text" class="it-input" style="min-width:unset" placeholder="Ana María"></div>
+          <div class="field"><label for="vBooking">Código de reserva (opcional)</label><input id="vBooking" type="text" class="it-input" style="min-width:unset;text-transform:uppercase" placeholder="EST-…"></div>
+        </div>
+        <div class="field-row" style="margin-top:16px">
+          <div class="field"><label for="vPlatform">Plataforma</label>
+            <select id="vPlatform" class="it-input" style="min-width:unset">
+              <option value="google">Google</option>
+              <option value="booking">Booking</option>
+              <option value="tripadvisor">TripAdvisor</option>
+              <option value="otra">Otra</option>
+            </select>
+          </div>
+          <div class="field"><label for="vLink">Enlace a la reseña (opcional)</label><input id="vLink" type="url" class="it-input" style="min-width:unset" placeholder="https://…"></div>
+          <div class="field"><label for="vLang">Idioma del correo</label>
+            <select id="vLang" class="it-input" style="min-width:unset"><option value="es">Español</option><option value="en">English</option></select>
+          </div>
+        </div>
+        <div class="field" style="margin-top:16px"><label for="vNote">Nota interna</label><input id="vNote" type="text" class="it-input" style="min-width:unset" placeholder="Reseña 5 estrellas, mencionó la cocina"></div>
+        <div style="margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button type="button" id="vAddBtn" class="btn btn-ghost-dark">Agregar a pendientes</button>
+          <button type="button" id="vApproveNowBtn" class="btn btn-primary">Registrar y aprobar</button>
+          <span id="vMsg" style="font-size:13px"></span>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">Reseñas por aprobar</p>
+        <table class="lista-table cod-table">
+          <thead><tr><th>Huésped</th><th>Reserva</th><th>Plataforma</th><th>Enlace</th><th>Registrada</th><th>Acciones</th></tr></thead>
+          <tbody id="reviewsPendingTbody"><tr><td colspan="6" style="text-align:center;color:var(--ink-500);padding:18px">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="admin-card">
+        <p class="admin-card-title">Historial de reseñas</p>
+        <table class="lista-table cod-table">
+          <thead><tr><th>Huésped</th><th>Plataforma</th><th>Estado</th><th>Código</th><th>Usado</th><th>Correo</th><th>Acciones</th></tr></thead>
+          <tbody id="reviewsDoneTbody"><tr><td colspan="7" style="text-align:center;color:var(--ink-500);padding:18px">Cargando…</td></tr></tbody>
+        </table>
+      </div>
       </div>
     </div>
 
@@ -1994,7 +2201,7 @@ function switchView(view) {
   if (view === 'reembolsos') loadRefunds();
   if (view === 'facturacion') loadFacturacion();
   if (view === 'documentos') loadDocumentos();
-  if (view === 'codigos') loadCodigos();
+  if (view === 'codigos') { loadCodigos(); loadResenas(); /* Frente codes: cuenta de reseñas por aprobar */ }
   if (view === 'usuarios') loadIam();
   if (view === 'config') loadSettings();
   if (view === 'desayunos') {
@@ -2605,8 +2812,13 @@ async function loadDocumentos() {
 }
 document.getElementById('docRefreshBtn').addEventListener('click', loadDocumentos);
 
-/* ════════════════ Códigos de descuento (Frente A) ════════════════ */
+/* ════════════════ Códigos de descuento (Frente A + Frente codes) ════════════════ */
 let COD_BLACKOUTS = [];
+let RULE_BLACKOUTS = [];
+let COD_CACHE = [];      /* último `list` de códigos */
+let RULES_CACHE = [];    /* último `rule-list` */
+let REVIEWS_CACHE = [];  /* último `review-list` */
+let COD_SUB = 'codigos';
 
 async function apiCodigos(action, payload) {
   const token = await window.getAuthToken();
@@ -2624,18 +2836,21 @@ function codValueLabelSync() {
   document.getElementById('cValueLabel').textContent = t === 'fixed' ? 'Valor (COP)' : 'Valor (%)';
 }
 
-function renderBlackouts() {
-  const wrap = document.getElementById('cBlackoutList');
+/* Chips de rangos bloqueados (compartido por el form de códigos y el de reglas). */
+function renderBlackoutChips(wrapId, list, delClass) {
+  const wrap = document.getElementById(wrapId);
   if (!wrap) return;
-  wrap.innerHTML = COD_BLACKOUTS.map((b, i) =>
+  wrap.innerHTML = list.map((b, i) =>
     '<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;background:var(--terracotta-100);border:1px solid var(--terracotta-300);font-size:12px">' +
     escHtml(b.from) + (b.to && b.to !== b.from ? ' → ' + escHtml(b.to) : '') +
-    ' <button type="button" data-i="' + i + '" class="cBlackDel" style="border:0;background:none;cursor:pointer;color:var(--terracotta-700);font-size:14px;line-height:1">×</button></span>'
-  ).join('') || '<span style="font-size:12px;color:var(--ink-400)">Sin fechas excluidas.</span>';
-  wrap.querySelectorAll('.cBlackDel').forEach(b => b.addEventListener('click', () => {
-    COD_BLACKOUTS.splice(parseInt(b.dataset.i, 10), 1); renderBlackouts();
+    ' <button type="button" data-i="' + i + '" class="' + delClass + '" aria-label="Quitar rango" style="border:0;background:none;cursor:pointer;color:var(--terracotta-700);font-size:14px;line-height:1">×</button></span>'
+  ).join('') || '<span style="font-size:12px;color:var(--ink-500)">Sin fechas excluidas.</span>';
+  wrap.querySelectorAll('.' + delClass).forEach(b => b.addEventListener('click', () => {
+    list.splice(parseInt(b.dataset.i, 10), 1); renderBlackoutChips(wrapId, list, delClass);
   }));
 }
+function renderBlackouts() { renderBlackoutChips('cBlackoutList', COD_BLACKOUTS, 'cBlackDel'); }
+function renderRuleBlackouts() { renderBlackoutChips('rBlackoutList', RULE_BLACKOUTS, 'rBlackDel'); }
 
 function codFmtDiscount(c) {
   return c.type === 'fixed' ? ('$' + Number(c.value).toLocaleString('es-CO')) : (c.value + '%');
@@ -2644,6 +2859,55 @@ function codFmtVigencia(c) {
   const f = c.validFrom ? fmtShortDate(c.validFrom) : '—';
   const t = c.validTo ? fmtShortDate(c.validTo) : '∞';
   return f + ' → ' + t;
+}
+
+/* Origen legible de un código (manual / personal / reseña) + a quién va ligado. */
+function codOriginLabel(c) {
+  const who = c.boundEmail || c.issuedToEmail || '';
+  const base = c.origin === 'review' ? 'Reseña' : c.origin === 'personal' ? 'Personal' : 'Manual';
+  return who ? base + ' · ' + who : base;
+}
+
+/* "Usado": conteo + reservas que lo usaron (si el servidor las adjuntó). */
+function codUsedLabel(c) {
+  const n = c.usedCount || 0;
+  if (!n) return '<span class="cod-muted">No usado</span>';
+  const by = Array.isArray(c.usedBy) && c.usedBy.length ? ' <span class="cod-muted">(' + c.usedBy.map(escHtml).join(', ') + ')</span>' : '';
+  return '<span class="cod-used">Usado ' + n + (n === 1 ? ' vez' : ' veces') + '</span>' + by;
+}
+
+/* Celda con etiqueta (vista de tarjetas en móvil): el contenido va en UN solo
+   bloque para que la fila flex de la tarjeta no lo parta en columnas. */
+function codTd(label, inner) {
+  return '<td data-label="' + label + '"><div class="cod-cell">' + inner + '</div></td>';
+}
+
+function renderCodeRow(c) {
+  return '<tr>' + codTd('Código', '<strong class="cod-code">' + escHtml(c.code) + '</strong>' +
+      (c.description ? '<div class="cod-muted">' + escHtml(c.description) + '</div>' : '')) +
+    codTd('Descuento', escHtml(codFmtDiscount(c))) +
+    codTd('Vigencia', escHtml(codFmtVigencia(c))) +
+    codTd('Usos', (c.usedCount || 0) + (c.maxUses ? ' / ' + c.maxUses : '')) +
+    codTd('Origen', escHtml(codOriginLabel(c))) +
+    codTd('Estado', (c.active ? '<span class="badge">activo</span>' : '<span style="color:var(--ink-500)">inactivo</span>')) +
+    '<td><div class="cod-actions">' +
+      '<button type="button" class="btn btn-ghost-dark cEdit" data-code="' + escHtml(c.code) + '">Editar</button>' +
+      '<button type="button" class="btn btn-ghost-dark cToggle" data-code="' + escHtml(c.code) + '" data-active="' + (c.active ? '1' : '0') + '">' + (c.active ? 'Desactivar' : 'Activar') + '</button>' +
+    '</div></td></tr>';
+}
+
+function renderIssuedRow(c) {
+  const who = (c.issuedToName ? escHtml(c.issuedToName) + '<div class="cod-muted">' : '<div>') + escHtml(c.boundEmail || c.issuedToEmail || '—') + '</div>';
+  return '<tr>' + codTd('Código', '<strong class="cod-code">' + escHtml(c.code) + '</strong>' +
+      (c.description ? '<div class="cod-muted">' + escHtml(c.description) + '</div>' : '')) +
+    codTd('Huésped', who) +
+    codTd('Origen', (c.origin === 'review' ? 'Reseña' : 'Personal') + (c.ruleId ? '<div class="cod-muted">' + escHtml(c.ruleId) + '</div>' : '')) +
+    codTd('Descuento', escHtml(codFmtDiscount(c))) +
+    codTd('Vence', escHtml(c.validTo ? fmtShortDate(c.validTo) : '∞')) +
+    codTd('Usado', codUsedLabel(c) + (c.active ? '' : ' <span class="cod-muted">· inactivo</span>')) +
+    '<td><div class="cod-actions">' +
+      '<button type="button" class="btn btn-ghost-dark cToggle" data-code="' + escHtml(c.code) + '" data-active="' + (c.active ? '1' : '0') + '">' + (c.active ? 'Desactivar' : 'Activar') + '</button>' +
+    '</div></td></tr>';
 }
 
 function clearCodForm() {
@@ -2656,6 +2920,7 @@ function clearCodForm() {
   document.getElementById('cMaxUses').value = '';
   document.getElementById('cMinNights').value = '';
   document.getElementById('cDesc').value = '';
+  document.getElementById('cBoundEmail').value = '';
   document.querySelectorAll('.croom').forEach(c => { c.checked = false; });
   document.getElementById('cActive').checked = false;
   document.getElementById('cOnePerEmail').checked = true;
@@ -2667,6 +2932,7 @@ function clearCodForm() {
 }
 
 function fillCodForm(c) {
+  showCodSub('codigos');
   document.getElementById('cCode').value = c.code || '';
   document.getElementById('cCode').disabled = true; /* el código es la clave: no se renombra */
   document.getElementById('cType').value = c.type || 'percent';
@@ -2676,6 +2942,7 @@ function fillCodForm(c) {
   document.getElementById('cMaxUses').value = c.maxUses || '';
   document.getElementById('cMinNights').value = c.minNights || '';
   document.getElementById('cDesc').value = c.description || '';
+  document.getElementById('cBoundEmail').value = c.boundEmail || '';
   const rooms = (c.roomTypeIds || []).map(String);
   document.querySelectorAll('.croom').forEach(cb => { cb.checked = rooms.includes(cb.value); });
   document.getElementById('cActive').checked = !!c.active;
@@ -2689,24 +2956,7 @@ function fillCodForm(c) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-async function loadCodigos() {
-  const tb = document.getElementById('codigosTbody');
-  tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--ink-400);padding:18px">Cargando…</td></tr>';
-  let codes;
-  try { codes = (await apiCodigos('list')).codes || []; }
-  catch (e) { tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--terracotta-700);padding:18px">' + escHtml(e.message) + '</td></tr>'; return; }
-  if (!codes.length) { tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--ink-400);padding:18px">Aún no hay códigos.</td></tr>'; return; }
-  tb.innerHTML = codes.map(c =>
-    '<tr><td><strong>' + escHtml(c.code) + '</strong></td>' +
-    '<td>' + escHtml(codFmtDiscount(c)) + '</td>' +
-    '<td>' + escHtml(codFmtVigencia(c)) + '</td>' +
-    '<td>' + (c.usedCount || 0) + (c.maxUses ? ' / ' + c.maxUses : '') + '</td>' +
-    '<td>' + (c.active ? '<span class="badge">activo</span>' : '<span style="color:var(--ink-400)">inactivo</span>') + '</td>' +
-    '<td style="white-space:nowrap">' +
-      '<button type="button" class="btn btn-ghost-dark cEdit" data-code="' + escHtml(c.code) + '" style="padding:6px 10px;font-size:12px">Editar</button> ' +
-      '<button type="button" class="btn btn-ghost-dark cToggle" data-code="' + escHtml(c.code) + '" data-active="' + (c.active ? '1' : '0') + '" style="padding:6px 10px;font-size:12px">' + (c.active ? 'Desactivar' : 'Activar') + '</button>' +
-    '</td></tr>'
-  ).join('');
+function wireCodeRowButtons(tb) {
   tb.querySelectorAll('.cEdit').forEach(b => b.addEventListener('click', async () => {
     try { const d = await apiCodigos('get', { code: b.dataset.code }); fillCodForm(d.code); }
     catch (e) { showToast(e.message); }
@@ -2717,6 +2967,37 @@ async function loadCodigos() {
       await loadCodigos();
     } catch (e) { showToast(e.message); }
   }));
+}
+
+async function loadCodigos() {
+  const tb = document.getElementById('codigosTbody');
+  const itb = document.getElementById('issuedTbody');
+  tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--ink-500);padding:18px">Cargando…</td></tr>';
+  let codes;
+  try {
+    const d = await apiCodigos('list');
+    codes = d.codes || [];
+    const warn = document.getElementById('codFlagWarn');
+    if (warn) warn.style.display = d.discountEnabled === false ? 'block' : 'none';
+  } catch (e) {
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--terracotta-700);padding:18px">' + escHtml(e.message) + '</td></tr>';
+    return;
+  }
+  COD_CACHE = codes;
+  /* Los códigos generales van en la tabla principal; los emitidos a un huésped
+     (personal / reseña) en "Códigos emitidos", para no mezclar cientos de
+     códigos de un solo uso con las campañas. */
+  const general = codes.filter(c => c.origin !== 'personal' && c.origin !== 'review');
+  const issued = codes.filter(c => c.origin === 'personal' || c.origin === 'review');
+  tb.innerHTML = general.length ? general.map(renderCodeRow).join('')
+    : '<tr><td colspan="7" style="text-align:center;color:var(--ink-500);padding:18px">Aún no hay códigos.</td></tr>';
+  wireCodeRowButtons(tb);
+  if (itb) {
+    itb.innerHTML = issued.length ? issued.map(renderIssuedRow).join('')
+      : '<tr><td colspan="7" style="text-align:center;color:var(--ink-500);padding:18px">Aún no se han emitido códigos personales.</td></tr>';
+    wireCodeRowButtons(itb);
+  }
+  renderReviews(); /* la columna "Usado" del historial de reseñas sale de COD_CACHE */
 }
 
 function wireCodigos() {
@@ -2737,6 +3018,10 @@ function wireCodigos() {
   if (clearBtn) clearBtn.addEventListener('click', clearCodForm);
   const saveBtn = document.getElementById('cSaveBtn');
   if (saveBtn) saveBtn.addEventListener('click', saveCodigo);
+  wireCodSubnav();
+  wireReglas();
+  wirePersonal();
+  wireResenas();
 }
 
 async function saveCodigo() {
@@ -2757,7 +3042,8 @@ async function saveCodigo() {
     active: document.getElementById('cActive').checked,
     onePerEmail: document.getElementById('cOnePerEmail').checked,
     notCombinable: document.getElementById('cNotCombinable').checked,
-    description: document.getElementById('cDesc').value.trim()
+    description: document.getElementById('cDesc').value.trim(),
+    boundEmail: document.getElementById('cBoundEmail').value.trim()
   };
   /* update si el campo código está deshabilitado (edición), si no create. */
   const editing = document.getElementById('cCode').disabled;
@@ -2768,6 +3054,411 @@ async function saveCodigo() {
     await loadCodigos();
     if (!editing) clearCodForm();
   } catch (e) { msg.textContent = e.message; }
+}
+
+/* ── Sub-navegación de la pestaña (Códigos / Reglas / Personalizado / Reseñas) ── */
+const COD_SUB_IDS = { codigos: 'codSubCodigos', reglas: 'codSubReglas', personal: 'codSubPersonal', resenas: 'codSubResenas' };
+function showCodSub(sub) {
+  if (!COD_SUB_IDS[sub]) sub = 'codigos';
+  COD_SUB = sub;
+  Object.keys(COD_SUB_IDS).forEach(k => {
+    const el = document.getElementById(COD_SUB_IDS[k]);
+    if (el) el.style.display = k === sub ? 'block' : 'none';
+  });
+  document.querySelectorAll('#codSubnav .rf-chip').forEach(ch => {
+    const on = ch.dataset.codsub === sub;
+    ch.classList.toggle('is-active', on);
+    ch.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  if (sub === 'reglas') loadReglas();
+  if (sub === 'personal') { loadReglas(); loadCodigos(); }
+  if (sub === 'resenas') { loadReglas(); loadResenas(); loadCodigos(); }
+}
+function wireCodSubnav() {
+  const nav = document.getElementById('codSubnav');
+  if (!nav) return;
+  nav.addEventListener('click', (e) => {
+    const chip = e.target.closest('.rf-chip');
+    if (chip) showCodSub(chip.dataset.codsub);
+  });
+}
+
+/* ── Reglas / plantillas ── */
+function ruleFmtValidity(r) {
+  if (r.validityMode === 'fixed') {
+    return (r.validFrom ? fmtShortDate(r.validFrom) : '—') + ' → ' + (r.validTo ? fmtShortDate(r.validTo) : '∞');
+  }
+  return (r.validityDays || 0) + ' días desde la emisión';
+}
+function ruleConditions(r) {
+  const out = [];
+  if (r.singleUse || r.maxUses === 1) out.push('Un solo uso');
+  else if (r.maxUses) out.push(r.maxUses + ' usos máx.');
+  if (r.bindEmail !== false) out.push('Ligado a email');
+  if (r.minNights) out.push('Mín. ' + r.minNights + (r.minNights === 1 ? ' noche' : ' noches'));
+  if (Array.isArray(r.blackoutDates) && r.blackoutDates.length) out.push(r.blackoutDates.length + (r.blackoutDates.length === 1 ? ' rango bloqueado' : ' rangos bloqueados'));
+  if (Array.isArray(r.roomTypeIds) && r.roomTypeIds.length) out.push(r.roomTypeIds.length + ' habitación(es)');
+  return out.join(' · ') || '—';
+}
+function renderRuleRow(r) {
+  return '<tr>' + codTd('Regla', '<strong>' + escHtml(r.name) + '</strong><div class="cod-muted">' + escHtml(r.prefix) + '-XXXXXXXX</div>') +
+    codTd('Propósito', (r.purpose === 'review' ? 'Reseña' : 'Personal / campaña')) +
+    codTd('Descuento', escHtml(codFmtDiscount(r))) +
+    codTd('Vigencia', escHtml(ruleFmtValidity(r))) +
+    codTd('Condiciones', escHtml(ruleConditions(r))) +
+    codTd('Estado', (r.active ? '<span class="badge">activa</span>' : '<span style="color:var(--ink-500)">inactiva</span>')) +
+    '<td><div class="cod-actions">' +
+      '<button type="button" class="btn btn-ghost-dark rEdit" data-id="' + escHtml(r.id) + '">Editar</button>' +
+      '<button type="button" class="btn btn-ghost-dark rToggle" data-id="' + escHtml(r.id) + '" data-active="' + (r.active ? '1' : '0') + '">' + (r.active ? 'Desactivar' : 'Activar') + '</button>' +
+    '</div></td></tr>';
+}
+function ruleValidityModeSync() {
+  const fixed = document.getElementById('rValidityMode').value === 'fixed';
+  document.getElementById('rDaysWrap').style.display = fixed ? 'none' : '';
+  document.getElementById('rFromWrap').style.display = fixed ? '' : 'none';
+  document.getElementById('rToWrap').style.display = fixed ? '' : 'none';
+  document.getElementById('rValueLabel').textContent = document.getElementById('rType').value === 'fixed' ? 'Valor (COP)' : 'Valor (%)';
+  document.getElementById('rMaxUses').disabled = document.getElementById('rSingleUse').checked;
+}
+function clearRuleForm() {
+  const f = (id, v) => { document.getElementById(id).value = v; };
+  f('rName', ''); f('rPurpose', 'general'); f('rPrefix', ''); f('rType', 'percent'); f('rValue', '');
+  f('rValidityMode', 'days'); f('rValidityDays', ''); f('rValidFrom', ''); f('rValidTo', '');
+  f('rMinNights', ''); f('rMaxUses', ''); f('rDesc', '');
+  document.getElementById('rName').dataset.editId = '';
+  document.querySelectorAll('.rroom').forEach(c => { c.checked = false; });
+  document.getElementById('rActive').checked = false;
+  document.getElementById('rSingleUse').checked = true;
+  document.getElementById('rBindEmail').checked = true;
+  document.getElementById('rOnePerEmail').checked = true;
+  RULE_BLACKOUTS = []; renderRuleBlackouts();
+  document.getElementById('rFormTitle').textContent = 'Nueva regla';
+  document.getElementById('rMsg').textContent = '';
+  ruleValidityModeSync();
+}
+function fillRuleForm(r) {
+  const f = (id, v) => { document.getElementById(id).value = v == null ? '' : v; };
+  f('rName', r.name); f('rPurpose', r.purpose || 'general'); f('rPrefix', r.prefix); f('rType', r.type || 'percent');
+  f('rValue', r.value); f('rValidityMode', r.validityMode || 'days'); f('rValidityDays', r.validityDays);
+  f('rValidFrom', r.validFrom); f('rValidTo', r.validTo); f('rMinNights', r.minNights);
+  f('rMaxUses', r.singleUse ? '' : r.maxUses); f('rDesc', r.description);
+  document.getElementById('rName').dataset.editId = r.id;
+  const rooms = (r.roomTypeIds || []).map(String);
+  document.querySelectorAll('.rroom').forEach(cb => { cb.checked = rooms.includes(cb.value); });
+  document.getElementById('rActive').checked = !!r.active;
+  document.getElementById('rSingleUse').checked = !!r.singleUse;
+  document.getElementById('rBindEmail').checked = r.bindEmail !== false;
+  document.getElementById('rOnePerEmail').checked = r.onePerEmail !== false;
+  RULE_BLACKOUTS = (r.blackoutDates || []).map(b => ({ from: b.from, to: b.to || b.from }));
+  renderRuleBlackouts();
+  document.getElementById('rFormTitle').textContent = 'Editar regla ' + (r.name || '');
+  document.getElementById('rMsg').textContent = '';
+  ruleValidityModeSync();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+async function loadReglas() {
+  const tb = document.getElementById('rulesTbody');
+  try { RULES_CACHE = (await apiCodigos('rule-list')).rules || []; }
+  catch (e) {
+    if (tb) tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--terracotta-700);padding:18px">' + escHtml(e.message) + '</td></tr>';
+    return;
+  }
+  if (tb) {
+    tb.innerHTML = RULES_CACHE.length ? RULES_CACHE.map(renderRuleRow).join('')
+      : '<tr><td colspan="7" style="text-align:center;color:var(--ink-500);padding:18px">Aún no hay reglas. Crea la de reseñas para poder aprobar reseñas.</td></tr>';
+    tb.querySelectorAll('.rEdit').forEach(b => b.addEventListener('click', () => {
+      const r = RULES_CACHE.find(x => x.id === b.dataset.id);
+      if (r) fillRuleForm(r);
+    }));
+    tb.querySelectorAll('.rToggle').forEach(b => b.addEventListener('click', async () => {
+      try {
+        await apiCodigos(b.dataset.active === '1' ? 'rule-deactivate' : 'rule-activate', { id: b.dataset.id });
+        await loadReglas();
+      } catch (e) { showToast(e.message); }
+    }));
+  }
+  renderRuleSelect();
+  renderReviewRuleInfo();
+}
+async function saveRegla() {
+  const msg = document.getElementById('rMsg');
+  msg.style.color = 'var(--terracotta-700)';
+  const editId = document.getElementById('rName').dataset.editId || '';
+  const payload = {
+    id: editId || undefined,
+    name: document.getElementById('rName').value.trim(),
+    purpose: document.getElementById('rPurpose').value,
+    prefix: document.getElementById('rPrefix').value.trim().toUpperCase(),
+    type: document.getElementById('rType').value,
+    value: parseFloat(document.getElementById('rValue').value),
+    validityMode: document.getElementById('rValidityMode').value,
+    validityDays: document.getElementById('rValidityDays').value || null,
+    validFrom: document.getElementById('rValidFrom').value || null,
+    validTo: document.getElementById('rValidTo').value || null,
+    minNights: document.getElementById('rMinNights').value || null,
+    maxUses: document.getElementById('rMaxUses').value || null,
+    singleUse: document.getElementById('rSingleUse').checked,
+    bindEmail: document.getElementById('rBindEmail').checked,
+    onePerEmail: document.getElementById('rOnePerEmail').checked,
+    active: document.getElementById('rActive').checked,
+    roomTypeIds: [...document.querySelectorAll('.rroom:checked')].map(c => c.value),
+    blackoutDates: RULE_BLACKOUTS.slice(),
+    description: document.getElementById('rDesc').value.trim()
+  };
+  if (!payload.name) { msg.textContent = 'El nombre de la regla es obligatorio.'; return; }
+  try {
+    await apiCodigos(editId ? 'rule-update' : 'rule-create', payload);
+    msg.style.color = 'var(--olive-700)';
+    msg.textContent = 'Regla guardada.';
+    await loadReglas();
+    if (!editId) clearRuleForm();
+  } catch (e) { msg.textContent = e.message; }
+}
+function wireReglas() {
+  ['rValidityMode', 'rType', 'rSingleUse'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', ruleValidityModeSync);
+  });
+  const addBlk = document.getElementById('rAddBlackout');
+  if (addBlk) addBlk.addEventListener('click', () => {
+    const from = document.getElementById('rBlackFrom').value;
+    const to = document.getElementById('rBlackTo').value || from;
+    if (!from) { showToast('Elige una fecha de inicio.'); return; }
+    if (to < from) { showToast('La fecha final no puede ser anterior.'); return; }
+    RULE_BLACKOUTS.push({ from, to });
+    document.getElementById('rBlackFrom').value = '';
+    document.getElementById('rBlackTo').value = '';
+    renderRuleBlackouts();
+  });
+  const save = document.getElementById('rSaveBtn');
+  if (save) save.addEventListener('click', saveRegla);
+  const clear = document.getElementById('rClearBtn');
+  if (clear) clear.addEventListener('click', clearRuleForm);
+  if (document.getElementById('rBlackoutList')) { renderRuleBlackouts(); ruleValidityModeSync(); }
+}
+
+/* ── Código personalizado ── */
+function renderRuleSelect() {
+  const sel = document.getElementById('pRule');
+  if (!sel) return;
+  const prev = sel.value;
+  const active = RULES_CACHE.filter(r => r.active);
+  sel.innerHTML = active.length
+    ? active.map(r => '<option value="' + escHtml(r.id) + '">' + escHtml(r.name) + ' — ' + escHtml(codFmtDiscount(r)) + '</option>').join('')
+    : '<option value="">No hay reglas activas (créalas en Reglas)</option>';
+  if (prev && active.some(r => r.id === prev)) sel.value = prev;
+}
+function renderIssueResult(d) {
+  const c = d.code || {};
+  let mail = '';
+  if (d.email) mail = d.email.sent ? ' Correo enviado al huésped.' : ' <strong>El correo no salió</strong> (' + escHtml(d.email.reason || 'error') + '): compártelo por otro medio.';
+  return 'Código emitido: <code>' + escHtml(c.code) + '</code> · ' + escHtml(codFmtDiscount(c)) +
+    (c.validTo ? ' · vence ' + escHtml(fmtShortDate(c.validTo)) : '') +
+    (c.boundEmail ? ' · ligado a ' + escHtml(c.boundEmail) : '') + '.' + mail +
+    (d.discountEnabled === false ? '<div class="cod-muted" style="margin-top:6px">Ojo: el motor de códigos está apagado en la web; el huésped no podrá usarlo hasta encenderlo.</div>' : '');
+}
+async function issueCodigo() {
+  const msg = document.getElementById('pMsg');
+  const out = document.getElementById('pResult');
+  msg.style.color = 'var(--terracotta-700)';
+  msg.textContent = '';
+  out.style.display = 'none';
+  const payload = {
+    ruleId: document.getElementById('pRule').value,
+    email: document.getElementById('pEmail').value.trim(),
+    name: document.getElementById('pName').value.trim(),
+    code: document.getElementById('pCode').value.trim().toUpperCase(),
+    note: document.getElementById('pNote').value.trim(),
+    lang: document.getElementById('pLang').value,
+    sendEmail: document.getElementById('pSendEmail').checked
+  };
+  if (!payload.ruleId) { msg.textContent = 'Elige una regla activa.'; return; }
+  if (!payload.email) { msg.textContent = 'El email del huésped es obligatorio.'; return; }
+  if (payload.sendEmail && codFlagOffNote() && !confirm('¿Generar el código y enviarlo por correo a ' + payload.email + '?' + codFlagOffNote())) return;
+  const btn = document.getElementById('pIssueBtn');
+  btn.disabled = true;
+  try {
+    const d = await apiCodigos('issue', payload);
+    out.innerHTML = renderIssueResult(d);
+    out.style.display = 'block';
+    ['pEmail', 'pName', 'pCode', 'pNote'].forEach(id => { document.getElementById(id).value = ''; });
+    await loadCodigos();
+  } catch (e) { msg.textContent = e.message; }
+  finally { btn.disabled = false; }
+}
+function wirePersonal() {
+  const btn = document.getElementById('pIssueBtn');
+  if (btn) btn.addEventListener('click', issueCodigo);
+}
+
+/* ── Reseñas ── */
+const REV_PLATFORM_LABEL = { google: 'Google', booking: 'Booking', tripadvisor: 'TripAdvisor', otra: 'Otra' };
+function reviewRuleInfoText(rules) {
+  const active = (rules || []).filter(r => r.active && r.purpose === 'review')
+    .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  const r = active[0];
+  if (!r) return { missing: true, text: 'No hay una regla de reseña activa: crea una en Reglas (propósito "Reseña") y actívala antes de aprobar.' };
+  return { missing: false, text: 'Regla de reseña activa: ' + r.name + ' — ' + codFmtDiscount(r) + ', ' + ruleFmtValidity(r) + ' · ' + ruleConditions(r) + '.' };
+}
+function renderReviewRuleInfo() {
+  const el = document.getElementById('vRuleInfo');
+  if (!el) return;
+  const info = reviewRuleInfoText(RULES_CACHE);
+  el.textContent = info.text;
+  el.classList.toggle('is-missing', info.missing);
+}
+function renderReviewPendingRow(v) {
+  return '<tr>' + codTd('Huésped', '<strong>' + escHtml(v.name || '—') + '</strong><div class="cod-muted">' + escHtml(v.email) + '</div>' +
+      (v.note ? '<div class="cod-muted">' + escHtml(v.note) + '</div>' : '')) +
+    codTd('Reserva', escHtml(v.bookingCode || '—')) +
+    codTd('Plataforma', escHtml(REV_PLATFORM_LABEL[v.platform] || v.platform)) +
+    codTd('Enlace', (v.link ? '<a href="' + escHtml(v.link) + '" target="_blank" rel="noopener noreferrer">Ver reseña</a>' : '—')) +
+    codTd('Registrada', escHtml(fmtShortDate(v.createdAt))) +
+    '<td><div class="cod-actions">' +
+      '<button type="button" class="btn btn-primary vApprove" data-id="' + escHtml(v.id) + '">Aprobar reseña</button>' +
+      '<button type="button" class="btn btn-ghost-dark vReject" data-id="' + escHtml(v.id) + '">Descartar</button>' +
+    '</div></td></tr>';
+}
+function renderReviewDoneRow(v, codesByCode) {
+  const c = v.issuedCode && codesByCode ? codesByCode[v.issuedCode] : null;
+  const state = v.status === 'approved' ? '<span class="badge badge-done">aprobada</span>' : '<span class="badge badge-denied">descartada</span>';
+  let mail = '—';
+  if (v.status === 'approved') {
+    if (v.emailSent === true) mail = 'Enviado ' + escHtml(fmtShortDate(v.emailSentAt));
+    else if (v.emailSent === false) mail = '<span style="color:var(--terracotta-700)">No salió</span>';
+    else mail = '<span class="cod-muted">Sin enviar</span>';
+  }
+  return '<tr>' + codTd('Huésped', '<strong>' + escHtml(v.name || '—') + '</strong><div class="cod-muted">' + escHtml(v.email) + '</div>') +
+    codTd('Plataforma', escHtml(REV_PLATFORM_LABEL[v.platform] || v.platform) + (v.bookingCode ? '<div class="cod-muted">' + escHtml(v.bookingCode) + '</div>' : '')) +
+    codTd('Estado', state) +
+    codTd('Código', (v.issuedCode ? '<strong class="cod-code">' + escHtml(v.issuedCode) + '</strong>' : '—')) +
+    codTd('Usado', (c ? codUsedLabel(c) : (v.issuedCode ? '<span class="cod-muted">—</span>' : '—'))) +
+    codTd('Correo', mail) +
+    '<td><div class="cod-actions">' +
+      (v.status === 'approved' ? '<button type="button" class="btn btn-ghost-dark vResend" data-id="' + escHtml(v.id) + '">Reenviar correo</button>' : '') +
+    '</div></td></tr>';
+}
+function renderReviews() {
+  const ptb = document.getElementById('reviewsPendingTbody');
+  const dtb = document.getElementById('reviewsDoneTbody');
+  const pending = REVIEWS_CACHE.filter(v => v.status === 'pending');
+  const done = REVIEWS_CACHE.filter(v => v.status !== 'pending');
+  const count = document.getElementById('codRevPendingCount');
+  if (count) count.textContent = String(pending.length);
+  const byCode = {};
+  COD_CACHE.forEach(c => { byCode[c.code] = c; });
+  if (ptb) {
+    ptb.innerHTML = pending.length ? pending.map(renderReviewPendingRow).join('')
+      : '<tr><td colspan="6" style="text-align:center;color:var(--ink-500);padding:18px">No hay reseñas por aprobar.</td></tr>';
+    ptb.querySelectorAll('.vApprove').forEach(b => b.addEventListener('click', () => approveResena(b.dataset.id, b)));
+    ptb.querySelectorAll('.vReject').forEach(b => b.addEventListener('click', () => rejectResena(b.dataset.id)));
+  }
+  if (dtb) {
+    dtb.innerHTML = done.length ? done.map(v => renderReviewDoneRow(v, byCode)).join('')
+      : '<tr><td colspan="7" style="text-align:center;color:var(--ink-500);padding:18px">Aún no hay reseñas aprobadas.</td></tr>';
+    dtb.querySelectorAll('.vResend').forEach(b => b.addEventListener('click', () => resendResena(b.dataset.id, b)));
+  }
+}
+async function loadResenas() {
+  try {
+    const d = await apiCodigos('review-list');
+    REVIEWS_CACHE = d.reviews || [];
+    const warn = document.getElementById('codFlagWarn');
+    if (warn && d.discountEnabled === false) warn.style.display = 'block';
+  } catch (e) {
+    const ptb = document.getElementById('reviewsPendingTbody');
+    if (ptb) ptb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--terracotta-700);padding:18px">' + escHtml(e.message) + '</td></tr>';
+    return;
+  }
+  renderReviews();
+}
+/* Si el motor público está apagado, el huésped recibiría un código que aún no
+   puede usar: lo advertimos en la confirmación antes de enviar. */
+function codFlagOffNote() {
+  const w = document.getElementById('codFlagWarn');
+  return (w && w.style.display === 'block')
+    ? '\n\nOjo: el motor de códigos está apagado en la web; el huésped no podrá usar el código hasta encenderlo en Configuración.'
+    : '';
+}
+function reviewFormPayload() {
+  return {
+    email: document.getElementById('vEmail').value.trim(),
+    name: document.getElementById('vName').value.trim(),
+    bookingCode: document.getElementById('vBooking').value.trim().toUpperCase(),
+    platform: document.getElementById('vPlatform').value,
+    link: document.getElementById('vLink').value.trim(),
+    lang: document.getElementById('vLang').value,
+    note: document.getElementById('vNote').value.trim()
+  };
+}
+function approveResultText(d) {
+  const code = d.code && d.code.code ? d.code.code : (d.review && d.review.issuedCode) || '';
+  if (d.alreadyApproved) return 'Esa reseña ya estaba aprobada (código ' + code + ').';
+  let t = 'Reseña aprobada. Código ' + code + '.';
+  if (d.email) t += d.email.sent ? ' Correo enviado.' : ' El correo NO salió: usa "Reenviar correo".';
+  if (d.discountEnabled === false) t += ' Ojo: el motor de códigos está apagado en la web.';
+  return t;
+}
+/* Evita el doble envío (doble clic): mientras una alta está en vuelo, los dos
+   botones del formulario quedan deshabilitados. El servidor además rechaza
+   duplicados de forma atómica (reclamo por plataforma + reserva/email). */
+let RESENA_SUBMITTING = false;
+function setResenaButtonsDisabled(disabled) {
+  ['vAddBtn', 'vApproveNowBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = disabled; });
+}
+async function submitResena(approve) {
+  if (RESENA_SUBMITTING) return;
+  const msg = document.getElementById('vMsg');
+  msg.style.color = 'var(--terracotta-700)';
+  msg.textContent = '';
+  const payload = reviewFormPayload();
+  if (!payload.email) { msg.textContent = 'El email del huésped es obligatorio.'; return; }
+  if (approve && !confirm('¿Aprobar la reseña de ' + (payload.name || payload.email) + ' y enviarle el código por correo?' + codFlagOffNote())) return;
+  payload.approve = !!approve;
+  RESENA_SUBMITTING = true;
+  setResenaButtonsDisabled(true);
+  try {
+    const d = await apiCodigos('review-create', payload);
+    msg.style.color = 'var(--olive-700)';
+    msg.textContent = approve ? approveResultText(d) : 'Reseña agregada a pendientes.';
+    ['vEmail', 'vName', 'vBooking', 'vLink', 'vNote'].forEach(id => { document.getElementById(id).value = ''; });
+  } catch (e) { msg.textContent = e.message; }
+  finally {
+    RESENA_SUBMITTING = false;
+    setResenaButtonsDisabled(false);
+  }
+  await Promise.all([loadResenas(), loadCodigos()]);
+}
+async function approveResena(id, btn) {
+  const v = REVIEWS_CACHE.find(x => x.id === id);
+  if (!confirm('¿Aprobar la reseña de ' + (v ? (v.name || v.email) : 'este huésped') + ' y enviarle el código por correo?' + codFlagOffNote())) return;
+  if (btn) btn.disabled = true;
+  try {
+    const d = await apiCodigos('review-approve', { id });
+    showToast(approveResultText(d), 5000);
+  } catch (e) { showToast(e.message, 5000); }
+  await Promise.all([loadResenas(), loadCodigos()]);
+}
+async function rejectResena(id) {
+  const reason = prompt('Motivo para descartar (opcional):', '');
+  if (reason === null) return;
+  try { await apiCodigos('review-reject', { id, reason }); showToast('Reseña descartada.'); }
+  catch (e) { showToast(e.message); }
+  await loadResenas();
+}
+async function resendResena(id, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const d = await apiCodigos('review-resend', { id });
+    showToast(d.email && d.email.sent ? 'Correo reenviado.' : 'El correo no salió (' + ((d.email && d.email.reason) || 'error') + ').', 4000);
+  } catch (e) { showToast(e.message); }
+  await loadResenas();
+}
+function wireResenas() {
+  const add = document.getElementById('vAddBtn');
+  if (add) add.addEventListener('click', () => submitResena(false));
+  const now = document.getElementById('vApproveNowBtn');
+  if (now) now.addEventListener('click', () => submitResena(true));
 }
 
 wireCodigos();
