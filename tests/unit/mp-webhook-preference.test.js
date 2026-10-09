@@ -107,6 +107,22 @@ test('cotización MP: monto incorrecto y doble pago alertan vía reportAlert (co
     const c = makeDeps({ lock: { acquired: false, ownerTx: 'MP-SAMEQ' } });
     await fresh.processApprovedPayment(mpTx('COT-2026-ABCDE', 'MP-SAMEQ', 50000000), H, c.deps);
     assert.equal(c.calls.alerts.length, 0, 're-entrega del mismo tx con el lock tomado: sin alerta');
+
+    /* Revisión final: cotización YA aceptada por otro pago + nuevo pago aprobado
+       = doble cobro (antes: duplicado silencioso y reconcile lo saltaba). */
+    quote.status = 'aceptada';
+    quote.transactionId = 'MP-PAID-1';
+    const d = makeDeps({});
+    const tx4 = nextTx();
+    const r4 = await fresh.processApprovedPayment(mpTx('COT-2026-ABCDE', tx4, 50000000), H, d.deps);
+    assert.equal(JSON.parse(r4.body).duplicate, true);
+    assert.equal(d.calls.alerts.length, 1);
+    assert.equal(d.calls.alerts[0].kind, 'payment_double_charge');
+    assert.equal(d.calls.alerts[0].dedupeKey, `pay-double-${tx4}`);
+
+    const e = makeDeps({});
+    await fresh.processApprovedPayment(mpTx('COT-2026-ABCDE', 'MP-PAID-1', 50000000), H, e.deps);
+    assert.equal(e.calls.alerts.length, 0, 're-entrega del pago que la aceptó: sin alerta');
   } finally {
     delete require.cache[R('_quotes-store')];
     delete require.cache[R('_payments')];

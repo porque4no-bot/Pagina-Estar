@@ -632,6 +632,23 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
 
   // Idempotent: already accepted
   if (quote.status === 'aceptada') {
+    /* Otro pago aprobado para una cotización ya pagada = doble cobro. */
+    if (quote.transactionId && String(quote.transactionId) !== String(transaction.id)) {
+      try {
+        await quoteMoneyAlert(deps, {
+          kind: 'payment_double_charge',
+          subject: `⚠ Doble pago — ${quoteId} ya estaba pagada`,
+          html: `<p>La cotización <strong>${quoteId}</strong> ya estaba pagada y recibió otro pago aprobado.</p>
+                 <ul>
+                   <li>Pago que la aceptó: ${quote.transactionId}</li>
+                   <li>Pago duplicado: ${transaction.id}</li>
+                 </ul>
+                 <p>No se creó otra reserva. Verifica con Wompi y reembolsa la transacción duplicada.</p>`,
+          context: { quoteId, existingTransaction: quote.transactionId, newTransaction: transaction.id },
+          dedupeKey: `pay-double-${transaction.id}`
+        });
+      } catch (e) { console.error('[wompi-webhook] double-pay alert failed:', e.message); }
+    }
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ received: true, duplicate: true }) };
   }
 

@@ -369,6 +369,19 @@ async function processQuotePayment(transaction, corsHeaders, deps) {
   }
 
   if (quote.status === 'aceptada') {
+    /* Otro pago aprobado para una cotización ya pagada (dos pestañas o una
+       preferencia vieja): es un doble cobro. Antes se respondía duplicado en
+       silencio, se marcaba procesado y la reconciliación lo saltaba. */
+    if (quote.transactionId && String(quote.transactionId) !== String(transaction.id)) {
+      console.error(`[payments] second approved payment ${transaction.id} for already-accepted quote ${quoteId} (paid by ${quote.transactionId}).`);
+      await moneyAlert(deps, {
+        kind: 'payment_double_charge',
+        message: `Doble pago — cotización ${quoteId}: ya estaba pagada con ${quote.transactionId} y llegó otro pago ${transaction.provider} aprobado (${transaction.id}). No se creó otra reserva; reembolsar el cargo duplicado.`,
+        context: { quoteId, existingTransaction: quote.transactionId, newTransaction: transaction.id, provider: transaction.provider, amountCents: transaction.amountCents },
+        dedupeKey: `pay-double-${transaction.id}`,
+        incident: { provider: transaction.provider, transactionId: transaction.id, bookingCode: quoteId }
+      });
+    }
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ received: true, duplicate: true }) };
   }
 
@@ -404,8 +417,10 @@ async function processQuotePayment(transaction, corsHeaders, deps) {
   const lock = await deps.acquireQuoteLock(quoteId, transaction.id);
   if (!lock.acquired) {
     if (String(lock.ownerTx) === String(transaction.id)) {
-      /* Re-entrega del MISMO pago mientras la primera sigue en curso: no es doble pago. */
-      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ received: true, duplicate: true, inProgress: true }) };
+      /* Re-entrega del MISMO pago mientras la primera sigue en curso: no es doble
+         pago. 409 (no 2xx) para que el tx no se marque procesado y MP reintente
+         más tarde por si la entrega original murió a mitad de camino. */
+      return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ received: true, duplicate: true, inProgress: true }) };
     }
     console.error(`[payments] quote ${quoteId} is already being processed by tx ${lock.ownerTx} (started ${lock.startedAt}). Refusing tx ${transaction.id}.`);
     await moneyAlert(deps, {
