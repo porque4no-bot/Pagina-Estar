@@ -56,7 +56,8 @@ test('la app del huésped ya no promete códigos de acceso: instrucciones por co
   await page.goto('/guest.html');
   const html = await page.content();
   expect(html).not.toMatch(/te mostraremos las instrucciones de llegada y acceso/);
-  expect(html).toContain('Te enviamos las instrucciones de llegada por correo');
+  expect(html).toContain('Completa el registro antes de llegar desde aquí');
+  expect(html).not.toMatch(/te enviamos (por correo )?las instrucciones de llegada/i);
   expect(html).toContain('¿Cómo ingreso a mi apartaestudio?');
 });
 

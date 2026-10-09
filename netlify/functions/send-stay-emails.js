@@ -14,9 +14,22 @@
  * them to book direct, and the OTA runs its own review invite). Placeholder /
  * invalid / our own addresses are skipped.
  *
+ * Ventanas (no fecha exacta): el cron corre una vez al día, así que cada corrida
+ * toma las llegadas entre HOY y hoy+PRE_DAYS y las salidas entre
+ * hoy-POST_DAYS-POST_RETRY_DAYS y hoy-POST_DAYS. Con el dedupe por reserva:
+ *   - lo normal sigue siendo 2 días antes / 1 día después (primera corrida en
+ *     que la reserva entra a la ventana);
+ *   - una reserva hecha con menos de PRE_DAYS de anticipación recibe el correo
+ *     en la corrida siguiente a su creación (si aún no ha llegado);
+ *   - un envío que Resend rechaza (o una lectura de OTASync que falla) se
+ *     reintenta solo en la corrida siguiente mientras siga dentro de la ventana.
+ *     En la última oportunidad la alerta pide enviarlo a mano y lista códigos.
+ *
  * Safety: gated by STAY_EMAILS_ENABLED (OFF by default); no-op without OTASync
  * creds or RESEND_API_KEY; dedupe per reservation+type in Blobs (marked only
- * after Resend CONFIRMS the send, so a failure stays retryable the next run).
+ * after Resend CONFIRMS the send). Sin store de dedupe la ventana se reduce a la
+ * fecha exacta (nunca se repite un correo a diario). Si leer el dedupe falla,
+ * esa reserva se salta en esta corrida (mejor tarde que duplicado).
  * Several reservations with the same email on the same day → ONE email.
  *
  * NOTE: filter_by='date_departure' is not explicitly documented by OTASync
@@ -39,6 +52,8 @@ const POST_DEPARTURE_LAG_DAYS = parseInt(process.env.STAY_EMAILS_POST_DAYS, 10) 
 /* Ventana de llegadas que se relee para el post-estadía (respaldo del filtro
    date_departure no documentado). Cubre estadías de hasta ~2 meses. */
 const POST_LOOKBACK_DAYS = 62;
+/* Días extra de reintento del post-estadía (salidas hasta POST_DAYS+2 atrás). */
+const POST_RETRY_DAYS = 2;
 
 /* Estados que NO reciben correo: canceladas, no-show, holds/ofertas sin
    confirmar (tentative/pending) y borradas. */
@@ -101,14 +116,21 @@ function classifyEmail(raw) {
   return { kind: 'personal', address: lower, relayChannel: null };
 }
 
+/* Reservas creadas por NUESTRA web (wompi-webhook/_payments ponen reference =
+   código EST-XXXXX del motor, o el texto fijo del motor) o cotizaciones
+   corporativas pagadas (COT-…): son directas aunque OTASync no devuelva
+   channel_name. */
+const DIRECT_REFERENCE_RE = /^(EST-[A-Z0-9]{3,}|COT-[A-Z0-9-]+|Hotel Estar Custom Booking Engine)$/i;
+
 /* Familia del canal de la reserva. OJO: "Booking engine" es el motor PROPIO de
-   OTASync (venta directa), NO Booking.com. Sin canal → 'unknown' (no se asume
-   directa: el descuento por reseña solo va a canales directos explícitos). */
+   OTASync (venta directa), NO Booking.com. Sin canal → por reference propia
+   'direct'; si tampoco → 'unknown' (no se asume directa: el descuento por reseña
+   solo va a canales directos identificados). */
 const DIRECT_CHANNEL_RE = /(p[aá]gina\s*web|sitio\s*web|website|^web$|booking engine|motor de reservas|private reservation|reserva privada|directa?\b|direct\b|recepci[oó]n|front desk|walk[\s-]?in|tel[eé]fono|phone|whatsapp|manual|\bestar\b)/i;
-function channelFamily(channelName, relayChannel, webChannelName) {
+function channelFamily(channelName, relayChannel, webChannelName, reference) {
   if (relayChannel) return relayChannel;
   const name = String(channelName || '').trim();
-  if (!name) return 'unknown';
+  if (!name) return DIRECT_REFERENCE_RE.test(String(reference || '').trim()) ? 'direct' : 'unknown';
   const web = String(webChannelName || '').trim().toLowerCase();
   if (web && name.toLowerCase() === web) return 'direct';
   if (/booking\.com|^booking$/i.test(name)) return 'booking';
@@ -125,7 +147,7 @@ function channelFamily(channelName, relayChannel, webChannelName) {
    → { send, reason, address, family, isDirect } */
 function contactPolicy(r, opts = {}) {
   const email = classifyEmail(r && r.email);
-  const family = channelFamily(r && r.channel, email.relayChannel, opts.webChannelName);
+  const family = channelFamily(r && r.channel, email.relayChannel, opts.webChannelName, r && r.reference);
   const base = { address: email.address, family, isDirect: family === 'direct' };
   if (email.kind === 'invalid') return { ...base, send: false, reason: 'no_email' };
   if (email.kind === 'own') return { ...base, send: false, reason: 'own_address' };
@@ -166,6 +188,19 @@ function targetDates(now = new Date(), preDays = PRE_ARRIVAL_DAYS, postDays = PO
   return { preDate: ymd(pre), postDate: ymd(post) };
 }
 
+/* Ventanas de elegibilidad (ver cabecera). today = día de Colombia.
+   pre:  [today, today+preDays]   post: [today-postDays-POST_RETRY_DAYS, today-postDays]
+   windowed=false (sin store de dedupe) → solo la fecha exacta. */
+function targetWindows(now = new Date(), preDays = PRE_ARRIVAL_DAYS, postDays = POST_DEPARTURE_LAG_DAYS, windowed = true) {
+  const { preDate, postDate } = targetDates(now, preDays, postDays);
+  const today = ymd(new Date(now.getTime() - 5 * 60 * 60 * 1000));
+  return {
+    today, preDate, postDate,
+    pre: { from: windowed ? today : preDate, to: preDate },
+    post: { from: windowed ? shiftDate(postDate, -POST_RETRY_DAYS) : postDate, to: postDate }
+  };
+}
+
 function shiftDate(isoDate, deltaDays) {
   const d = new Date(`${isoDate}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + deltaDays);
@@ -176,12 +211,20 @@ function activeReservation(r) {
   return !!(r && !SKIP_STATUSES.has(String(r.status || '').toLowerCase()) && !isHoldReservation(r));
 }
 
-function eligiblePreArrival(r, preDate) {
-  return !!(r && r.email && r.dateArrival === preDate && activeReservation(r));
+/* target: 'YYYY-MM-DD' (fecha exacta) o { from, to } (ventana inclusiva). */
+function inTarget(date, target) {
+  const d = String(date || '');
+  if (!d) return false;
+  if (target && typeof target === 'object') return d >= target.from && d <= target.to;
+  return d === target;
 }
 
-function eligiblePostStay(r, postDate) {
-  return !!(r && r.email && r.dateDeparture === postDate && activeReservation(r));
+function eligiblePreArrival(r, target) {
+  return !!(r && r.email && inTarget(r.dateArrival, target) && activeReservation(r));
+}
+
+function eligiblePostStay(r, target) {
+  return !!(r && r.email && inTarget(r.dateDeparture, target) && activeReservation(r));
 }
 
 /* Une listas de reservas sin repetir id. */
@@ -214,6 +257,25 @@ function safeHttpsUrl(u) {
   return /^https:\/\/[^\s"'<>]+$/i.test(s) ? s : '';
 }
 
+/* Enlace de reseña pegado desde el panel: completa "g.page/…" / "www.google…"
+   sin esquema y sube http→https; si aun así no es válido devuelve ''. */
+function normalizeReviewUrl(u) {
+  let s = String(u || '').trim();
+  if (!s) return '';
+  if (/^http:\/\//i.test(s)) s = `https://${s.slice(7)}`;
+  else if (!/^[a-z][a-z0-9+.-]*:/i.test(s) && /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/|$)/i.test(s)) s = `https://${s}`;
+  return safeHttpsUrl(s);
+}
+
+/* Primer enlace válido de la lista (panel → legado → default). */
+function firstReviewUrl(...candidates) {
+  for (const c of candidates) {
+    const u = normalizeReviewUrl(c);
+    if (u) return u;
+  }
+  return '';
+}
+
 function getStayStore() {
   try {
     const { getStore } = require('@netlify/blobs');
@@ -230,9 +292,10 @@ function getStayStore() {
   }
 }
 
+/* true / false, o null si el store falló (no se sabe → no arriesgar duplicado). */
 async function alreadySent(store, key) {
   if (!store) return false;
-  try { return !!(await store.get(key)); } catch (e) { return false; }
+  try { return !!(await store.get(key)); } catch (e) { return null; }
 }
 
 async function markSent(store, key, meta) {
@@ -247,7 +310,8 @@ async function markSent(store, key, meta) {
 async function processBatch(store, reservations, type, predicate, targetDate, opts = {}) {
   const send = opts.sendEmail || sendEmail; /* inyectable para tests */
   const reviews = opts.reviews || {};
-  const stats = { sent: 0, checked: 0, skipped: 0, failed: 0, already: 0, reasons: {} };
+  const stats = { sent: 0, checked: 0, skipped: 0, failed: 0, already: 0, reasons: {}, failedItems: [] };
+  const dateOf = (r) => (type === 'pre' ? r.dateArrival : r.dateDeparture);
 
   /* 1) elegibles por fecha/estado → política de contacto → agrupar por correo */
   const groups = new Map();
@@ -261,7 +325,13 @@ async function processBatch(store, reservations, type, predicate, targetDate, op
       continue;
     }
     const key = `${r.idReservations}:${type}`;
-    if (await alreadySent(store, key)) { stats.already++; continue; }
+    const seen = await alreadySent(store, key);
+    if (seen === null) {
+      stats.failed++;
+      stats.failedItems.push({ code: String(r.idReservations || ''), date: dateOf(r), reason: 'dedupe_unavailable' });
+      continue;
+    }
+    if (seen) { stats.already++; continue; }
     if (!groups.has(policy.address)) groups.set(policy.address, { policy, items: [] });
     groups.get(policy.address).items.push({ r, key });
   }
@@ -286,6 +356,7 @@ async function processBatch(store, reservations, type, predicate, targetDate, op
       const res = await send({ to: address, subject: staySubject(type, lang, resv), html });
       if (!res || res.sent !== true) {
         stats.failed++;
+        for (const i of items) stats.failedItems.push({ code: String(i.r.idReservations || ''), date: dateOf(i.r), reason: (res && res.reason) || 'resend_error' });
         console.error(`[send-stay-emails] ${type} email not sent for ${items.map(i => i.r.idReservations).join(',')}: ${(res && res.reason) || 'resend error'}`);
         continue;
       }
@@ -293,6 +364,7 @@ async function processBatch(store, reservations, type, predicate, targetDate, op
       stats.sent++;
     } catch (e) {
       stats.failed++;
+      for (const i of items) stats.failedItems.push({ code: String(i.r.idReservations || ''), date: dateOf(i.r), reason: 'exception' });
       console.error(`[send-stay-emails] ${type} email failed for ${items.map(i => i.r.idReservations).join(',')}:`, e.message);
     }
   }
@@ -313,9 +385,11 @@ async function resolveSettings() {
     preDays,
     postDays,
     npsUrl,
+    /* Un valor inválido en el panel NUNCA deja el correo sin botón de reseña:
+       se ignora y se cae al legado/default. */
     reviews: {
-      googleUrl: safeHttpsUrl(await get('GOOGLE_REVIEW_URL', process.env.REVIEW_LINK_URL || DEFAULT_GOOGLE_REVIEW_URL)),
-      bookingUrl: safeHttpsUrl(await get('BOOKING_REVIEW_URL', DEFAULT_BOOKING_REVIEW_URL))
+      googleUrl: firstReviewUrl(await get('GOOGLE_REVIEW_URL', ''), process.env.REVIEW_LINK_URL, DEFAULT_GOOGLE_REVIEW_URL),
+      bookingUrl: firstReviewUrl(await get('BOOKING_REVIEW_URL', ''), DEFAULT_BOOKING_REVIEW_URL)
     },
     discountEnabled: await flag('STAY_REVIEW_DISCOUNT_ENABLED'),
     webChannelName: process.env.OTASYNC_CHANNEL_NAME || 'Pagina web'
@@ -329,30 +403,31 @@ async function runStayEmails(settings, deps = {}) {
   const fetchReservations = deps.fetchReservations || getReservationsByDate;
   const store = deps.store === undefined ? getStayStore() : deps.store;
   const alert = deps.reportAlert || (async (a) => { try { await require('./_alert').reportAlert(a); } catch (_) { /* best-effort */ } });
-  const { preDate, postDate } = targetDates(deps.now || new Date(), settings.preDays, settings.postDays);
+  const win = targetWindows(deps.now || new Date(), settings.preDays, settings.postDays, !!store);
+  const { preDate, postDate, today } = win;
   const batchOpts = { sendEmail: deps.sendEmail, webChannelName: settings.webChannelName };
-  const empty = { sent: 0, checked: 0, skipped: 0, failed: 0, already: 0, reasons: {} };
+  const empty = { sent: 0, checked: 0, skipped: 0, failed: 0, already: 0, reasons: {}, failedItems: [] };
   let pre = empty;
   let post = empty;
 
   try {
-    const arrivals = await fetchReservations({ filterBy: 'date_arrival', dfrom: preDate, dto: preDate, arrivals: 1 });
-    if (!arrivals.isMock) pre = await processBatch(store, arrivals.reservations, 'pre', eligiblePreArrival, preDate, batchOpts);
+    const arrivals = await fetchReservations({ filterBy: 'date_arrival', dfrom: win.pre.from, dto: win.pre.to, arrivals: 1 });
+    if (!arrivals.isMock) pre = await processBatch(store, arrivals.reservations, 'pre', eligiblePreArrival, win.pre, batchOpts);
   } catch (e) {
     console.error('[send-stay-emails] pre-arrival batch failed:', e.message);
-    await alert({ kind: 'cron_failed', severity: 'error', message: 'El cron de correos de pre-llegada falló (no se enviaron los avisos de hoy).', context: { fase: 'pre-arrival', detail: String(e.message || '').slice(0, 200) }, dedupeKey: 'stay-emails-pre' });
+    await alert({ kind: 'cron_failed', severity: 'error', message: `El cron de correos de pre-llegada falló hoy. Se reintenta mañana, pero los huéspedes que llegan hoy (${today}) ya no lo recibirán: revisa en recepción.`, context: { fase: 'pre-arrival', detail: String(e.message || '').slice(0, 200) }, dedupeKey: 'stay-emails-pre' });
   }
 
   /* Post-estadía: salidas por date_departure (no documentado) + respaldo con las
-     llegadas de la ventana, filtrando en cliente por dateDeparture===postDate. */
+     llegadas de la ventana, filtrando en cliente por dateDeparture en la ventana. */
   let departures = null;
   let windowArrivals = null;
   let lastError = null;
   try {
-    departures = await fetchReservations({ filterBy: 'date_departure', dfrom: postDate, dto: postDate, departures: 1 });
+    departures = await fetchReservations({ filterBy: 'date_departure', dfrom: win.post.from, dto: win.post.to, departures: 1 });
   } catch (e) { lastError = e; }
   try {
-    windowArrivals = await fetchReservations({ filterBy: 'date_arrival', dfrom: shiftDate(postDate, -POST_LOOKBACK_DAYS), dto: postDate, arrivals: 1 });
+    windowArrivals = await fetchReservations({ filterBy: 'date_arrival', dfrom: shiftDate(win.post.from, -POST_LOOKBACK_DAYS), dto: win.post.to, arrivals: 1 });
   } catch (e) { lastError = e; }
   if (lastError && (departures || windowArrivals)) {
     console.warn('[send-stay-emails] post-stay: una de las dos lecturas falló, sigo con la otra:', lastError.message);
@@ -360,32 +435,46 @@ async function runStayEmails(settings, deps = {}) {
   if (!departures && !windowArrivals) {
     const detail = String((lastError && lastError.message) || '').slice(0, 200);
     console.error('[send-stay-emails] post-stay batch failed:', detail);
-    await alert({ kind: 'cron_failed', severity: 'error', message: 'El cron de correos de post-estadía falló (no se enviaron los avisos de hoy).', context: { fase: 'post-stay', detail }, dedupeKey: 'stay-emails-post' });
+    await alert({ kind: 'cron_failed', severity: 'error', message: 'El cron de correos de post-estadía falló hoy. Se reintenta en la próxima corrida (las salidas de los últimos días siguen en la ventana).', context: { fase: 'post-stay', detail }, dedupeKey: 'stay-emails-post' });
   } else if (!((departures && departures.isMock) || (windowArrivals && windowArrivals.isMock))) {
     const rows = mergeReservations(departures && departures.reservations, windowArrivals && windowArrivals.reservations);
     try {
-      post = await processBatch(store, rows, 'post', eligiblePostStay, postDate, {
+      post = await processBatch(store, rows, 'post', eligiblePostStay, win.post, {
         ...batchOpts, npsUrl: settings.npsUrl, reviews: settings.reviews, discountEnabled: settings.discountEnabled
       });
     } catch (e) {
       console.error('[send-stay-emails] post-stay batch failed:', e.message);
-      await alert({ kind: 'cron_failed', severity: 'error', message: 'El cron de correos de post-estadía falló (no se enviaron los avisos de hoy).', context: { fase: 'post-stay', detail: String(e.message || '').slice(0, 200) }, dedupeKey: 'stay-emails-post' });
+      await alert({ kind: 'cron_failed', severity: 'error', message: 'El cron de correos de post-estadía falló hoy. Se reintenta en la próxima corrida (las salidas de los últimos días siguen en la ventana).', context: { fase: 'post-stay', detail: String(e.message || '').slice(0, 200) }, dedupeKey: 'stay-emails-post' });
     }
   }
 
   const failed = pre.failed + post.failed;
   if (failed > 0) {
+    /* Mañana la ventana empieza un día después: lo que hoy está en el primer día
+       de su ventana ya no se reintenta → hay que mandarlo a mano. */
+    const split = (items, lastDay) => {
+      const retry = []; const manual = [];
+      for (const it of items) (String(it.date || '') <= lastDay ? manual : retry).push(it.code);
+      return { retry, manual };
+    };
+    const p = split(pre.failedItems, win.pre.from);
+    const q = split(post.failedItems, win.post.from);
+    const retry = [...p.retry.map(c => `${c} (pre-llegada)`), ...q.retry.map(c => `${c} (post-estadía)`)];
+    const manual = [...p.manual.map(c => `${c} (pre-llegada)`), ...q.manual.map(c => `${c} (post-estadía)`)];
+    const parts = [`${failed} correo(s) de estadía no salieron hoy (Resend rechazó o falló).`];
+    if (manual.length) parts.push(`ENVIAR A MANO (ya no se reintentan): ${manual.join(', ')}.`);
+    if (retry.length) parts.push(`Se reintentan solos mañana: ${retry.join(', ')}.`);
     await alert({
-      kind: 'email_failed', severity: 'warn',
-      message: `${failed} correo(s) de estadía no salieron hoy (Resend rechazó o falló). Se reintentan en la próxima corrida.`,
-      context: { preDate, postDate, preFailed: pre.failed, postFailed: post.failed },
-      dedupeKey: 'stay-emails-send-failed'
+      kind: 'email_failed', severity: manual.length ? 'error' : 'warn',
+      message: parts.join(' '),
+      context: { preDate, postDate, preFailed: pre.failed, postFailed: post.failed, manual, retry },
+      dedupeKey: `stay-emails-send-failed-${today}`
     });
   }
 
-  console.log(`[send-stay-emails] preDate=${preDate} sent=${pre.sent}/${pre.checked} skipped=${pre.skipped} failed=${pre.failed}, postDate=${postDate} sent=${post.sent}/${post.checked} skipped=${post.skipped} failed=${post.failed}`);
+  console.log(`[send-stay-emails] pre=${win.pre.from}..${win.pre.to} post=${win.post.from}..${win.post.to} preDate=${preDate} sent=${pre.sent}/${pre.checked} skipped=${pre.skipped} failed=${pre.failed}, postDate=${postDate} sent=${post.sent}/${post.checked} skipped=${post.skipped} failed=${post.failed}`);
   return {
-    preDate, postDate,
+    preDate, postDate, preWindow: win.pre, postWindow: win.post,
     preSent: pre.sent, postSent: post.sent, preChecked: pre.checked, postChecked: post.checked,
     preSkipped: pre.skipped, postSkipped: post.skipped, preFailed: pre.failed, postFailed: post.failed,
     skipReasons: { pre: pre.reasons, post: post.reasons }
@@ -410,8 +499,8 @@ exports.handler = async () => {
 
 exports._test = {
   runStayEmails, resolveSettings,
-  ymd, targetDates, shiftDate, eligiblePreArrival, eligiblePostStay, processBatch, mergeReservations,
+  ymd, targetDates, targetWindows, inTarget, shiftDate, normalizeReviewUrl, firstReviewUrl, eligiblePreArrival, eligiblePostStay, processBatch, mergeReservations,
   classifyEmail, channelFamily, contactPolicy, stayLang, staySubject, safeHttpsUrl,
-  PRE_ARRIVAL_DAYS, POST_DEPARTURE_LAG_DAYS, POST_LOOKBACK_DAYS,
+  PRE_ARRIVAL_DAYS, POST_DEPARTURE_LAG_DAYS, POST_LOOKBACK_DAYS, POST_RETRY_DAYS,
   DEFAULT_NPS_SURVEY_URL, DEFAULT_GOOGLE_REVIEW_URL, DEFAULT_BOOKING_REVIEW_URL
 };

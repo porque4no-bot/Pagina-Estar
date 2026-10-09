@@ -255,7 +255,7 @@ const NOW = new Date('2026-10-08T12:00:00Z'); /* pre = 10-oct, post = 07-oct */
 test('runStayEmails: pre 2 días antes y post 1 día después, todos los canales, un correo por huésped', async () => {
   const sent = [];
   const otasync = fakeOtasync(q => {
-    if (q.filterBy === 'date_arrival' && q.dfrom === '2026-10-10') {
+    if (q.filterBy === 'date_arrival' && q.dto === '2026-10-10') {
       return [
         resv({ idReservations: '1', email: 'ana@gmail.com', channel: 'Pagina web' }),
         resv({ idReservations: '2', email: 'b.2@guest.booking.com', channel: 'Booking.com', country: 'DE' }),
@@ -273,13 +273,18 @@ test('runStayEmails: pre 2 días antes y post 1 día después, todos los canales
   });
   assert.equal(r.preDate, '2026-10-10');
   assert.equal(r.postDate, '2026-10-07');
+  /* ventanas: llegadas hoy..+2, salidas -3..-1 */
+  assert.deepEqual(r.preWindow, { from: '2026-10-08', to: '2026-10-10' });
+  assert.deepEqual(r.postWindow, { from: '2026-10-05', to: '2026-10-07' });
+  const preCall = otasync.calls.find(c => c.filterBy === 'date_arrival' && c.dto === '2026-10-10');
+  assert.equal(preCall.dfrom, '2026-10-08');
   assert.equal(r.preSent, 3);
   assert.equal(r.preSkipped, 1); /* Airbnb relay */
   assert.equal(r.postSent, 1);
   /* respaldo del post-estadía: también lee las llegadas de la ventana */
   const windowCall = otasync.calls.find(c => c.filterBy === 'date_arrival' && c.dto === '2026-10-07');
   assert.ok(windowCall);
-  assert.equal(windowCall.dfrom, shiftDate('2026-10-07', -POST_LOOKBACK_DAYS));
+  assert.equal(windowCall.dfrom, shiftDate('2026-10-05', -POST_LOOKBACK_DAYS));
   for (const m of sent) assert.doesNotMatch(m.html, FALSE_PROMISES);
 });
 
@@ -321,9 +326,9 @@ test('runStayEmails: una lectura del post-estadía falla → sigue con la otra; 
   assert.deepEqual(alerts.map(a => a.dedupeKey).sort(), ['stay-emails-post', 'stay-emails-pre']);
 });
 
-test('runStayEmails: correos que Resend rechaza → alerta "email_failed" deduplicada', async () => {
+test('runStayEmails: correos que Resend rechaza → alerta "email_failed" con los códigos y si se reintentan', async () => {
   const alerts = [];
-  const otasync = fakeOtasync(q => (q.filterBy === 'date_arrival' && q.dfrom === '2026-10-10' ? [resv()] : []));
+  const otasync = fakeOtasync(q => (q.filterBy === 'date_arrival' && q.dto === '2026-10-10' ? [resv()] : []));
   const r = await runStayEmails(SETTINGS, {
     now: NOW, fetchReservations: otasync, store: memStore(), reportAlert: async (a) => { alerts.push(a); },
     sendEmail: async () => ({ sent: false })
@@ -331,7 +336,95 @@ test('runStayEmails: correos que Resend rechaza → alerta "email_failed" dedupl
   assert.equal(r.preFailed, 1);
   assert.equal(alerts.length, 1);
   assert.equal(alerts[0].kind, 'email_failed');
-  assert.equal(alerts[0].dedupeKey, 'stay-emails-send-failed');
+  assert.equal(alerts[0].dedupeKey, 'stay-emails-send-failed-2026-10-08');
+  assert.match(alerts[0].message, /Se reintentan solos mañana: 5001 \(pre-llegada\)/);
+  assert.doesNotMatch(alerts[0].message, /ENVIAR A MANO/);
+});
+
+/* Simula el cron diario: misma OTASync, mismo store, días consecutivos. */
+async function dailyRuns(days, rows, sendFor) {
+  const store = memStore();
+  const sentLog = [];
+  const alerts = [];
+  const otasync = fakeOtasync(q => rows.filter(x => {
+    const d = q.filterBy === 'date_departure' ? x.dateDeparture : x.dateArrival;
+    return d >= q.dfrom && d <= q.dto;
+  }));
+  const results = [];
+  for (const day of days) {
+    results.push(await runStayEmails(SETTINGS, {
+      now: new Date(`${day}T12:00:00Z`), fetchReservations: otasync, store,
+      reportAlert: async (a) => { alerts.push({ day, ...a }); },
+      sendEmail: async (m) => {
+        const ok = sendFor(day, m);
+        if (ok) sentLog.push({ day, to: m.to, subject: m.subject });
+        return { sent: ok };
+      }
+    }));
+  }
+  return { store, sentLog, alerts, results };
+}
+
+test('reintento real: Resend falla el día D → el pre-llegada sale el día D+1 (una sola vez)', async () => {
+  const rows = [resv({ idReservations: '123', dateArrival: '2026-10-10', dateDeparture: '2026-10-12' })];
+  const { sentLog, alerts } = await dailyRuns(
+    ['2026-10-08', '2026-10-09', '2026-10-10'], rows,
+    (day, m) => !(day === '2026-10-08' && /llegada|stay at/i.test(m.subject))
+  );
+  const pre = sentLog.filter(x => /llegada/.test(x.subject));
+  assert.deepEqual(pre.map(x => x.day), ['2026-10-09']);
+  assert.equal(alerts.filter(a => a.kind === 'email_failed').length, 1);
+});
+
+test('reintento real del post-estadía: falla 2 días seguidos y sale al tercero; si falla el último día → "ENVIAR A MANO"', async () => {
+  const rows = [resv({ idReservations: '777', dateArrival: '2026-10-03', dateDeparture: '2026-10-07' })];
+  const ok = await dailyRuns(['2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'], rows,
+    (day) => day === '2026-10-10');
+  assert.deepEqual(ok.sentLog.filter(x => /Gracias/.test(x.subject)).map(x => x.day), ['2026-10-10']);
+
+  const lost = await dailyRuns(['2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'], rows, () => false);
+  const fails = lost.alerts.filter(a => a.kind === 'email_failed');
+  assert.equal(fails.length, 3, 'tres días de ventana → tres intentos');
+  assert.match(fails[0].message, /Se reintentan solos mañana: 777/);
+  assert.match(fails[2].message, /ENVIAR A MANO \(ya no se reintentan\): 777 \(post-estadía\)/);
+  assert.equal(fails[2].severity, 'error');
+  assert.equal(lost.results[3].postChecked, 0, 'fuera de ventana ya no se evalúa');
+});
+
+test('reserva de última hora (llega mañana) recibe el pre-llegada en la corrida siguiente', async () => {
+  /* reservada el 8 después del cron, llega el 9 */
+  const rows = [resv({ idReservations: '900', dateArrival: '2026-10-09', dateDeparture: '2026-10-10', channel: 'Booking.com', email: 'z.9@guest.booking.com' })];
+  const { sentLog } = await dailyRuns(['2026-10-09'], rows, () => true);
+  assert.equal(sentLog.filter(x => /llegada/.test(x.subject)).length, 1);
+  /* y quien llega HOY aún lo recibe en la corrida de las 7 a. m. (check-in 3 p. m.) */
+  const today = await dailyRuns(['2026-10-09'], [resv({ idReservations: '901', dateArrival: '2026-10-09' })], () => true);
+  assert.equal(today.sentLog.length, 1);
+  /* reserva con tiempo: sale exactamente 2 días antes y no se repite */
+  const normal = await dailyRuns(['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10'],
+    [resv({ idReservations: '902', dateArrival: '2026-10-10', dateDeparture: '2026-10-11' })], () => true);
+  assert.deepEqual(normal.sentLog.filter(x => /llegada/.test(x.subject)).map(x => x.day), ['2026-10-08']);
+  assert.deepEqual(normal.sentLog.filter(x => /Gracias/.test(x.subject)).map(x => x.day), []);
+});
+
+test('sin store de dedupe la ventana se reduce a la fecha exacta (nunca repite a diario)', async () => {
+  const otasync = fakeOtasync(() => [resv({ dateArrival: '2026-10-09' })]);
+  const r = await runStayEmails(SETTINGS, {
+    now: NOW, fetchReservations: otasync, store: null, reportAlert: async () => {},
+    sendEmail: async () => ({ sent: true })
+  });
+  assert.deepEqual(r.preWindow, { from: '2026-10-10', to: '2026-10-10' });
+  assert.equal(r.preSent, 0);
+});
+
+test('si leer el dedupe falla, la reserva se salta (no duplicar) y cuenta como fallida', async () => {
+  const broken = { async get() { throw new Error('blobs 503'); }, async set() {} };
+  const sent = [];
+  const res = await processBatch(broken, [resv()], 'pre', eligiblePreArrival, { from: '2026-10-08', to: '2026-10-10' }, {
+    sendEmail: async (m) => { sent.push(m); return { sent: true }; }
+  });
+  assert.equal(sent.length, 0);
+  assert.equal(res.failed, 1);
+  assert.equal(res.failedItems[0].reason, 'dedupe_unavailable');
 });
 
 /* ── Plantillas ── */
@@ -423,4 +516,49 @@ test('"Mi estadía" está en el menú y el pie de todas las páginas públicas, 
   assert.equal(es.nav_mi_estadia, 'Mi estadía');
   assert.equal(en.nav_mi_estadia, 'My stay');
   assert.ok(es.footer_mi_estadia && en.footer_mi_estadia);
+});
+
+/* ── Enlaces de reseña y canal por reference ── */
+
+test('enlace de reseña inválido o sin https en el panel → nunca deja el correo sin Google', async () => {
+  const { normalizeReviewUrl, firstReviewUrl } = stay._test;
+  assert.equal(normalizeReviewUrl('g.page/r/CW6uBmyymSHlEBM/review'), 'https://g.page/r/CW6uBmyymSHlEBM/review');
+  assert.equal(normalizeReviewUrl('www.google.com/maps/place/estar'), 'https://www.google.com/maps/place/estar');
+  assert.equal(normalizeReviewUrl('http://g.page/x'), 'https://g.page/x');
+  assert.equal(normalizeReviewUrl('javascript:alert(1)'), '');
+  assert.equal(normalizeReviewUrl('dejar reseña'), '');
+  assert.equal(firstReviewUrl('dejar reseña', '', DEFAULT_GOOGLE_REVIEW_URL), DEFAULT_GOOGLE_REVIEW_URL);
+
+  const prevG = process.env.GOOGLE_REVIEW_URL;
+  const prevL = process.env.REVIEW_LINK_URL;
+  delete process.env.REVIEW_LINK_URL;
+  try {
+    process.env.GOOGLE_REVIEW_URL = 'texto que no es enlace';
+    let s = await stay._test.resolveSettings();
+    assert.equal(s.reviews.googleUrl, DEFAULT_GOOGLE_REVIEW_URL);
+    process.env.GOOGLE_REVIEW_URL = 'g.page/r/OTRO/review';
+    s = await stay._test.resolveSettings();
+    assert.equal(s.reviews.googleUrl, 'https://g.page/r/OTRO/review');
+    process.env.BOOKING_REVIEW_URL = 'nada';
+    s = await stay._test.resolveSettings();
+    assert.equal(s.reviews.bookingUrl, DEFAULT_BOOKING_REVIEW_URL);
+  } finally {
+    if (prevG === undefined) delete process.env.GOOGLE_REVIEW_URL; else process.env.GOOGLE_REVIEW_URL = prevG;
+    if (prevL !== undefined) process.env.REVIEW_LINK_URL = prevL;
+    delete process.env.BOOKING_REVIEW_URL;
+  }
+  /* y el correo resultante sí trae el botón de Google */
+  const html = postStayHtml({ resv: resv(), lang: 'es', reviews: { googleUrl: firstReviewUrl('mal', DEFAULT_GOOGLE_REVIEW_URL), bookingUrl: '' } });
+  assert.ok(html.includes(DEFAULT_GOOGLE_REVIEW_URL));
+});
+
+test('sin channel_name, la reference propia (EST-…/COT-…) identifica una reserva directa', () => {
+  assert.equal(channelFamily('', null, 'Pagina web', 'EST-AB12C'), 'direct');
+  assert.equal(channelFamily('', null, 'Pagina web', 'COT-2026-0012'), 'direct');
+  assert.equal(channelFamily('', null, 'Pagina web', 'Hotel Estar Custom Booking Engine'), 'direct');
+  assert.equal(channelFamily('', null, 'Pagina web', '4429181723'), 'unknown');
+  assert.equal(channelFamily('', null, 'Pagina web', ''), 'unknown');
+  /* un relay de OTA manda sobre la reference */
+  assert.equal(channelFamily('', 'booking', 'Pagina web', 'EST-AB12C'), 'booking');
+  assert.equal(contactPolicy(resv({ channel: '', reference: 'EST-ZZ9Q1' })).isDirect, true);
 });

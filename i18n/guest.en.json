@@ -1,9 +1,9 @@
 {
   "expirationDateOptionalHint": "(optional, passports only)",
   "nationalityPlaceholder": "E.g. Colombia",
-  "arrivalCardCopy": "Complete your registration before you arrive. We email you the arrival instructions and our front desk helps you with your check-in.",
+  "arrivalCardCopy": "Complete your registration here before you arrive and our front desk helps you with your check-in.",
   "accessFaqQuestion": "How do I get into my studio?",
-  "accessFaqAnswer": "Before your stay we email you the arrival instructions. Our front desk (6:00–10:00 am and 4:00–10:00 pm) helps you with your check-in. If you'll arrive outside those hours, message us on WhatsApp in advance and we'll arrange your arrival.",
+  "accessFaqAnswer": "Our front desk (6:00–10:00 am and 4:00–10:00 pm) helps you with your check-in. If you'll arrive outside those hours, message us on WhatsApp in advance and we'll arrange your arrival.",
   "cameraButton": "Take photo",
   "cameraInstruction": "Frame the document inside the guide",
   "captureBtn": "Capture",
