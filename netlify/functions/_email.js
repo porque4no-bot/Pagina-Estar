@@ -1025,3 +1025,31 @@ module.exports.guestAppUrl = guestAppUrl;
 module.exports.guestCheckinUrl = guestCheckinUrl;
 module.exports.STAY_RECEPTION_HOURS = STAY_RECEPTION_HOURS;
 module.exports.contractCopyHtml = contractCopyHtml;
+/* Frente site */
+/* Aviso al equipo: nueva postulación desde "Trabaja con nosotros" (trabaja.html /
+   en/trabaja.html). El postulante NO entra al maestro de clientes de Odoo: su dato
+   tiene otra finalidad (selección de personal, ver privacidad.html). Todo lo que
+   viene del formulario es texto del público → siempre escapado; el enlace a la
+   hoja de vida solo se vuelve <a> si es http(s). */
+function jobApplicationHtml({ application }) {
+  const a = application || {};
+  const attr = (s) => esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const link = (href, label) => `<a href="${attr(href)}" style="color:${C.olive};font-weight:700;text-decoration:none;word-break:break-all;">${esc(label)}</a>`;
+  const cv = a.hojaVidaUrl ? link(a.hojaVidaUrl, a.hojaVidaUrl) : esc(a.hojaVida || '—');
+  const rows = [
+    ['Nombre', esc(a.nombre || '—')],
+    ['Correo', a.email ? link(`mailto:${a.email}`, a.email) : '—'],
+    ['Área de interés', esc(a.area || '—')],
+    ['Hoja de vida / portafolio', cv],
+    ['Idioma del formulario', a.lang === 'en' ? 'Inglés' : 'Español'],
+    ['Acepta la política de datos', a.aceptaPolitica ? 'Sí' : 'No']
+  ];
+  const mensaje = a.mensaje ? esc(a.mensaje).replace(/\r?\n/g, '<br>') : '';
+  const body = `
+    <p style="margin:0 0 22px;font-family:${SANS};font-size:14px;line-height:1.65;color:${C.body};">Llegó una postulación desde <strong style="color:#28292b;">Trabaja con nosotros</strong> en el sitio.</p>
+    ${dataRows(rows)}
+    ${mensaje ? calloutBox(C.olive, 'Sobre la persona', mensaje) : ''}
+    <p style="margin:20px 0 0;font-family:${SANS};font-size:12px;line-height:1.6;color:${C.muted};">Dato personal para selección de personal: úsalo solo para este proceso y no lo reenvíes fuera del equipo. La copia original queda en Netlify Forms (vacantes-empleo). Si la persona pide eliminar su postulación, bórrala de Netlify Forms y de este buzón (así lo promete la política de privacidad).</p>`;
+  return internalShell({ accent: C.olive, kicker: 'Selección de personal', title: `Nueva postulación — ${a.nombre || a.email || 'sin nombre'}`, bodyHtml: body });
+}
+module.exports.jobApplicationHtml = jobApplicationHtml;

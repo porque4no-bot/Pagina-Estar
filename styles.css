@@ -4726,6 +4726,21 @@ html[lang="en"] .lang-es { display: none !important; }
   outline: 2px solid var(--white, #fff);
   outline-offset: 2px;
 }
+/* "Configurar cookies" (consent.js lo agrega junto a la política en el footer):
+   botón con apariencia de enlace, hereda la tipografía del .footer-bot. */
+.cookie-settings-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: color var(--dur-base) var(--ease-out);
+}
+.cookie-settings-link:hover { color: var(--paper); }
 
 /* ── Accesibilidad: Focus Visible ────────────────────── */
 :focus-visible {

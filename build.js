@@ -140,6 +140,16 @@ filesToCopy.forEach(file => {
   copyFileSync(path.join(rootDir, file), path.join(distDir, file));
 });
 
+/* sitemap.xml: las URLs cuyo contenido cambia con cada despliegue (el motor de
+   reservas, que muestra tarifas y disponibilidad vivas) llevan
+   <lastmod>__BUILD_DATE__</lastmod> en el fuente; aquí se fija la fecha real
+   del build (AAAA-MM-DD). */
+const distSitemap = path.join(distDir, 'sitemap.xml');
+if (fs.existsSync(distSitemap)) {
+  const buildDate = new Date().toISOString().slice(0, 10);
+  fs.writeFileSync(distSitemap, fs.readFileSync(distSitemap, 'utf8').replace(/__BUILD_DATE__/g, buildDate));
+}
+
 // Copy all HTML files from root to dist (skip generator templates, prefixed `_`).
 fs.readdirSync(rootDir).forEach(file => {
   if (file.endsWith('.html') && !file.startsWith('_')) {
@@ -167,6 +177,7 @@ validateMarketingData({ rootDir });
 // Ad pixels are emitted ONLY when their IDs are configured at build time, so
 // the markup is inert until META_PIXEL_ID / GOOGLE_ADS_ID are set in Netlify.
 const GA4_ID = 'G-9PB0Z2KQJK';
+const { isGa4Excluded, ga4ConfigScript, metaPixelScript } = require('./build-ga4');
 const META_PIXEL_ID = (process.env.META_PIXEL_ID || '').trim();
 const GOOGLE_ADS_ID = (process.env.GOOGLE_ADS_ID || '').trim();
 
@@ -185,23 +196,17 @@ let ga4Snippet =
   `  function gtag(){dataLayer.push(arguments);}\n` +
   `  ${consentDefault}\n` +
   `  gtag('js', new Date());\n` +
-  `  gtag('config', '${GA4_ID}', { anonymize_ip: true });\n` +
-  (GOOGLE_ADS_ID ? `  gtag('config', '${GOOGLE_ADS_ID}');\n` : '') +
+  /* page_location/page_referrer limpios (sin external_reference de Mercado
+     Pago, tokens ni #hash) antes de configurar GA4/Ads — ver build-ga4.js. */
+  ga4ConfigScript(GA4_ID, GOOGLE_ADS_ID) +
   `</script>`;
 
 if (META_PIXEL_ID) {
   ga4Snippet +=
     `\n<!-- Meta Pixel (consent-gated; fires only after opt-in) -->\n` +
-    `<script>\n` +
-    `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?` +
-    `n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;` +
-    `n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;` +
-    `t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}` +
-    `(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');\n` +
-    `fbq('consent','revoke');\n` +
-    `fbq('init','${META_PIXEL_ID}');\n` +
-    `fbq('track','PageView');\n` +
-    `</script>`;
+    /* No se carga si la URL o el referrer traen parámetros fuera de la lista
+       blanca (datos personales de Mercado Pago, tokens) — ver build-ga4.js. */
+    metaPixelScript(META_PIXEL_ID);
 }
 
 // External consent manager (banner + Consent Mode update on opt-in).
@@ -217,6 +222,10 @@ function injectGA4(dir) {
     if (fs.lstatSync(fullPath).isDirectory()) {
       injectGA4(fullPath);
     } else if (entry.endsWith('.html')) {
+      /* Páginas privadas o con tokens en la URL (cotización, datos de cuenta,
+         pase de desayuno, app del huésped, portal y paneles del personal): sin
+         GA4, sin Consent Mode y sin banner. Lista en build-ga4.js. */
+      if (isGa4Excluded(entry)) return;
       let content = fs.readFileSync(fullPath, 'utf8');
       if (!content.includes('gtag') && content.includes('</head>')) {
         content = content.replace('</head>', ga4Snippet + '\n</head>');
