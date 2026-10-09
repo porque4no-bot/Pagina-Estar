@@ -1072,6 +1072,27 @@ exports.handler = async event => {
 
       await deps.guestStore('guest-checkins').setJSON(checkinId, deps.protectRecord(record));
 
+      /* Frente Hoy: check-in aceptado con revisión manual (el OCR no leyó el
+         documento) → tarea "verificar documento" en la cola de recepción (panel
+         Hoy), para que se coteje el documento físico a la llegada. Sin PII en la
+         tarea (solo códigos). Best-effort: nunca tumba el check-in. */
+      if (manualReview) {
+        try {
+          await require('./_ops-queue').enqueue({
+            kind: 'checkin_manual_review',
+            severity: 'warn',
+            title: `Verificar documento en recepción: check-in de la reserva ${session.sub} quedó en revisión manual`,
+            context: {
+              bookingCode: session.sub,
+              checkinId,
+              guestsToVerify: entries.filter(entry => entry.needsManualReview).length,
+              roomNumber: reservation.roomNumber || ''
+            },
+            dedupeKey: `checkin_manual_review:${checkinId}`
+          });
+        } catch (_) { /* cola best-effort */ }
+      }
+
       let stagedDocument = false;
       if (await flag('GUEST_APP_STORE_DOCUMENTS')) {
         await Promise.all(entries.map((entry, index) => {

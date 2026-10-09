@@ -915,7 +915,13 @@ function normalizeReservation(r) {
     hasBreakfast: reservaTieneDesayuno(r),
     roomName: (r.rooms && r.rooms[0] && r.rooms[0].name) || '',
     reference: String(r.reference || ''),
-    lang: inferLang(r.country)
+    lang: inferLang(r.country),
+    /* Frente Hoy (panel de recepción): canal, número de apto y saldo del folio,
+       tal como los lista reservation/data/reservations. Aditivo, solo lectura. */
+    channel: String(r.channel_name || r.channel || '').trim(),
+    roomNumber: String((r.rooms && r.rooms[0] && r.rooms[0].room_number) || '').trim(),
+    totalPrice: Number(r.total_price) || 0,
+    remainingAmount: Number(r.remaining_amount) || 0
   };
 }
 

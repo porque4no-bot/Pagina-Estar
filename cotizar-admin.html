@@ -438,6 +438,34 @@
 .badge-done { background: #D8EBD8; color: #2E6B3A; }
 .badge-denied, .badge-failed { background: #F0DCDC; color: #8A2E2E; }
 .badge-route { background: var(--paper-300); color: var(--ink-700); }
+/* ── Hoy: fila de reserva enriquecida (recepción) ── */
+.hoy-res {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;
+  padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.hoy-res-main { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.hoy-res-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.hoy-res-actions .btn { padding: 5px 10px; font-size: 11px; }
+.hoy-meta { color: var(--fg-muted); font-size: 12px; margin-top: 2px; }
+.hoy-meta a { color: inherit; }
+.hoy-flags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+.hoy-tag {
+  display: inline-block; font-family: var(--font-label); font-size: 10px; letter-spacing: 0.06em;
+  padding: 2px 8px; border-radius: var(--radius-pill); background: var(--paper-300); color: var(--ink-700);
+  white-space: nowrap;
+}
+.hoy-tag-ok { background: var(--olive-100); color: var(--olive-700); }
+.hoy-tag-warn { background: var(--sand-100); color: var(--sand-700); }
+.hoy-tag-bad { background: var(--terracotta-100); color: var(--terracotta-700); }
+.hoy-tag-ch { background: var(--white); border: 1px solid var(--border); }
+.hoy-orders { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--ink-700); }
+.hoy-muted { color: var(--fg-muted); font-size: 12px; }
+.hoy-ci-guest { border-top: 1px dashed var(--paper-300); padding-top: 10px; margin-top: 10px; }
+.hoy-ci-guest:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.hoy-ci-guest-name { font-family: var(--font-body); font-size: 14px; color: var(--ink); margin: 0 0 6px; }
+.hoy-ci-docs { list-style: none; margin: 0; padding: 0; }
+.hoy-ci-docs li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; font-size: 12.5px; }
+.hoy-ci-doc-view img { max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-top: 8px; }
 /* Refund filter chips */
 .rf-filters { display: flex; gap: 6px; flex-wrap: wrap; }
 .rf-chip {
@@ -753,6 +781,11 @@
         <p class="admin-card-title">Tareas pendientes · <span id="hoyOpsCount">0</span></p>
         <p style="font-size:12px;color:var(--fg-muted);margin:0 0 8px;">Alertas y acciones del sistema (folio sin cargar, pagos sin reserva, fallos). Resuelve aquí en vez de revisar el correo.</p>
         <div id="hoyOps"></div>
+      </div>
+      <div id="hoyWebCard" class="admin-card">
+        <p class="admin-card-title">Reservas web · últimos 30 días · <span id="hoyWebCount">0</span></p>
+        <p style="font-size:12px;color:var(--fg-muted);margin:0 0 8px;">Pagos en línea (Mercado Pago o Wompi) que registró el sistema, cruzados con Kunas. "Pago sin reserva" = cobramos pero la reserva no quedó creada: hay que crearla a mano o devolver.</p>
+        <div id="hoyWeb"></div>
       </div>
     </div>
 
@@ -1291,6 +1324,20 @@
       <button type="button" class="audit-close" id="auditCloseBtn" aria-label="Cerrar">×</button>
     </div>
     <div class="audit-modal-body" id="auditBody"></div>
+  </div>
+</div>
+
+<!-- ── Hoy: visor de check-in (datos del registro hotelero, acceso auditado) ── -->
+<div id="hoyCiBackdrop" class="audit-backdrop" role="dialog" aria-modal="true" aria-labelledby="hoyCiTitle">
+  <div class="audit-modal">
+    <div class="audit-modal-head">
+      <div>
+        <h3 id="hoyCiTitle">Check-in del huésped</h3>
+        <div class="audit-quote-id" id="hoyCiCode"></div>
+      </div>
+      <button type="button" class="audit-close" id="hoyCiClose" aria-label="Cerrar">×</button>
+    </div>
+    <div class="audit-modal-body" id="hoyCiBody"></div>
   </div>
 </div>
 
@@ -1963,11 +2010,157 @@ document.querySelectorAll('.admin-tab').forEach(t => {
 
 /* ════════════════ Hoy (operación del día — Staff App v1, read-only) ════════════════ */
 function hoyEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+/* Frente Hoy: la fila trae canal, teléfono, saldo, pago en línea, check-in,
+   pedidos por cobrar y acciones (ver check-in auditado / reenviar confirmación). */
+const HOY_PROVIDER = { mercadopago: 'Mercado Pago', wompi: 'Wompi' };
+function hoyMoney(n){ return '$ ' + Math.round(Number(n) || 0).toLocaleString('es-CO'); }
+function hoyWhen(iso){ return hoyEsc(String(iso || '').slice(0, 16).replace('T', ' ')); }
+function hoyPayLine(p){
+  if (!p) return '';
+  const prov = HOY_PROVIDER[String(p.provider || '').toLowerCase()] || (p.provider || 'pasarela');
+  const amount = p.amountCents ? hoyMoney(p.amountCents / 100) : 'monto sin registrar';
+  const method = p.method ? ' (' + hoyEsc(String(p.method).toLowerCase()) + ')' : '';
+  if (p.status === 'pago_sin_reserva') {
+    return '<span class="hoy-tag hoy-tag-bad">Pago sin reserva</span> ' + hoyEsc(prov) + ' · ' + amount
+      + ' · motivo: ' + hoyEsc(p.reason || 'pendiente');
+  }
+  /* El marcador "sin reserva" ya no aplica: la reserva existe en Kunas, o
+     recepción lo marcó resuelto (auditado). */
+  if (p.status === 'reserva_creada') {
+    return 'Pagado en línea: <strong>' + amount + '</strong> · ' + hoyEsc(prov) + method + ' · <span class="hoy-tag hoy-tag-ok">Reserva ya creada en Kunas</span>';
+  }
+  if (p.status === 'resuelto') {
+    const how = p.resolution && p.resolution.how === 'devuelto' ? 'dinero devuelto' : 'reserva creada a mano';
+    return hoyEsc(prov) + ' · ' + amount + ' · <span class="hoy-tag hoy-tag-ok">Resuelto: ' + how + '</span>'
+      + (p.resolution && p.resolution.by ? ' <span class="hoy-muted">(' + hoyEsc(p.resolution.by) + ')</span>' : '');
+  }
+  return 'Pagado en línea: <strong>' + amount + '</strong> · ' + hoyEsc(prov) + method + ' · aprobado';
+}
+function hoyCanResendPayment(p){ return Boolean(p && p.status !== 'pago_sin_reserva' && p.status !== 'resuelto'); }
+function hoyFlags(r){
+  const tags = [];
+  const c = r.checkin || {};
+  if (c.done) {
+    tags.push('<span class="hoy-tag hoy-tag-ok">Check-in hecho' + (c.guests ? ' · ' + hoyEsc(c.guests) + ' huésped(es)' : '') + '</span>');
+    if (c.manualReview) tags.push('<span class="hoy-tag hoy-tag-warn">Revisión manual: verificar documento</span>');
+  } else {
+    tags.push('<span class="hoy-tag">Sin check-in en línea</span>');
+  }
+  if (r.verifyDocumentTasks && !c.manualReview) tags.push('<span class="hoy-tag hoy-tag-warn">Documento por verificar</span>');
+  if (r.pendingOrdersCount) tags.push('<span class="hoy-tag hoy-tag-warn">' + hoyEsc(r.pendingOrdersCount) + ' pedido(s) por cobrar</span>');
+  else if (r.tasksUnknown) tags.push('<span class="hoy-tag">Pedidos: no se pudo leer la cola</span>');
+  /* "Sin registro de pago" SOLO si el registro se pudo leer: con Blobs caído
+     (paymentUnknown) se dice eso, no que no haya pago. */
+  if (r.paymentUnknown) tags.push('<span class="hoy-tag">Pago: no se pudo leer el registro</span>');
+  else if (r.isWeb && !r.payment) tags.push('<span class="hoy-tag hoy-tag-warn">Web sin registro de pago</span>');
+  return tags.join(' ');
+}
 function hoyRow(r){
-  return '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">'
-    + '<strong>'+hoyEsc(r.guestName||'—')+'</strong> · '+hoyEsc(r.roomName||'')
-    + '<br><span style="color:var(--fg-muted);font-size:12px;">'+hoyEsc(r.checkIn)+' → '+hoyEsc(r.checkOut)+' · '+(r.nights||0)+'n'
-    + (r.hasBreakfast?' · 🍳':'')+' · '+hoyEsc(r.bookingCode)+'</span></div>';
+  const room = (r.roomName || '') + (r.roomNumber ? ' · apto ' + r.roomNumber : '');
+  const tel = String(r.phone || '').replace(/[^\d+]/g, '');
+  const phone = r.phone ? ' · <a href="tel:' + hoyEsc(tel) + '">' + hoyEsc(r.phone) + '</a>' : '';
+  const pay = hoyPayLine(r.payment);
+  const balance = Number(r.balance) > 0 ? 'Saldo en Kunas: <strong>' + hoyMoney(r.balance) + '</strong>' : '';
+  const money = [pay, balance].filter(Boolean).join(' · ');
+  const orders = (r.pendingOrders || []).map(o =>
+    '<li>Por cobrar: ' + hoyMoney(o.total) + (o.items ? ' · ' + hoyEsc(o.items) : '') + '</li>').join('');
+  const actions = [];
+  if (r.checkin && r.checkin.done && r.checkin.checkinId) {
+    actions.push('<button type="button" class="btn btn-ghost-dark hoy-ci-view" data-checkin="' + hoyEsc(r.checkin.checkinId) + '" data-code="' + hoyEsc(r.bookingCode) + '">Ver check-in</button>');
+  }
+  /* Solo reservas web CON pago registrado: el correo es la confirmación de pago
+     del motor propio (sin pago diría "Total pagado" con el total de la reserva). */
+  if (r.hasEmail && r.isWeb && hoyCanResendPayment(r.payment)) {
+    actions.push('<button type="button" class="btn btn-ghost-dark hoy-resend" data-code="' + hoyEsc(r.bookingCode) + '">Reenviar confirmación</button>');
+  }
+  return '<div class="hoy-res"><div class="hoy-res-main">'
+    + '<strong>' + hoyEsc(r.guestName || '—') + '</strong> · ' + hoyEsc(room)
+    + (r.channel ? ' <span class="hoy-tag hoy-tag-ch">' + hoyEsc(r.channel) + '</span>' : '')
+    + '<div class="hoy-meta">' + hoyEsc(r.checkIn) + ' → ' + hoyEsc(r.checkOut) + ' · ' + hoyEsc(Number(r.nights) || 0) + 'n'
+    + (r.hasBreakfast ? ' · con desayuno' : '') + ' · ' + hoyEsc(r.bookingCode) + phone + '</div>'
+    + (money ? '<div class="hoy-meta">' + money + '</div>' : '')
+    + '<div class="hoy-flags">' + hoyFlags(r) + '</div>'
+    + (orders ? '<ul class="hoy-orders">' + orders + '</ul>' : '')
+    + '</div>'
+    + (actions.length ? '<div class="hoy-res-actions">' + actions.join('') + '</div>' : '')
+    + '</div>';
+}
+/* Reservas web (booking-results ↔ Kunas). */
+function hoyWebRow(w, partial){
+  const tags = [];
+  if (w.needsAttention) tags.push('<span class="hoy-tag hoy-tag-bad">Pago sin reserva</span>');
+  /* Con lectura parcial de booking-results, que no cruce no prueba que no haya pago. */
+  else if (!w.payment && !partial) tags.push('<span class="hoy-tag hoy-tag-warn">Sin registro de pago</span>');
+  if (/cancel/i.test(String(w.pmsStatus || ''))) tags.push('<span class="hoy-tag">Cancelada en Kunas</span>');
+  const who = w.guestName ? '<strong>' + hoyEsc(w.guestName) + '</strong>' : '<span class="hoy-muted">(no aparece en Kunas)</span>';
+  const stay = w.checkIn ? hoyEsc(w.checkIn) + ' → ' + hoyEsc(w.checkOut) + (w.roomName ? ' · ' + hoyEsc(w.roomName) : '') : '';
+  const codes = hoyEsc(w.webCode || '') + (w.bookingCode ? ' · Kunas ' + hoyEsc(w.bookingCode) : '');
+  const when = w.createdAt ? ' · pagado ' + hoyWhen(w.createdAt) : '';
+  const pay = w.payment && w.payment.status !== 'pago_sin_reserva' ? hoyPayLine(w.payment)
+    : (w.payment ? hoyEsc(HOY_PROVIDER[String(w.payment.provider || '').toLowerCase()] || w.payment.provider || '') + ' · ' + (w.payment.amountCents ? hoyMoney(w.payment.amountCents / 100) : 'monto sin registrar') + ' · motivo: ' + hoyEsc(w.payment.reason || 'pendiente') : '');
+  const canResend = w.bookingCode && w.hasEmail && !w.needsAttention && hoyCanResendPayment(w.payment) && !/cancel/i.test(String(w.pmsStatus || ''));
+  /* "Pago sin reserva" que nadie ha resuelto: acción auditada para dejar
+     constancia (si no, sigue en rojo y alguien la crea otra vez o devuelve). */
+  const resolveBtns = w.needsAttention && w.webCode
+    ? '<button type="button" class="btn btn-ghost-dark hoy-web-resolve" data-web="' + hoyEsc(w.webCode) + '" data-resolution="reserva_creada">Ya creé la reserva</button>'
+      + '<button type="button" class="btn btn-ghost-dark hoy-web-resolve" data-web="' + hoyEsc(w.webCode) + '" data-resolution="devuelto">Ya se devolvió</button>'
+    : '';
+  const webActions = (canResend ? '<button type="button" class="btn btn-ghost-dark hoy-resend" data-code="' + hoyEsc(w.bookingCode) + '">Reenviar confirmación</button>' : '') + resolveBtns;
+  return '<div class="hoy-res"><div class="hoy-res-main">'
+    + who + (stay ? ' · ' + stay : '')
+    + '<div class="hoy-meta">' + codes + when + '</div>'
+    + (pay ? '<div class="hoy-meta">' + pay + '</div>' : '')
+    + (tags.length ? '<div class="hoy-flags">' + tags.join(' ') + '</div>' : '')
+    + '</div>'
+    + (webActions ? '<div class="hoy-res-actions">' + webActions + '</div>' : '')
+    + '</div>';
+}
+/* Visor de check-in: solo lo del registro hotelero (SIRE/TRA). */
+function hoyLoc(o){ o = o || {}; return [o.city, o.state, o.country].filter(Boolean).join(', '); }
+function hoyCheckinHtml(data){
+  const list = (data && data.checkins) || [];
+  if (!list.length) return '<div class="audit-empty">No hay check-in registrado para esta reserva.</div>';
+  const DOC_LABEL = { documento: 'Documento de identidad', 'registro-civil': 'Registro civil (menor)', autorizacion: 'Autorización de viaje (menor)', menor: 'Documento del menor' };
+  return list.map(ci => {
+    const res = ci.reservation || {};
+    const guests = (ci.guests || []).map(g => {
+      const role = [g.isPrimary ? 'titular' : '', g.isMinor ? 'menor de edad' : ''].filter(Boolean).join(' · ');
+      const rows = [
+        ['Documento', [g.documentType, g.documentNumber].filter(Boolean).join(' ') || '—'],
+        ['Nacionalidad', g.nationality || '—'],
+        ['Nacimiento', g.birthDate || '—'],
+        ['Sexo', g.sex || '—'],
+        ['Ocupación', g.occupation || '—'],
+        ['Residencia', hoyLoc(g.residence) || '—'],
+        ['Procedencia', hoyLoc(g.origin) || '—']
+      ];
+      if (g.foreign || g.destination) rows.push(['Destino', g.destination || '— (falta, es extranjero)']);
+      if (g.minor) {
+        rows.push(['Menor', (g.minor.parentPresent ? 'viaja con padre/madre' : 'sin padre/madre en la reserva')
+          + (g.minor.hasAuthorization ? ' · con autorización' : '')]);
+        if (g.minor.fatherName || g.minor.motherName) rows.push(['Padres', [g.minor.fatherName, g.minor.motherName].filter(Boolean).join(' / ')]);
+      }
+      return '<div class="hoy-ci-guest">'
+        + '<p class="hoy-ci-guest-name"><strong>' + hoyEsc(((g.firstName || '') + ' ' + (g.lastName || '')).trim() || '—') + '</strong>'
+        + (role ? ' <span class="hoy-tag">' + hoyEsc(role) + '</span>' : '')
+        + (g.needsManualReview ? ' <span class="hoy-tag hoy-tag-warn">Verificar documento físico</span>' : '') + '</p>'
+        + '<dl class="rf-grid">' + rows.map(x => '<dt>' + hoyEsc(x[0]) + '</dt><dd>' + hoyEsc(x[1]) + '</dd>').join('') + '</dl>'
+        + '</div>';
+    }).join('');
+    const docs = (ci.documents || []).length
+      ? '<ul class="hoy-ci-docs">' + ci.documents.map(d =>
+          '<li><span>' + hoyEsc(DOC_LABEL[d.kind] || d.kind) + (d.guestIndex != null ? ' · huésped ' + hoyEsc(Number(d.guestIndex) + 1) : '') + '</span>'
+          + '<button type="button" class="btn btn-ghost-dark hoy-ci-doc" style="padding:4px 10px;font-size:11px;" data-checkin="' + hoyEsc(ci.checkinId) + '" data-doc="' + hoyEsc(d.key) + '" data-store="' + hoyEsc(d.store) + '">Ver</button></li>').join('') + '</ul>'
+      : '<p class="hoy-muted">No hay imágenes de documentos guardadas para este check-in (el guardado de documentos de adultos está apagado).</p>';
+    return '<div class="audit-entry">'
+      + '<div class="audit-entry-head"><span class="audit-entry-action">Check-in ' + hoyEsc(ci.checkinId) + '</span><span class="audit-entry-ts">' + hoyWhen(ci.createdAt) + '</span></div>'
+      + (ci.manualReview ? '<p class="rf-note">El documento de al menos un huésped no se pudo leer automáticamente: compara el documento físico con estos datos antes de entregar la llave.</p>' : '')
+      + '<dl class="rf-grid"><dt>Estadía</dt><dd>' + hoyEsc(res.checkIn || '—') + ' → ' + hoyEsc(res.checkOut || '—') + '</dd>'
+      + '<dt>Apto</dt><dd>' + hoyEsc(res.roomNumber || '—') + '</dd><dt>Motivo</dt><dd>' + hoyEsc(res.motive || '—') + '</dd></dl>'
+      + '<div class="rf-section"><h4>Huéspedes</h4>' + (guests || '<p class="hoy-muted">Sin huéspedes.</p>') + '</div>'
+      + '<div class="rf-section"><h4>Documentos guardados</h4>' + docs + '<div class="hoy-ci-doc-view"></div></div>'
+      + '</div>';
+  }).join('') + '<p class="hoy-muted">Este acceso a datos personales quedó registrado (auditoría).</p>';
 }
 function hoyRenderList(id, list){
   const el = document.getElementById(id);
@@ -2001,11 +2194,128 @@ async function loadHoy(){
     } else {
       refCard.style.display = 'none';
     }
-    status.textContent = d.isMock ? 'Modo demo (sin credenciales OTASync).' : ('Actualizado · ' + d.date);
+    const partial = d.enrichment && (!d.enrichment.payments || !d.enrichment.checkins || !d.enrichment.tasks)
+      ? ' · algunos datos (pagos, check-ins o tareas) no se pudieron leer' : '';
+    status.textContent = (d.isMock ? 'Modo demo (sin credenciales OTASync).' : ('Actualizado · ' + d.date)) + partial;
   } catch(e) {
     status.textContent = 'Error al cargar.';
   }
   loadOps();
+  loadWebBookings();
+}
+
+/* ── Reservas web de los últimos 30 días ── */
+async function loadWebBookings(){
+  const el = document.getElementById('hoyWeb');
+  if (!el) return;
+  try {
+    const token = await window.getAuthToken();
+    const r = await fetch('/api/staff-web-bookings?days=30', { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) { el.innerHTML = '<p class="hoy-muted">No se pudo cargar (' + r.status + ').</p>'; return; }
+    const d = await r.json();
+    document.getElementById('hoyWebCount').textContent = d.count || 0;
+    const partial = Boolean(d.partial || d.storeAvailable === false);
+    const note = (d.pmsAvailable ? '' : '<p class="hoy-muted">Sin conexión a Kunas: se muestran solo los pagos registrados.</p>')
+      + (partial ? '<p class="hoy-muted">Algunos registros de pago no se pudieron leer: no se marca "sin registro de pago". Actualiza en un momento.</p>' : '');
+    el.innerHTML = note + ((d.items && d.items.length) ? d.items.map(w => hoyWebRow(w, partial)).join('') : '<p class="hoy-muted">Sin reservas web en los últimos 30 días.</p>');
+  } catch(e) {
+    el.innerHTML = '<p class="hoy-muted">Error al cargar las reservas web.</p>';
+  }
+}
+
+/* ── Visor de check-in (auditado) y reenvío de confirmación ── */
+function hoyCloseCheckin(){
+  document.getElementById('hoyCiBackdrop').classList.remove('is-open');
+  document.getElementById('hoyCiBody').innerHTML = '';
+}
+async function hoyOpenCheckin(checkinId, bookingCode){
+  const body = document.getElementById('hoyCiBody');
+  document.getElementById('hoyCiCode').textContent = 'Reserva ' + (bookingCode || '');
+  body.innerHTML = '<div class="audit-loading">Cargando check-in…</div>';
+  document.getElementById('hoyCiBackdrop').classList.add('is-open');
+  try {
+    const token = await window.getAuthToken();
+    const r = await fetch('/api/staff-checkin-view?checkinId=' + encodeURIComponent(checkinId), { headers: { Authorization: 'Bearer ' + token } });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ('Error ' + r.status));
+    body.innerHTML = hoyCheckinHtml(d);
+  } catch (e) {
+    body.innerHTML = '<div class="audit-error">' + hoyEsc(e && e.message ? e.message : 'No se pudo abrir el check-in.') + '</div>';
+  }
+}
+async function hoyShowDocument(btn){
+  const view = btn.closest('.audit-entry') && btn.closest('.audit-entry').querySelector('.hoy-ci-doc-view');
+  if (!view) return;
+  btn.disabled = true;
+  view.textContent = 'Cargando documento…';
+  try {
+    const token = await window.getAuthToken();
+    const qs = 'checkinId=' + encodeURIComponent(btn.dataset.checkin) + '&doc=' + encodeURIComponent(btn.dataset.doc) + '&store=' + encodeURIComponent(btn.dataset.store);
+    const r = await fetch('/api/staff-checkin-view?' + qs, { headers: { Authorization: 'Bearer ' + token } });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ('Error ' + r.status));
+    const type = String(d.contentType || '');
+    view.textContent = '';
+    if (/^image\/(png|jpe?g|bmp|tiff|heif)$/i.test(type)) {
+      const img = document.createElement('img');
+      img.alt = 'Documento';
+      img.src = 'data:' + type + ';base64,' + d.dataBase64;
+      view.appendChild(img);
+    } else if (type === 'application/pdf') {
+      const a = document.createElement('a');
+      a.href = 'data:application/pdf;base64,' + d.dataBase64;
+      a.download = (btn.dataset.checkin || 'documento') + '.pdf';
+      a.textContent = 'Descargar PDF';
+      a.className = 'btn btn-ghost-dark';
+      view.appendChild(a);
+    } else {
+      view.textContent = 'Formato no previsualizable.';
+    }
+  } catch (e) {
+    view.textContent = e && e.message ? e.message : 'No se pudo abrir el documento.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+async function hoyResendConfirmation(btn){
+  const code = btn.dataset.code;
+  if (!code) return;
+  if (!confirm('¿Reenviar la confirmación de la reserva ' + code + ' al correo que tiene registrado en Kunas?')) return;
+  const prev = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    const token = await window.getAuthToken();
+    const r = await fetch('/api/staff-resend-confirmation', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ bookingCode: code }) });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.sent) showToast('Confirmación reenviada a ' + (d.to || 'el huésped') + '.');
+    else if (d.reason === 'no-key') showToast('El envío de correos no está configurado (falta la llave de Resend).');
+    else showToast('No se pudo reenviar: ' + (d.error || d.reason || ('error ' + r.status)) + '.');
+  } catch (e) {
+    showToast('No se pudo reenviar la confirmación.');
+  } finally {
+    btn.disabled = false; btn.textContent = prev;
+  }
+}
+
+async function hoyResolveWebPayment(btn){
+  const webCode = btn.dataset.web;
+  const resolution = btn.dataset.resolution;
+  if (!webCode || !resolution) return;
+  const what = resolution === 'devuelto' ? 'el dinero ya se devolvió' : 'la reserva ya se creó a mano en Kunas';
+  if (!confirm('¿Confirmas que ' + what + ' para el pago ' + webCode + '? Quedará registrado con tu usuario.')) return;
+  const note = (prompt('Nota opcional (ej. número de reserva en Kunas o de la devolución):', '') || '').slice(0, 300);
+  btn.disabled = true;
+  try {
+    const token = await window.getAuthToken();
+    const r = await fetch('/api/staff-resolve-web-payment', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ webCode, resolution, note }) });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) { showToast('Pago ' + webCode + ' marcado como resuelto.'); loadWebBookings(); }
+    else showToast('No se pudo marcar: ' + (d.error || ('error ' + r.status)) + '.');
+  } catch (e) {
+    showToast('No se pudo marcar el pago como resuelto.');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 /* ── Cola de tareas (Staff App v2) ── */
@@ -2017,11 +2327,17 @@ function opsRow(it){
   if (it.kind === 'folio_post_failed' && ctx.eventId) {
     actions = '<button type="button" class="btn btn-ghost-dark hoy-op-retry" data-event="'+hoyEsc(ctx.eventId)+'" data-id="'+hoyEsc(it.id)+'" style="padding:5px 10px;font-size:11px;margin-right:6px;">Reintentar folio</button>' + actions;
   }
+  /* Frente Hoy: "verificar documento" abre el visor del check-in (auditado). */
+  if (it.kind === 'checkin_manual_review' && ctx.checkinId) {
+    actions = '<button type="button" class="btn btn-ghost-dark hoy-ci-view" data-checkin="'+hoyEsc(ctx.checkinId)+'" data-code="'+hoyEsc(ctx.bookingCode||'')+'" style="padding:5px 10px;font-size:11px;margin-right:6px;">Ver check-in</button>' + actions;
+  }
   const detail = ctx.bookingCode ? (' · reserva '+hoyEsc(ctx.bookingCode)) : '';
   /* Frente cancel: las tareas de reembolso/cancelación traen el paso a paso. */
   const howto = ctx.instructions ? '<br><span style="color:var(--fg-muted);font-size:12px;">↳ '+hoyEsc(ctx.instructions)+'</span>' : '';
+  /* Frente Hoy: nombres legibles para las tareas de recepción. */
+  const OPS_KIND_LABEL = { folio_manual_charge: (ctx.paymentPreference === 'online' ? 'Cobrar pedido (sin pago en línea)' : 'Cargar pedido a la cuenta'), checkin_manual_review: 'Verificar documento', folio_post_failed: 'Folio sin cargar' };
   return '<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">'
-    + '<div><strong>'+sev+' '+hoyEsc(it.kind)+'</strong>'+detail
+    + '<div><strong>'+sev+' '+hoyEsc(OPS_KIND_LABEL[it.kind] || it.kind)+'</strong>'+detail
     + '<br><span style="color:var(--fg-muted);font-size:12px;">'+hoyEsc(it.title||'')+' · '+when+'</span>'+howto+'</div>'
     + '<div style="white-space:nowrap;">'+actions+'</div></div>';
 }
@@ -2050,6 +2366,28 @@ async function opsAction(payload){
   const rb = document.getElementById('hoyRefresh');
   if (rb) rb.addEventListener('click', loadHoy);
   if (dateEl) dateEl.addEventListener('change', loadHoy);
+  /* Frente Hoy: acciones por reserva (delegadas) + modal del check-in. */
+  const vh = document.getElementById('viewHoy');
+  if (vh) vh.addEventListener('click', (ev) => {
+    const ciBtn = ev.target.closest('.hoy-ci-view');
+    const rsBtn = ev.target.closest('.hoy-resend');
+    const wrBtn = ev.target.closest('.hoy-web-resolve');
+    if (ciBtn) hoyOpenCheckin(ciBtn.dataset.checkin, ciBtn.dataset.code);
+    else if (rsBtn) hoyResendConfirmation(rsBtn);
+    else if (wrBtn) hoyResolveWebPayment(wrBtn);
+  });
+  const ciBody = document.getElementById('hoyCiBody');
+  if (ciBody) ciBody.addEventListener('click', (ev) => {
+    const docBtn = ev.target.closest('.hoy-ci-doc');
+    if (docBtn) hoyShowDocument(docBtn);
+  });
+  const ciClose = document.getElementById('hoyCiClose');
+  if (ciClose) ciClose.addEventListener('click', hoyCloseCheckin);
+  const ciBackdrop = document.getElementById('hoyCiBackdrop');
+  if (ciBackdrop) ciBackdrop.addEventListener('click', (ev) => { if (ev.target === ciBackdrop) hoyCloseCheckin(); });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && ciBackdrop && ciBackdrop.classList.contains('is-open')) hoyCloseCheckin();
+  });
   const ops = document.getElementById('hoyOps');
   if (ops) ops.addEventListener('click', async (ev) => {
     const resolveBtn = ev.target.closest('.hoy-op-resolve');

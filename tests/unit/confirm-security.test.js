@@ -357,7 +357,9 @@ test('ningún HTML del sitio llama al endpoint retirado', () => {
   const htmls = fs.readdirSync(ROOT).filter(f => f.endsWith('.html'))
     .concat(fs.readdirSync(path.join(ROOT, 'en')).filter(f => f.endsWith('.html')).map(f => path.join('en', f)));
   for (const f of htmls) {
-    assert.doesNotMatch(fs.readFileSync(path.join(ROOT, f), 'utf8'), /send-confirmation/, f);
+    /* \/api\/ delante: /api/staff-resend-confirmation (frente Hoy, autenticado y
+       con datos del servidor) es otro endpoint y no cuenta. */
+    assert.doesNotMatch(fs.readFileSync(path.join(ROOT, f), 'utf8'), /\/api\/send-confirmation/, f);
   }
 });
 
