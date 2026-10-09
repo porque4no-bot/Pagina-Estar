@@ -84,6 +84,8 @@
   "confirmingBoxText": "Your payment was approved. As soon as the booking is registered you will receive the confirmation by email. There is no need to pay again; if you have questions, contact us with this reference.",
   "processingBoxTitle": "Your payment is still being processed.",
   "processingBoxText": "Once your bank or payment method approves it, we will confirm your booking and email you the confirmation. Please do not pay again; if you have questions, contact us with this reference.",
+  "soldOutBoxTitle": "Your booking was no longer available.",
+  "soldOutBoxText": "Your payment was received, but the studio sold out while it was being processed, so the booking was not registered. Our team will contact you to offer an alternative or refund your payment. There is no need to pay again; if you have questions, contact us with this reference.",
   "stillChecking": "We keep checking the status automatically…",
   "returnSuccessTitle": "Payment received",
   "returnSuccessText": "Mercado Pago reported your payment as approved. We are confirming your booking and will email you the confirmation in a few minutes. There is no need to pay again.",

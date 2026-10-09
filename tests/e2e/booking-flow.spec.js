@@ -343,6 +343,8 @@ test('returning from Mercado Pago without the draft still checks the status and 
   await expect(page.locator('.be-confirm-card')).toContainText('Selección');
   await expect(page.locator('.be-confirm-card')).toContainText('$ 795.000');
   await expect(page.locator('body')).not.toContainText('reportó tu pago');
+  /* Sin borrador nadie envía el correo de confirmación: no se promete. */
+  await expect(page.locator('body')).not.toContainText('Confirmación enviada');
 });
 
 test('returning from Mercado Pago with a pending payment says "in process", not "approved"', async ({ page }) => {
@@ -404,4 +406,62 @@ test('payment received but booking still registering: friendly copy, no PMS jarg
   await expect(page.locator('body')).not.toContainText('Kunas');
   await expect(page.locator('body')).not.toContainText('manualmente');
   await expect(page.locator('a.be-checkin-link')).toHaveCount(0);
+});
+
+function seedDraftWithMpPending(page, code) {
+  return page.addInitScript(([ci, co, c]) => {
+    try {
+      if (sessionStorage.getItem('__seeded')) return;
+      sessionStorage.setItem('__seeded', '1');
+      sessionStorage.setItem('estar-booking-draft', JSON.stringify({
+        savedAt: Date.now(),
+        search: { checkin: ci, checkout: co, guests: 2 },
+        selectedRoom: { id: 'clasica', roomTypeId: '31348', name: 'Clásica', priceFlexible: 250000, num: '01', area: 29, capacity: 2 },
+        selectedRate: 'best',
+        currentStep: 'payment',
+        extras: {},
+        guestData: { nombre: 'Ana', apellido: 'Prueba', email: 'ana@example.com', tel: '3000000000', pais: 'Colombia' },
+        paymentMethod: 'mercadopago'
+      }));
+      sessionStorage.setItem('estar-mp-pending', JSON.stringify({ code: c, savedAt: Date.now() }));
+    } catch (e) {}
+  }, [D1, D4, code]);
+}
+
+test('payment still registering offers a way out, and a reload does not trap the guest', async ({ page }) => {
+  await seedDraftWithMpPending(page, 'EST-OUT01');
+  await page.route('**/api/booking-status**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ status: 'confirmed', ref: 'EST-OUT01', bookingCode: 'EST-OUT01', reservationPending: true })
+  }));
+  await page.goto('/reservar.html?payment=success&payment_id=1001');
+  await expect(page.locator('.be-confirm-hero h2')).toHaveText('Pago recibido');
+  const again = page.locator('.be-confirm-actions button', { hasText: 'Nueva reserva' });
+  await expect(again).toBeVisible();
+  await again.click();
+  await expect(page.locator('.be-confirm-hero')).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('.be-confirm-hero')).toHaveCount(0);
+  await expect(page.locator('.be-pay-wait')).toHaveCount(0);
+});
+
+test('payment received but sold out: no "arrives by email" and no confirmation email', async ({ page }) => {
+  await seedDraftWithMpPending(page, 'EST-SOLD1');
+  let emails = 0;
+  await page.route('**/api/send-confirmation**', route => { emails += 1; return route.fulfill({ status: 200, contentType: 'application/json', body: '{"sent":true}' }); });
+  await page.route('**/api/booking-status**', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ status: 'confirmed', ref: 'EST-SOLD1', bookingCode: 'EST-SOLD1', reservationPending: true, reason: 'sold_out' })
+  }));
+  await page.goto('/reservar.html?payment=success&payment_id=1002');
+  await expect(page.locator('.be-confirm-hero h2')).toHaveText('Pago recibido');
+  const status = page.locator('.be-confirm-status');
+  await expect(status).toContainText('Ya no había disponibilidad');
+  await expect(status).toContainText('devolución');
+  await expect(status).not.toContainText('te llegará la confirmación');
+  await expect(page.locator('.be-confirm-polling')).toHaveCount(0);
+  await expect(page.locator('a.be-checkin-link')).toHaveCount(0);
+  await expect(page.locator('.be-confirm-actions button', { hasText: 'Nueva reserva' })).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(emails).toBe(0);
 });

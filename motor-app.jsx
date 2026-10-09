@@ -1449,6 +1449,8 @@ function BookingSummary({ booking, search, lang }) {
                     webhook no ha terminado o quedó en revisión). Llega por correo.
      'processing' → el pago sigue en proceso en el banco / la pasarela.
      'declined'   → la pasarela rechazó el pago.
+     'soldout'    → el pago entró pero ya no había disponibilidad: la reserva no
+                    se crea; el equipo contacta al huésped (devolución o alternativa).
    minimal: volvimos de Mercado Pago sin el borrador (otro navegador o venció):
    solo mostramos lo que viene en la referencia del pago, sin desglose de IVA. */
 function Confirmation({ booking, search, code, paymentDetails, outcome = 'confirmed', polling, minimal, onManage, onNew, onRetry, lang }) {
@@ -1471,14 +1473,17 @@ function Confirmation({ booking, search, code, paymentDetails, outcome = 'confir
     confirmed: t.successTitle,
     confirming: t.confirmingHero,
     processing: t.processingHero,
-    declined: t.declinedHero
+    declined: t.declinedHero,
+    soldout: t.confirmingHero
   }[outcome] || t.successTitle;
 
   const statusBox = {
     confirming: { icon: 'clock', title: t.confirmingBoxTitle, text: t.confirmingBoxText },
     processing: { icon: 'clock', title: t.processingBoxTitle, text: t.processingBoxText },
-    declined: { icon: 'alert-triangle', title: t.declinedHero + '.', text: t.paymentErrorDeclined }
+    declined: { icon: 'alert-triangle', title: t.declinedHero + '.', text: t.paymentErrorDeclined },
+    soldout: { icon: 'alert-triangle', title: t.soldOutBoxTitle, text: t.soldOutBoxText }
   }[outcome];
+  const isError = outcome === 'declined' || outcome === 'soldout';
 
   /* App del huésped (check-in en línea) con el código prellenado: solo cuando la
      reserva ya existe en el PMS (antes no la encontraría). Ruta absoluta porque
@@ -1491,14 +1496,17 @@ function Confirmation({ booking, search, code, paymentDetails, outcome = 'confir
         <span className="be-confirm-icon">✶</span>
         <h2>{heroTitle}</h2>
         <p>{isConfirmed ? t.successCode : t.referenceLabel} <strong>{code}</strong></p>
-        {isConfirmed && booking.guest?.email && (
+        {/* Solo afirmamos el envío cuando el motor lo envía (con el borrador en
+            mano). En la confirmación mínima (retorno de MP sin borrador) nadie
+            envía ese correo, así que no se promete. */}
+        {isConfirmed && !minimal && booking.guest?.email && (
           <p style={{ marginTop: 8 }}>
             {t.successSent} <strong>{booking.guest.email}</strong>
           </p>
         )}
       </div>
       {statusBox && (
-        <div className={`be-info-box be-confirm-status${outcome === 'declined' ? ' be-info-error' : ''}`} role="status"
+        <div className={`be-info-box be-confirm-status${isError ? ' be-info-error' : ''}`} role="status"
           style={{ marginBottom: 16, flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
             <Icon name={statusBox.icon} size={18} />
@@ -1506,7 +1514,7 @@ function Confirmation({ booking, search, code, paymentDetails, outcome = 'confir
               <strong>{statusBox.title}</strong>{' '}{statusBox.text}
             </p>
           </div>
-          {polling && outcome !== 'declined' && (
+          {polling && !isError && (
             <p className="be-confirm-polling">
               <span className="be-spinner-small" aria-hidden="true"></span>
               <span>{t.stillChecking}</span>
@@ -1631,7 +1639,10 @@ function Confirmation({ booking, search, code, paymentDetails, outcome = 'confir
             </a>
           </div>
         )}
-        {(isConfirmed || outcome === 'declined') && (
+        {/* Siempre hay salida: en 'confirming'/'processing' el huésped puede hacer
+            otra reserva (handleSearch detiene la consulta y borra el pago en
+            curso, así una recarga no lo devuelve a esta pantalla). */}
+        {onNew && (
           <div className="be-confirm-actions">
             {isConfirmed && (
               <button className="be-btn-secondary" onClick={onManage}>
@@ -1642,7 +1653,7 @@ function Confirmation({ booking, search, code, paymentDetails, outcome = 'confir
           </div>
         )}
       </div>
-      {outcome !== 'declined' && <div className="be-confirm-next">
+      {!isError && <div className="be-confirm-next">
         <span className="be-eyebrow">{t.beforeArrival}</span>
         <div className="be-confirm-tips">
           {[
@@ -2336,6 +2347,17 @@ function BookingEngine() {
         return;
       }
 
+      if (status === 'soldOut') {
+        /* Pago recibido sin disponibilidad: la reserva no se va a crear. Ni
+           "llegará por correo" ni correo de confirmación; el equipo ya recibió
+           la alerta y contacta al huésped (devolución o alternativa). */
+        payRunRef.current += 1;
+        clearPendingPayment();
+        setPayPolling(false);
+        showInterim('soldout');
+        return;
+      }
+
       if (status === 'reservationPending') {
         /* El webhook recibió el pago pero la reserva quedó en revisión: no es un
            error del huésped. "Estamos terminando de confirmarla" y seguimos
@@ -2369,6 +2391,9 @@ function BookingEngine() {
 
       const delay = nextPollDelay(attempt, phase);
       if (delay == null) {
+        /* Se acabaron las consultas: se borra el pago en curso para que una
+           recarga posterior no vuelva a dejar al huésped en la espera. */
+        clearPendingPayment();
         setPayPolling(false);
         if (!interimShown) { interimShown = true; showInterim(phase); }
         return;

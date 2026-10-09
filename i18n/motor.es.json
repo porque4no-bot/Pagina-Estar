@@ -84,6 +84,8 @@
   "confirmingBoxText": "Tu pago fue aprobado. En cuanto la reserva quede registrada te llegará la confirmación por correo. No necesitas pagar de nuevo; si tienes dudas, escríbenos con esta referencia.",
   "processingBoxTitle": "Tu pago todavía está en proceso.",
   "processingBoxText": "Cuando tu banco o medio de pago lo apruebe, confirmaremos tu reserva y te llegará la confirmación por correo. No vuelvas a pagar; si tienes dudas, escríbenos con esta referencia.",
+  "soldOutBoxTitle": "Ya no había disponibilidad para tu reserva.",
+  "soldOutBoxText": "Tu pago fue recibido, pero mientras se procesaba el apartaestudio se agotó, así que la reserva no quedó registrada. Nuestro equipo te contactará para ofrecerte una alternativa o hacer la devolución del pago. No necesitas pagar de nuevo; si tienes dudas, escríbenos con esta referencia.",
   "stillChecking": "Seguimos verificando el estado automáticamente…",
   "returnSuccessTitle": "Pago recibido",
   "returnSuccessText": "Mercado Pago reportó tu pago como aprobado. Estamos confirmando tu reserva y te llegará la confirmación por correo en unos minutos. No necesitas pagar de nuevo.",

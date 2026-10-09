@@ -88,6 +88,26 @@ test('interpretBookingStatus distingue confirmada / pago recibido en revisión /
   assert.equal(logic.interpretBookingStatus({ status: 'pending' }), 'pending');
   assert.equal(logic.interpretBookingStatus(null), 'pending');
   assert.equal(logic.interpretBookingStatus({ error: 'Too many requests' }), 'pending');
+  /* Pago recibido sin disponibilidad (_payments reason 'sold_out'): la reserva
+     no se creará → estado propio, no "llegará por correo". */
+  assert.equal(logic.interpretBookingStatus({ status: 'confirmed', reservationPending: true, reason: 'sold_out' }), 'soldOut');
+  assert.equal(logic.interpretBookingStatus({ status: 'confirmed', reservationPending: true, reason: 'insert_failed' }), 'reservationPending');
+  assert.equal(logic.interpretBookingStatus({ status: 'confirmed', reservationPending: false, reason: 'sold_out' }), 'confirmed');
+});
+
+test('motor-app: salidas de los estados intermedios y sin promesas falsas de correo', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'motor-app.jsx'), 'utf8');
+  /* El correo solo se afirma fuera de la confirmación mínima. */
+  assert.match(src, /isConfirmed && !minimal && booking\.guest\?\.email/);
+  /* Al agotarse las consultas se borra el pago en curso (una recarga no retoma la espera). */
+  assert.match(src, /if \(delay == null\) \{[\s\S]{0,300}clearPendingPayment\(\);/);
+  /* sold_out: no se envía correo de confirmación. */
+  const soldOut = src.slice(src.indexOf("if (status === 'soldOut')"), src.indexOf("if (status === 'reservationPending')"));
+  assert.ok(soldOut.length > 0 && !/maybeSendEmail/.test(soldOut));
+  for (const lang of ['es', 'en']) {
+    const t = require(`../../i18n/motor.${lang}.json`);
+    assert.ok(t.soldOutBoxTitle && t.soldOutBoxText);
+  }
 });
 
 test('interpretWompiStatus y wompiApiBase', () => {

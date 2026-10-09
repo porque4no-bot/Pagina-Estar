@@ -52,10 +52,15 @@ function phaseForPaymentStatus(status) {
   return null;
 }
 
-/* Respuesta de /api/booking-status → 'confirmed' | 'reservationPending' | 'pending'. */
+/* Respuesta de /api/booking-status → 'confirmed' | 'reservationPending' |
+   'soldOut' | 'pending'.
+   'soldOut' = el pago entró pero el apartaestudio ya estaba agotado
+   (_payments escribe reservationPending con reason 'sold_out'): la reserva NO
+   se va a crear, así que no se le puede decir al huésped que llegará por correo. */
 function interpretBookingStatus(data) {
   if (!data || data.status !== 'confirmed') return 'pending';
-  return data.reservationPending ? 'reservationPending' : 'confirmed';
+  if (!data.reservationPending) return 'confirmed';
+  return data.reason === 'sold_out' ? 'soldOut' : 'reservationPending';
 }
 
 /* Estado de una transacción Wompi → 'approved' | 'declined' | 'pending'. */
