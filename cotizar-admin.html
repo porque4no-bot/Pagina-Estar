@@ -648,6 +648,23 @@
 .cfg-switch input:checked + .cfg-slider { background: var(--olive); }
 .cfg-switch input:checked + .cfg-slider::before { transform: translateX(20px); }
 .cfg-switch input:disabled + .cfg-slider { opacity: 0.5; cursor: not-allowed; }
+.cfg-source-default { background: var(--paper-300); color: var(--olive-700); }
+/* Frente staff: probe TTLock + aviso sin permisos */
+.tt-status { font-family: var(--font-body); font-size: 13px; color: var(--ink-500); margin: 10px 0 0; }
+.tt-status.is-error { color: var(--error-700); }
+.tt-checks { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+.tt-check { font-family: var(--font-label); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 9px; border-radius: 100px; background: var(--paper-300); color: var(--ink-700); }
+.tt-check.ok { background: var(--olive-100); color: var(--olive-700); }
+.tt-check.bad { background: var(--terracotta-100); color: var(--terracotta-700); }
+.tt-sub { font-family: var(--font-label); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-500); margin: 18px 0 8px; }
+.tt-json { width: 100%; min-height: 72px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--paper); color: var(--ink); resize: vertical; }
+.lista-table.tt-table { min-width: 0; width: 100%; }
+@media (max-width: 720px) {
+  .lista-table.tt-table td:last-child { border-top: none; margin-top: 0; padding-top: 7px; }
+  .lista-table.tt-table td:last-child::before { display: block; }
+}
+.tt-howto { font-family: var(--font-body); font-size: 13px; color: var(--ink-500); line-height: 1.55; margin: 8px 0 0; padding-left: 18px; }
+.noperm-card p { font-family: var(--font-body); font-size: 14px; color: var(--ink-500); max-width: 64ch; margin: 10px 0 0; line-height: 1.55; }
 @media (max-width: 560px) {
   .cfg-row { align-items: flex-start; }
   .cfg-row-control { width: 100%; justify-content: space-between; }
@@ -703,6 +720,14 @@
       </div>
     </div>
 
+    <!-- ══════════════ Estado de permisos (cargando / sin permisos) ══════════════ -->
+    <div id="viewNoPerms">
+      <div class="admin-card noperm-card">
+        <p class="admin-card-title" id="noPermsTitle" style="margin:0;">Cargando tus permisos…</p>
+        <p id="noPermsMsg"></p>
+      </div>
+    </div>
+
     <!-- ══════════════ VIEW: Hoy (operación del día) ══════════════ -->
     <div id="viewHoy" style="display:none">
       <div class="admin-card">
@@ -732,7 +757,7 @@
     </div>
 
     <!-- ══════════════ VIEW: Nueva / Editar ══════════════ -->
-    <div id="viewNueva">
+    <div id="viewNueva" style="display:none">
 
     <div id="editBanner" style="display:none; background:var(--terracotta-100); border:1px solid var(--terracotta-300); border-radius:8px; padding:14px 18px; margin-bottom:24px; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
       <span style="font-family:var(--font-label); font-size:12px; letter-spacing:0.06em; color:var(--ink);">Editando cotización <strong id="editBannerId"></strong></span>
@@ -964,6 +989,7 @@
         <button id="copyUrlBtn" class="btn btn-ghost-dark" style="padding:10px 16px; font-size:11px; flex-shrink:0;">Copiar enlace</button>
       </div>
 
+      <div id="sendEmailBlock">
       <p class="eyebrow" style="margin-bottom:10px">Enviar por email al cliente</p>
       <div class="send-email-row">
         <input type="email" id="sendToEmail" class="send-email-input" placeholder="Email del cliente">
@@ -973,6 +999,7 @@
         </button>
       </div>
       <p id="emailStatus" style="font-family:var(--font-label); font-size:11px; display:none; margin:0 0 16px;"></p>
+      </div>
 
       <div class="success-btn-row">
         <a id="viewQuoteLink" href="#" target="_blank" class="btn btn-ghost-dark">Ver cotización →</a>
@@ -1233,6 +1260,18 @@
         <div id="cfgLoading" style="padding:32px;text-align:center;font-family:var(--font-label);font-size:12px;color:var(--ink-500);letter-spacing:0.08em;">Cargando configuración…</div>
         <div id="cfgError" style="display:none;padding:24px;text-align:center;font-family:var(--font-label);font-size:12px;color:var(--error-700);"></div>
         <div id="cfgGroups"></div>
+      </div>
+
+      <div class="admin-card" id="ttlockCard">
+        <p class="admin-card-title">Chapas (TTLock)</p>
+        <p class="cfg-intro">
+          Verifica que las credenciales de TTLock cargadas en Netlify funcionan y mira
+          las chapas de la cuenta y a qué apartamento está asignada cada una. Es una
+          consulta de <strong>solo lectura</strong>: no programa códigos ni abre puertas,
+          y funciona aunque "Emitir códigos de chapa" esté apagado.
+        </p>
+        <button type="button" id="ttlockProbeBtn" class="btn btn-ghost-dark" style="padding:10px 16px; font-size:11px;">Probar conexión TTLock</button>
+        <div id="ttlockResult"></div>
       </div>
     </div>
 
@@ -1769,6 +1808,23 @@ document.getElementById('copyUrlBtn').addEventListener('click', function() {
 });
 
 /* ── Send email ── */
+/* Envía (o reenvía) la cotización por correo. Lanza Error con el motivo si NO
+   salió: un 200 con sent:false (p.ej. correo sin configurar) también es fallo —
+   antes la UI mostraba "✓ enviado" aunque no se hubiera enviado nada. */
+async function sendQuoteEmailRequest(quoteId, toEmail, quoteUrl) {
+  const token = await window.getAuthToken();
+  const res = await fetch('/api/send-quote-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ quoteId, clientEmail: toEmail, quoteUrl })
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json.sent !== true) {
+    throw new Error(json.error || (json.reason ? 'No se envió el correo (' + json.reason + ')' : 'Error al enviar'));
+  }
+  return json;
+}
+
 document.getElementById('sendEmailBtn').addEventListener('click', async function() {
   const emailInput = document.getElementById('sendToEmail');
   const toEmail = emailInput.value.trim();
@@ -1787,17 +1843,8 @@ document.getElementById('sendEmailBtn').addEventListener('click', async function
   statusEl.style.display = 'none';
 
   try {
-    const token = await window.getAuthToken();
     const shareUrl = document.getElementById('quoteUrlInput').value;
-
-    const res = await fetch('/api/send-quote-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ quoteId: currentQuoteId, clientEmail: toEmail, quoteUrl: shareUrl })
-    });
-
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Error al enviar');
+    await sendQuoteEmailRequest(currentQuoteId, toEmail, shareUrl);
 
     statusEl.style.color = 'var(--success)';
     statusEl.textContent = '✓ Email enviado correctamente a ' + toEmail;
@@ -1865,6 +1912,8 @@ document.getElementById('cancelEditBtn').addEventListener('click', function() {
 
 /* ════════════════ Tabs ════════════════ */
 function switchView(view) {
+  const vnp = document.getElementById('viewNoPerms');
+  if (vnp) vnp.style.display = 'none';
   document.querySelectorAll('.admin-tab').forEach(t => t.classList.toggle('is-active', t.dataset.view === view));
   const vh = document.getElementById('viewHoy');
   if (vh) vh.style.display = view === 'hoy' ? 'block' : 'none';
@@ -2028,18 +2077,26 @@ function hasPerm(p) { return window.MY.isEnvAdmin || window.MY.perms.includes(p)
 
 /* Llamado por showAdmin (módulo Firebase) tras iniciar sesión. */
 window.afterLogin = async function () {
+  let whoamiError = null;
   try {
     const token = await window.getAuthToken();
     const r = await fetch('/api/whoami', { headers: { Authorization: 'Bearer ' + token } });
     if (r.ok) {
       const d = await r.json();
       window.MY = { perms: d.permissions || [], roles: d.roles || [], isEnvAdmin: !!d.isEnvAdmin };
+    } else {
+      const d = await r.json().catch(() => ({}));
+      whoamiError = d.error || ('Error ' + r.status);
     }
-  } catch (e) { /* sin permisos extra: solo lo que den las env vars */ }
-  applyGating();
+  } catch (e) { whoamiError = e && e.message ? e.message : 'sin conexión'; }
+  applyGating(whoamiError);
 };
 
-function applyGating() {
+/* Pestañas y acciones según permisos. Si el usuario no tiene NINGUNA pestaña
+   (p.ej. alguien de aseo o del tercero de desayunos que entra a /admin), se
+   muestra un aviso en vez del formulario de cotización (que antes quedaba a la
+   vista por ser la vista por defecto). La autorización real es del servidor. */
+function applyGating(whoamiError) {
   let firstVisible = null;
   document.querySelectorAll('.admin-tab').forEach(t => {
     const need = t.dataset.perm;
@@ -2047,8 +2104,36 @@ function applyGating() {
     t.style.display = ok ? '' : 'none';
     if (ok && !firstVisible) firstVisible = t.dataset.view;
   });
+  /* Sin permiso de envío no se ofrece "Enviar por email" tras crear/editar. */
+  const sendBlock = document.getElementById('sendEmailBlock');
+  if (sendBlock) sendBlock.style.display = hasPerm('quotes.send') ? '' : 'none';
+  if (!firstVisible) { showNoPerms(whoamiError); return; }
   const active = document.querySelector('.admin-tab.is-active');
-  if ((!active || active.style.display === 'none') && firstVisible) switchView(firstVisible);
+  const target = (active && active.style.display !== 'none') ? active.dataset.view : firstVisible;
+  switchView(target);
+}
+
+function showNoPerms(whoamiError) {
+  ['viewHoy', 'viewNueva', 'viewLista', 'viewReembolsos', 'viewFacturacion', 'viewDocumentos',
+   'viewDesayunos', 'viewCodigos', 'viewUsuarios', 'viewConfig'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('is-active'));
+  const title = document.getElementById('noPermsTitle');
+  const msg = document.getElementById('noPermsMsg');
+  const page = document.getElementById('pageTitle');
+  if (whoamiError) {
+    if (page) page.textContent = 'Panel';
+    if (title) title.textContent = 'No se pudieron cargar tus permisos';
+    if (msg) msg.textContent = 'Recarga la página o vuelve a iniciar sesión. Detalle: ' + whoamiError;
+  } else {
+    if (page) page.textContent = 'Sin permisos';
+    if (title) title.textContent = 'No tienes permisos en este panel';
+    if (msg) msg.textContent = 'Tu usuario no tiene acceso a ninguna sección del panel. Si necesitas entrar, pide al administrador que te asigne un rol en Usuarios. (El personal de aseo usa /aseo y el de desayunos /desayuno.)';
+  }
+  const vnp = document.getElementById('viewNoPerms');
+  if (vnp) vnp.style.display = 'block';
 }
 
 async function apiIam(action, payload) {
@@ -2351,9 +2436,16 @@ wireCodigos();
 
 function allRoleDefs() {
   const out = [];
-  Object.keys(IAM_ROLES.builtins).forEach(id => out.push({ id, permissions: IAM_ROLES.builtins[id], builtin: true }));
+  Object.keys(IAM_ROLES.builtins).forEach(id => out.push({ id, label: (IAM_ROLES.labels || {})[id], permissions: IAM_ROLES.builtins[id], builtin: true }));
   (IAM_ROLES.custom || []).forEach(r => { if (!IAM_ROLES.builtins[r.id]) out.push({ id: r.id, label: r.label, permissions: r.permissions || [], builtin: false }); });
   return out;
+}
+/* Nombre visible (ES) de un rol: integrado (labels de list-roles) o custom. */
+function roleLabelEs(id) {
+  const b = (IAM_ROLES.labels || {})[id];
+  if (b && b.es) return b.es;
+  const c = (IAM_ROLES.custom || []).find(r => r.id === id);
+  return (c && c.label && c.label.es) ? c.label.es : id;
 }
 function permCheckbox(perm, cls) {
   return '<label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" class="' + cls + '" value="' + escHtml(perm) + '"> ' + escHtml(perm) + '</label>';
@@ -2361,10 +2453,11 @@ function permCheckbox(perm, cls) {
 async function loadRolesIam() {
   try {
     const d = await apiIam('list-roles');
-    IAM_ROLES = { builtins: d.builtins || {}, custom: d.custom || [], catalog: d.catalog || [] };
+    IAM_ROLES = { builtins: d.builtins || {}, custom: d.custom || [], catalog: d.catalog || [], labels: d.labels || {} };
   } catch (e) { document.getElementById('rolesList').textContent = e.message; return; }
   document.getElementById('rolesList').innerHTML = allRoleDefs().map(r =>
-    '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px"><strong>' + escHtml(r.id) + '</strong>' +
+    '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px"><strong>' + escHtml(r.label && r.label.es ? r.label.es : r.id) + '</strong>' +
+    (r.label && r.label.es && r.label.es !== r.id ? ' <span style="font-size:11px;color:var(--ink-400)">' + escHtml(r.id) + '</span>' : '') +
     (r.builtin ? ' <span style="font-size:11px;color:var(--ink-400)">(base)</span>' : '') +
     '<div style="font-size:12px;color:var(--ink-500);margin-top:4px">' + (r.permissions || []).join(', ') + '</div></div>'
   ).join('');
@@ -2383,7 +2476,7 @@ async function loadUsersIam() {
       '<tr><td>' + escHtml(e) + '</td><td>—</td><td><span class="badge">superadmin (env)</span></td><td>activo</td><td><span style="color:var(--ink-400);font-size:12px">no editable</span></td></tr>'
     ).join('');
     rows += IAM_USERS.map(u =>
-      '<tr><td>' + escHtml(u.email) + '</td><td>' + escHtml(u.name || '') + '</td><td>' + (u.roles || []).join(', ') + '</td>' +
+      '<tr><td>' + escHtml(u.email) + '</td><td>' + escHtml(u.name || '') + '</td><td>' + escHtml((u.roles || []).map(roleLabelEs).join(', ')) + '</td>' +
       '<td>' + (u.status === 'suspended' ? '<span style="color:var(--terracotta-700)">suspendido</span>' : 'activo') + '</td>' +
       '<td><button class="btn btn-ghost-dark iam-act" data-act="edit" data-email="' + escHtml(u.email) + '" style="padding:5px 10px;font-size:11px">Editar</button> ' +
       '<button class="btn btn-ghost-dark iam-act" data-act="' + (u.status === 'suspended' ? 'reactivate' : 'suspend') + '" data-email="' + escHtml(u.email) + '" style="padding:5px 10px;font-size:11px">' + (u.status === 'suspended' ? 'Reactivar' : 'Suspender') + '</button> ' +
@@ -2511,9 +2604,7 @@ function renderQuotesList() {
   document.getElementById('listBody').innerHTML = rows.map(q => {
     const st = q.statusEfectivo || 'activa';
     const stay = (q.checkin && q.checkout) ? `${fmtShortDate(q.checkin)} → ${fmtShortDate(q.checkout)}` : '—';
-    const isPaid = st === 'aceptada';
-    const canCancel = st !== 'cancelada' && !isPaid;
-    const canReactivate = q.status === 'cancelada';
+    const acts = quoteRowActions(q);
     return `
       <tr data-id="${escHtml(q.quoteId)}">
         <td class="lista-id" data-label="ID">${escHtml(q.quoteId)}</td>
@@ -2528,17 +2619,51 @@ function renderQuotesList() {
         <td style="text-align:center" data-label="Vistas">${q.views || 0}</td>
         <td>
           <div class="lista-actions">
-            <button data-act="view">Ver</button>
-            <button data-act="copy">Enlace</button>
-            <button data-act="history">Historial</button>
-            ${!isPaid ? '<button data-act="edit">Editar</button>' : ''}
-            ${q.reservationPending ? '<button data-act="retry">Reintentar reserva</button>' : ''}
-            ${canReactivate ? '<button data-act="reactivate">Reactivar</button>' : ''}
-            ${canCancel ? '<button data-act="cancel" class="danger">Cancelar</button>' : ''}
+            ${acts.map(a => '<button data-act="' + a + '"' + (a === 'cancel' ? ' class="danger"' : '') + '>' + QUOTE_ACTION_LABEL[a] + '</button>').join('')}
           </div>
         </td>
       </tr>`;
   }).join('');
+}
+
+/* Acciones visibles de una fila según el estado de la cotización Y los
+   permisos del usuario (cada botón = el permiso que exige su endpoint):
+   ver/enlace → quotes.view · reenviar → quotes.send · historial →
+   quotes.audit.read · editar/reintentar/reactivar/cancelar → quotes.edit. */
+const QUOTE_ACTION_LABEL = {
+  view: 'Ver', copy: 'Enlace', resend: 'Reenviar', history: 'Historial', edit: 'Editar',
+  retry: 'Reintentar reserva', reactivate: 'Reactivar', cancel: 'Cancelar'
+};
+function quoteRowActions(q) {
+  const st = q.statusEfectivo || 'activa';
+  const isPaid = st === 'aceptada';
+  const acts = [];
+  if (hasPerm('quotes.view')) acts.push('view', 'copy');
+  if (hasPerm('quotes.send') && (st === 'activa' || st === 'vista')) acts.push('resend');
+  if (hasPerm('quotes.audit.read')) acts.push('history');
+  if (hasPerm('quotes.edit')) {
+    if (!isPaid) acts.push('edit');
+    if (q.reservationPending) acts.push('retry');
+    if (q.status === 'cancelada') acts.push('reactivate');
+    if (st !== 'cancelada' && !isPaid) acts.push('cancel');
+  }
+  return acts;
+}
+
+async function resendQuote(quote, btn) {
+  const to = (prompt('Reenviar la cotización ' + quote.quoteId + ' al correo:', quote.email || '') || '').trim();
+  if (!to) return;
+  if (!to.includes('@')) { showToast('Ingresa un email válido.'); return; }
+  const prev = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    await sendQuoteEmailRequest(quote.quoteId, to, quoteShareUrl(quote.quoteId));
+    showToast('Cotización reenviada a ' + to + ' ✓', 3200);
+  } catch (err) {
+    alert('✗ No se reenvió: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = prev;
+  }
 }
 
 document.getElementById('listSearch').addEventListener('input', renderQuotesList);
@@ -2575,6 +2700,8 @@ document.getElementById('listBody').addEventListener('click', async function(e) 
     await quoteStatusAction(id, 'reactivate');
   } else if (act === 'retry') {
     await retryBooking(id, btn);
+  } else if (act === 'resend') {
+    await resendQuote(quote, btn);
   }
 });
 
@@ -3437,8 +3564,10 @@ let SETTINGS_CACHE = {};
 let _settingsBusy = false;
 
 /* Etiquetas amistosas para el origen del valor efectivo. */
-const CFG_SOURCE_LABEL = { panel: 'Panel', netlify: 'Netlify', 'sin definir': 'Sin definir' };
-const CFG_SOURCE_CLASS = { panel: 'cfg-source-panel', netlify: 'cfg-source-netlify', 'sin definir': 'cfg-source-empty' };
+/* 'por defecto' = no está en el panel ni en Netlify y rige el valor que asume
+   el código (p.ej. ALERT_ENABLED sin definir = activo). */
+const CFG_SOURCE_LABEL = { panel: 'Panel', netlify: 'Netlify', 'por defecto': 'Por defecto', 'sin definir': 'Sin definir' };
+const CFG_SOURCE_CLASS = { panel: 'cfg-source-panel', netlify: 'cfg-source-netlify', 'por defecto': 'cfg-source-default', 'sin definir': 'cfg-source-empty' };
 
 async function loadSettings() {
   const loading = document.getElementById('cfgLoading');
@@ -3602,6 +3731,125 @@ async function saveSetting(key, value) {
     const btn = e.target.closest('[data-cfg-reset]');
     if (!btn) return;
     saveSetting(btn.dataset.cfgReset, '');
+  });
+})();
+
+/* ════════════════ Chapas TTLock (probe de solo lectura) ════════════════ */
+/* Arma el HTML del resultado de /api/ttlock-probe. Pura (testeable): recibe el
+   JSON del probe y devuelve HTML escapado. Nunca hay secretos en el JSON. */
+function renderTtlockProbe(d) {
+  d = d || {};
+  const cfg = d.config || {};
+  const chk = (ok, label) => '<span class="tt-check ' + (ok ? 'ok' : 'bad') + '">' + (ok ? '✓ ' : '✗ ') + escHtml(label) + '</span>';
+  let html = '<div class="tt-checks">' +
+    chk(cfg.clientId, 'Client ID') + chk(cfg.clientSecret, 'Client secret') +
+    chk(cfg.username, 'Usuario') + chk(cfg.password, 'Contraseña') +
+    '<span class="tt-check">' + (cfg.enabled ? 'Emisión de códigos: encendida' : 'Emisión de códigos: apagada') + '</span>' +
+    '</div>';
+
+  if (d.error) {
+    html += '<p class="tt-status is-error">✗ No se pudo conectar con TTLock: ' + escHtml(d.error) + '</p>';
+  } else if (d.ok) {
+    html += '<p class="tt-status">✓ Conexión correcta · ' + (d.locks || []).length + ' chapa(s) en la cuenta.</p>';
+  }
+  if (d.note) html += '<p class="tt-status">' + escHtml(d.note) + '</p>';
+
+  /* Chapas de la cuenta */
+  const check = d.check || { entries: [], unmapped: [], suggested: {}, pendingWithoutKey: [] };
+  const keyByLock = {};
+  (check.entries || []).forEach(e => { (keyByLock[e.lockId] = keyByLock[e.lockId] || []).push(e.key); });
+  if ((d.locks || []).length) {
+    html += '<p class="tt-sub">Chapas en la cuenta</p>' +
+      '<table class="items-table lista-table tt-table"><thead><tr><th>lockId</th><th>Nombre (alias)</th><th>Batería</th><th>Gateway</th><th>Apartamento</th></tr></thead><tbody>' +
+      d.locks.map(l =>
+        '<tr><td data-label="lockId">' + escHtml(l.lockId) + '</td><td data-label="Nombre">' + escHtml(l.alias || l.name || '—') + '</td>' +
+        '<td data-label="Batería">' + (l.battery == null ? '—' : escHtml(l.battery) + '%') + '</td>' +
+        '<td data-label="Gateway">' + (l.hasGateway ? 'Sí' : '<span style="color:var(--terracotta-700)">No (sin wifi: no recibe códigos remotos)</span>') + '</td>' +
+        '<td data-label="Apartamento">' + (keyByLock[l.lockId] ? escHtml(keyByLock[l.lockId].join(', ')) : '<span style="color:var(--ink-500)">sin asignar</span>') + '</td></tr>'
+      ).join('') + '</tbody></table>';
+  }
+
+  /* Mapa actual */
+  const map = d.mapping || { defined: false, valid: true, entries: [] };
+  html += '<p class="tt-sub">Mapa actual apartamento → chapa (TTLOCK_LOCKS_JSON)</p>';
+  if (!map.defined) {
+    html += '<p class="tt-status">Aún no está definido.</p>';
+  } else if (!map.valid) {
+    html += '<p class="tt-status is-error">✗ ' + escHtml(map.error || 'JSON inválido') + '</p>';
+  } else {
+    const found = {};
+    (check.entries || []).forEach(e => { found[e.key] = e.foundInAccount; });
+    html += '<table class="items-table lista-table tt-table"><thead><tr><th>Apartamento</th><th>lockId</th><th>¿Existe en la cuenta?</th></tr></thead><tbody>' +
+      (map.entries || []).map(e =>
+        '<tr><td data-label="Apartamento">' + escHtml(e.key === 'main' ? 'main (puerta principal)' : e.key) + '</td><td data-label="lockId">' + escHtml(e.lockId) + '</td><td data-label="¿Existe?">' +
+        (d.ok ? (found[e.key] ? '✓' : '<span style="color:var(--terracotta-700)">✗ no existe</span>') : '—') + '</td></tr>'
+      ).join('') + '</tbody></table>';
+  }
+
+  /* Mapa sugerido + instrucciones */
+  if (d.ok && (d.locks || []).length) {
+    const suggested = JSON.stringify(check.suggested || {});
+    html += '<p class="tt-sub">Mapa sugerido</p>' +
+      '<textarea class="tt-json" id="ttlockSuggested" readonly>' + escHtml(suggested) + '</textarea>' +
+      ((check.pendingWithoutKey || []).length
+        ? '<p class="tt-status">Sin apartamento reconocible por el nombre (complétalas a mano): ' + escHtml(check.pendingWithoutKey.join(', ')) + '</p>'
+        : '') +
+      '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
+        '<button type="button" class="btn btn-ghost-dark" data-tt-act="copy" style="padding:8px 14px;font-size:11px;">Copiar mapa</button>' +
+        '<button type="button" class="btn btn-ghost-dark" data-tt-act="save" style="padding:8px 14px;font-size:11px;">Guardar este mapa en el panel</button>' +
+      '</div>';
+  }
+  html += '<ol class="tt-howto">' +
+    '<li>En la app TTLock, ponle a cada chapa un nombre con el número del apartamento (ej. "Apto 101"); a la de la entrada, "Principal".</li>' +
+    '<li>Las claves del mapa son el número del apartamento tal como aparece en Kunas (ej. "101"); "main" = puerta principal. El valor es el lockId de la tabla.</li>' +
+    '<li>Guarda el mapa con el botón de arriba o pégalo en "Mapa apartamento → chapa (TTLock)" (grupo Desayuno / chapas). También sirve la variable TTLOCK_LOCKS_JSON de Netlify.</li>' +
+    '<li>Vuelve a probar: todas las filas del mapa deben salir ✓ y cada chapa debe tener gateway para recibir códigos a distancia.</li>' +
+    '</ol>';
+  return html;
+}
+
+async function runTtlockProbe() {
+  const btn = document.getElementById('ttlockProbeBtn');
+  const out = document.getElementById('ttlockResult');
+  if (!btn || !out) return;
+  btn.disabled = true;
+  const prev = btn.textContent;
+  btn.textContent = 'Probando…';
+  out.innerHTML = '<p class="tt-status">Consultando TTLock…</p>';
+  try {
+    const token = await window.getAuthToken();
+    const res = await fetch('/api/ttlock-probe', { headers: { Authorization: 'Bearer ' + token } });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok && !d.config) throw new Error(d.error || ('Error ' + res.status));
+    out.innerHTML = renderTtlockProbe(d);
+  } catch (err) {
+    out.innerHTML = '<p class="tt-status is-error">✗ ' + escHtml(err.message) + '</p>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prev;
+  }
+}
+
+(function wireTtlock() {
+  const btn = document.getElementById('ttlockProbeBtn');
+  const out = document.getElementById('ttlockResult');
+  if (btn) btn.addEventListener('click', runTtlockProbe);
+  if (!out) return;
+  out.addEventListener('click', async function (e) {
+    const b = e.target.closest('[data-tt-act]');
+    if (!b) return;
+    const ta = document.getElementById('ttlockSuggested');
+    const json = ta ? ta.value : '';
+    if (!json) return;
+    if (b.dataset.ttAct === 'copy') {
+      navigator.clipboard.writeText(json)
+        .then(() => showToast('Mapa copiado ✓'))
+        .catch(() => { ta.select(); document.execCommand('copy'); showToast('Mapa copiado ✓'); });
+    } else if (b.dataset.ttAct === 'save') {
+      if (!confirm('¿Guardar este mapa como "Mapa apartamento → chapa (TTLock)"?\n\nRevisa antes que cada apartamento corresponda a su chapa real:\n' + json)) return;
+      await saveSetting('TTLOCK_LOCKS_JSON', json);
+      runTtlockProbe();
+    }
   });
 })();
 

@@ -29,7 +29,9 @@ const MODULES = [
   '_refunds-store', '_refund-flow', 'refund-admin-action', 'get-pending-refunds',
   'request-cancellation', 'request-quote', 'retry-quote-booking', 'revalidate-quotes',
   'send-confirmation', 'send-quote-email', 'send-stay-emails', 'submit-bank-details', 'update-quote',
-  'upload-drive-credentials', 'whatsapp-probe', 'whatsapp-webhook', 'wompi-webhook'
+  'upload-drive-credentials', 'whatsapp-probe', 'whatsapp-webhook', 'wompi-webhook',
+  /* frente staff */
+  'ttlock-probe', 'cleaning-checklist', 'validate-cleaning-photo', 'breakfast-status', '_ttlock', '_permissions'
 ];
 
 for (const mod of MODULES) {

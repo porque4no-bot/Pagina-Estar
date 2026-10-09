@@ -56,7 +56,7 @@ Root HTML pages (Spanish, canonical):
 | `cotizar-admin.html` | Admin panel — served at **`/admin`** (rewrite). Tabs: **Hoy** (day board, `staff-today`), quotes, refunds, and **breakfast** (embeds `desayuno-admin.html` in an iframe), códigos, usuarios, configuración. noindex |
 | `desayuno.html` | Staff: breakfast-pass verifier — scan/lookup a reservation, mark breakfast served, + cycle/day served counts (noindex) |
 | `desayuno-admin.html` | Admin: breakfast money analytics + day board ("día de desayunos") + per-reservation lookup with courtesy action (noindex). Embedded as the **Desayunos** tab of `/admin`; `/desayuno-admin` redirects there |
-| `aseo.html` | Staff: cleaning quality control — housekeeper photographs each checklist item (bed, bathroom, kitchen…) and an AI vision audit validates the photo (well-taken + cleanliness) before accepting it (noindex) |
+| `aseo.html` | Staff: cleaning quality control — housekeeper photographs each checklist item (bed, bathroom, kitchen…) and an AI vision audit validates the photo (well-taken + cleanliness) before accepting it. Access = permission `cleaning.audit` (role **aseo**), checked via `whoami` (noindex) |
 | `privacidad.html` / `aviso-legal.html` / `cancelacion.html` / `cookies.html` / `escnna.html` | Legal |
 | `404.html` | Error page |
 
@@ -206,8 +206,8 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 
 | Function | Purpose |
 |---|---|
-| `cleaning-checklist` | Returns the cleaning checklist items (bed, bathroom, kitchen, living area, towels) for the staff panel (`aseo.html`). Single source is `_cleaning-audit.CHECKLIST`. Staff auth. |
-| `validate-cleaning-photo` | Audits a housekeeping photo with Claude vision against the item's rubric, then applies a **hybrid** decision **in code** (not the prompt): `rechazada` (photo poorly taken or clearly not the subject → hard block, not stored), `advertida` (cleanliness issues → stored with the observations, does not block), `aprobada`. On accept, stores the image to Google Drive (`aseo/<date>/<apartment>/`) **and** Netlify Blobs (`cleaning-photos`), plus the verdict/metadata to Blobs (`cleaning-audits`). Staff auth. |
+| `cleaning-checklist` | Returns the cleaning checklist items (bed, bathroom, kitchen, living area, towels) for the staff panel (`aseo.html`). Single source is `_cleaning-audit.CHECKLIST`. Auth `cleaning.audit` (role `aseo`; env superusers too). |
+| `validate-cleaning-photo` | Audits a housekeeping photo with Claude vision against the item's rubric, then applies a **hybrid** decision **in code** (not the prompt): `rechazada` (photo poorly taken or clearly not the subject → hard block, not stored), `advertida` (cleanliness issues → stored with the observations, does not block), `aprobada`. On accept, stores the image to Google Drive (`aseo/<date>/<apartment>/`) **and** Netlify Blobs (`cleaning-photos`), plus the verdict/metadata to Blobs (`cleaning-audits`). `advertida` also opens an **ops-queue task** (via `_alert.reportAlert`, deduped per apartment+item+day) and a later `aprobada` of the same item resolves it. Auth `cleaning.audit`. |
 
 **WhatsApp chatbot (Meta Cloud API):**
 
@@ -226,8 +226,9 @@ See `docs/whatsapp-bot.md` for setup (credentials checklist, sandbox, flows, 24h
 | `iam-admin` | CRUD for users and roles (`users.manage` / `roles.manage`) with anti-escalation guards: an actor can't grant a permission it lacks, only env-superusers/full admins can mint admins, no self-lockout, the system never ends with zero admins; every mutation is appended to an audit. Backs the **Usuarios** tab |
 | `admin-settings` | Reads/writes the panel-managed toggles (`settings.manage`) — a whitelist that **deliberately excludes every secret**. Backs the **Configuración** tab |
 | `admin-discount-codes` | CRUD + activate/deactivate for discount codes (reuses `quotes.view`/`quotes.edit`). Backs the **Códigos** tab |
+| `ttlock-probe` | **Read-only** TTLock health check (`settings.manage`): credential booleans (never secrets), OAuth token + `GET /v3/lock/list` (lockId, alias, battery, gateway — never `lockData`), cross-check against the apartment→lock map `TTLOCK_LOCKS_JSON` + suggested map. Works with `TTLOCK_ENABLED` off; mock-safe without credentials. Backs **Probar conexión TTLock** in the **Configuración** tab |
 
-Panel functions migrated to the new `authorize` layer (per-permission gate, env-vars = superuser): `list-quotes`, `create-quote`, `update-quote`, `send-quote-email`, `read-quote-audit`, `retry-quote-booking`, `get-pending-refunds`, `refund-admin-action`, the `breakfast-*` staff/admin functions, `upload-drive-credentials`, and the `*-probe` health checks.
+Panel functions migrated to the new `authorize` layer (per-permission gate, env-vars = superuser): `list-quotes`, `create-quote`, `update-quote`, `send-quote-email`, `read-quote-audit`, `retry-quote-booking`, `get-pending-refunds`, `refund-admin-action`, the `breakfast-*` staff/admin functions, `cleaning-checklist`/`validate-cleaning-photo` (`cleaning.audit`), `upload-drive-credentials`, and the `*-probe` health checks. `_staff-auth` is deprecated (no consumers).
 
 **Shared modules (prefixed `_`, not HTTP-callable):**
 
@@ -290,7 +291,7 @@ See `docs/guest-app.md` for implementation details.
 
 The `/admin` panel adds an **authorization** layer on top of the existing Firebase **identity**:
 
-- **Roles/IAM:** `_permissions` defines 22 atomic permissions and four default roles (`admin`, `recepcion`, `cocina`, `tesoreria`); `_iam-store` persists users/roles in Blobs; `_authz.authorize(event, permission)` resolves an email → effective permissions. `ADMIN_EMAILS`/`STAFF_EMAILS` remain break-glass superusers (a permission granted by env vars can never be revoked, so the owner can't lock himself out). The **Usuarios** tab (`iam-admin`) does CRUD with anti-escalation guards; `whoami` drives which tabs the UI shows.
+- **Roles/IAM:** `_permissions` defines the atomic permissions and five default roles mapped to the staff the owner defined: `admin` (administrador-recepcionista), `recepcion` (recepcionista de reemplazo), `aseo` (only `cleaning.audit`), `cocina` — internal id kept for compatibility, labelled **"Desayunos (tercero)"**: the contracted third party that scans breakfasts, only `breakfast.status` + `breakfast.redeem` — and `tesoreria`; `_iam-store` persists users/roles in Blobs; `_authz.authorize(event, permission)` resolves an email → effective permissions. `ADMIN_EMAILS`/`STAFF_EMAILS` remain break-glass superusers (a permission granted by env vars can never be revoked, so the owner can't lock himself out). The **Usuarios** tab (`iam-admin`) does CRUD with anti-escalation guards; `whoami` drives which tabs the UI shows.
 - **Settings:** the **Configuración** tab (`admin-settings`, permission `settings.manage`) toggles 17+ manageable flags. `_settings.flag()`/`get()` read a Blobs override (`app-settings`) first and fall back to `process.env`. The whitelist **never** admits secrets — they live only in Netlify env. Carril-A flags are now manageable from here without a redeploy.
 - **Discount codes:** the **Códigos** tab (`admin-discount-codes`) manages server-side discount codes (`_discount-store`); applied in `_direct-pricing`/`create-wompi-signature`/`wompi-webhook` (Wompi path), gated by `DISCOUNT_CODES_ENABLED`.
 
@@ -300,7 +301,7 @@ The `/admin` panel adds an **authorization** layer on top of the existing Fireba
 
 ### Door locks (TTLock)
 
-`_ttlock` is a mock-safe TTLock Open Platform client (`TTLOCK_ENABLED` + `TTLOCK_*`) that can mint per-reservation temporary keyboard PINs; the email template (`accessCodesHtml`) already exists. Off by default; never breaks check-in.
+`_ttlock` is a mock-safe TTLock Open Platform client (`TTLOCK_ENABLED` + `TTLOCK_*`) that can mint per-reservation temporary keyboard PINs; the email template (`accessCodesHtml`) already exists. Off by default; never breaks check-in. The apartment→lock map `TTLOCK_LOCKS_JSON` is panel-manageable (not a secret) and `ttlock-probe` (button **Probar conexión TTLock** in Configuración) verifies the credentials and lists the account's locks read-only, even with the flag off.
 
 ### Portal Estar (`/portal`) — gated OFF
 
@@ -544,8 +545,8 @@ ANTHROPIC_API_KEY=        # shared with the WhatsApp bot; unset ⇒ mock verdict
 CLEANING_AI_MODEL=        # default claude-sonnet-5 (claude-opus-4-8 for max rigor on fine detail)
 CLEANING_AI_TIMEOUT_MS=   # default 30000
 ```
-Access is gated by `STAFF_EMAILS`/`ADMIN_EMAILS` (Firebase, same as the breakfast
-panel). Photos are archived to Google Drive when `GOOGLE_DRIVE_FOLDER_ID` +
+Access is gated by the `cleaning.audit` permission (role **aseo** in `/admin` →
+Usuarios; `STAFF_EMAILS`/`ADMIN_EMAILS` still work as break-glass superusers). Photos are archived to Google Drive when `GOOGLE_DRIVE_FOLDER_ID` +
 service-account are configured; otherwise only the Blobs backup is kept.
 
 **Misc:**

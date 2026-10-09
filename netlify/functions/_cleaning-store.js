@@ -55,6 +55,14 @@ async function saveAudit(record) {
   return value;
 }
 
+/* Lee la auditoría vigente de un apartamento+ítem+día (o null). Nunca lanza. */
+async function getAudit(slug, item, date) {
+  try {
+    const raw = await auditsStore().get(auditKey(slug, item, date || todayBogota()));
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
 /* Guarda los bytes de la imagen aprobada (respaldo local a Drive). */
 async function savePhoto({ apartmentSlug: slug, item, date, buffer, mediaType }) {
   const day = date || todayBogota();
@@ -86,6 +94,7 @@ module.exports = {
   apartmentSlug,
   auditKey,
   saveAudit,
+  getAudit,
   savePhoto,
   getApartmentAudits,
   getCleaningStore: auditsStore

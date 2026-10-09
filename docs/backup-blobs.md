@@ -9,7 +9,7 @@ un store aislado `backups` y, opcionalmente, lo copia a Google Drive (off-site).
 
 | Grupo | Stores | Por defecto |
 |---|---|---|
-| `business` | `quotes`, `quote-audit`, `refunds`, `breakfast-redemptions`, `cancellation-requests` | ✅ siempre |
+| `business` | `quotes`, `quote-audit`, `refunds`, `breakfast-redemptions`, `cancellation-requests`, `iam`, `discount-codes`, `discount-usage`, `app-settings`, `quote-requests`, `ops-queue`, `guest-service-payments` | ✅ siempre |
 | `pii` | `guest-checkins`, `guest-events`, `guest-documents`, `guest-minor-documents` | ⛔ solo con `BACKUP_INCLUDE_PII=true` |
 
 - **No** se respaldan stores efímeros/TTL (`booking-results`, `processed-transactions`, `booking-idempotency`, rate-limit, whatsapp-*): son ventana rodante de días, restaurarlos reintroduce datos vencidos.

@@ -326,7 +326,17 @@ exports.handler = async (event, context) => {
     const resendApiKey = process.env.RESEND_API_KEY;
     if (!resendApiKey) {
       if (process.env.DEBUG) console.log('[send-quote-email] RESEND_API_KEY no configurada. Omitiendo envío.');
-      return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ sent: false, reason: 'RESEND_API_KEY not configured' }) };
+      /* 503 + mensaje legible: antes respondía 200 { sent:false } y el panel
+         mostraba "✓ enviado" sin que hubiera salido ningún correo. */
+      return {
+        statusCode: 503,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          sent: false,
+          reason: 'RESEND_API_KEY not configured',
+          error: 'El correo no está configurado (falta RESEND_API_KEY en Netlify): la cotización NO se envió. Copia el enlace y compártelo por otro medio.'
+        })
+      };
     }
 
     const resolvedUrl = quoteUrl;

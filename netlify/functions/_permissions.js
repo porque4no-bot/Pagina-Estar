@@ -46,7 +46,8 @@ const ALL_PERMISSIONS = [
   'portal.accounts.manage',        // provisionar/dar de alta cuentas del Portal Estar (solo admin)
   'cartera.view',                  // ver la cartera (saldos/mora) del staff — visor de tesorería
   'cobranza.ver',                  // ver el estado de gestiones de cobranza (sin ejecutarlas)
-  'pagare.ver'                     // ver el visor de pagarés en /admin (PII financiera cifrada en reposo)
+  'pagare.ver',                    // ver el visor de pagarés en /admin (PII financiera cifrada en reposo)
+  'cleaning.audit'                 // control de aseo (aseo.html): ver la lista y subir/auditar fotos
 ];
 
 const PERMISSION_SET = new Set(ALL_PERMISSIONS);
@@ -94,7 +95,13 @@ const DEFAULT_ROLES = {
     'docs.view',
     'portal.view'
   ],
-  cocina: ['breakfast.status', 'breakfast.redeem', 'breakfast.day'],
+  /* id histórico 'cocina' (NO se renombra: los usuarios ya guardados con
+     roles:['cocina'] siguen funcionando). Hoy es el TERCERO con convenio que
+     escanea los desayunos: solo consultar el pase y marcar servido — sin
+     tablero del día, sin upgrade (cobro) ni dinero. Etiqueta: "Desayunos (tercero)". */
+  cocina: ['breakfast.status', 'breakfast.redeem'],
+  /* Personal de aseo: solo el control de calidad de aseo (aseo.html). */
+  aseo: ['cleaning.audit'],
   tesoreria: [
     'quotes.view', 'quotes.audit.read',
     'refunds.view', 'refunds.approve', 'refunds.deny', 'refunds.set_amount', 'refunds.mark_done',
@@ -113,8 +120,9 @@ const BUILTIN_ROLE_IDS = Object.keys(DEFAULT_ROLES);
 const ROLE_LABELS = {
   admin: { es: 'Administrador', en: 'Administrator' },
   recepcion: { es: 'Recepción', en: 'Front desk' },
-  cocina: { es: 'Cocina', en: 'Kitchen' },
-  tesoreria: { es: 'Tesorería', en: 'Treasury' }
+  cocina: { es: 'Desayunos (tercero)', en: 'Breakfast (contractor)' },
+  tesoreria: { es: 'Tesorería', en: 'Treasury' },
+  aseo: { es: 'Aseo', en: 'Housekeeping' }
 };
 
 /* Etiquetas ES/EN de PERMISOS para la UI. Hasta ahora los permisos solo tenían
@@ -132,12 +140,14 @@ const PERMISSION_LABELS = {
   'portal.accounts.manage': { es: 'Provisionar cuentas del Portal', en: 'Provision Portal accounts' },
   'cartera.view':       { es: 'Ver cartera', en: 'View accounts receivable' },
   'cobranza.ver':       { es: 'Ver estado de cobranza', en: 'View collections status' },
-  'pagare.ver':         { es: 'Ver pagarés', en: 'View promissory notes' }
+  'pagare.ver':         { es: 'Ver pagarés', en: 'View promissory notes' },
+  'cleaning.audit':     { es: 'Control de aseo (fotos)', en: 'Housekeeping audit (photos)' }
 };
 
-/* Permisos que otorga estar en STAFF_EMAILS (comportamiento actual del panel de
-   desayunos), para que la migración no le quite acceso a la cocina. */
-const STAFF_ENV_PERMISSIONS = ['breakfast.status', 'breakfast.redeem', 'breakfast.day', 'breakfast.upgrade'];
+/* Permisos que otorga estar en STAFF_EMAILS (comportamiento histórico de
+   _staff-auth: panel de desayunos + panel de aseo), para que la migración a
+   `authorize` no le quite acceso a nadie que hoy entre por esa env var. */
+const STAFF_ENV_PERMISSIONS = ['breakfast.status', 'breakfast.redeem', 'breakfast.day', 'breakfast.upgrade', 'cleaning.audit'];
 
 /* Une los permisos de una lista de roles. `customRoles` = mapa opcional
    id → { permissions:[] } proveniente del store (sobrescribe/añade builtins).

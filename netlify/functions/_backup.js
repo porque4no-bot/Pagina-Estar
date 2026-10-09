@@ -31,9 +31,14 @@ const BACKUP_STORE_GROUPS = [
     id: 'business', pii: false,
     /* A-7: incluye stores durables antes omitidos e IRRECUPERABLES: iam
        (usuarios/roles), discount-codes/discount-usage (cupones), app-settings
-       (flags del panel), quote-requests (leads B2B). */
+       (flags del panel), quote-requests (leads B2B).
+       Frente staff: + ops-queue (tareas operativas abiertas/resueltas del panel
+       "Hoy" — perderlas = perder el pendiente) y guest-service-payments
+       (intents de cobro en línea de pedidos del huésped; sin PII más allá del
+       código de reserva, ver _guest-payments.js). */
     stores: ['quotes', 'quote-audit', 'refunds', 'breakfast-redemptions', 'cancellation-requests',
-             'iam', 'discount-codes', 'discount-usage', 'app-settings', 'quote-requests']
+             'iam', 'discount-codes', 'discount-usage', 'app-settings', 'quote-requests',
+             'ops-queue', 'guest-service-payments']
   },
   {
     id: 'pii', pii: true,

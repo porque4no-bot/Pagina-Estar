@@ -1,4 +1,9 @@
-/* Autenticación del personal del restaurante para el pase de desayuno.
+/* DEPRECADO (frente staff, oct-2026): ninguna función lo usa ya. Desayunos,
+ * aseo y probes autorizan con `_authz.authorize(event, '<permiso>')`, que
+ * respeta los usuarios/roles del panel /admin y mantiene STAFF_EMAILS /
+ * ADMIN_EMAILS como superusuarios de respaldo. No usar en código nuevo.
+ *
+ * Autenticación del personal del restaurante para el pase de desayuno.
  *
  * Reusa la verificación de tokens de Firebase de _firebase-auth y aplica una
  * allowlist propia: STAFF_EMAILS ∪ ADMIN_EMAILS (un admin también puede entrar
