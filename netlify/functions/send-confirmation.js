@@ -559,7 +559,7 @@ async function sendConfirmationEmail(params, deps = {}) {
   let passUrl = '';
   if (breakfast) {
     try {
-      passUrl = `${base}/pase-desayuno?t=${d.signPassToken(dedupeKey)}`;
+      passUrl = `${base}/pase-desayuno?t=${d.signPassToken(dedupeKey, { checkOut })}`; // v2, vence con la estadía
     } catch (e) {
       if (process.env.DEBUG) console.warn('[send-confirmation] no se pudo firmar el pase:', e.message);
     }

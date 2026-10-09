@@ -21,7 +21,38 @@
 const crypto = require('crypto');
 const { isDemoMode } = require('./_guest-app');
 
-const PASS_TTL_SECONDS = 45 * 24 * 60 * 60; // ~45 días: estadía + margen
+const PASS_TTL_SECONDS = 45 * 24 * 60 * 60; // ~45 días: fallback si no se conoce el check-out
+/* Con check-out conocido, el pase vale hasta el FIN del día de salida (hora
+   Colombia, UTC-5) + este margen. Antes vencía a 45 días de emitido: una reserva
+   hecha con más de 45 días de anticipación llegaba con el pase ya vencido. */
+const PASS_GRACE_AFTER_CHECKOUT_SECONDS = 24 * 60 * 60;
+/* Tope de seguridad: un check-out absurdo (año 2099) no debe emitir un pase eterno. */
+const PASS_MAX_TTL_SECONDS = 550 * 24 * 60 * 60;
+
+/* exp (epoch s) para un check-out 'YYYY-MM-DD': 23:59:59 de ese día en Bogotá
+   + margen. null si la fecha no es válida. */
+function expiryForCheckOut(checkOut) {
+  const value = String(checkOut || '').trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const endOfDay = Date.parse(`${value}T23:59:59-05:00`);
+  if (Number.isNaN(endOfDay)) return null;
+  return Math.floor(endOfDay / 1000) + PASS_GRACE_AFTER_CHECKOUT_SECONDS;
+}
+
+/* Firma compatible: signPassToken(bookingCode) y signPassToken(bookingCode,
+   ttlSeconds) siguen igual; signPassToken(bookingCode, { checkOut }) vence
+   relativo al check-out (y { checkOut, ttlSeconds } usa ttlSeconds solo si la
+   fecha no sirve). */
+function resolvePassExpiry(options, nowSeconds) {
+  if (typeof options === 'number' && Number.isFinite(options)) return nowSeconds + options;
+  const opts = options && typeof options === 'object' ? options : {};
+  const fallbackTtl = typeof opts.ttlSeconds === 'number' && Number.isFinite(opts.ttlSeconds)
+    ? opts.ttlSeconds
+    : PASS_TTL_SECONDS;
+  const fromCheckOut = expiryForCheckOut(opts.checkOut);
+  if (fromCheckOut == null) return nowSeconds + fallbackTtl;
+  return Math.min(fromCheckOut, nowSeconds + PASS_MAX_TTL_SECONDS);
+}
 
 function baseSecret() {
   const configured = process.env.GUEST_APP_TOKEN_SECRET || '';
@@ -52,12 +83,12 @@ function base64url(value) {
   return Buffer.from(value).toString('base64url');
 }
 
-function signPassToken(bookingCode, ttlSeconds = PASS_TTL_SECONDS) {
+function signPassToken(bookingCode, options = PASS_TTL_SECONDS) {
   const payload = {
     bc: String(bookingCode),
     scope: 'breakfast-pass',
     v: CURRENT_PASS_VERSION,
-    exp: Math.floor(Date.now() / 1000) + ttlSeconds
+    exp: resolvePassExpiry(options, Math.floor(Date.now() / 1000))
   };
   const encoded = base64url(JSON.stringify(payload));
   const signature = crypto.createHmac('sha256', passKey(CURRENT_PASS_VERSION)).update(encoded).digest('base64url');
@@ -86,4 +117,12 @@ function verifyPassToken(token) {
   }
 }
 
-module.exports = { signPassToken, verifyPassToken, PASS_TTL_SECONDS, CURRENT_PASS_VERSION };
+module.exports = {
+  signPassToken,
+  verifyPassToken,
+  expiryForCheckOut,
+  PASS_TTL_SECONDS,
+  PASS_GRACE_AFTER_CHECKOUT_SECONDS,
+  PASS_MAX_TTL_SECONDS,
+  CURRENT_PASS_VERSION
+};

@@ -306,6 +306,18 @@ if (fs.existsSync(root404)) {
   fs.writeFileSync(path.join(distEnDir, '404.html'), en404);
 }
 
+// Generate the English guest app (/en/guest.html) from the bilingual root
+// guest.html, like the 404 above: force <html lang="en">, translate the
+// <title>/description and the injected skip-link, and climb one level for the
+// relative assets/scripts (page links like index.html / privacidad.html stay
+// relative so they land on the /en/ twins). The en/ strip below then drops the
+// .lang-es elements; guest-app.js picks the English dictionary from lang="en".
+const { buildEnglishGuestHtml } = require('./build-guest-en');
+const rootGuest = path.join(distDir, 'guest.html');
+if (fs.existsSync(rootGuest)) {
+  fs.writeFileSync(path.join(distEnDir, 'guest.html'), buildEnglishGuestHtml(fs.readFileSync(rootGuest, 'utf8')));
+}
+
 // Strip bilingual mash: remove .lang-en from root ES pages, .lang-es from en/ pages
 console.log('Stripping bilingual inline elements...');
 fs.readdirSync(distDir).forEach(file => {
@@ -612,11 +624,13 @@ async function build() {
     });
   }
 
-  // Root pages: cotizacion.html and reservar.html keep the Lucide CDN
-  optimizeHtmlDir(distDir, '', new Set(['reservar.html', 'cotizacion.html']));
-  // English pages live in en/ and reach assets via ../ ; only reservar.html is dynamic
+  // Root pages: cotizacion.html and reservar.html keep the Lucide CDN.
+  // guest.html too: most of its icons are not in LUCIDE_SVGS, and without the CDN
+  // they rendered as empty <i> in production (nav, cards, buttons).
+  optimizeHtmlDir(distDir, '', new Set(['reservar.html', 'cotizacion.html', 'guest.html']));
+  // English pages live in en/ and reach assets via ../ ; reservar + guest are dynamic
   if (fs.existsSync(distEnDir)) {
-    optimizeHtmlDir(distEnDir, '../', new Set(['reservar.html']));
+    optimizeHtmlDir(distEnDir, '../', new Set(['reservar.html', 'guest.html']));
   }
 
   // 404.html needs absolute asset paths so it works from any URL depth on Netlify

@@ -1,5 +1,7 @@
 /* Estar Guest App */
 .guest-access[hidden],.guest-shell[hidden],.guest-cart[hidden],.guest-camera-modal[hidden],.guest-contract-modal[hidden]{display:none!important}
+/* [hidden] siempre gana (p. ej. .btn trae display:inline-flex y lo anulaba). */
+.guest-app-page [hidden]{display:none!important}
 body.guest-modal-open{overflow:hidden}
 .guest-contract-modal{position:fixed;z-index:430;inset:0;padding:28px;display:grid;place-items:center;background:color-mix(in srgb,var(--ink) 72%,transparent);backdrop-filter:blur(16px)}
 .guest-contract-dialog{width:min(920px,100%);max-height:calc(100vh - 56px);display:flex;flex-direction:column;border:1px solid var(--paper-400);border-radius:18px;background:var(--paper);box-shadow:var(--shadow-lg);overflow:hidden}
@@ -38,7 +40,8 @@ body.guest-modal-open{overflow:hidden}
 .guest-header-actions{display:flex;align-items:center;gap:20px;font:700 11px var(--font-label);letter-spacing:.12em;text-transform:uppercase}
 .guest-secure-label{display:inline-flex;align-items:center;gap:7px;color:var(--success)}
 .guest-secure-label svg,.guest-home-link svg{width:16px;height:16px}
-.guest-home-link,.guest-text-button{padding-bottom:4px;border-bottom:1px solid currentColor}
+.guest-home-link,.guest-text-button,.guest-lang-link{padding-bottom:4px;border-bottom:1px solid currentColor}
+.guest-lang-link{color:var(--olive-700)}
 .guest-text-button{color:var(--terracotta-700)}
 .guest-access{min-height:100vh;padding-top:76px;display:grid;grid-template-columns:minmax(0,1.12fr) minmax(420px,.88fr)}
 .guest-access-art{min-height:calc(100vh - 76px);position:relative;overflow:hidden;background:var(--ink)}
@@ -111,7 +114,7 @@ body.guest-modal-open{overflow:hidden}
 .guest-checkin-form{display:grid;gap:20px}
 .guest-form-card,.guest-contract-card,.guest-trust-card,.guest-detail-card,.guest-support-card{margin:0;padding:30px;border:1px solid var(--paper-400);border-radius:16px;background:var(--paper)}
 .guest-form-card{min-width:0}.guest-form-card legend{padding:0 8px;display:flex;align-items:center;gap:10px;font:700 13px var(--font-label);text-transform:uppercase;letter-spacing:.08em}
-.guest-form-card legend span{width:28px;height:28px;display:inline-grid;place-items:center;color:var(--paper);border-radius:50%;background:var(--terracotta)}
+.guest-form-card legend .guest-step{width:28px;height:28px;display:inline-grid;place-items:center;color:var(--paper);border-radius:50%;background:var(--terracotta)}
 .guest-upload{min-height:210px;padding:32px;display:grid;place-items:center;align-content:center;gap:10px;border:1px dashed var(--olive);border-radius:12px;background:rgba(227,222,207,.42);text-align:center;cursor:pointer}
 .guest-upload input{position:absolute;width:1px;height:1px;opacity:0}.guest-upload-icon{width:54px;height:54px;display:grid;place-items:center;color:var(--paper);border-radius:50%;background:var(--olive)}
 .guest-upload-icon svg{width:25px;height:25px}.guest-upload strong{font:700 15px var(--font-label)}.guest-upload small{color:var(--ink-500);font-size:11px}
@@ -207,3 +210,9 @@ body.guest-modal-open{overflow:hidden}
 
 /* Cart badge: hide when empty (overrides the grid display) */
 .guest-cart-button span[hidden]{display:none}
+
+/* Frente guestapp: aviso de contacto opcional para menores + descarga del contrato firmado */
+.guest-minor-contact-hint{margin:12px 0 0;font-size:12px}
+#downloadSignedContract{justify-self:start}
+.guest-contract-view:disabled,.guest-contract-card .btn:disabled{opacity:.45;cursor:not-allowed}
+.guest-contract-view:disabled:hover{background:transparent;color:var(--olive-700)}
