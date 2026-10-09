@@ -131,7 +131,7 @@ test('processBatch threads npsUrl into the post-stay email html (injected sendEm
   const url = DEFAULT_NPS_SURVEY_URL;
   const sent = [];
   const reservations = [
-    { idReservations: '1', email: 'a@b.co', dateDeparture: '2026-06-18', status: 'confirmed', lang: 'es' }
+    { idReservations: '1', email: 'a@b.co', dateDeparture: '2026-06-18', status: 'confirmed', country: 'CO' }
   ];
   const res = await processBatch(
     false, reservations, 'post', eligiblePostStay, '2026-06-18',
@@ -145,13 +145,14 @@ test('processBatch threads npsUrl into the post-stay email html (injected sendEm
 test('processBatch omits the NPS CTA when npsUrl is absent', async () => {
   const sent = [];
   const reservations = [
-    { idReservations: '2', email: 'c@d.co', dateDeparture: '2026-06-18', status: 'confirmed', lang: 'en' }
+    { idReservations: '2', email: 'c@d.co', dateDeparture: '2026-06-18', status: 'confirmed', country: 'US' }
   ];
   await processBatch(
     false, reservations, 'post', eligiblePostStay, '2026-06-18',
     { sendEmail: async (m) => { sent.push(m); return { sent: true }; } }
   );
   assert.equal(sent.length, 1);
+  assert.match(sent[0].html, /Thank you for choosing estar/); /* país US → correo en inglés */
   assert.ok(!sent[0].html.includes('Tell us about your stay'));
 });
 

@@ -1757,6 +1757,7 @@
       saveSession();
       setStatus($('#loginStatus'), '', '');
       showApp();
+      if (state.linkTab) openTab(state.linkTab);
     } catch (error) {
       setStatus($('#loginStatus'), error.message, 'error');
     } finally {
@@ -1884,6 +1885,19 @@
     }
   }
 
+  /* Enlace del correo de pre-llegada: guest.html?code=<reserva>&tab=checkin.
+     El código lo prellena prefillBookingCodeFromUrl (mismo enlace que el correo
+     de confirmación; el apellido sigue siendo obligatorio: es el segundo
+     factor). Aquí solo se recuerda la pestaña pedida (valores conocidos) para
+     abrirla al entrar. */
+  const LINK_TABS = ['home', 'checkin', 'services', 'concierge', 'booking'];
+  function applyStayLink() {
+    const params = new URLSearchParams(window.location.search);
+    const tab = String(params.get('tab') || '');
+    state.linkTab = LINK_TABS.includes(tab) ? tab : '';
+    if (state.token && state.linkTab) openTab(state.linkTab);
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     bindEvents();
     applyGuestI18n();
@@ -1892,6 +1906,7 @@
     let showingLogin = false;
     if (restoreSession()) {
       showApp();
+      applyStayLink();
     } else if (
       new URLSearchParams(window.location.search).get('demo') === '1' &&
       ['localhost', '127.0.0.1'].includes(window.location.hostname)
@@ -1901,6 +1916,7 @@
     } else {
       showLogin();
       showingLogin = true;
+      applyStayLink();
     }
     prefillBookingCodeFromUrl(showingLogin);
     handlePaymentReturn();

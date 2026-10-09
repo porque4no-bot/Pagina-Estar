@@ -910,6 +910,9 @@ function normalizeReservation(r) {
     lastName: r.last_name || '',
     email: String(r.email || '').trim(),
     phone: r.phone || '',
+    /* canal de origen (Booking.com, Expedia, Airbnb, "Pagina web"…): los correos de
+       estadía lo usan para tratar distinto a los huéspedes de OTA (correo relay). */
+    channel: String(r.channel_name || '').trim(),
     country: String(r.country || '').trim(),
     nights: parseInt(r.nights, 10) || 0,
     hasBreakfast: reservaTieneDesayuno(r),
