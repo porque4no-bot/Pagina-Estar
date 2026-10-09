@@ -150,7 +150,8 @@ test('contract_preview: renders the check-in guests (not the body), the studio a
   assert.match(first.data.html, /Juan Pérez/);
   assert.doesNotMatch(first.data.html, /Intruso/);
   assert.match(first.data.html, /Selección · 402/, 'el apartaestudio ya no sale "—"');
-  assert.match(first.data.html, /52123456/, 'documento del huésped principal');
+  assert.match(first.data.html, /••••3456/, 'documento del huésped principal, enmascarado');
+  assert.doesNotMatch(first.data.html, /52123456|X998877|maria@example\.com|300 111 2222/, 'la vista previa no expone datos personales completos');
   assert.match(first.data.html, /Pendiente de firma/);
   assert.equal(first.data.contractHash, sha256(first.data.html), 'hash = SHA-256 del HTML mostrado');
   assert.equal(first.data.checkinId, 'CHK-1700000000000-ABC123');
@@ -251,8 +252,10 @@ test('contract: signs with the previewed hash, Ley 527 evidence, PDF and an emai
   const rebuilt = guestActionModule._test.buildContractDocument(
     session, { checkinId: 'CHK-1700000000000-ABC123', record: sampleCheckin() }, 'es'
   );
-  assert.equal(record.contractHash, sha256(renderContractHTML(rebuilt)));
-  assert.equal(record.contractHashScope, 'preview-html');
+  assert.equal(record.contractHash, sha256(renderContractHTML(guestActionModule._test.maskContractDocument(rebuilt))));
+  assert.equal(record.contractHashScope, 'preview-html-masked');
+  assert.equal(record.fullContractHash, sha256(renderContractHTML(rebuilt)));
+  assert.equal(record.documentNumber, '52123456', 'el registro firmado conserva los datos completos');
   assert.equal(record.contractHashAlgorithm, 'sha256');
   assert.equal(record.contractVersion, guestActionModule._test.CURRENT_CONTRACT_VERSION, 'versión fijada por el servidor');
   assert.equal(record.consentText, CONSENT_TEXT.es, 'texto de consentimiento canónico del servidor');
@@ -354,4 +357,125 @@ test('contract copy email: bilingual, escapes input and carries the hash', () =>
   assert.doesNotMatch(es, /<b>Ruiz<\/b>/);
   assert.match(en, /Agreement signed/);
   assert.match(en, /SHA-256 fingerprint/);
+});
+
+/* ── Revisión: la vista previa no puede servir para sacar PII ─────────────── */
+
+test('contract_preview: the draft PDF is rendered from MASKED data', async () => {
+  const seen = [];
+  setup({ renderPdf: async record => { seen.push(record); return renderContractPDF(record); } });
+  const { res } = await preview(token(), { format: 'pdf' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(seen.length, 1);
+  const draft = seen[0];
+  assert.equal(draft.draft, true);
+  assert.equal(draft.documentNumber, '••••3456');
+  assert.equal(draft.email, 'm•••@example.com');
+  assert.equal(draft.phone, '••••2222');
+  assert.deepEqual(draft.guests.map(g => g.documentNumber), ['••••3456', '••••8877']);
+});
+
+test('contract_preview / contract: closed after check-out + 1 day (403 contract_window_closed)', async () => {
+  const { captured } = setup();
+  const past = token({ checkIn: '2026-01-01', checkOut: '2026-01-05' });
+  const { res, data } = await preview(past);
+  assert.equal(res.statusCode, 403);
+  assert.equal(data.code, 'contract_window_closed');
+  const sign = await guestAction(makeEvent({
+    type: 'contract', signedName: 'María López', acceptedTerms: true, previewHash: 'a'.repeat(64)
+  }, past));
+  assert.equal(sign.statusCode, 403);
+  assert.equal(body(sign).code, 'contract_window_closed');
+  assert.equal(captured.length, 0);
+
+  const { contractWindowOpen } = guestActionModule._test;
+  const endOfCheckOutBogota = Date.parse('2026-11-05T23:59:59.999-05:00');
+  assert.equal(contractWindowOpen({ checkOut: '2026-11-05' }, endOfCheckOutBogota + 23 * 3600 * 1000), true, 'día de gracia');
+  assert.equal(contractWindowOpen({ checkOut: '2026-11-05' }, endOfCheckOutBogota + 25 * 3600 * 1000), false);
+  assert.equal(contractWindowOpen({ checkOut: '' }), true, 'sin fecha legible no se bloquea');
+});
+
+test('contract: once signed, preview and a second signature are refused (409 contract_already_signed)', async () => {
+  const authToken = token();
+  const index = new Map();
+  const stores = memoryStores({ checkin: sampleCheckin() });
+  const guestStore = name => (name === 'guest-contract-index'
+    ? { get: async key => index.get(key) || null, setJSON: async (key, value) => { index.set(key, value); } }
+    : stores.guestStore(name));
+  setup();
+  guestActionModule._test.setDeps({ guestStore });
+
+  const { data: shown } = await preview(authToken);
+  const signed = await guestAction(makeEvent({
+    type: 'contract', signedName: 'María López', acceptedTerms: true, previewHash: shown.contractHash
+  }, authToken));
+  assert.equal(signed.statusCode, 201);
+  const marker = index.get(BOOKING);
+  assert.equal(marker.eventId, body(signed).eventId);
+  assert.deepEqual(Object.keys(marker).sort(), ['checkinId', 'eventId', 'signedAt'], 'marca sin PII');
+
+  const again = await preview(authToken);
+  assert.equal(again.res.statusCode, 409);
+  assert.equal(again.data.code, 'contract_already_signed');
+  const pdf = await preview(authToken, { format: 'pdf' });
+  assert.equal(pdf.res.statusCode, 409);
+  const resign = await guestAction(makeEvent({
+    type: 'contract', signedName: 'María López', acceptedTerms: true, previewHash: shown.contractHash
+  }, authToken));
+  assert.equal(resign.statusCode, 409);
+  assert.equal(body(resign).code, 'contract_already_signed');
+});
+
+/* ── Revisión: reserva cancelada DESPUÉS de emitir el token ──────────────── */
+
+function cancelledDep() {
+  const calls = [];
+  const assertBookingActive = async code => {
+    calls.push(code);
+    throw Object.assign(new Error('Esta reserva fue cancelada.'), { statusCode: 403, code: 'booking_cancelled' });
+  };
+  return { calls, assertBookingActive };
+}
+
+test('guest-action: a booking cancelled after login cannot preview/sign the contract or order services', async () => {
+  const { captured } = setup();
+  const dep = cancelledDep();
+  guestActionModule._test.setDeps({ assertBookingActive: dep.assertBookingActive });
+  const authToken = token();
+
+  const pv = await preview(authToken);
+  assert.equal(pv.res.statusCode, 403);
+  assert.equal(pv.data.code, 'booking_cancelled');
+
+  const sign = await guestAction(makeEvent({
+    type: 'contract', signedName: 'María López', acceptedTerms: true, previewHash: 'a'.repeat(64)
+  }, authToken));
+  assert.equal(sign.statusCode, 403);
+  assert.equal(body(sign).code, 'booking_cancelled');
+
+  const order = await guestAction(makeEvent({
+    type: 'order', items: [{ id: 'laundry', quantity: 1 }], paymentPreference: 'account'
+  }, authToken));
+  assert.equal(order.statusCode, 403);
+  assert.equal(body(order).code, 'booking_cancelled');
+
+  assert.deepEqual(dep.calls, [BOOKING, BOOKING, BOOKING]);
+  assert.equal(captured.length, 0, 'nada se persiste para una reserva cancelada');
+});
+
+test('assertBookingActive: cancelled or missing → 403; PMS error → fail-open', async () => {
+  const { assertBookingActive } = guestHelpers;
+  await assert.rejects(
+    assertBookingActive('R1', async () => ({ bookingCode: 'R1', status: 'canceled' })),
+    error => error.statusCode === 403 && error.code === 'booking_cancelled'
+  );
+  await assert.rejects(
+    assertBookingActive('R1', async () => ({ bookingCode: 'R1', status: 'cancelled', cancelled: true })),
+    error => error.code === 'booking_cancelled'
+  );
+  await assert.rejects(assertBookingActive('R1', async () => null), error => error.code === 'booking_cancelled');
+  const ok = await assertBookingActive('R1', async () => ({ bookingCode: 'R1', status: 'confirmed' }));
+  assert.equal(ok.checked, true);
+  const down = await assertBookingActive('R1', async () => { throw new Error('OTASync 502'); });
+  assert.equal(down.checked, false, 'un tropiezo del PMS no bloquea al huésped');
 });

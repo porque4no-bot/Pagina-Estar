@@ -14,6 +14,7 @@ const { sendEmail, adminEmail, esc, formatCOP, contractCopyHtml } = require('./_
 const { reportAlert: _reportAlert } = require('./_alert');
 const {
   archiveGuestPayload: _archiveGuestPayload,
+  assertBookingActive: _assertBookingActive,
   cleanText,
   corsHeaders,
   guestStore: _guestStore,
@@ -66,7 +67,16 @@ function sha256Hex(value) {
      es determinista) y exige que el hash coincida con el que el huésped vio
      (previewHash): así el contractHash guardado es el del texto leído.
    - Al firmar se genera el PDF (_pdf-render), se guarda su SHA-256 en la
-     evidencia, se devuelve al navegador y se envía una copia al correo. */
+     evidencia, se devuelve al navegador y se envía una copia al correo.
+   - PROTECCIÓN DE DATOS: la vista previa (HTML y borrador PDF) se entrega con
+     los documentos, el teléfono y el correo ENMASCARADOS. Una sesión solo exige
+     código de reserva + apellido, así que la vista previa no puede servir para
+     sacar las cédulas/pasaportes de los acompañantes. El hash firmado es el del
+     texto enmascarado que el huésped leyó (contractHashScope
+     'preview-html-masked'); los datos completos solo van en el PDF firmado que
+     se envía al correo registrado en el check-in. Además la vista previa y la
+     firma solo existen dentro de la estadía (hasta el check-out + 1 día) y una
+     vez firmado el contrato no se puede volver a pedir la vista previa. */
 const CHECKIN_ID_RE = /^CHK-[A-Za-z0-9-]+$/;
 
 function contractError(statusCode, message, code) {
@@ -134,6 +144,74 @@ function buildContractDocument(session, loaded, lang) {
   };
 }
 
+/* ── Enmascarado de datos personales para la vista previa ─────────────────── */
+function maskTail(value, keep = 4) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const visible = text.length > keep ? text.slice(-keep) : '';
+  return `••••${visible}`;
+}
+
+function maskEmail(value) {
+  const text = String(value || '').trim();
+  const at = text.indexOf('@');
+  if (at < 1) return text ? '••••' : '';
+  return `${text[0]}•••${text.slice(at)}`;
+}
+
+function maskContractDocument(document) {
+  return {
+    ...document,
+    documentNumber: maskTail(document.documentNumber),
+    phone: maskTail(document.phone),
+    email: maskEmail(document.email),
+    guests: (document.guests || []).map(guest => ({
+      ...guest,
+      documentNumber: maskTail(guest.documentNumber),
+      phone: maskTail(guest.phone),
+      email: maskEmail(guest.email)
+    }))
+  };
+}
+
+/* La vista previa y la firma solo tienen sentido durante la estadía: hasta el
+   final del día siguiente al check-out (hora Colombia). Sin fecha de salida
+   legible no se bloquea (el token siempre la trae). */
+const CONTRACT_GRACE_MS = 24 * 3600 * 1000;
+function contractWindowOpen(session, now = Date.now()) {
+  const checkOut = cleanText(session && session.checkOut, 20).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(checkOut)) return true;
+  const endOfCheckOut = Date.parse(`${checkOut}T23:59:59.999-05:00`);
+  if (Number.isNaN(endOfCheckOut)) return true;
+  return now <= endOfCheckOut + CONTRACT_GRACE_MS;
+}
+
+/* Índice SIN PII de contratos firmados por reserva (store guest-contract-index):
+   permite rechazar una nueva vista previa o una segunda firma. Best-effort en
+   la lectura: si Blobs no responde, no se bloquea. */
+const CONTRACT_INDEX_STORE = 'guest-contract-index';
+async function signedContractFor(bookingCode) {
+  try {
+    const entry = await deps.guestStore(CONTRACT_INDEX_STORE).get(String(bookingCode), { type: 'json' });
+    return entry && entry.eventId ? entry : null;
+  } catch (error) {
+    console.warn('[guest-action] contract index read failed:', error.message);
+    return null;
+  }
+}
+
+/* Puertas comunes a vista previa y firma: reserva vigente en OTASync, dentro
+   de la estadía y sin contrato firmado. */
+async function assertContractAvailable(session) {
+  await deps.assertBookingActive(session.sub);
+  if (!contractWindowOpen(session)) {
+    throw contractError(403, 'El contrato ya no está disponible porque la estadía terminó. Si necesitas una copia, escríbenos por WhatsApp.', 'contract_window_closed');
+  }
+  if (await signedContractFor(session.sub)) {
+    throw contractError(409, 'Este contrato ya fue firmado. La copia firmada se envió a tu correo.', 'contract_already_signed');
+  }
+}
+
 function contractPdfFilename(record, draft) {
   const code = String(record.bookingCode || 'reserva').replace(/[^A-Za-z0-9-]+/g, '');
   const base = record.lang === 'en' ? 'hospitality-agreement' : 'contrato-hospedaje';
@@ -150,7 +228,8 @@ async function buildContractRecord(body, session, event) {
     throw contractError(409, 'Completa el check-in antes de firmar el contrato.', 'checkin_required');
   }
   const document = buildContractDocument(session, loaded, body.lang);
-  const contractHash = sha256Hex(renderContractHTML(document));
+  /* El hash es el del documento ENMASCARADO: exactamente lo que se le mostró. */
+  const contractHash = sha256Hex(renderContractHTML(maskContractDocument(document)));
   const previewHash = cleanText(body.previewHash, 80).toLowerCase();
   if (!previewHash || previewHash !== contractHash) {
     throw contractError(409, 'El contrato cambió desde que lo leíste. Ábrelo de nuevo antes de firmar.', 'contract_changed');
@@ -163,7 +242,9 @@ async function buildContractRecord(body, session, event) {
      - contractVersion pins the template revision presented (server-side);
      - consentText is the acceptance wording shown, in the signing language;
      - contractHash is SHA-256 over the exact contract HTML the guest read in
-       the preview (contractHashScope), re-verified here before signing. */
+       the preview (masked personal data — contractHashScope), re-verified here
+       before signing; the full-data render is fingerprinted too
+       (fullContractHash) and its PDF in pdfSha256. */
   let acknowledgedAt = '';
   if (body.acknowledgedAt) {
     const parsed = new Date(String(body.acknowledgedAt));
@@ -187,7 +268,8 @@ async function buildContractRecord(body, session, event) {
     userAgent: event ? extractUserAgent(event) : '',
     contractHash,
     contractHashAlgorithm: 'sha256',
-    contractHashScope: 'preview-html'
+    contractHashScope: 'preview-html-masked',
+    fullContractHash: sha256Hex(renderContractHTML(document))
   };
 }
 
@@ -376,6 +458,7 @@ async function openHelpdeskTicket(record) {
 
 const defaultDeps = {
   archiveGuestPayload: _archiveGuestPayload,
+  assertBookingActive: _assertBookingActive,
   guestStore: _guestStore,
   protectRecord: _protectRecord,
   requireGuest: _requireGuest,
@@ -427,6 +510,8 @@ exports._test = {
   buildHelpdeskTicket,
   openHelpdeskTicket,
   buildContractDocument,
+  maskContractDocument,
+  contractWindowOpen,
   loadCheckinForContract,
   contractPdfFilename,
   CURRENT_CONTRACT_VERSION
@@ -620,12 +705,15 @@ exports.handler = async event => {
     const type = String(body.type || '');
 
     if (type === 'contract_preview') {
-      /* Vista previa (o borrador en PDF con format:'pdf'). Requiere check-in. */
+      /* Vista previa (o borrador en PDF con format:'pdf'). Requiere check-in,
+         reserva vigente, estadía en curso y contrato sin firmar; los datos
+         personales salen enmascarados. */
+      await assertContractAvailable(session);
       const loaded = await loadCheckinForContract(session, body.checkinId);
       if (!loaded) {
         throw contractError(409, 'Completa el check-in antes de ver el contrato.', 'checkin_required');
       }
-      const document = buildContractDocument(session, loaded, body.lang);
+      const document = maskContractDocument(buildContractDocument(session, loaded, body.lang));
       const html = renderContractHTML(document);
       const contractHash = sha256Hex(html);
       if (body.format === 'pdf') {
@@ -639,6 +727,12 @@ exports.handler = async event => {
       }
       return json(200, { ok: true, html, contractHash, checkinId: loaded.checkinId });
     }
+
+    /* Acciones con efecto: el token dura 24 h, así que se re-verifica que la
+       reserva siga vigente en OTASync (una cancelación aprobada después de
+       entrar cierra la app). */
+    if (type === 'contract') await assertContractAvailable(session);
+    else if (type === 'order') await deps.assertBookingActive(session.sub);
 
     const record = type === 'contract'
       ? await buildContractRecord(body, session, event)
@@ -658,6 +752,19 @@ exports.handler = async event => {
     }
 
     await deps.guestStore('guest-events').setJSON(record.eventId, deps.protectRecord(record));
+
+    if (type === 'contract') {
+      /* Marca SIN PII de contrato firmado (bloquea vista previa y re-firma). */
+      try {
+        await deps.guestStore(CONTRACT_INDEX_STORE).setJSON(String(session.sub), {
+          eventId: record.eventId,
+          checkinId: record.checkinId,
+          signedAt: record.signedAt
+        });
+      } catch (indexErr) {
+        console.error('[guest-action] contract index write failed:', indexErr.message);
+      }
+    }
 
     const sync = await deps.syncGuestEvent(record);
     const archive = type === 'contract'

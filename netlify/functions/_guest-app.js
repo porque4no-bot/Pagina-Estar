@@ -253,6 +253,31 @@ async function getReservationDetail(bookingCode, accessKey) {
   throw error;
 }
 
+/* Re-verificación del estado de la reserva en las ACCIONES con efecto (enviar
+   el check-in, ver/firmar el contrato, pedir servicios). guest-session solo
+   bloquea al emitir el token; el token dura 24 h, así que una cancelación
+   aprobada después de entrar no cerraba la app. Política:
+   - reserva cancelada en OTASync, o que ya no existe (404) → 403 booking_cancelled;
+   - OTASync no responde / sin credenciales → se deja pasar (fail-open): el
+     segundo factor ya se validó al emitir la sesión y un tropiezo del PMS no
+     debe impedirle el check-in a un huésped legítimo. */
+async function assertBookingActive(bookingCode, lookup = getReservation) {
+  let booking;
+  try {
+    booking = await lookup(String(bookingCode || ''), '');
+  } catch (error) {
+    console.warn('[guest-app] booking status re-check skipped:', error.message);
+    return { checked: false };
+  }
+  if (!booking || isCancelledBooking(booking)) {
+    const error = new Error('Esta reserva fue cancelada, así que no es posible hacer el check-in ni pedir servicios. Si crees que es un error, escríbenos por WhatsApp.');
+    error.statusCode = 403;
+    error.code = 'booking_cancelled';
+    throw error;
+  }
+  return { checked: true, booking };
+}
+
 function normalizeComparable(value) {
   return String(value || '')
     .normalize('NFD')
@@ -505,6 +530,7 @@ async function archiveGuestPayload(payload) {
 
 module.exports = {
   archiveGuestPayload,
+  assertBookingActive,
   cleanText,
   corsHeaders,
   getReservation,

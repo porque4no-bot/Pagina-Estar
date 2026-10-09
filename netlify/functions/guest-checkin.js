@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { checkRateLimit, rateLimitResponse } = require('./_rate-limit');
 const {
   archiveGuestPayload,
+  assertBookingActive,
   cleanText,
   corsHeaders,
   guestStore,
@@ -52,6 +53,7 @@ const MAX_OCR_ATTEMPTS = 3;
 const VALID_DOCUMENT_TYPES = ['CC', 'TI', 'CE', 'Pasaporte'];
 const defaultDeps = {
   archiveGuestPayload,
+  assertBookingActive,
   guestStore,
   openBinaryFromStore,
   protectRecord,
@@ -1052,6 +1054,10 @@ exports.handler = async event => {
     }
 
     if (mode === 'submit') {
+      /* El token dura 24 h: si recepción canceló la reserva después de que el
+         huésped entró, no se registra un check-in (PII en Blobs/Drive, opt-in a
+         Odoo) de una estadía que ya no existe. */
+      await deps.assertBookingActive(session.sub);
       const entries = await normalizeSubmitGuests(body, session);
       const guestValidation = validateGuests(entries);
       const minorValidation = validateMinors(entries);

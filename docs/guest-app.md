@@ -125,12 +125,25 @@ El ID de la carpeta raíz no se guarda en Netlify. Se configura como propiedad `
 3. Al firmar, el navegador envía ese hash (`previewHash`); el servidor vuelve a
    renderizar el mismo documento y exige que coincida (si no, 409
    `contract_changed` y se pide leerlo de nuevo). El `contractHash` guardado es
-   el del texto leído (`contractHashScope: preview-html`).
+   el del texto leído (`contractHashScope: preview-html-masked`); el render con
+   datos completos queda en `fullContractHash`.
 4. Se genera el PDF con `_pdf-render` (ES/EN, cláusulas de
    `_contract-template`, bloque de evidencia con la huella), se guarda su SHA-256
    (`pdfSha256`), se ofrece para descargar y se envía una copia al correo del
    huésped (`_email.contractCopyHtml`, best-effort).
 5. "Descargar PDF" en la vista previa genera un **borrador** en el servidor.
+6. **Protección de datos:** la vista previa (HTML y borrador PDF) muestra los
+   documentos, el teléfono y el correo **enmascarados** (`••••1234`,
+   `m•••@dominio`): una sesión solo exige código + apellido. Los datos completos
+   solo van en el PDF firmado que se envía al correo del check-in. La vista
+   previa y la firma solo existen hasta el check-out + 1 día (403
+   `contract_window_closed`) y, una vez firmado, se rechazan (409
+   `contract_already_signed`, índice sin PII `guest-contract-index`).
+7. **Reserva cancelada después de entrar:** el token dura 24 h, así que el envío
+   del check-in, la vista previa/firma del contrato y los pedidos de servicios
+   vuelven a consultar la reserva en OTASync (`_guest-app.assertBookingActive`)
+   y responden 403 `booking_cancelled` si fue cancelada (si OTASync no responde
+   se deja pasar).
 
 ## Decisiones importantes
 

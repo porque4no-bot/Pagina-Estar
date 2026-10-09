@@ -134,6 +134,8 @@
       "contractConsentText": "Declaro que he leído, entiendo y acepto íntegramente este contrato de hospedaje, sus cláusulas y políticas, y firmo electrónicamente con plenos efectos legales conforme a la Ley 527 de 1999 y el Decreto 2364 de 2012 de Colombia.",
       "contractNeedsCheckin": "Completa el check-in antes de firmar el contrato.",
       "contractChanged": "El contrato cambió desde que lo leíste. Ábrelo de nuevo antes de firmar.",
+      "contractAlreadySigned": "Este contrato ya fue firmado. La copia firmada se envió a tu correo.",
+      "contractWindowClosed": "El contrato ya no está disponible porque la estadía terminó. Si necesitas una copia, escríbenos por WhatsApp.",
       "contractLoading": "Cargando contrato…",
       "contractPreviewError": "No fue posible cargar la vista previa del contrato.",
       "contractPdfError": "No fue posible generar el PDF. Intenta de nuevo.",
@@ -341,6 +343,8 @@
       "contractConsentText": "I declare that I have read, understand, and fully accept this hospitality agreement, its clauses, and policies, and I electronically sign it with full legal effect under Colombian Law 527 of 1999 and Decree 2364 of 2012.",
       "contractNeedsCheckin": "Complete the check-in before signing the contract.",
       "contractChanged": "The contract changed since you read it. Please open it again before signing.",
+      "contractAlreadySigned": "This agreement is already signed. The signed copy was sent to your email.",
+      "contractWindowClosed": "The agreement is no longer available because your stay has ended. If you need a copy, message us on WhatsApp.",
       "contractLoading": "Loading contract…",
       "contractPreviewError": "We could not load the contract preview.",
       "contractPdfError": "We could not generate the PDF. Please try again.",
@@ -458,7 +462,9 @@
     validation_failed: 'errValidation',
     minor_document_missing: 'errMinorDocument',
     checkin_required: 'contractNeedsCheckin',
-    contract_changed: 'contractChanged'
+    contract_changed: 'contractChanged',
+    contract_already_signed: 'contractAlreadySigned',
+    contract_window_closed: 'contractWindowClosed'
   };
   /* Campos que el servidor puede reportar como faltantes (validation.missing =
      "guests.<i>.<campo>") → etiqueta legible. */
@@ -2121,6 +2127,8 @@
       });
     } catch (e) {
       console.error('[guest-app] failed to load contract preview:', e);
+      /* Ya firmado (p. ej. en otro dispositivo): se refleja en la app. */
+      if (e && e.code === 'contract_already_signed') markContractAlreadySigned();
       body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--terracotta);">
         <p>${escHtml(e && e.message ? e.message : t('contractPreviewError'))}</p>
         <button class="btn btn-ghost-dark" type="button" data-contract-retry>${escHtml(t('retry'))}</button>
@@ -2195,6 +2203,16 @@
     }
   }
 
+  /* El servidor dice que el contrato ya está firmado (otra pestaña u otro
+     dispositivo): se marca como firmado para no ofrecer otra firma. */
+  function markContractAlreadySigned() {
+    if (state.contractSigned) return;
+    state.contractSigned = true;
+    saveSession();
+    renderCheckinProgress();
+    updateContractAvailability();
+  }
+
   function downloadSignedContract() {
     if (!state.signedPdf || !state.signedPdf.base64) return;
     triggerDownload(base64ToBlob(state.signedPdf.base64), state.signedPdf.filename || 'contrato-estar-firmado.pdf');
@@ -2246,6 +2264,7 @@
         state.previewHash = '';
         setContractGate(false);
       }
+      if (error.code === 'contract_already_signed') markContractAlreadySigned();
       setStatus(statusEl, error.message, 'error');
       return;
     }

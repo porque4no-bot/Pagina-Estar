@@ -199,3 +199,22 @@ test('file errors carry stable codes; session errors answer 401 session_expired'
   assert.equal(expired.statusCode, 401);
   assert.equal(JSON.parse(expired.body).code, 'session_expired');
 });
+
+test('a booking cancelled after the token was issued cannot submit the check-in (403 booking_cancelled)', async () => {
+  const checked = [];
+  const { persisted, odoo } = baseDeps({
+    assertBookingActive: async code => {
+      checked.push(code);
+      throw Object.assign(new Error('Esta reserva fue cancelada.'), { statusCode: 403, code: 'booking_cancelled' });
+    }
+  });
+  const res = await guestCheckin.handler(submitEvent({
+    marketingAccepted: true,
+    guests: [{ guest: adult(), file: file(9), isPrimary: true }]
+  }));
+  assert.equal(res.statusCode, 403);
+  assert.equal(JSON.parse(res.body).code, 'booking_cancelled');
+  assert.deepEqual(checked, ['TEST-MKT-1'], 'se re-verifica la reserva del token');
+  assert.equal(persisted.length, 0, 'no se guarda PII de una estadía cancelada');
+  assert.equal(odoo.partners.length + odoo.mailing.length, 0, 'ni se sincroniza Odoo');
+});

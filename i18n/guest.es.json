@@ -122,6 +122,8 @@
   "contractConsentText": "Declaro que he leído, entiendo y acepto íntegramente este contrato de hospedaje, sus cláusulas y políticas, y firmo electrónicamente con plenos efectos legales conforme a la Ley 527 de 1999 y el Decreto 2364 de 2012 de Colombia.",
   "contractNeedsCheckin": "Completa el check-in antes de firmar el contrato.",
   "contractChanged": "El contrato cambió desde que lo leíste. Ábrelo de nuevo antes de firmar.",
+  "contractAlreadySigned": "Este contrato ya fue firmado. La copia firmada se envió a tu correo.",
+  "contractWindowClosed": "El contrato ya no está disponible porque la estadía terminó. Si necesitas una copia, escríbenos por WhatsApp.",
   "contractLoading": "Cargando contrato…",
   "contractPreviewError": "No fue posible cargar la vista previa del contrato.",
   "contractPdfError": "No fue posible generar el PDF. Intenta de nuevo.",

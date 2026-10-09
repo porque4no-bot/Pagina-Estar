@@ -122,6 +122,8 @@
   "contractConsentText": "I declare that I have read, understand, and fully accept this hospitality agreement, its clauses, and policies, and I electronically sign it with full legal effect under Colombian Law 527 of 1999 and Decree 2364 of 2012.",
   "contractNeedsCheckin": "Complete the check-in before signing the contract.",
   "contractChanged": "The contract changed since you read it. Please open it again before signing.",
+  "contractAlreadySigned": "This agreement is already signed. The signed copy was sent to your email.",
+  "contractWindowClosed": "The agreement is no longer available because your stay has ended. If you need a copy, message us on WhatsApp.",
   "contractLoading": "Loading contract…",
   "contractPreviewError": "We could not load the contract preview.",
   "contractPdfError": "We could not generate the PDF. Please try again.",
