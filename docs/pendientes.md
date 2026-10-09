@@ -105,7 +105,7 @@ si el NIT se valida contra el RUES/DIAN al crear cotizaciones.
 > nacionalidad). `netlify/functions/sire-export.js` arma el archivo plano (solo
 > extranjeros, E/S) y el subidor del VPS del grupo (`tools/sire-uploader/`,
 > Python + Playwright, timer 10:00) lo sube al portal. **Falta:** instalarlo en
-> el VPS, `SIRE_EXPORT_TOKEN` + `SIRE_HOTEL_CODE` + `SIRE_ENABLED` en Netlify, el
+> el VPS, `SIRE_EXPORT_TOKEN` + `SIRE_HOTEL_CODE` + `SIRE_REPORT_START` + `SIRE_ENABLED` en Netlify, el
 > ensayo, confirmar formato y códigos contra la guía del portal, y el visto bueno
 > del dueño antes de la primera subida real (paso a paso en
 > `tools/sire-uploader/SIRE.md`). TRA sigue aparte (`_tra.js`).

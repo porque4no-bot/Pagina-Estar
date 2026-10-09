@@ -95,6 +95,8 @@ const MANAGEABLE = {
   SIRE_DELIMITER:                { type: 'enum', group: 'Recepción/Legal', label: 'SIRE: separador de columnas',
                                    options: ['\\t', '|', ';', ','],
                                    desc: 'Separador entre columnas del archivo de SIRE. \\t = tabulador (por defecto, lo más probable). Ajustarlo a lo que muestre la guía del portal en el ensayo.' },
+  SIRE_REPORT_START:             { type: 'text', group: 'Recepción/Legal', label: 'SIRE: reportar desde (fecha)',
+                                   desc: 'Fecha (YYYY-MM-DD) desde la que el servidor del grupo reporta los movimientos al SIRE. Lo anterior se reportó a mano y NO se sube. Poner la fecha de la primera subida real. Sin esta fecha la exportación no entrega archivo.' },
   LEGAL_DOCS_ENABLED:            { type: 'bool', group: 'Recepción/Legal', label: 'Registro de documentos legales',
                                    desc: 'Muestra el registro de documentos legales de la empresa (RUT, RNT, Cámara de Comercio, certificaciones bancarias) con alertas de vigencia. Lee la carpeta de Google Drive configurada.' },
   LEGAL_DOCS_REQUEST_CONTACT:    { type: 'text', group: 'Recepción/Legal', label: 'Contacto para solicitar documentos',

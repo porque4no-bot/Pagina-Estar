@@ -23,6 +23,15 @@ const catalogMod = require('./_sire-catalog');
  *        movimiento y su fecha — sin datos personales.
  *        `avisos` = huéspedes extranjeros con campos faltantes, identificados
  *        SOLO por código de reserva e índice de huésped.
+ *        `excluidos` = reservas que NO se exportan porque OTASync dice que no
+ *        están vigentes (cancelada / no-show / no encontrada) o no se pudo
+ *        comprobar; las fechas que se reportan son las de OTASync.
+ *        `atrasados` = movimientos SIN reportar anteriores a `desde` (desde
+ *        SIRE_REPORT_START): el subidor pide un rango que empiece en el más
+ *        antiguo, así un bloqueo de más de 7 días no deja nada por fuera.
+ *        Estadías largas: el índice `sire-pending-exits` mantiene a la vista el
+ *        check-in de un extranjero hasta reportar su salida, aunque salga del
+ *        lookback.
  *   POST { accion: 'ack', ids | filas, lote }   → marca movimientos reportados
  *        (store `sire-reports`) para no reportarlos dos veces.
  *   POST { accion: 'desmarcar', ids }           → deshace un ack equivocado.
@@ -38,6 +47,10 @@ const catalogMod = require('./_sire-catalog');
 
 const CHECKIN_STORE = 'guest-checkins';
 const REPORTS_STORE = 'sire-reports';
+/* Índice de check-ins de extranjeros con SALIDA aún sin reportar (clave del
+   check-in → { checkOut }). Sin datos personales. Existe para que una estadía
+   larga cuyo check-in ya salió del lookback siga leyéndose hasta reportar la S. */
+const PENDING_EXITS_STORE = 'sire-pending-exits';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BOGOTA_OFFSET_MS = 5 * 60 * 60 * 1000; /* UTC-5 fijo (Colombia no tiene horario de verano) */
 const DEFAULT_WINDOW_DAYS = 7;
@@ -45,6 +58,14 @@ const MAX_RANGE_DAYS = 62;
 const DEFAULT_LOOKBACK_DAYS = 190;
 const MIN_TOKEN_LENGTH = 32;
 const MAX_ACK_IDS = 1000;
+const MAX_VERIFY = 100;      /* reservas a comprobar en OTASync por pasada */
+const VERIFY_BATCH = 5;
+const MAX_ATRASADOS = 1000;
+const PENDING_EXIT_MAX_AGE_DAYS = 400;
+/* Estados de reserva de OTASync que cuentan como vigentes (igual que
+   canCancel en _guest-app). Cualquier otro (cancelada, no-show, hold…) ⇒ no se
+   reporta nada y se avisa. */
+const ACTIVE_RESERVATION_STATUSES = new Set(['confirmed', 'pending', '']);
 const READ_BATCH = 10;
 const EOL = '\r\n'; /* TODO(SIRE): confirmar fin de línea esperado por el portal */
 const ID_RE = /^[a-f0-9]{24}$/;
@@ -55,7 +76,10 @@ const defaultDeps = {
   guestStore: (name, consistency) => require('./_guest-app').guestStore(name, consistency),
   unprotectRecord: stored => require('./_guest-app').unprotectRecord(stored),
   checkRateLimit,
+  hasOtasyncCreds: () => require('./_otasync').hasOtasyncCreds(),
+  fetchReservation: ref => require('./_guest-app').fetchOtasyncReservation(ref),
   flag: key => settings.flag(key),
+  getSetting: (key, fallback) => settings.get(key, fallback),
   preload: () => settings.preload(),
   now: () => Date.now()
 };
@@ -148,12 +172,17 @@ function timestampFromKey(key) {
 
 /* ---------- ids de movimiento ---------- */
 
-/* Id opaco y estable de un movimiento: misma reserva + mismo documento + mismo
-   tipo de movimiento ⇒ mismo id (aunque el huésped re-envíe el check-in o
-   cambie el orden de los acompañantes). No contiene datos personales en claro. */
-function movementId(bookingCode, docType, docNumber, movement) {
+/* Id opaco y estable de un movimiento: misma reserva + mismo número de
+   documento (normalizado) + mismo tipo de movimiento ⇒ mismo id (aunque el
+   huésped re-envíe el check-in o cambie el orden de los acompañantes). NO
+   depende de nada configurable: ni del código SIRE del tipo de documento
+   (SIRE_DOC_TYPE_CODES_JSON se corrige tras el ensayo) ni del tipo elegido en el
+   check-in (un huésped puede corregirlo al re-enviar). Si cambiara, los acks de
+   `sire-reports` dejarían de coincidir y se reportaría dos veces. Sin datos
+   personales en claro. */
+function movementId(bookingCode, docNumber, movement) {
   return crypto.createHash('sha256')
-    .update(['sire-v1', bookingCode, docType, docNumber, movement].join('|'), 'utf8')
+    .update(['sire-v2', bookingCode, catalogMod.normalizeDocNumber(docNumber), movement].join('|'), 'utf8')
     .digest('hex')
     .slice(0, 24);
 }
@@ -224,10 +253,68 @@ function exportConfig(catalog) {
   return { config, faltante, errores };
 }
 
+/* Movimientos posibles de los huéspedes EXTRANJEROS de un check-in, con su id
+   estable y las fechas del token (sin verificar). Base común del índice de
+   salidas pendientes, de la verificación en OTASync y de la exportación. */
+function foreignGuestsOf(rec, catalog) {
+  const out = [];
+  for (const { guest, index } of guestsOf(rec)) {
+    if (!catalogMod.isForeignNationality(guest.nationality, catalog)) continue;
+    const ref = String(rec.bookingCode || '').trim();
+    out.push({
+      guest,
+      index,
+      ids: {
+        E: movementId(ref, guest.documentNumber, 'E'),
+        S: movementId(ref, guest.documentNumber, 'S')
+      }
+    });
+  }
+  return out;
+}
+
+/* Estado de una reserva en OTASync → { ok, checkIn, checkOut, motivo }.
+   raw null = no existe; undefined/throw se trata fuera (sin_verificar). */
+function verifiedStay(raw) {
+  if (!raw) return { ok: false, motivo: 'reserva_no_encontrada' };
+  const status = String(raw.status || '').trim().toLowerCase();
+  if (!ACTIVE_RESERVATION_STATUSES.has(status)) return { ok: false, motivo: 'reserva_no_vigente', status };
+  const { checkIn, checkOut } = sire.reservationDates(raw);
+  return { ok: true, checkIn, checkOut };
+}
+
+/* Reservas que hay que comprobar en OTASync antes de exportar: las que tienen
+   algún extranjero con un movimiento SIN reportar y cuyo huésped, según el
+   token, ya llegó (E ≤ upper). Las más antiguas primero; tope MAX_VERIFY. */
+function verificationTargets(records, opts) {
+  const catalog = opts.catalog || catalogMod.loadCatalog();
+  const reported = opts.reported || new Set();
+  const upper = opts.hasta < opts.hoy ? opts.hasta : opts.hoy;
+  const floor = opts.reportStart || '';
+  const latest = latestPerBooking(records, { sin_reserva: 0, reenvios_ignorados: 0 });
+  const targets = [];
+  for (const [ref, rec] of latest) {
+    const { checkIn, checkOut } = sire.reservationDates(rec.reservation || {});
+    if (!checkIn || checkIn > upper) continue;
+    if (floor && (checkOut || checkIn) < floor) continue;
+    const pending = foreignGuestsOf(rec, catalog).some(g => !reported.has(g.ids.E) || !reported.has(g.ids.S));
+    if (pending) targets.push({ ref, checkIn });
+  }
+  targets.sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : 0));
+  return targets.map(t => t.ref);
+}
+
 /**
  * Arma la exportación a partir de registros de check-in YA descifrados.
  * opts: { desde, hasta, hoy, reported:Set, includeReported, config, catalog,
- *         faltante, errores }
+ *         faltante, errores, advertencias, reportStart, verified:Map|undefined,
+ *         ilegibles }
+ *   reportStart: fecha (YYYY-MM-DD) desde la que se reporta con este sistema;
+ *     antes de ella no se emite nada (se reportó a mano) y no hay atrasados.
+ *   verified: ref → verifiedStay(...) de OTASync. Si se pasa, una reserva sin
+ *     verificar, cancelada o no encontrada NO se exporta (se avisa en
+ *     `excluidos`) y se usan las fechas de OTASync (salida anticipada /
+ *     extensión), no las del token del check-in.
  */
 function buildExport(records, opts) {
   const { desde, hasta, hoy } = opts;
@@ -236,6 +323,9 @@ function buildExport(records, opts) {
   const reported = opts.reported || new Set();
   const faltante = opts.faltante || [];
   const errores = opts.errores || [];
+  const advertencias = opts.advertencias || [];
+  const reportStart = opts.reportStart || '';
+  const verified = opts.verified instanceof Map ? opts.verified : null;
   const upper = hasta < hoy ? hasta : hoy;
   const conteos = {
     checkins: records.length,
@@ -252,6 +342,10 @@ function buildExport(records, opts) {
     incompletos: 0,
     futuros: 0,
     duplicados: 0,
+    antes_de_inicio: 0,
+    no_vigentes: 0,
+    sin_verificar: 0,
+    atrasados: 0,
     ilegibles: opts.ilegibles || 0
   };
 
@@ -263,7 +357,9 @@ function buildExport(records, opts) {
   const configLevel = new Set(faltante.includes('SIRE_HOTEL_CODE') ? ['codigo_establecimiento'] : []);
 
   const candidates = [];
+  const atrasados = [];
   const avisosMap = new Map();
+  const excluidosMap = new Map();
   const addAviso = (ref, huesped, movimiento, faltan) => {
     const key = `${ref}#${huesped}`;
     const a = avisosMap.get(key) || { ref, huesped, movimientos: [], faltan: [] };
@@ -271,10 +367,18 @@ function buildExport(records, opts) {
     faltan.forEach(f => { if (!a.faltan.includes(f)) a.faltan.push(f); });
     avisosMap.set(key, a);
   };
+  const addExcluido = (ref, motivo, movimiento) => {
+    const e = excluidosMap.get(ref) || { ref, motivo, movimientos: [] };
+    if (movimiento && !e.movimientos.includes(movimiento)) e.movimientos.push(movimiento);
+    excluidosMap.set(ref, e);
+  };
 
   for (const [ref, rec] of latest) {
-    const reserva = rec.reservation || {};
-    const { checkIn, checkOut } = sire.reservationDates(reserva);
+    const tokenDates = sire.reservationDates(rec.reservation || {});
+    const v = verified ? (verified.get(ref) || { ok: false, motivo: 'reserva_sin_verificar' }) : null;
+    const checkIn = v && v.ok ? (v.checkIn || tokenDates.checkIn) : tokenDates.checkIn;
+    const checkOut = v && v.ok ? (v.checkOut || tokenDates.checkOut) : tokenDates.checkOut;
+    const reserva = { ...(rec.reservation || {}), checkIn, checkOut };
     const createdDay = rec.createdAt ? bogotaDate(Date.parse(rec.createdAt) || 0) : '';
     for (const { guest, index } of guestsOf(rec)) {
       conteos.huespedes += 1;
@@ -303,11 +407,36 @@ function buildExport(records, opts) {
           }
           continue;
         }
-        if (fecha < desde || fecha > hasta) continue;
+        if (fecha > hasta) continue;
         if (fecha > upper) { conteos.futuros += 1; continue; }
-        const id = movementId(ref, h.documentType, h.documentNumber, movimiento);
+        const inRange = fecha >= desde;
+        if (reportStart && fecha < reportStart) {
+          if (inRange) conteos.antes_de_inicio += 1;
+          continue;
+        }
+        /* Id con el número de documento CRUDO del check-in (normalizado), nunca
+           con un código de catálogo configurable. */
+        const id = movementId(ref, guest.documentNumber, movimiento);
         const yaReportado = reported.has(id);
+        if (!inRange) {
+          /* Fuera de la ventana pedida: no va en el archivo, pero si sigue SIN
+             reportar se devuelve en `atrasados` para que el subidor vuelva por
+             él (nunca se pierde en silencio). */
+          if (yaReportado || (v && !v.ok)) continue;
+          const { missing } = sire.movementRow(h, reserva, movimiento, { config });
+          if (missing.filter(k => !configLevel.has(k)).length) continue;
+          atrasados.push({ id, fecha });
+          continue;
+        }
         if (yaReportado && !opts.includeReported) { conteos.ya_reportados += 1; continue; }
+        if (v && !v.ok) {
+          /* Cancelada, no-show, no encontrada o sin poder comprobarla: nada de
+             reportar a Migración a alguien que quizá nunca se hospedó. */
+          addExcluido(ref, v.motivo, movimiento);
+          if (v.motivo === 'reserva_sin_verificar') conteos.sin_verificar += 1;
+          else conteos.no_vigentes += 1;
+          continue;
+        }
         const { row, missing } = sire.movementRow(h, reserva, movimiento, { config });
         const faltan = missing.filter(k => !configLevel.has(k));
         if (faltan.length) {
@@ -341,9 +470,17 @@ function buildExport(records, opts) {
   }
   conteos.movimientos_listos = filas.length;
 
+  const atrasadosUnicos = [];
+  const seenAtr = new Set();
+  atrasados
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0))
+    .forEach(a => { if (!seenAtr.has(a.id)) { seenAtr.add(a.id); atrasadosUnicos.push(a); } });
+  conteos.atrasados = atrasadosUnicos.length;
+
   const listo = faltante.length === 0 && errores.length === 0;
   const avisos = [...avisosMap.values()].sort((a, b) =>
     (a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0) || a.huesped - b.huesped);
+  const excluidos = [...excluidosMap.values()].sort((a, b) => (a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0));
 
   return {
     ok: true,
@@ -360,45 +497,138 @@ function buildExport(records, opts) {
     /* Sin config completa NO se entrega archivo (nunca subir a medias). */
     filas: listo ? filas : [],
     txt: listo ? lines.join(EOL) : '',
+    /* Movimientos SIN reportar anteriores a `desde` (desde reportStart): el
+       subidor pide un rango que empiece en el más antiguo. Solo ids + fecha. */
+    atrasados: {
+      cantidad: listo ? atrasadosUnicos.length : 0,
+      masAntiguo: listo && atrasadosUnicos.length ? atrasadosUnicos[0].fecha : null,
+      filas: listo ? atrasadosUnicos.slice(0, MAX_ATRASADOS) : []
+    },
     avisos,
-    configuracion: { faltante, errores }
+    excluidos,
+    advertencias,
+    configuracion: { faltante, errores, inicioReporte: reportStart || null }
   };
 }
 
 /* ---------- E/S con Blobs ---------- */
 
-async function loadCheckinRecords(minMs) {
+/* Lee los check-ins con clave dentro del lookback MÁS los del índice de
+   salidas pendientes (estadías largas). Devuelve entradas { key, record }. */
+async function loadCheckinRecords(minMs, forcedKeys = new Set()) {
   const store = deps.guestStore(CHECKIN_STORE);
   const listing = await store.list();
-  const keys = ((listing && listing.blobs) || [])
-    .map(b => b.key)
-    .filter(k => {
-      const ms = timestampFromKey(k);
-      return ms === null || ms >= minMs; /* sin fecha en la clave: se lee (no perder a nadie) */
-    });
-  const records = [];
-  let ilegibles = 0;
+  const allKeys = ((listing && listing.blobs) || []).map(b => b.key);
+  const present = new Set(allKeys);
+  const keys = allKeys.filter(k => {
+    if (forcedKeys.has(k)) return true;
+    const ms = timestampFromKey(k);
+    return ms === null || ms >= minMs; /* sin fecha en la clave: se lee (no perder a nadie) */
+  });
+  const entries = [];
+  const unreadable = new Set();
   for (let i = 0; i < keys.length; i += READ_BATCH) {
     const batch = keys.slice(i, i + READ_BATCH);
     const results = await Promise.all(batch.map(async key => {
       try {
         const stored = await store.get(key, { type: 'json' });
         if (!stored) return null;
-        return deps.unprotectRecord(stored);
+        return { key, record: deps.unprotectRecord(stored) };
       } catch (e) {
-        ilegibles += 1;
+        unreadable.add(key);
         return null;
       }
     }));
-    results.forEach(r => { if (r) records.push(r); });
+    results.forEach(r => { if (r && r.record) entries.push(r); });
   }
-  return { records, ilegibles };
+  const missingForced = [...forcedKeys].filter(k => !present.has(k));
+  return { entries, ilegibles: unreadable.size, unreadable, missingForced };
 }
 
 async function loadReportedIds() {
   const store = deps.guestStore(REPORTS_STORE);
   const listing = await store.list();
   return new Set(((listing && listing.blobs) || []).map(b => b.key));
+}
+
+async function loadPendingExitKeys() {
+  const store = deps.guestStore(PENDING_EXITS_STORE);
+  const listing = await store.list();
+  return new Set(((listing && listing.blobs) || []).map(b => b.key));
+}
+
+/* Mantiene el índice de salidas pendientes: un check-in (el más reciente de su
+   reserva) entra si tiene algún extranjero con la S sin reportar; sale cuando
+   ya se reportaron todas, la reserva no está vigente, fue reemplazado por un
+   re-envío o su salida es muy vieja. Best-effort: un fallo se reintenta en la
+   próxima pasada (el check-in sigue dentro del lookback mucho tiempo). */
+async function syncPendingExits({ entries, indexKeys, unreadable, missingForced, reported, verified, catalog, reportStart, hoy }) {
+  const latestKeys = new Map();
+  for (const { key, record } of entries) {
+    const ref = String((record && record.bookingCode) || '').trim();
+    if (!ref || (record.type && record.type !== 'guest_checkin')) continue;
+    const prev = latestKeys.get(ref);
+    if (!prev || String(record.createdAt || '') > String(prev.record.createdAt || '')) latestKeys.set(ref, { key, record });
+  }
+  const tooOld = addDays(hoy, -PENDING_EXIT_MAX_AGE_DAYS);
+  const desired = new Map();
+  for (const [ref, { key, record }] of latestKeys) {
+    const v = verified && verified.get(ref);
+    if (v && !v.ok && v.motivo !== 'reserva_sin_verificar') continue;
+    const tokenOut = sire.reservationDates(record.reservation || {}).checkOut;
+    const checkOut = (v && v.ok && v.checkOut) || tokenOut;
+    if (!checkOut || checkOut < tooOld) continue;
+    if (reportStart && checkOut < reportStart) continue;
+    const pendingExit = foreignGuestsOf(record, catalog).some(g => !reported.has(g.ids.S));
+    if (pendingExit) desired.set(key, checkOut);
+  }
+  const store = deps.guestStore(PENDING_EXITS_STORE);
+  let escritos = 0;
+  let borrados = 0;
+  let fallos = 0;
+  const ops = [];
+  for (const [key, checkOut] of desired) {
+    if (!indexKeys.has(key)) ops.push(() => store.set(key, JSON.stringify({ v: 1, checkOut })).then(() => { escritos += 1; }));
+  }
+  const loadedKeys = new Set(entries.map(e => e.key));
+  for (const key of indexKeys) {
+    if (desired.has(key)) continue;
+    /* Solo se borra lo que se pudo leer (o ya no existe): un check-in ilegible
+       NO se suelta del índice. */
+    if (unreadable.has(key)) continue;
+    if (!loadedKeys.has(key) && !missingForced.includes(key)) continue;
+    ops.push(() => store.delete(key).then(() => { borrados += 1; }));
+  }
+  for (let i = 0; i < ops.length; i += READ_BATCH) {
+    await Promise.all(ops.slice(i, i + READ_BATCH).map(op => op().catch(() => { fallos += 1; })));
+  }
+  return { escritos, borrados, fallos };
+}
+
+/* Comprueba en OTASync que las reservas sigan vigentes y trae sus fechas
+   reales. Un fallo de red deja la reserva "sin verificar" (no se exporta; se
+   reintenta en la próxima pasada y, si se sale de la ventana, vuelve como
+   atrasado). */
+async function verifyReservations(refs) {
+  const verified = new Map();
+  for (let i = 0; i < refs.length; i += VERIFY_BATCH) {
+    const batch = refs.slice(i, i + VERIFY_BATCH);
+    await Promise.all(batch.map(async ref => {
+      try {
+        verified.set(ref, verifiedStay(await deps.fetchReservation(ref)));
+      } catch (e) {
+        verified.set(ref, { ok: false, motivo: 'reserva_sin_verificar' });
+      }
+    }));
+  }
+  return verified;
+}
+
+async function reportStartSetting() {
+  const raw = String((await deps.getSetting('SIRE_REPORT_START', '')) || '').trim();
+  if (!raw) return { value: '', missing: true };
+  if (!isIsoDate(raw)) return { value: '', error: 'SIRE_REPORT_START debe ser una fecha YYYY-MM-DD.' };
+  return { value: raw };
 }
 
 async function handleExport(event) {
@@ -409,32 +639,67 @@ async function handleExport(event) {
 
   const catalog = catalogMod.loadCatalog();
   const { config, faltante, errores } = exportConfig(catalog);
+  const start = await reportStartSetting();
+  if (start.missing) faltante.push('SIRE_REPORT_START');
+  if (start.error) errores.push(start.error);
+  const reportStart = start.value;
   const minMs = Date.parse(`${range.desde}T00:00:00Z`) + BOGOTA_OFFSET_MS - lookbackDays() * DAY_MS;
 
   let reported;
+  let indexKeys;
   try {
     reported = await loadReportedIds();
+    indexKeys = await loadPendingExitKeys();
   } catch (e) {
-    /* Sin el registro de lo ya reportado se arriesga reportar dos veces: cerrar. */
-    console.error('[sire-export] no se pudo leer sire-reports');
+    /* Sin el registro de lo ya reportado se arriesga reportar dos veces; sin
+       el índice, perder salidas de estadías largas: cerrar. */
+    console.error('[sire-export] no se pudo leer sire-reports / sire-pending-exits');
     return respond(503, { error: 'No se pudo leer el registro de movimientos ya reportados. Intenta más tarde.' });
   }
 
   let loaded;
   try {
-    loaded = await loadCheckinRecords(minMs);
+    loaded = await loadCheckinRecords(minMs, indexKeys);
   } catch (e) {
     console.error('[sire-export] no se pudo listar guest-checkins');
     return respond(503, { error: 'No se pudieron leer los check-ins. Intenta más tarde.' });
   }
+  const records = loaded.entries.map(e => e.record);
 
-  const result = buildExport(loaded.records, {
-    ...range, reported, includeReported, config, catalog, faltante, errores, ilegibles: loaded.ilegibles
+  const advertencias = [];
+  if (loaded.ilegibles > 0) {
+    advertencias.push(`${loaded.ilegibles} check-in(s) no se pudieron descifrar: sus huéspedes extranjeros NO están en esta exportación. Revisar GUEST_APP_KEY_RING / GUEST_APP_ACTIVE_KEY_ID.`);
+    if (!records.length) errores.push('Ningún check-in se pudo descifrar (¿clave de cifrado rotada o incompleta?): no se exporta nada para no dar por vacío lo que no se pudo leer.');
+  }
+
+  /* Verificación en OTASync (cancelaciones / no-show / fechas reales). Sin
+     credenciales no se puede comprobar: no se entrega archivo. */
+  let verified = new Map();
+  const readyBeforeVerify = faltante.length === 0 && errores.length === 0;
+  if (!deps.hasOtasyncCreds()) {
+    errores.push('Sin credenciales de OTASync: no se puede comprobar que las reservas sigan vigentes (canceladas / no-show).');
+  } else if (readyBeforeVerify) {
+    const targets = verificationTargets(records, { ...range, reported, catalog, reportStart });
+    verified = await verifyReservations(targets.slice(0, MAX_VERIFY));
+    if (targets.length > MAX_VERIFY) {
+      advertencias.push(`${targets.length - MAX_VERIFY} reserva(s) quedan sin comprobar en esta pasada (tope ${MAX_VERIFY}); se comprueban en las siguientes.`);
+    }
+  }
+
+  const result = buildExport(records, {
+    ...range, reported, includeReported, config, catalog, faltante, errores, advertencias,
+    reportStart, verified: readyBeforeVerify && deps.hasOtasyncCreds() ? verified : undefined, ilegibles: loaded.ilegibles
   });
   result.generadoEn = new Date(deps.now()).toISOString();
+
+  const idx = await syncPendingExits({
+    entries: loaded.entries, indexKeys, unreadable: loaded.unreadable, missingForced: loaded.missingForced,
+    reported, verified: readyBeforeVerify ? verified : null, catalog, reportStart, hoy: range.hoy
+  }).catch(() => ({ escritos: 0, borrados: 0, fallos: 1 }));
+
   const c = result.conteos;
   /* Ley 1581: SOLO conteos en el log. */
-  console.log(`[sire-export] rango=${range.desde}..${range.hasta} listo=${result.listo} checkins=${c.checkins} extranjeros=${c.extranjeros} movimientos=${c.movimientos_listos} ya_reportados=${c.ya_reportados} incompletos=${c.incompletos} ilegibles=${c.ilegibles}`);
+  console.log(`[sire-export] rango=${range.desde}..${range.hasta} listo=${result.listo} checkins=${c.checkins} extranjeros=${c.extranjeros} movimientos=${c.movimientos_listos} ya_reportados=${c.ya_reportados} incompletos=${c.incompletos} no_vigentes=${c.no_vigentes} sin_verificar=${c.sin_verificar} atrasados=${c.atrasados} ilegibles=${c.ilegibles} indice=+${idx.escritos}/-${idx.borrados}${idx.fallos ? ` fallos=${idx.fallos}` : ''}`);
   return respond(200, result);
 }
 
@@ -574,8 +839,12 @@ exports._test = {
   normalizeAckEntries,
   toSireGuest,
   bogotaDate,
+  verifiedStay,
+  verificationTargets,
+  foreignGuestsOf,
   setDeps(overrides) { deps = { ...defaultDeps, ...overrides }; },
   resetDeps() { deps = { ...defaultDeps }; },
   MIN_TOKEN_LENGTH,
-  MAX_RANGE_DAYS
+  MAX_RANGE_DAYS,
+  DEFAULT_WINDOW_DAYS
 };

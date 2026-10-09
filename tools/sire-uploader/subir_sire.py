@@ -48,7 +48,7 @@ CONSEJOS = {
     c.CONFIG: "Revisar la configuracion: secretos en .secrets/ (sire.json, sire_export.json, permisos 600) y, en Netlify, SIRE_ENABLED, SIRE_HOTEL_CODE y SIRE_EXPORT_TOKEN. Ver SIRE.md.",
     c.VERIFICACION_HUMANA: "El portal pidio verificacion humana y no se intenta saltar. Subir a mano el archivo indicado y despues correr: correr.sh sire/subir_sire.py --resolver reportado",
     c.NO_VERIFICABLE: "Entrar al portal SIRE y revisar si el archivo de esta pasada quedo cargado. Si quedo: --resolver reportado. Si no: --resolver reintentar.",
-    c.BLOQUEADO: "Hay algo pendiente de una pasada anterior; mientras tanto no se sube nada para no reportar dos veces. Resolverlo con --resolver reportado o --resolver reintentar (ver SIRE.md).",
+    c.BLOQUEADO: "Hay algo pendiente de una pasada anterior; mientras tanto no se sube nada para no reportar dos veces. Si el motivo es ack_pendiente el archivo YA quedo cargado en el portal: solo --resolver reportado (reintentar lo subiria otra vez). En los demas casos: --resolver reportado si quedo en el portal, --resolver reintentar si no (ver SIRE.md). Lo que se acumule mientras tanto no se pierde: la siguiente pasada se pone al dia sola.",
     c.NO_AUTORIZADA: "Correr --ensayo, revisar las capturas con el dueno y, con su visto bueno, crear .secrets/sire_autorizacion.txt (quien y cuando). Ver SIRE.md.",
     c.LOGIN: "Revisar tipo_documento / numero_documento / password en .secrets/sire.json: puede haber cambiado o vencido la clave del portal.",
     c.RECHAZOS: "El portal rechazo registros: corregirlos a mano en el portal y despues --resolver reportado (o corregir el dato en el check-in y --resolver reintentar).",
@@ -81,6 +81,12 @@ def informar_exportacion(datos):
     c.log("exportacion %s..%s: %s movimiento(s) listos (E=%s, S=%s), ya reportados %s, incompletos %s, extranjeros %s" % (
         rango.get("desde"), rango.get("hasta"), k.get("movimientos_listos"), k.get("entradas"), k.get("salidas"),
         k.get("ya_reportados"), k.get("incompletos"), k.get("extranjeros")))
+    c.log("no vigentes en OTASync %s, sin verificar %s, atrasados %s, check-ins ilegibles %s" % (
+        k.get("no_vigentes", 0), k.get("sin_verificar", 0), k.get("atrasados", 0), k.get("ilegibles", 0)))
+    for adv in datos.get("advertencias") or []:
+        c.log("ADVERTENCIA: %s" % adv)
+    for linea in resumen_excluidos(datos.get("excluidos")):
+        c.log(linea.strip())
     c.log("formato: %s columnas, separador %s, fecha %s" % (
         len(fmt.get("columnas") or []), fmt.get("delimitador"), fmt.get("fecha")))
     conf = datos.get("configuracion") or {}
@@ -90,6 +96,63 @@ def informar_exportacion(datos):
         c.log("error de configuracion: %s" % e)
     for linea in c.resumen_avisos(datos.get("avisos")):
         c.log(linea.strip())
+
+
+MOTIVOS_EXCLUSION = {
+    "reserva_no_vigente": "cancelada o no-show en Kunas",
+    "reserva_no_encontrada": "no aparece en Kunas",
+    "reserva_sin_verificar": "no se pudo comprobar en Kunas (se reintenta)",
+}
+
+
+def resumen_excluidos(excluidos, maximo=40):
+    """Reservas que la exportacion NO incluyo por su estado en OTASync. Sin
+    datos personales: solo codigo de reserva y motivo."""
+    lineas = []
+    for e in (excluidos or [])[:maximo]:
+        lineas.append("  reserva %s (%s): no se reporta, %s" % (
+            e.get("ref"), "/".join(e.get("movimientos") or []) or "-",
+            MOTIVOS_EXCLUSION.get(e.get("motivo"), e.get("motivo"))))
+    if excluidos and len(excluidos) > maximo:
+        lineas.append("  ... y %d mas" % (len(excluidos) - maximo))
+    return lineas
+
+
+def pendientes_atrasados(datos, estado):
+    """Movimientos sin reportar anteriores a la ventana que NO son rechazos ya
+    conocidos (esos esperan correccion manual y no deben frenar lo demas)."""
+    rechazados = estado.get("rechazados") or {}
+    filas = ((datos.get("atrasados") or {}).get("filas")) or []
+    return [a for a in filas if a.get("id") not in rechazados and c.FECHA_RE.match(str(a.get("fecha") or ""))]
+
+
+def ponerse_al_dia(cfg, args, datos, estado):
+    """Si la cadena estuvo parada mas que la ventana (bloqueo, CAPTCHA, portal
+    rechazando, exportacion apagada, VPS apagado), la exportacion devuelve los
+    movimientos sin reportar anteriores en `atrasados`. Se vuelve a pedir desde
+    el mas antiguo (maximo 62 dias por pasada) para que nada quede por fuera de
+    la ventana. Con --desde/--hasta explicitos se respeta lo pedido."""
+    if args.desde or args.hasta:
+        pend = pendientes_atrasados(datos, estado)
+        if pend:
+            c.log("OJO: hay %d movimiento(s) sin reportar anteriores a --desde (el mas antiguo del %s)" % (
+                len(pend), min(a["fecha"] for a in pend)))
+        return datos
+    pend = pendientes_atrasados(datos, estado)
+    if not pend:
+        return datos
+    from datetime import date, timedelta
+    desde = min(a["fecha"] for a in pend)
+    hasta_original = (datos.get("rango") or {}).get("hasta") or desde
+    tope = (date.fromisoformat(desde) + timedelta(days=61)).isoformat()
+    hasta = min(tope, hasta_original)
+    c.log("poniendose al dia: %d movimiento(s) sin reportar desde el %s; se pide %s..%s" % (
+        len(pend), desde, desde, hasta))
+    nuevos = c.descargar_exportacion(cfg, desde, hasta)
+    nuevos["_al_dia"] = {"pendientes": len(pend), "desde": desde, "hasta": hasta,
+                         "completo": hasta == hasta_original}
+    informar_exportacion(nuevos)
+    return nuevos
 
 
 def exigir_lista(datos):
@@ -121,17 +184,36 @@ def debe_avisar(estado, clave, cada_dias):
     return True
 
 
-def avisos_nuevos(estado, avisos):
-    """Avisos de datos incompletos que no se habian contado antes."""
+def avisos_nuevos(estado, datos):
+    """Avisos (datos incompletos, reservas excluidas, advertencias, puesta al
+    dia) que no se habian contado antes: lo repetido no vuelve a llegar por
+    correo cada dia; lo nuevo, siempre."""
     conocidos = set(estado.get("avisos_conocidos") or [])
-    claves = ["%s#%s#%s" % (a.get("ref"), a.get("huesped"), ",".join(sorted(a.get("faltan") or []))) for a in avisos or []]
-    nuevos = [a for a, k in zip(avisos or [], claves) if k not in conocidos]
+    claves = ["%s#%s#%s" % (a.get("ref"), a.get("huesped"), ",".join(sorted(a.get("faltan") or [])))
+              for a in datos.get("avisos") or []]
+    claves += ["excl#%s#%s" % (e.get("ref"), e.get("motivo")) for e in datos.get("excluidos") or []
+               if e.get("motivo") != "reserva_sin_verificar"]
+    claves += ["adv#%s" % a for a in datos.get("advertencias") or []]
+    if datos.get("_al_dia"):
+        claves.append("aldia#%s" % datos["_al_dia"]["desde"])
+    nuevos = [k for k in claves if k not in conocidos]
     estado["avisos_conocidos"] = claves[-500:]
     return nuevos
 
 
 def notas_pendientes(datos, estado):
     notas = []
+    for adv in datos.get("advertencias") or []:
+        notas.append("ADVERTENCIA: %s" % adv)
+    al_dia = datos.get("_al_dia")
+    if al_dia:
+        notas.append("La subida estuvo parada: habia %d movimiento(s) sin reportar desde el %s. Esta pasada pidio %s..%s%s." % (
+            al_dia["pendientes"], al_dia["desde"], al_dia["desde"], al_dia["hasta"],
+            "" if al_dia["completo"] else " (lo mas reciente sale en las pasadas siguientes)"))
+    excluidos = [e for e in datos.get("excluidos") or [] if e.get("motivo") != "reserva_sin_verificar"]
+    if excluidos:
+        notas.append("Reservas de extranjeros que NO se reportan por su estado en Kunas (revisar que sea correcto):")
+        notas.extend(resumen_excluidos(excluidos))
     avisos = datos.get("avisos") or []
     if avisos:
         notas.append("Huespedes extranjeros con datos incompletos (no se suben hasta completarlos en el check-in o a mano en el portal):")
@@ -265,7 +347,8 @@ def modo_subir(args, secretos, estado_dir, conf, enviar):
             estado["bloqueo"] = None
             c.guardar_estado(estado_dir, estado)
         except c.ErrorSire as e:
-            raise c.ErrorSire(c.BLOQUEADO, "sigue pendiente el ack de la subida del %s (%s)" % (bloqueo.get("desde", "?")[:10], e.mensaje))
+            raise c.ErrorSire(c.BLOQUEADO, "sigue pendiente el ack de la subida del %s (%s). Ese archivo YA esta cargado en el portal: resolver solo con --resolver reportado" % (
+                bloqueo.get("desde", "?")[:10], e.mensaje))
     bloqueo = estado.get("bloqueo")
     if bloqueo:
         raise c.ErrorSire(c.BLOQUEADO, "pendiente desde %s (%s)%s" % (
@@ -279,17 +362,19 @@ def modo_subir(args, secretos, estado_dir, conf, enviar):
     datos = c.descargar_exportacion(cfg, args.desde, args.hasta)
     informar_exportacion(datos)
     exigir_lista(datos)
+    datos = ponerse_al_dia(cfg, args, datos, estado)
+    exigir_lista(datos)
     filas, lineas = c.quitar_rechazados(datos, estado.get("rechazados") or {})
     resumen = {"movimientos": len(lineas), "incompletos": (datos.get("conteos") or {}).get("incompletos", 0)}
 
     notas = notas_pendientes(datos, estado)
-    nuevos = avisos_nuevos(estado, datos.get("avisos"))
+    nuevos = avisos_nuevos(estado, datos)
     c.guardar_estado(estado_dir, estado)
 
     if not lineas:
         c.log("nada que reportar en este rango")
         if notas and nuevos and enviar:
-            c.avisar(asunto("datos incompletos de huespedes extranjeros"), notas + ["", "Registro: %s" % ruta_log()])
+            c.avisar(asunto("hay pendientes del SIRE por revisar"), notas + ["", "Registro: %s" % ruta_log()])
         return c.OK, resumen
 
     archivo = c.escribir_archivo(lineas, c.carpeta_temporal(), c.nombre_archivo(),
@@ -380,6 +465,8 @@ def modo_solo_archivo(args, secretos, estado_dir, conf, enviar):
     datos = c.descargar_exportacion(cfg, args.desde, args.hasta)
     informar_exportacion(datos)
     exigir_lista(datos)
+    datos = ponerse_al_dia(cfg, args, datos, estado)
+    exigir_lista(datos)
     filas, lineas = c.quitar_rechazados(datos, estado.get("rechazados") or {})
     if not lineas:
         c.log("nada que reportar en este rango: no se deja archivo")
@@ -409,6 +496,12 @@ def modo_resolver(args, secretos, estado_dir, conf, enviar):
     if not bloqueo and not rechazados:
         c.log("no hay nada pendiente")
         return c.OK, {}
+    if args.resolver == "reintentar" and bloqueo and bloqueo.get("motivo") == "ack_pendiente":
+        # El portal YA acepto ese lote; solo fallo avisarle a estar.com.co.
+        # Soltarlo lo volveria a subir: registros duplicados en el SIRE.
+        raise c.ErrorSire(c.USO, "el bloqueo es ack_pendiente: ese archivo YA quedo cargado en el portal el %s. "
+                          "No se puede reintentar (se duplicaria en el SIRE); usar --resolver reportado." % (
+                              str(bloqueo.get("desde", "?"))[:10]))
     filas = list(bloqueo.get("filas") or []) if bloqueo else []
     filas += [dict(v, id=k) for k, v in rechazados.items()]
     if args.resolver == "reportado":
@@ -442,7 +535,7 @@ def construir_parser():
     modo.add_argument("--subir", action="store_true", help="subida real (requiere autorizacion)")
     modo.add_argument("--solo-archivo", action="store_true", help="deja el archivo para subida manual y avisa")
     modo.add_argument("--resolver", choices=["reportado", "reintentar"], help="cierra lo pendiente")
-    p.add_argument("--desde", type=fecha_valida, help="YYYY-MM-DD (hora Colombia); default: hace 7 dias")
+    p.add_argument("--desde", type=fecha_valida, help="YYYY-MM-DD (hora Colombia); default: hace 7 dias, o el movimiento sin reportar mas antiguo")
     p.add_argument("--hasta", type=fecha_valida, help="YYYY-MM-DD (hora Colombia); default: ayer")
     p.add_argument("--secretos", help="carpeta de secretos (default: .secrets del repo)")
     p.add_argument("--estado", help="carpeta de estado (default: ~/.local/state/estar-sire)")

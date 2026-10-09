@@ -473,6 +473,7 @@ module.exports = {
   archiveGuestPayload,
   cleanText,
   corsHeaders,
+  fetchOtasyncReservation,
   getReservation,
   getReservationDetail,
   guestStore,

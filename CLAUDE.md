@@ -206,7 +206,7 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 
 | Function | Purpose |
 |---|---|
-| `sire-export` | Export of the SIRE flat file for the group VPS uploader (`tools/sire-uploader/`). GET with a Bearer compared in constant time against `SIRE_EXPORT_TOKEN` (secret, NOT panel-manageable; **off/503 without it**), rate-limited, gated `SIRE_ENABLED`. Reads `guest-checkins` (decrypts via `_guest-app`), latest check-in per booking, **foreign guests only**: row E on check-in date, S on check-out date (Bogotá dates, never future). Returns `{listo, conteos, filas (opaque ids), txt, avisos}` — avisos identify only booking code + guest index; logs only counts. POST `ack`/`desmarcar` → `sire-reports` store so nothing is reported twice. No file is returned while `SIRE_HOTEL_CODE` is missing |
+| `sire-export` | Export of the SIRE flat file for the group VPS uploader (`tools/sire-uploader/`). GET with a Bearer compared in constant time against `SIRE_EXPORT_TOKEN` (secret, NOT panel-manageable; **off/503 without it**), rate-limited, gated `SIRE_ENABLED`. Reads `guest-checkins` (decrypts via `_guest-app`), latest check-in per booking, **foreign guests only**: row E on check-in date, S on check-out date (Bogotá dates, never future). Returns `{listo, conteos, filas (opaque ids), txt, avisos}` — avisos identify only booking code + guest index; logs only counts. POST `ack`/`desmarcar` → `sire-reports` store so nothing is reported twice (movement id = booking + normalized document number + E/S — never a configurable catalog code). Each booking is checked against OTASync first: cancelled/no-show/not found/unverifiable ⇒ not exported, listed in `excluidos`; OTASync dates win over the token's. Unreported movements older than the window come back in `atrasados` so the uploader catches up after any stall; long stays stay readable past the lookback via the `sire-pending-exits` index. Undecryptable check-ins ⇒ `advertencias` (all undecryptable ⇒ not `listo`). No file is returned while `SIRE_HOTEL_CODE`/`SIRE_REPORT_START` are missing or without OTASync creds |
 
 The uploader itself (Python + Playwright, systemd timer 10:00 Bogotá on the group VPS, ensayo → owner confirmation → real upload; CAPTCHA ⇒ stop, leave the file, alert) lives in `tools/sire-uploader/` with its own README and `SIRE.md` (doc for the VPS repo `00 - Indice/`). It is NOT deployed by Netlify.
 
@@ -568,6 +568,7 @@ SIRE_DATE_FORMAT=          # optional, YYYY-MM-DD default | DD/MM/YYYY | YYYYMMD
 SIRE_COLUMNS=              # optional column order (comma list; primer_apellido/segundo_apellido available)
 SIRE_TEXT_ASCII=           # optional, 'false' keeps accents/case in names (default UPPERCASE ASCII)
 SIRE_DOC_TYPE_CODES_JSON= / SIRE_COUNTRY_CODES_JSON= / SIRE_CITY_CODES_JSON=   # optional code corrections
+SIRE_REPORT_START=         # YYYY-MM-DD of the first real upload; earlier movements are never exported (panel-manageable). Required
 SIRE_EXPORT_LOOKBACK_DAYS= # optional, default 190
 ```
 VPS side (secrets in the VPS `.secrets/`, never here): see `tools/sire-uploader/README.md`.

@@ -62,6 +62,7 @@ redeploy (las funciones leen el entorno al desplegarse):
 | `SIRE_EXPORT_TOKEN` | `openssl rand -hex 32` (32+ caracteres). Sin ella la exportación está **apagada** | sí |
 | `SIRE_HOTEL_CODE` | el código SIRE del establecimiento (lo da Migración; se ve en el portal) | no |
 | `SIRE_ENABLED` | `true` (también desde `/admin` → Configuración) | no |
+| `SIRE_REPORT_START` | fecha `YYYY-MM-DD` de la **primera subida real** (también desde `/admin`). Lo anterior se reportó a mano y no se sube. Sin ella la exportación no entrega archivo | no |
 | `SIRE_CITY_CODE` | opcional; por defecto `17001` (Manizales, DIVIPOLA) | no |
 
 **4. Los secretos en el VPS**, como `vault`, con permisos 600 (el programa se
@@ -171,9 +172,18 @@ cada 3 días y los datos incompletos solo cuando aparece uno nuevo.
 | 4 | CAPTCHA o verificación humana: el archivo quedó en `…/estar-sire/pendientes/` | subirlo a mano y `--resolver reportado` |
 | 5 | el portal rechazó registros | corregir a mano y `--resolver reportado`, o corregir el dato y `--resolver reintentar` |
 | 6 | no se sabe si el portal cargó el archivo | mirar el portal: `--resolver reportado` o `reintentar` |
-| 7 | hay algo pendiente de antes: no se sube nada hasta resolverlo | `--resolver …` |
+| 7 | hay algo pendiente de antes: no se sube nada hasta resolverlo | `--resolver …`; con `ack_pendiente` el archivo YA está en el portal: **solo** `--resolver reportado` |
 | 8 | falta `sire_autorizacion.txt` | ensayo + visto bueno |
 | 9 | el portal rechazó el usuario o la clave | revisar `sire.json` |
+
+Lo que se acumule mientras algo está bloqueado (o la exportación apagada, o el
+VPS caído) **no se pierde**: la exportación devuelve los movimientos sin
+reportar anteriores a la ventana y la pasada siguiente se pone al día sola
+desde el más antiguo (avisa por correo cuando lo hace).
+
+Antes de exportar, la página comprueba cada reserva en Kunas: si está
+**cancelada o no-show** no se reporta nada a Migración y llega el aviso; las
+fechas que se reportan son las de Kunas (salida anticipada o extensión).
 
 `--resolver` se corre igual que lo demás:
 `sudo -u vault bash "/opt/vault/99 - Herramientas/vps/sire_vps.sh" --resolver reportado`.

@@ -48,11 +48,13 @@ correr.sh sire/subir_sire.py --ensayo        # todo menos subir; capturas del fo
 correr.sh sire/subir_sire.py --subir         # la subida real (exige autorización del dueño)
 correr.sh sire/subir_sire.py --solo-archivo  # deja el .txt para subirlo a mano y avisa
 correr.sh sire/subir_sire.py --resolver reportado    # lo pendiente ya está en el portal: ack
-correr.sh sire/subir_sire.py --resolver reintentar   # soltarlo para que la próxima pasada lo suba
+correr.sh sire/subir_sire.py --resolver reintentar   # soltarlo para que la próxima pasada lo suba (NUNCA con ack_pendiente)
 ```
 
 Opcionales: `--desde/--hasta YYYY-MM-DD` (hora Colombia; por defecto los 7 días
-que terminan ayer), `--secretos DIR`, `--estado DIR`, `--portal-conf FICHERO`,
+que terminan ayer **o, si quedó algo sin reportar de antes, desde el movimiento
+pendiente más antiguo**, en tramos de 62 días: un bloqueo largo no deja nada por
+fuera), `--secretos DIR`, `--estado DIR`, `--portal-conf FICHERO`,
 `--visible`, `--sin-aviso`, `--avisar` (en el ensayo).
 
 `sire_vps.sh` es lo que lanza el temporizador: escribe en
@@ -71,7 +73,7 @@ temporizador exista.
 | 4 | **verificación humana / CAPTCHA**: el archivo quedó listo en la carpeta de estado | subirlo a mano y `--resolver reportado` |
 | 5 | el portal rechazó registros (o el archivo entero) | corregir a mano en el portal y `--resolver reportado`, o corregir el dato y `--resolver reintentar` |
 | 6 | no se pudo confirmar si el portal cargó el archivo | mirar el portal: `--resolver reportado` o `--resolver reintentar` |
-| 7 | hay algo pendiente de una pasada anterior: no se sube nada | `--resolver …` |
+| 7 | hay algo pendiente de una pasada anterior: no se sube nada | `--resolver …`; si el motivo es `ack_pendiente` el archivo YA está en el portal: **solo** `--resolver reportado` (reintentar se rechaza: duplicaría) |
 | 8 | la subida real aún no está autorizada | ensayo + visto bueno del dueño → `.secrets/sire_autorizacion.txt` |
 | 9 | el portal rechazó el ingreso | revisar `.secrets/sire.json` |
 

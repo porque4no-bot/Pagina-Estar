@@ -7,7 +7,7 @@ process.env.GUEST_APP_TOKEN_SECRET = 'unit-test-token-secret';
 process.env.GUEST_APP_DATA_ENCRYPTION_KEY = 'unit-test-encryption-secret-sire-export';
 for (const k of ['SIRE_EXPORT_TOKEN', 'SIRE_ENABLED', 'SIRE_HOTEL_CODE', 'SIRE_CITY_CODE', 'SIRE_DELIMITER',
   'SIRE_DATE_FORMAT', 'SIRE_COLUMNS', 'SIRE_TEXT_ASCII', 'SIRE_COUNTRY_CODES_JSON', 'SIRE_DOC_TYPE_CODES_JSON',
-  'SIRE_CITY_CODES_JSON', 'SIRE_EXPORT_LOOKBACK_DAYS']) {
+  'SIRE_CITY_CODES_JSON', 'SIRE_EXPORT_LOOKBACK_DAYS', 'SIRE_REPORT_START']) {
   delete process.env[k];
 }
 
@@ -260,12 +260,96 @@ test('resolveRange: valida formato, orden y tamaño máximo', () => {
 });
 
 test('movementId: estable y opaco; distinto por movimiento y por reserva', () => {
-  const a = _test.movementId('R1', '3', 'X1', 'E');
+  const a = _test.movementId('R1', 'X1', 'E');
   assert.match(a, /^[a-f0-9]{24}$/);
-  assert.equal(a, _test.movementId('R1', '3', 'X1', 'E'));
-  assert.notEqual(a, _test.movementId('R1', '3', 'X1', 'S'));
-  assert.notEqual(a, _test.movementId('R2', '3', 'X1', 'E'));
+  assert.equal(a, _test.movementId('R1', 'X1', 'E'));
+  assert.equal(a, _test.movementId('R1', ' x-1 ', 'E'), 'el número se normaliza');
+  assert.notEqual(a, _test.movementId('R1', 'X1', 'S'));
+  assert.notEqual(a, _test.movementId('R2', 'X1', 'E'));
   assert.ok(!a.includes('X1'));
+});
+
+test('movementId NO depende del catálogo: corregir SIRE_DOC_TYPE_CODES_JSON (o el tipo en el check-in) no re-reporta', () => {
+  const records = [checkinRecord('R1', [GUEST_ES], { checkIn: '2026-10-03', checkOut: '2026-10-06' }, '2026-10-02T12:00:00Z')];
+  const before = _test.buildExport(records, exportOpts());
+  const after = withEnv({ SIRE_DOC_TYPE_CODES_JSON: '{"Pasaporte":"2"}' }, () =>
+    _test.buildExport(records, exportOpts({ catalog: catalog.loadCatalog() })));
+  const cols = after.formato.columnas;
+  assert.equal(after.txt.split('\r\n')[0].split('\t')[cols.indexOf('tipo_documento')], '2', 'el código sí cambia en el archivo');
+  assert.deepEqual(after.filas.map(f => f.id), before.filas.map(f => f.id));
+  /* Ya reportados con el código viejo => con el nuevo siguen reportados. */
+  const again = withEnv({ SIRE_DOC_TYPE_CODES_JSON: '{"Pasaporte":"2"}' }, () =>
+    _test.buildExport(records, exportOpts({ catalog: catalog.loadCatalog(), reported: new Set(before.filas.map(f => f.id)) })));
+  assert.equal(again.filas.length, 0);
+  assert.equal(again.conteos.ya_reportados, 2);
+  /* El huésped re-envía el check-in corrigiendo el tipo de documento: mismo id. */
+  const fixed = [checkinRecord('R1', [{ ...GUEST_ES, documentType: 'CE' }], { checkIn: '2026-10-03', checkOut: '2026-10-06' }, '2026-10-02T13:00:00Z')];
+  assert.deepEqual(_test.buildExport(fixed, exportOpts()).filas.map(f => f.id), before.filas.map(f => f.id));
+});
+
+test('buildExport: movimientos SIN reportar anteriores a la ventana salen en `atrasados` (nunca se pierden)', () => {
+  const records = [
+    checkinRecord('R1', [GUEST_ES], { checkIn: '2026-09-10', checkOut: '2026-09-12' }, '2026-09-09T12:00:00Z'),
+    checkinRecord('R2', [GUEST_US], { checkIn: '2026-08-01', checkOut: '2026-08-03' }, '2026-07-30T12:00:00Z')
+  ];
+  const out = _test.buildExport(records, exportOpts({ reportStart: '2026-09-01' }));
+  assert.equal(out.filas.length, 0);
+  assert.equal(out.conteos.atrasados, 2);
+  assert.equal(out.atrasados.masAntiguo, '2026-09-10');
+  assert.deepEqual(out.atrasados.filas.map(a => a.fecha), ['2026-09-10', '2026-09-12']);
+  const eId = out.atrasados.filas[0].id;
+  const reported = _test.buildExport(records, exportOpts({ reportStart: '2026-09-01', reported: new Set([eId]) }));
+  assert.deepEqual(reported.atrasados.filas.map(a => a.fecha), ['2026-09-12']);
+  /* El subidor pide desde el más antiguo: ahí ya salen en el archivo. */
+  const catchUp = _test.buildExport(records, exportOpts({ desde: '2026-09-10', reportStart: '2026-09-01' }));
+  assert.deepEqual(catchUp.filas.map(f => `${f.ref}:${f.movimiento}`), ['R1:E', 'R1:S']);
+  assert.equal(catchUp.conteos.atrasados, 0);
+  /* Antes de SIRE_REPORT_START nada se emite ni cuenta como atrasado. */
+  const early = _test.buildExport(records, exportOpts({ desde: '2026-08-01', reportStart: '2026-09-01' }));
+  assert.deepEqual(early.filas.map(f => f.ref), ['R1', 'R1']);
+  assert.equal(early.conteos.antes_de_inicio, 2);
+  /* Sin configuración completa no se devuelven atrasados (no hay archivo). */
+  const notReady = _test.buildExport(records, exportOpts({ reportStart: '2026-09-01', faltante: ['SIRE_REPORT_START'] }));
+  assert.equal(notReady.atrasados.cantidad, 0);
+});
+
+test('buildExport: reservas canceladas / no encontradas / sin verificar en OTASync NO se reportan', () => {
+  const records = [
+    checkinRecord('R1', [GUEST_ES], { checkIn: '2026-10-03', checkOut: '2026-10-06' }, '2026-09-28T12:00:00Z'),
+    checkinRecord('R2', [GUEST_US], { checkIn: '2026-10-02', checkOut: '2026-10-04' }, '2026-09-28T12:00:00Z'),
+    checkinRecord('R3', [GUEST_US], { checkIn: '2026-10-02', checkOut: '2026-10-04' }, '2026-09-28T12:00:00Z'),
+    checkinRecord('R4', [GUEST_ES], { checkIn: '2026-10-02', checkOut: '2026-10-09' }, '2026-09-28T12:00:00Z')
+  ];
+  const verified = new Map([
+    ['R1', _test.verifiedStay({ status: 'canceled', date_arrival: '2026-10-03', date_departure: '2026-10-06' })],
+    ['R2', _test.verifiedStay(null)],
+    /* R3 no está: no se pudo comprobar */
+    /* R4: salida anticipada registrada en Kunas (el token decía el 9) */
+    ['R4', _test.verifiedStay({ status: 'confirmed', date_arrival: '2026-10-02', date_departure: '2026-10-05' })]
+  ]);
+  const out = _test.buildExport(records, exportOpts({ verified }));
+  assert.deepEqual(out.filas.map(f => `${f.ref}:${f.movimiento}:${f.fecha}`), ['R4:E:2026-10-02', 'R4:S:2026-10-05']);
+  assert.deepEqual(out.excluidos.map(e => [e.ref, e.motivo]),
+    [['R1', 'reserva_no_vigente'], ['R2', 'reserva_no_encontrada'], ['R3', 'reserva_sin_verificar']]);
+  assert.equal(out.conteos.no_vigentes, 4);
+  assert.equal(out.conteos.sin_verificar, 2);
+  assert.ok(!JSON.stringify(out.excluidos).includes('Smith'));
+  assert.equal(_test.verifiedStay({ status: 'no_show' }).ok, false);
+  assert.equal(_test.verifiedStay({ status: 'Confirmed', date_arrival: '2026-10-02 14:00:00' }).checkIn, '2026-10-02');
+});
+
+test('verificationTargets: solo reservas con extranjeros pendientes y ya llegados', () => {
+  const records = [
+    checkinRecord('R1', [GUEST_ES], { checkIn: '2026-10-03', checkOut: '2026-10-06' }, '2026-09-28T12:00:00Z'),
+    checkinRecord('R2', [GUEST_CO], { checkIn: '2026-10-03', checkOut: '2026-10-06' }, '2026-09-28T12:00:00Z'),
+    checkinRecord('R3', [GUEST_ES], { checkIn: '2026-10-20', checkOut: '2026-10-22' }, '2026-09-28T12:00:00Z'),
+    checkinRecord('R4', [GUEST_US], { checkIn: '2026-09-01', checkOut: '2026-09-03' }, '2026-08-28T12:00:00Z')
+  ];
+  const base = { desde: '2026-10-01', hasta: '2026-10-07', hoy: '2026-10-08', catalog: catalog.loadCatalog() };
+  assert.deepEqual(_test.verificationTargets(records, { ...base, reportStart: '2026-08-01' }), ['R4', 'R1']);
+  assert.deepEqual(_test.verificationTargets(records, { ...base, reportStart: '2026-10-01' }), ['R1']);
+  const ids = _test.foreignGuestsOf(records[0], catalog.loadCatalog())[0].ids;
+  assert.deepEqual(_test.verificationTargets(records, { ...base, reportStart: '2026-10-01', reported: new Set([ids.E, ids.S]) }), []);
 });
 
 test('buildExport: solo extranjeros, E en check-in y S en check-out, en orden', () => {
@@ -403,22 +487,38 @@ test('exportConfig: ciudad por defecto Manizales y errores de SIRE_COLUMNS bloqu
 
 function bearer(token) { return { authorization: `Bearer ${token}` }; }
 
-function setupHandler({ records = [], flagOn = true, rateOk = true, reports } = {}) {
+function setupHandler({ records = [], flagOn = true, rateOk = true, reports, otasync, creds = true, pending } = {}) {
   const checkins = memStore();
   for (const r of records) checkins.data.set(r.checkinId + '-' + r.bookingCode, guestApp.protectRecord(r));
   const reportsStore = reports || memStore();
-  const stores = { 'guest-checkins': checkins, 'sire-reports': reportsStore };
+  const pendingStore = pending || memStore();
+  const stores = { 'guest-checkins': checkins, 'sire-reports': reportsStore, 'sire-pending-exits': pendingStore };
+  const lookups = [];
   _test.setDeps({
     guestStore: name => stores[name],
     checkRateLimit: async () => (rateOk ? { ok: true } : { ok: false, retryAfter: 60 }),
     flag: async key => key === 'SIRE_ENABLED' && flagOn,
+    getSetting: async (key, fallback) => process.env[key] || fallback,
+    hasOtasyncCreds: () => creds,
+    /* OTASync simulado: por defecto toda reserva existe, confirmada, con las
+       fechas del check-in. `otasync` permite sobreescribir por código. */
+    fetchReservation: async ref => {
+      lookups.push(ref);
+      if (otasync && Object.prototype.hasOwnProperty.call(otasync, ref)) {
+        const v = otasync[ref];
+        if (v instanceof Error) throw v;
+        return v;
+      }
+      const rec = records.find(r => r.bookingCode === ref);
+      return { id_reservations: ref, status: 'confirmed', date_arrival: rec.reservation.checkIn, date_departure: rec.reservation.checkOut };
+    },
     preload: async () => {},
     now: () => Date.parse('2026-10-08T15:00:00Z')
   });
-  return { checkins, reportsStore };
+  return { checkins, reportsStore, pendingStore, lookups };
 }
 
-const baseEnv = { SIRE_EXPORT_TOKEN: TOKEN, SIRE_HOTEL_CODE: 'H777' };
+const baseEnv = { SIRE_EXPORT_TOKEN: TOKEN, SIRE_HOTEL_CODE: 'H777', SIRE_REPORT_START: '2026-09-01' };
 
 test('handler: apagada (503) sin SIRE_EXPORT_TOKEN o con uno corto', async () => {
   setupHandler();
@@ -579,6 +679,113 @@ test('handler: rango inválido → 400', async () => {
   } finally { _test.resetDeps(); }
 });
 
+test('handler: sin SIRE_REPORT_START o sin credenciales de OTASync no entrega archivo', async () => {
+  const records = [checkinRecord('R1', [GUEST_ES], { checkIn: '2026-10-03', checkOut: '2026-10-06' }, '2026-10-02T12:00:00Z')];
+  setupHandler({ records });
+  try {
+    await withEnv({ ...baseEnv, SIRE_REPORT_START: undefined }, async () => {
+      const body = JSON.parse((await sireExport.handler({ httpMethod: 'GET', headers: bearer(TOKEN) })).body);
+      assert.equal(body.listo, false);
+      assert.ok(body.configuracion.faltante.includes('SIRE_REPORT_START'));
+      assert.equal(body.txt, '');
+    });
+    await withEnv({ ...baseEnv, SIRE_REPORT_START: '1-10-2026' }, async () => {
+      const body = JSON.parse((await sireExport.handler({ httpMethod: 'GET', headers: bearer(TOKEN) })).body);
+      assert.equal(body.listo, false);
+      assert.match(body.configuracion.errores.join(' '), /SIRE_REPORT_START/);
+    });
+  } finally { _test.resetDeps(); }
+  setupHandler({ records, creds: false });
+  try {
+    await withEnv(baseEnv, async () => {
+      const body = JSON.parse((await sireExport.handler({ httpMethod: 'GET', headers: bearer(TOKEN) })).body);
+      assert.equal(body.listo, false);
+      assert.match(body.configuracion.errores.join(' '), /OTASync/);
+    });
+  } finally { _test.resetDeps(); }
+});
+
+test('handler: una reserva cancelada en OTASync no se exporta y se avisa; un fallo de OTASync la deja pendiente', async () => {
+  const records = [
+    checkinRecord('R1', [GUEST_ES], { checkIn: '2026-10-03', checkOut: '2026-10-06' }, '2026-09-28T12:00:00Z'),
+    checkinRecord('R2', [GUEST_US], { checkIn: '2026-10-03', checkOut: '2026-10-05' }, '2026-09-28T12:00:00Z'),
+    checkinRecord('R3', [GUEST_US], { checkIn: '2026-10-04', checkOut: '2026-10-05' }, '2026-09-28T12:00:00Z')
+  ];
+  const { lookups } = setupHandler({ records, otasync: { R1: { id_reservations: 'R1', status: 'cancelled' }, R3: new Error('timeout') } });
+  try {
+    await withEnv(baseEnv, async () => {
+      const body = JSON.parse((await sireExport.handler({ httpMethod: 'GET', headers: bearer(TOKEN) })).body);
+      assert.equal(body.listo, true);
+      assert.deepEqual(body.filas.map(f => f.ref), ['R2', 'R2']);
+      assert.deepEqual(body.excluidos.map(e => [e.ref, e.motivo]), [['R1', 'reserva_no_vigente'], ['R3', 'reserva_sin_verificar']]);
+      assert.deepEqual(lookups.sort(), ['R1', 'R2', 'R3']);
+    });
+  } finally { _test.resetDeps(); }
+});
+
+test('handler: check-ins ilegibles -> advertencia; todos ilegibles -> no listo (nunca "nada que reportar" en silencio)', async () => {
+  const records = [
+    checkinRecord('R1', [GUEST_ES], { checkIn: '2026-10-03', checkOut: '2026-10-06' }, '2026-10-02T12:00:00Z'),
+    checkinRecord('R2', [GUEST_US], { checkIn: '2026-10-03', checkOut: '2026-10-05' }, '2026-10-02T12:00:00Z')
+  ];
+  const { checkins } = setupHandler({ records });
+  try {
+    await withEnv(baseEnv, async () => {
+      checkins.data.set('CHK-1790000000000-ROTO', { encrypted: true, v: 2, kid: 'rotada', iv: 'x', tag: 'y', ct: 'z' });
+      let body = JSON.parse((await sireExport.handler({ httpMethod: 'GET', headers: bearer(TOKEN) })).body);
+      assert.equal(body.listo, true);
+      assert.equal(body.conteos.ilegibles, 1);
+      assert.match(body.advertencias.join(' '), /1 check-in\(s\) no se pudieron descifrar/);
+      for (const k of [...checkins.data.keys()]) checkins.data.set(k, { encrypted: true, v: 2, kid: 'rotada', iv: 'x', tag: 'y', ct: 'z' });
+      body = JSON.parse((await sireExport.handler({ httpMethod: 'GET', headers: bearer(TOKEN) })).body);
+      assert.equal(body.listo, false);
+      assert.equal(body.conteos.ilegibles, 3);
+      assert.match(body.configuracion.errores.join(' '), /Ningún check-in se pudo descifrar/);
+    });
+  } finally { _test.resetDeps(); }
+});
+
+test('handler: estadía larga — el índice de salidas pendientes mantiene el check-in más allá del lookback', async () => {
+  /* Residente extranjero: check-in en línea el 1 de enero, sale el 6 de octubre. */
+  const rec = checkinRecord('RL', [GUEST_ES], { checkIn: '2026-01-02', checkOut: '2026-10-06' }, '2026-01-01T12:00:00Z');
+  const { pendingStore, checkins } = setupHandler({ records: [rec] });
+  const key = [...checkins.data.keys()][0];
+  try {
+    /* Cuando el check-in todavía estaba dentro del lookback, la pasada lo indexa. */
+    await withEnv({ ...baseEnv, SIRE_REPORT_START: '2025-12-01', SIRE_EXPORT_LOOKBACK_DAYS: '730' }, async () => {
+      const body = JSON.parse((await sireExport.handler({ httpMethod: 'GET', headers: bearer(TOKEN), queryStringParameters: { desde: '2025-12-31', hasta: '2026-01-31' } })).body);
+      assert.deepEqual(body.filas.map(f => f.movimiento), ['E']);
+      await sireExport.handler({ httpMethod: 'POST', headers: bearer(TOKEN), body: JSON.stringify({ accion: 'ack', filas: body.filas }) });
+    });
+    assert.ok(pendingStore.data.has(key), 'el check-in quedó en el índice');
+    assert.ok(!String(pendingStore.data.get(key)).includes('Muñoz'));
+    /* Ahora el lookback (190 días) ya no lo alcanza por su clave, pero la S sale igual. */
+    await withEnv({ ...baseEnv, SIRE_REPORT_START: '2025-12-01' }, async () => {
+      const body = JSON.parse((await sireExport.handler({ httpMethod: 'GET', headers: bearer(TOKEN) })).body);
+      assert.deepEqual(body.filas.map(f => `${f.ref}:${f.movimiento}:${f.fecha}`), ['RL:S:2026-10-06']);
+      await sireExport.handler({ httpMethod: 'POST', headers: bearer(TOKEN), body: JSON.stringify({ accion: 'ack', filas: body.filas }) });
+      /* Con la S reportada, la siguiente pasada lo saca del índice. */
+      await sireExport.handler({ httpMethod: 'GET', headers: bearer(TOKEN) });
+    });
+    assert.equal(pendingStore.data.has(key), false);
+  } finally { _test.resetDeps(); }
+});
+
+test('handler: devuelve `atrasados` cuando el subidor estuvo parado más que la ventana', async () => {
+  const records = [checkinRecord('R1', [GUEST_ES], { checkIn: '2026-09-20', checkOut: '2026-09-25' }, '2026-09-19T12:00:00Z')];
+  setupHandler({ records });
+  try {
+    await withEnv(baseEnv, async () => {
+      const body = JSON.parse((await sireExport.handler({ httpMethod: 'GET', headers: bearer(TOKEN) })).body);
+      assert.equal(body.filas.length, 0);
+      assert.equal(body.atrasados.cantidad, 2);
+      assert.equal(body.atrasados.masAntiguo, '2026-09-20');
+      const catchUp = JSON.parse((await sireExport.handler({ httpMethod: 'GET', headers: bearer(TOKEN), queryStringParameters: { desde: body.atrasados.masAntiguo } })).body);
+      assert.deepEqual(catchUp.filas.map(f => f.movimiento), ['E', 'S']);
+    });
+  } finally { _test.resetDeps(); }
+});
+
 test('tokenMatches: compara en tiempo constante y nunca acepta vacío', () => {
   assert.equal(_test.tokenMatches(TOKEN, TOKEN), true);
   assert.equal(_test.tokenMatches(TOKEN + 'x', TOKEN), false);
@@ -596,6 +803,7 @@ test('_settings: formato de SIRE gestionable; el token de exportación NUNCA', (
   assert.equal(isManageable('SIRE_EXPORT_TOKEN'), false);
   assert.equal(isManageable('SIRE_DATE_FORMAT'), true);
   assert.equal(isManageable('SIRE_DELIMITER'), true);
+  assert.equal(isManageable('SIRE_REPORT_START'), true);
   assert.ok(MANAGEABLE.SIRE_DELIMITER.options.includes('\\t'));
   assert.equal(sire.normalizeDelimiter(MANAGEABLE.SIRE_DELIMITER.options[0]), '\t');
 });

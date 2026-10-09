@@ -232,5 +232,96 @@ class TestPortalPuro(unittest.TestCase):
         self.assertEqual(conf["archivo"]["fin_de_linea"], "\r\n")
 
 
+class TestSubirSire(unittest.TestCase):
+    """Logica del programa principal sin portal: puesta al dia, avisos y
+    resolver."""
+
+    def setUp(self):
+        import subir_sire
+        self.s = subir_sire
+        self._descargar = c.descargar_exportacion
+        self.pedidos = []
+
+    def tearDown(self):
+        c.descargar_exportacion = self._descargar
+
+    def _args(self, **kw):
+        import argparse
+        base = {"desde": None, "hasta": None, "resolver": None}
+        base.update(kw)
+        return argparse.Namespace(**base)
+
+    def _falsa_descarga(self, respuesta):
+        def descargar(cfg, desde=None, hasta=None):
+            self.pedidos.append((desde, hasta))
+            return respuesta
+        c.descargar_exportacion = descargar
+
+    def test_ponerse_al_dia_pide_desde_el_atrasado_mas_antiguo(self):
+        datos = dict(exportacion([]), rango={"desde": "2026-10-01", "hasta": "2026-10-07", "hoy": "2026-10-08"},
+                     atrasados={"cantidad": 3, "masAntiguo": "2026-09-20", "filas": [
+                         {"id": ID1, "fecha": "2026-09-20"}, {"id": ID2, "fecha": "2026-09-22"}, {"id": ID3, "fecha": "2026-09-25"}]})
+        self._falsa_descarga(dict(exportacion(["x\ty"]), rango={"desde": "2026-09-20", "hasta": "2026-10-07"}))
+        with redirect_stdout(io.StringIO()):
+            nuevos = self.s.ponerse_al_dia({}, self._args(), datos, {"rechazados": {}})
+        self.assertEqual(self.pedidos, [("2026-09-20", "2026-10-07")])
+        self.assertEqual(nuevos["_al_dia"]["pendientes"], 3)
+        self.assertTrue(nuevos["_al_dia"]["completo"])
+
+    def test_ponerse_al_dia_parte_en_tramos_de_62_dias_e_ignora_rechazados_conocidos(self):
+        datos = dict(exportacion([]), rango={"desde": "2026-10-01", "hasta": "2026-10-07"},
+                     atrasados={"filas": [{"id": ID1, "fecha": "2026-05-01"}, {"id": ID2, "fecha": "2026-07-10"}]})
+        self._falsa_descarga(dict(exportacion([]), rango={}))
+        with redirect_stdout(io.StringIO()):
+            nuevos = self.s.ponerse_al_dia({}, self._args(), datos, {"rechazados": {ID1: {}}})
+        self.assertEqual(self.pedidos, [("2026-07-10", "2026-09-09")])
+        self.assertFalse(nuevos["_al_dia"]["completo"])
+
+    def test_ponerse_al_dia_no_hace_nada_sin_atrasados_o_con_rango_explicito(self):
+        datos = dict(exportacion([]), rango={"desde": "2026-10-01", "hasta": "2026-10-07"},
+                     atrasados={"filas": [{"id": ID1, "fecha": "2026-09-01"}]})
+        self._falsa_descarga({})
+        with redirect_stdout(io.StringIO()):
+            self.assertIs(self.s.ponerse_al_dia({}, self._args(desde="2026-10-01"), datos, {}), datos)
+            sin = dict(datos, atrasados={"filas": []})
+            self.assertIs(self.s.ponerse_al_dia({}, self._args(), sin, {}), sin)
+        self.assertEqual(self.pedidos, [])
+
+    def test_avisos_nuevos_incluye_excluidos_y_advertencias_una_sola_vez(self):
+        datos = {"avisos": [], "excluidos": [{"ref": "R1", "motivo": "reserva_no_vigente"},
+                                             {"ref": "R2", "motivo": "reserva_sin_verificar"}],
+                 "advertencias": ["2 check-in(s) no se pudieron descifrar"]}
+        estado = {}
+        self.assertEqual(len(self.s.avisos_nuevos(estado, datos)), 2)
+        self.assertEqual(self.s.avisos_nuevos(estado, datos), [])
+        notas = "\n".join(self.s.notas_pendientes(datos, estado))
+        self.assertIn("ADVERTENCIA", notas)
+        self.assertIn("reserva R1", notas)
+        self.assertNotIn("reserva R2", notas)
+
+    def test_resolver_reintentar_no_suelta_un_ack_pendiente(self):
+        with tempfile.TemporaryDirectory() as d:
+            estado = c.cargar_estado(d)
+            estado["bloqueo"] = {"motivo": "ack_pendiente", "desde": "2026-10-01T10:00:00-05:00", "lote": "vps-1",
+                                 "filas": [{"id": ID1}], "archivo": None}
+            c.guardar_estado(d, estado)
+            with redirect_stdout(io.StringIO()):
+                with self.assertRaises(c.ErrorSire) as ctx:
+                    self.s.modo_resolver(self._args(resolver="reintentar"), d, d, {}, False)
+            self.assertEqual(ctx.exception.codigo, c.USO)
+            self.assertIn("--resolver reportado", ctx.exception.mensaje)
+            self.assertEqual(c.cargar_estado(d)["bloqueo"]["motivo"], "ack_pendiente")
+
+    def test_resolver_reintentar_si_suelta_otros_bloqueos(self):
+        with tempfile.TemporaryDirectory() as d:
+            estado = c.cargar_estado(d)
+            estado["bloqueo"] = {"motivo": "no_verificable", "desde": "2026-10-01", "filas": [{"id": ID1}], "archivo": None}
+            c.guardar_estado(d, estado)
+            with redirect_stdout(io.StringIO()):
+                codigo, _ = self.s.modo_resolver(self._args(resolver="reintentar"), d, d, {}, False)
+            self.assertEqual(codigo, c.OK)
+            self.assertIsNone(c.cargar_estado(d)["bloqueo"])
+
+
 if __name__ == "__main__":
     unittest.main()
