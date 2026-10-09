@@ -4,9 +4,42 @@
    client cannot pay $1 for a $300k room. Quote payments (COT-...) take a
    different path via _quotes-store.computeQuoteTotal. */
 
+const fs = require('fs');
+const path = require('path');
 const { getDynamicPricing } = require('./_otasync');
 const { EXTRAS_PRICES, EXTRAS_KEYS } = require('./_pricing');
 const { verifyDiscountCode } = require('./_discount-store');
+
+/* Capacidad por tipo de habitación desde rooms_db.json (fuente canónica; llega a
+   las funciones vía included_files). Sin esto el servidor firmaba, p. ej., una
+   Clásica (2 personas) para 4 huéspedes. Si el archivo o el tipo no se conocen,
+   no se bloquea por capacidad (OTASync decide room_not_found / disponibilidad). */
+let _roomsDb = null;
+function loadRoomsDb() {
+  if (_roomsDb) return _roomsDb;
+  try {
+    const p = path.join(__dirname, '../../rooms_db.json');
+    _roomsDb = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : {};
+  } catch (e) {
+    _roomsDb = {};
+  }
+  return _roomsDb;
+}
+
+function roomCapacity(roomTypeId, roomsDb) {
+  const db = roomsDb || loadRoomsDb();
+  const room = db && db[String(roomTypeId)];
+  const cap = room ? Number(room.capacity) : NaN;
+  return cap > 0 ? cap : null;
+}
+
+/* null si cabe (o no se conoce la capacidad); si no, el detalle del exceso. */
+function capacityViolation(decoded, roomsDb) {
+  const capacity = roomCapacity(decoded && decoded.roomTypeId, roomsDb);
+  if (!capacity) return null;
+  const guests = Math.max(1, parseInt(decoded.guestsCount, 10) || 1);
+  return guests > capacity ? { capacity, guests } : null;
+}
 
 /* URL-safe base64 decode of the Wompi reservation reference. Mirrors the
    encoding in motor-app.jsx (PaymentPanel.handlePayment) and matches the
@@ -190,6 +223,22 @@ function withinTolerance(actualCents, expectedCents) {
    full-price payment. `opts` is forwarded to computeDirectBookingTotals
    (discountCode, email, deps, verifyDiscountCode). */
 async function verifyDirectBookingAmount(decoded, clientAmountInCents, opts = {}) {
+  /* Capacidad primero: no depende de OTASync (aplica también en modo mock) y
+     evita consultar precios de una reserva que no se puede alojar.
+     reason 'over_capacity' → el motor lo traduce a un mensaje amable. */
+  const overCapacity = capacityViolation(decoded, opts.roomsDb);
+  if (overCapacity) {
+    return {
+      ok: false,
+      isMock: false,
+      reason: 'over_capacity',
+      capacity: overCapacity.capacity,
+      guests: overCapacity.guests,
+      expectedCents: null,
+      actualCents: clientAmountInCents,
+      discount: { applied: false }
+    };
+  }
   const totals = await computeDirectBookingTotals(decoded, opts);
   if (totals.isMock) {
     return { ok: true, isMock: true, reason: 'mock_fallback', expectedCents: null, actualCents: clientAmountInCents, discount: totals.discount };
@@ -233,6 +282,8 @@ module.exports = {
   computeExtrasTotal,
   computeDirectBookingTotals,
   verifyDirectBookingAmount,
+  roomCapacity,
+  capacityViolation,
   withinTolerance,
   EXTRAS_KEYS,
   EXTRAS_PRICES,

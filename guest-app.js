@@ -782,6 +782,9 @@
     document.body.classList.remove('guest-is-authenticated');
   }
 
+  /* Frente motor: la confirmación de la reserva enlaza aquí con
+     ?code=<número de reserva> para hacer el check-in en línea. Prellenamos el
+     código (nunca el apellido: el segundo factor lo escribe el huésped). */
   function openTab(tabName) {
     $$('[data-guest-panel]').forEach(panel => {
       panel.classList.toggle('is-active', panel.dataset.guestPanel === tabName);

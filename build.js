@@ -639,6 +639,17 @@ async function build() {
     c = c.replace(/href="\.\.\/(bundle\.css)"/g, 'href="/$1"');
     fs.writeFileSync(en404Path, c);
   }
+
+  // ── Cache-busting por hash de contenido ─────────────────────────────────
+  // JS/CSS se sirven con caché de 1 año (netlify.toml): cada <script src> y
+  // hoja de estilo local del HTML construido pasa a `archivo?v=<hash>` para que
+  // un cambio llegue a quien ya visitó el sitio. Va al final, cuando todos los
+  // JS/CSS de dist/ ya tienen su contenido definitivo. No afecta los hashes CSP
+  // (solo cubren <script> inline, sin src). Ver build-cache-bust.js.
+  console.log('Applying content-hash cache-busting to built HTML...');
+  const { applyCacheBusting } = require('./build-cache-bust');
+  const busted = applyCacheBusting(distDir);
+  console.log(`  Versioned ${busted.assets} asset(s) across ${busted.files} HTML file(s).`);
 }
 
 /* ── CSP hash generation ────────────────────────────────────────────────────

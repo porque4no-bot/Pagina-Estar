@@ -332,8 +332,13 @@ test('motor-app.jsx ya no llama a /api/send-confirmation ni dice "Kunas" al hué
   assert.doesNotMatch(src, /sendConfirmationEmailIfPossible/);
   assert.doesNotMatch(src, /Kunas no creo/);
   assert.doesNotMatch(src, /Tu reserva está confirmada\. En unos minutos/);
-  assert.match(src, /Estamos verificando tu pago/);
-  assert.match(src, /We are verifying your payment/);
+  /* Integración con el frente motor: la espera de un pago EN PROCESO usa su
+     propio texto (i18n), que no dice "aprobado". */
+  assert.match(src, /processing \? t\.waitProcessingText : t\.waitConfirmingText/);
+  for (const lang of ['es', 'en']) {
+    const i18n = JSON.parse(fs.readFileSync(path.join(ROOT, 'i18n', `motor.${lang}.json`), 'utf8'));
+    assert.doesNotMatch(i18n.waitProcessingText, /aprobado|approved/i);
+  }
   /* El bundle solo se revisa si está al día con la fuente (npm run test:unit
      compila antes; un dist viejo no debe dar un falso rojo). */
   const built = path.join(ROOT, 'dist', 'motor-app.js');

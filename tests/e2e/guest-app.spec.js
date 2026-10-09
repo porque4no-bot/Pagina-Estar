@@ -156,6 +156,15 @@ test('a malformed ?code= is ignored', async ({ page }) => {
   await expect(page.locator('#bookingCode')).toHaveValue('');
 });
 
+/* Frente motor: el botón "Haz tu check-in en línea" de la confirmación abre la
+   app con ?code=<reserva>; el código llega prellenado (el apellido no). */
+test('the booking code from the confirmation link is prefilled', async ({ page }) => {
+  await mockGuestApis(page);
+  await page.goto('/guest.html?code=3273564');
+  await expect(page.locator('#bookingCode')).toHaveValue('3273564');
+  await expect(page.locator('#accessKey')).toHaveValue('');
+});
+
 test('invalid reservation displays the API error without opening the app', async ({ page }) => {
   await page.route('https://unpkg.com/lucide@*/**', route => route.fulfill({
     contentType: 'application/javascript',
