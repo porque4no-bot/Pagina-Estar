@@ -211,14 +211,30 @@ async function markNotified(store, o, now) {
    en el panel (ops-queue). La dedupeKey es la MISMA que usa el webhook para
    "pago sin reserva" de ese tx, así el webhook y la reconciliación comparten una
    sola tarea por incidente. */
+async function defaultFindReservationByReference(reference, checkin) {
+  const ota = require('./_otasync');
+  if (!ota.hasOtasyncCreds()) return null;
+  return ota.findReservationByReference(reference, checkin);
+}
+
 async function alertOrphan(o, deps = {}) {
   const report = deps.reportAlert || require('./_alert').reportAlert;
   const amount = o.amountCents != null ? Math.round(o.amountCents / 100).toLocaleString('es-CO') : '?';
+  const ref = o.reference || o.quoteId || o.transactionId;
+  let message;
+  if (o.existingReservation) {
+    message = `Reconciliación: pago ${o.provider || '?'} aprobado — ${ref} ($${amount}). La reserva ${o.existingReservation} SÍ existe en Kunas con ese código, pero el sistema no la registró. NO crear otra: verificar que esté bien y marcar el pago como resuelto en /admin → Hoy.`;
+  } else if (o.quoteId) {
+    message = `Reconciliación: pago ${o.provider || '?'} aprobado sin reserva en OTASync — ${ref} ($${amount}). Verificar en el proveedor y crear la reserva o reembolsar.`;
+  } else {
+    message = `Reconciliación: pago ${o.provider || '?'} aprobado sin reserva registrada — ${ref} ($${amount}). Antes de crearla, verificar en Kunas buscando por el código ${ref} (puede existir); si no está, crear la reserva o reembolsar.`;
+  }
   return report({
     kind: 'payment_without_reservation',
     severity: 'critical',
-    message: `Reconciliación: pago ${o.provider || '?'} aprobado sin reserva en OTASync — ${o.reference || o.quoteId || o.transactionId} ($${amount}). Verificar en el proveedor y crear la reserva o reembolsar.`,
+    message,
     context: {
+      existingReservation: o.existingReservation || null,
       provider: o.provider, transactionId: o.transactionId, reference: o.reference || null,
       quoteId: o.quoteId || null, amountCents: o.amountCents, createdAt: o.createdAt || null, reason: o.reason
     },
@@ -355,6 +371,15 @@ exports.handler = async (event, context, overrides = {}) => {
        una reserva duplicada. */
     if (await readPaymentIncident(incidentsStore, tx.provider, tx.id)) continue;
 
+    /* Antes de pedir "crear la reserva": ¿ya existe en Kunas con ese código EST?
+       (p. ej. el webhook creó la reserva y la función murió por tiempo antes de
+       escribir booking-results). Crearla a mano la duplicaría. */
+    let existingInPms = null;
+    try {
+      const lookup = deps.findReservationByReference || defaultFindReservationByReference;
+      existingInPms = await lookup(decoded.bookingCode, decoded.checkin);
+    } catch (e) { existingInPms = null; }
+
     orphans.push({
       quoteId: null,
       provider: tx.provider,
@@ -362,7 +387,10 @@ exports.handler = async (event, context, overrides = {}) => {
       reference: decoded.bookingCode,
       amountCents: tx.amountCents,
       createdAt: tx.createdAt,
-      reason: 'direct booking paid but no reservation (missing or pending in booking-results)'
+      existingReservation: existingInPms && existingInPms.idReservations ? String(existingInPms.idReservations) : null,
+      reason: existingInPms && existingInPms.idReservations
+        ? 'direct booking paid; reservation exists in OTASync but booking-results is missing/pending'
+        : 'direct booking paid but no reservation (missing or pending in booking-results)'
     });
   }
 

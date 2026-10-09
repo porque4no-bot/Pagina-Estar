@@ -258,3 +258,46 @@ test('directBookingReconciled: pending sin resolver se reporta; resuelto desde e
   assert.equal(await directBookingReconciled(store({ reservationPending: false }), 'EST-A'), true);
   assert.equal(await directBookingReconciled(store(null), 'EST-A'), false);
 });
+
+/* Revisión final: antes de pedir "crear la reserva", reconcile busca en Kunas por
+   el código EST (la función pudo morir tras crearla y antes de registrarla). */
+test('reconcile: si la reserva YA existe en Kunas con ese código, la alerta dice NO crear otra', async () => {
+  const ref = payments.createDirectReference({ checkin: '2026-11-01', checkout: '2026-11-03', guestsCount: 1, roomTypeId: '31348', firstName: 'Ana', lastName: 'R', email: 'a@x.co', phone: '300', extrasMask: '0000000', bookingCode: 'EST-MP-EX', amountCents: 30000000 });
+  const fetchImpl = async (url) => {
+    if (String(url).includes('mercadopago')) {
+      return new Response(JSON.stringify({ results: [mpPayment(ref, 'MP-EX', 300000)], paging: { total: 1 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  };
+  const ctx = load({ env: { MERCADOPAGO_ACCESS_TOKEN: 'tok' }, fetchImpl });
+  const alerts = [];
+  const lookups = [];
+  const reportAlert = async (a) => { alerts.push(a); return { alerted: true }; };
+  const findReservationByReference = async (code, checkin) => { lookups.push([code, checkin]); return { idReservations: '3299001', reference: code }; };
+  try {
+    await ctx.recon.handler(undefined, undefined, { reportAlert, findReservationByReference });
+    assert.deepEqual(lookups[0], ['EST-MP-EX', '2026-11-01']);
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0].message, /3299001 SÍ existe en Kunas/);
+    assert.match(alerts[0].message, /NO crear otra/);
+    assert.equal(alerts[0].context.existingReservation, '3299001');
+  } finally { ctx.cleanup(); }
+});
+
+test('reconcile: si no aparece en Kunas, la alerta pide verificar por el código EST antes de crearla', async () => {
+  const ref = payments.createDirectReference({ checkin: '2026-11-01', checkout: '2026-11-03', guestsCount: 1, roomTypeId: '31348', firstName: 'Ana', lastName: 'R', email: 'a@x.co', phone: '300', extrasMask: '0000000', bookingCode: 'EST-MP-NX', amountCents: 30000000 });
+  const fetchImpl = async (url) => {
+    if (String(url).includes('mercadopago')) {
+      return new Response(JSON.stringify({ results: [mpPayment(ref, 'MP-NX', 300000)], paging: { total: 1 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  };
+  const ctx = load({ env: { MERCADOPAGO_ACCESS_TOKEN: 'tok' }, fetchImpl });
+  const alerts = [];
+  const reportAlert = async (a) => { alerts.push(a); return { alerted: true }; };
+  try {
+    await ctx.recon.handler(undefined, undefined, { reportAlert, findReservationByReference: async () => null });
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0].message, /verificar en Kunas buscando por el código EST-MP-NX/);
+  } finally { ctx.cleanup(); }
+});

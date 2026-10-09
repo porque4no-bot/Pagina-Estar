@@ -757,7 +757,50 @@ async function recordDirectPending(deps, resultsStore, { code, decoded, transact
   return reply ? reply(res) : res;
 }
 
+/* Presupuesto de tiempo de la ruta directa. Netlify corta las funciones
+   síncronas a los ~10 s (por defecto) y el webhook ya gastó parte en consultar el
+   pago a MP. Si la función muere a mitad de camino no corren ni el pendiente en
+   booking-results ni la alerta, así que cada paso a OTASync tiene tope y el
+   insert se rinde antes del límite. deps.deadlineMs (absoluto) permite al
+   webhook pasar el límite real; si no, se asume MP_FUNCTION_BUDGET_MS desde ahora. */
+const DEFAULT_BUDGET_MS = 8500;
+const LOOKUP_CAP_MS = 2500;
+const AVAIL_CAP_MS = 2000;
+const PLAN_CAP_MS = 2000;
+function makeBudget(deps) {
+  const now = deps.now();
+  const total = Number(process.env.MP_FUNCTION_BUDGET_MS) || DEFAULT_BUDGET_MS;
+  const deadline = Number(deps.deadlineMs) > 0 ? Number(deps.deadlineMs) : now + total;
+  return { deadline, now: () => deps.now() };
+}
+/* Tiempo para un paso: el tope del paso, sin pasar de lo que queda menos una
+   reserva para el insert (4 s) — nunca negativo. */
+function stepBudget(budget, cap) {
+  const left = budget.deadline - budget.now() - 4000;
+  return Math.max(0, Math.min(cap, left));
+}
+function withTimeout(promise, ms, fallback) {
+  let tid;
+  const p = Promise.resolve(promise);
+  if (!(ms > 0)) { p.catch(() => {}); return Promise.resolve(fallback); }
+  return Promise.race([
+    p.finally(() => clearTimeout(tid)),
+    new Promise(resolve => { tid = setTimeout(() => resolve(fallback), ms); })
+  ]);
+}
+
+function loadRoomDetails() {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const dbPath = path.join(__dirname, '../../rooms_db.json');
+    if (fs.existsSync(dbPath)) return JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+  } catch (e) { /* fall back to default name */ }
+  return {};
+}
+
 async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
+  const budget = makeBudget(deps);
   const reply = (obj) => ({ statusCode: 200, headers: corsHeaders, body: JSON.stringify(obj) });
   const decoded = decodeDirectReference(transaction.reference);
   if (!decoded) {
@@ -789,8 +832,13 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
       /* Mercado Pago reenvía la notificación del MISMO pago mientras la primera
          sigue en curso (visto en producción, oct-2026). No es doble pago: se
          ignora en silencio — la entrega original crea la reserva. */
-      console.log(`[payments] duplicate delivery of tx ${transaction.id} for ${code} while in progress; ignoring.`);
-      return reply({ success: true, bookingCode: code, duplicate: true, inProgress: true });
+      console.log(`[payments] duplicate delivery of tx ${transaction.id} for ${code} while in progress; asking MP to retry later.`);
+      /* 409 (no 2xx): si la entrega original murió a mitad de camino (timeout de
+         Netlify) con el lock tomado, un 200 aquí haría que MP dejara de reintentar
+         y el pago quedaría sin reserva. Con 409 MP vuelve a entregar más tarde: si
+         la original terminó, booking-results lo resuelve como duplicado. El tx NO
+         se marca procesado. */
+      return { statusCode: 409, headers: corsHeaders, body: JSON.stringify({ success: true, bookingCode: code, duplicate: true, inProgress: true }) };
     }
     if (!lock.acquired) {
       console.error(`[payments] direct booking ${code} already being processed by tx ${lock.ownerTx}. Refusing tx ${transaction.id}.`);
@@ -827,11 +875,20 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
       return reply({ success: true, bookingCode: existing.bookingCode || code, duplicate: true, ...(existing.reservationPending ? { reservationPending: true } : {}) });
     }
 
-    /* (2) Idempotencia POR ESTADÍA (A-4): atrapa el doble pago de la misma estadía
-       con códigos/tx distintos. La re-entrega del MISMO tx es duplicado aunque
-       hayan pasado semanas. Fail-open si Blobs no está. */
+    /* (2) Idempotencia POR ESTADÍA (A-4). La re-entrega del MISMO tx es
+       duplicado aunque hayan pasado semanas. Un pago de OTRO tx para la misma
+       estadía (tipo de habitación + fechas + correo):
+         - con el MISMO código EST → doble pago de la misma preferencia: no se crea
+           otra reserva y se pide reembolsar;
+         - con OTRO código EST → NO se bloquea. El motor reserva una sola unidad
+           por checkout, así que quien necesita dos apartamentos del mismo tipo
+           para las mismas fechas paga dos veces con el mismo correo (dos pagos
+           legítimos). Se crea la reserva (la disponibilidad se revisa en el paso
+           4) y se alerta "posible doble pago — verificar", sin pedir reembolso.
+       Fail-open si Blobs no está. */
     const stayIdemKey = `booking_${decoded.roomTypeId}_${decoded.checkin}_${decoded.checkout}_${String(decoded.email || '').toLowerCase().trim()}`;
     let stayIdemStore = null;
+    let possibleDuplicateStay = null;
     if (resilient) {
       stayIdemStore = tryStore('booking-idempotency', deps);
       if (stayIdemStore) {
@@ -842,15 +899,18 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
               return reply({ success: true, bookingCode: prev.bookingCode || code, duplicate: true });
             }
             if ((deps.now() - (prev.createdAt || 0)) < STAY_IDEM_MAX_AGE_MS) {
-              console.error(`[payments] DUPLICATE STAY for ${code}: prev tx ${prev.transactionId}, new tx ${transaction.id}. NOT creating a second reservation.`);
-              await moneyAlert(deps, {
-                kind: 'payment_double_charge',
-                message: `Doble pago de la misma estadía — ${code}: ya hay una reserva para esas fechas, habitación y correo. No se creó otra; reembolsar el cargo duplicado.`,
-                context: { bookingCode: code, existingBooking: prev.bookingCode, existingTransaction: prev.transactionId, newTransaction: transaction.id, roomTypeId: decoded.roomTypeId, checkin: decoded.checkin, checkout: decoded.checkout },
-                dedupeKey: `pay-double-${transaction.id}`,
-                incident: { provider: transaction.provider, transactionId: transaction.id, bookingCode: code }
-              });
-              return reply({ success: true, bookingCode: prev.bookingCode, duplicate: true });
+              if (prev.reference && String(prev.reference) === String(code)) {
+                console.error(`[payments] DUPLICATE STAY for ${code}: prev tx ${prev.transactionId}, new tx ${transaction.id}. NOT creating a second reservation.`);
+                await moneyAlert(deps, {
+                  kind: 'payment_double_charge',
+                  message: `Doble pago de la misma estadía — ${code}: ya hay una reserva con este mismo código para esas fechas, habitación y correo. No se creó otra; reembolsar el cargo duplicado.`,
+                  context: { bookingCode: code, existingBooking: prev.bookingCode, existingTransaction: prev.transactionId, newTransaction: transaction.id, roomTypeId: decoded.roomTypeId, checkin: decoded.checkin, checkout: decoded.checkout },
+                  dedupeKey: `pay-double-${transaction.id}`,
+                  incident: { provider: transaction.provider, transactionId: transaction.id, bookingCode: code }
+                });
+                return reply({ success: true, bookingCode: prev.bookingCode, duplicate: true });
+              }
+              possibleDuplicateStay = prev;
             }
           }
         } catch (e) {
@@ -865,7 +925,9 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
        de Blobs. Si la consulta falla, se sigue (fail-open: un pago nuevo no puede
        quedar bloqueado por una caída de la consulta). */
     let found = null;
-    try { found = await deps.findReservationByReference(code, decoded.checkin); } catch (e) { found = null; }
+    try {
+      found = await withTimeout(deps.findReservationByReference(code, decoded.checkin), stepBudget(budget, LOOKUP_CAP_MS), null);
+    } catch (e) { found = null; }
     if (found && found.idReservations) {
       /* ¿La creó ESTE pago? La nota de OTASync lleva "ID Transaccion: <tx>". Solo
          si coincide es una re-entrega del mismo pago. Si es OTRO tx (la misma
@@ -883,6 +945,18 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
         ...(sameTx ? { paymentMethod: transaction.paymentMethod, amountInCents: transaction.amountCents } : {}),
         recoveredFrom: 'otasync_reference', createdAt: new Date(deps.now()).toISOString()
       });
+      if (sameTx && decoded.email) {
+        /* La entrega anterior de este mismo pago creó la reserva pero murió antes
+           de terminar (p. ej. timeout): el correo de confirmación pudo no salir.
+           sendConfirmationEmail deduplica por código, así que nunca sale doble. */
+        try {
+          const b = buildDirectReservationPayload({ decoded, transaction, pkey: '', creds: {}, roomDetails: loadRoomDetails(), ratePlan: decoded.ratePlan || null, guestNote: '' });
+          await sendDirectConfirmation({
+            decoded, bookingCode: String(found.idReservations), roomName: b.roomName, nights: b.nights,
+            paidAmount: b.paidAmount, totalAmount: b.roomPrice, via: transaction.provider
+          }, deps.sendConfirmationEmail);
+        } catch (e) { /* best-effort */ }
+      }
       if (!sameTx) {
         await moneyAlert(deps, {
           kind: 'payment_double_charge',
@@ -903,7 +977,9 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
        PROPIA reserva y escribía un falso sold_out encima del resultado bueno. */
     if (decoded.checkin && decoded.checkout) {
       try {
-        const { availByType, isMock } = await deps.getAvailabilityByType(decoded.checkin, decoded.checkout);
+        const avail = await withTimeout(deps.getAvailabilityByType(decoded.checkin, decoded.checkout), stepBudget(budget, AVAIL_CAP_MS), null);
+        if (!avail) throw new Error('availability check timed out');
+        const { availByType, isMock } = avail;
         if (!isMock && (availByType[String(decoded.roomTypeId)] || 0) <= 0) {
           console.error(`[payments] direct booking PAID but SOLD OUT: roomType=${decoded.roomTypeId}, bookingCode=${code}, tx=${transaction.id}. Reservation NOT created.`);
           await writeBookingResult(resultsStore, code, {
@@ -925,12 +1001,17 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
     }
 
     const side = await loadDirectSideData(code, deps);
-    const ratePlan = await deriveRatePlan(decoded, transaction.amountCents, side.discount, deps);
+    /* El plan autoritativo (recalculado con OTASync) va en la nota de la reserva,
+       pero no puede comerse el tiempo del insert: con tope; si no alcanza, cae al
+       plan de la referencia. */
+    const ratePlan = await withTimeout(
+      deriveRatePlan(decoded, transaction.amountCents, side.discount, deps),
+      stepBudget(budget, PLAN_CAP_MS), decoded.ratePlan || null
+    );
 
-    /* Credenciales/sesión de OTASync DENTRO de la protección: en la ruta
-       resiliente el tx ya está marcado procesado, así que si esto lanzara el
-       reintento de MP chocaría con alreadyProcessed y el pago quedaría sin
-       reserva y sin alerta. insertReservation obtiene (y renueva) su propia
+    /* Credenciales/sesión de OTASync DENTRO de la protección: si esto lanzara,
+       la ruta resiliente deja el pendiente + alerta en vez de un 500.
+       insertReservation obtiene (y renueva) su propia
        sesión con withSessionRetry: aquí la clave solo hace falta para el legacy. */
     let creds, pkey = '';
     try {
@@ -941,13 +1022,7 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
       return await recordDirectPending(deps, resultsStore, { code, decoded, transaction, ratePlan, reason: 'auth_failed', error: authErr, reply });
     }
 
-    let roomDetails = {};
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const dbPath = path.join(__dirname, '../../rooms_db.json');
-      if (fs.existsSync(dbPath)) roomDetails = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-    } catch (e) { /* fall back to default name */ }
+    const roomDetails = loadRoomDetails();
 
     const built = buildDirectReservationPayload({
       decoded, transaction, pkey, creds, roomDetails, ratePlan, guestNote: side.notes
@@ -961,7 +1036,10 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
          y 200 (para que MP no reintente infinito). El reconciliador trata
          reservationPending:true como NO reconciliado, así el pago no se pierde. */
       try {
-        data = await deps.insertReservation(payload);
+        /* Los reintentos del insert se limitan al tiempo que le queda a la función:
+           si Netlify la mata a mitad de camino no corre ni el pendiente ni la
+           alerta. Mejor rendirse a tiempo y dejar el pendiente registrado. */
+        data = await deps.insertReservation(payload, { deadlineMs: budget.deadline });
       } catch (insertErr) {
         console.error(`[payments] direct insert failed for ${code} (tx ${transaction.id}): ${insertErr.message}`);
         return await recordDirectPending(deps, resultsStore, { code, decoded, transaction, ratePlan, reason: 'insert_failed', error: insertErr, reply });
@@ -988,8 +1066,20 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
     /* Idempotencia por estadía: registrar SOLO tras inserción exitosa. */
     if (resilient && stayIdemStore) {
       try {
-        await stayIdemStore.set(stayIdemKey, JSON.stringify({ bookingCode: finalBookingCode, transactionId: transaction.id, createdAt: deps.now() }));
+        await stayIdemStore.set(stayIdemKey, JSON.stringify({ bookingCode: finalBookingCode, reference: code, transactionId: transaction.id, createdAt: deps.now() }));
       } catch (e) { /* non-fatal */ }
+    }
+
+    /* Segundo pago de la misma estadía con OTRO código EST: la reserva se creó
+       (pueden ser dos apartamentos), pero se avisa para verificar con el huésped
+       que no sea un pago repetido por error. No marca incidente: hay reserva. */
+    if (possibleDuplicateStay) {
+      await moneyAlert(deps, {
+        kind: 'payment_possible_duplicate',
+        message: `Posible doble pago — ${code}: el mismo correo ya pagó otra reserva (${possibleDuplicateStay.reference || possibleDuplicateStay.bookingCode}) del mismo tipo de habitación y fechas. Se creó la reserva ${finalBookingCode} porque puede ser un segundo apartamento; verificar con el huésped y, solo si fue un pago repetido por error, cancelar una y reembolsar.`,
+        context: { bookingCode: code, newReservation: finalBookingCode, existingBooking: possibleDuplicateStay.bookingCode, existingReference: possibleDuplicateStay.reference || null, existingTransaction: possibleDuplicateStay.transactionId, newTransaction: transaction.id, roomTypeId: decoded.roomTypeId, checkin: decoded.checkin, checkout: decoded.checkout },
+        dedupeKey: `pay-maybedouble-${transaction.id}`
+      });
     }
 
     /* Correo de confirmación desde el SERVIDOR (como Wompi): llega aunque el
@@ -1088,27 +1178,31 @@ async function processApprovedPayment(transaction, corsHeaders, overrides = {}) 
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Reference was not an encoded direct reservation payload' }) };
   }
   if (!isQuote) {
-    /* C4 — mark-before-work en la ruta DIRECTA resiliente: una re-entrega del
-       MISMO tx es no-op aunque el insert falle después (la red de seguridad es
-       el pendiente en booking-results, que el reconciliador cruza aunque el tx
-       esté marcado). */
+    /* El tx se marca procesado SOLO cuando la ruta terminó y dejó su resultado
+       (booking-results confirmado o pendiente, o un duplicado/alerta resuelto).
+       Antes se marcaba ANTES de trabajar (mark-before-work): si Netlify mataba la
+       función por tiempo a mitad de camino, no quedaba ni pendiente ni alerta y
+       las re-entregas de MP se descartaban como duplicadas. Ahora una re-entrega
+       se resuelve con el lock, booking-results, el registro por estadía y la
+       búsqueda por reference en OTASync. */
     const resilient = await mpDirectResilient(deps);
     if (resilient) {
-      await markProcessed(transaction.id, deps);
+      let res;
       try {
-        return await processDirectPayment(transaction, corsHeaders, deps, true);
+        res = await processDirectPayment(transaction, corsHeaders, deps, true);
       } catch (err) {
-        /* Red de seguridad: el tx YA está marcado, así que una excepción no puede
-           subir como 500 (el reintento de MP sería descartado como duplicado y el
-           pago quedaría sin reserva y sin alerta). Pendiente + alerta + 200. */
+        /* Red de seguridad: pendiente + alerta + 200 (el pago no se pierde; la
+           reconciliación lo cruza). */
         console.error(`[payments] direct processing threw for tx ${transaction.id}:`, err && err.message);
         const decoded = decodeDirectReference(transaction.reference) || {};
         const code = decoded.bookingCode || transaction.reference;
-        return await recordDirectPending(deps, tryStore('booking-results', deps), {
+        res = await recordDirectPending(deps, tryStore('booking-results', deps), {
           code, decoded, transaction, ratePlan: null, reason: 'unexpected_error', error: err,
           reply: (obj) => ({ statusCode: 200, headers: corsHeaders, body: JSON.stringify(obj) })
         });
       }
+      if (res && res.statusCode >= 200 && res.statusCode < 300) await markProcessed(transaction.id, deps);
+      return res;
     }
     const legacy = await processDirectPayment(transaction, corsHeaders, deps, false);
     if (legacy && legacy.statusCode >= 200 && legacy.statusCode < 300) await markProcessed(transaction.id, deps);

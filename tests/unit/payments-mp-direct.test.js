@@ -116,7 +116,7 @@ test('flag ON: éxito → inserta una vez, escribe booking-results e idempotenci
 test('flag ON: doble pago de la misma estadía (otro tx) → duplicate, NO inserta, alerta', async () => {
   const ref1 = '__seed__';
   const ctx = load({
-    seed: { 'booking-idempotency': { ['booking_31348_2026-08-01_2026-08-03_a@x.co']: { bookingCode: 'RES-PREV', transactionId: 'MP-OLD', createdAt: Date.now() } } }
+    seed: { 'booking-idempotency': { ['booking_31348_2026-08-01_2026-08-03_a@x.co']: { bookingCode: 'RES-PREV', reference: 'EST-D2', transactionId: 'MP-OLD', createdAt: Date.now() } } }
   });
   try {
     const ref = refFor(ctx.payments, 'EST-D2', 30000000);

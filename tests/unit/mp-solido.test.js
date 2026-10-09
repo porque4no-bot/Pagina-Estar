@@ -320,9 +320,9 @@ test('monto incorrecto → alerta "monto incorrecto" vía reportAlert y NO inser
   assert.equal(calls.alerts[0].kind, 'payment_amount_mismatch');
 });
 
-test('doble pago de la misma estadía (otro tx, < 7 días) → alerta vía reportAlert', async () => {
+test('doble pago de la misma estadía con el MISMO código EST (otro tx, < 7 días) → alerta vía reportAlert', async () => {
   const key = 'booking_31348_2026-11-10_2026-11-12_ana@example.com';
-  const blobs = memBlobs({ 'booking-idempotency': { [key]: { bookingCode: 3300300, transactionId: 'MP-OTHER', createdAt: Date.now() } } });
+  const blobs = memBlobs({ 'booking-idempotency': { [key]: { bookingCode: 3300300, reference: 'EST-DS1', transactionId: 'MP-OTHER', createdAt: Date.now() } } });
   const { deps, calls } = makeDeps({ blobs });
   const res = await processApprovedPayment(mpTx(refFor('EST-DS1', 30000000), nextTx(), 30000000), H, deps);
   assert.equal(body(res).duplicate, true);
@@ -445,7 +445,7 @@ test('última defensa sin poder saber qué tx la creó → alerta de POSIBLE dob
 
 test('doble pago y monto incorrecto dejan el incidente marcado (reconcile no los repite como "sin reserva")', async () => {
   const key = 'booking_31348_2026-11-10_2026-11-12_ana@example.com';
-  const blobs = memBlobs({ 'booking-idempotency': { [key]: { bookingCode: 3300301, transactionId: 'MP-OTHER2', createdAt: Date.now() } } });
+  const blobs = memBlobs({ 'booking-idempotency': { [key]: { bookingCode: 3300301, reference: 'EST-DS2', transactionId: 'MP-OTHER2', createdAt: Date.now() } } });
   const { deps } = makeDeps({ blobs });
   const tx1 = nextTx();
   await processApprovedPayment(mpTx(refFor('EST-DS2', 30000000), tx1, 30000000), H, deps);
@@ -483,4 +483,78 @@ test('_alert.reportAlert: lo que se loguea va redactado', async () => {
   const text = JSON.stringify(logged);
   assert.ok(!text.includes('a@x.co'));
   assert.ok(!text.includes('Ana'));
+});
+
+/* ── Revisión final de integración (oct-2026) ─────────────────────────── */
+
+test('misma estadía y correo pero OTRO código EST (dos apartamentos) → se crea la reserva y solo alerta "posible doble pago"', async () => {
+  const key = 'booking_31348_2026-11-10_2026-11-12_ana@example.com';
+  const blobs = memBlobs({ 'booking-idempotency': { [key]: { bookingCode: 3300400, reference: 'EST-FAMA', transactionId: 'MP-FAM-A', createdAt: Date.now() } } });
+  const { deps, calls } = makeDeps({ blobs });
+  const tx = nextTx();
+  const res = await processApprovedPayment(mpTx(refFor('EST-FAMB', 30000000), tx, 30000000), H, deps);
+  assert.equal(body(res).success, true);
+  assert.notEqual(body(res).duplicate, true);
+  assert.equal(calls.insert.length, 1, 'la segunda reserva SÍ se crea');
+  assert.equal(calls.alerts.length, 1);
+  assert.equal(calls.alerts[0].kind, 'payment_possible_duplicate');
+  assert.match(calls.alerts[0].message, /verificar con el huésped/);
+  assert.doesNotMatch(calls.alerts[0].message, /reembolsar el cargo duplicado/);
+  assert.equal(blobs.read('payment-incidents', `mercadopago:${tx}`), null, 'no marca incidente: hay reserva');
+  assert.equal(blobs.read('booking-idempotency', key).reference, 'EST-FAMB', 'el registro por estadía guarda el código EST');
+});
+
+test('el tx NO se marca procesado antes de trabajar: si la función muere a mitad, la re-entrega de MP vuelve a procesarse', async () => {
+  const blobs = memBlobs();
+  const { deps } = makeDeps({ blobs });
+  const tx = nextTx();
+  /* Simula que Netlify corta la función durante el insert: la promesa nunca vuelve. */
+  deps.insertReservation = () => new Promise(() => {});
+  processApprovedPayment(mpTx(refFor('EST-KILL', 30000000), tx, 30000000), H, deps);
+  await new Promise(r => setTimeout(r, 30));
+  assert.equal(blobs.read('processed-transactions', String(tx)), null, 'nada marcado mientras trabaja');
+
+  /* La re-entrega (otra instancia, lock libre) crea la reserva. */
+  const { deps: deps2, calls: calls2 } = makeDeps({ blobs });
+  const res = await processApprovedPayment(mpTx(refFor('EST-KILL', 30000000), tx, 30000000), H, deps2);
+  assert.equal(body(res).success, true);
+  assert.notEqual(body(res).duplicate, true);
+  assert.equal(calls2.insert.length, 1);
+  assert.equal(blobs.read('processed-transactions', String(tx)), 1, 'marcado al terminar');
+});
+
+test('re-entrega del MISMO tx con el lock tomado → 409 (MP reintenta) y el tx no queda marcado', async () => {
+  const blobs = memBlobs();
+  const tx = nextTx();
+  const { deps } = makeDeps({ blobs, lock: { acquired: false, ownerTx: tx } });
+  const res = await processApprovedPayment(mpTx(refFor('EST-INP', 30000000), tx, 30000000), H, deps);
+  assert.equal(res.statusCode, 409);
+  assert.equal(body(res).inProgress, true);
+  assert.equal(blobs.read('processed-transactions', String(tx)), null);
+});
+
+test('presupuesto de tiempo: consultas lentas a OTASync no se comen el insert (el plan cae al de la referencia)', async () => {
+  const { deps, calls } = makeDeps({});
+  deps.findReservationByReference = () => new Promise(() => {});
+  deps.getAvailabilityByType = () => new Promise(() => {});
+  deps.verifyDirectBookingAmount = () => new Promise(() => {});
+  let opts = null;
+  deps.insertReservation = async (p, o) => { calls.insert.push(p); opts = o; return { id_reservations: 3300777 }; };
+  const t0 = Date.now();
+  deps.deadlineMs = t0 + 4600; /* ~0,6 s para consultas; el resto queda para el insert */
+  const res = await processApprovedPayment(mpTx(refFor('EST-SLOW', 30000000, { ratePlan: 'flexible' }), nextTx(), 30000000), H, deps);
+  assert.equal(body(res).success, true);
+  assert.ok(Date.now() - t0 < 3000, 'no esperó a las consultas colgadas');
+  assert.equal(calls.insert.length, 1);
+  assert.equal(opts.deadlineMs, deps.deadlineMs, 'el insert recibe el límite');
+  assert.match(calls.insert[0].note, /Plan: Flexible/);
+});
+
+test('re-entrega del mismo tx cuando la reserva ya existía en OTASync → reenvía (deduplicado) el correo de confirmación', async () => {
+  const tx = nextTx();
+  const { deps, calls } = makeDeps({ found: { idReservations: '3083720', reference: 'EST-RE8', note: `ID Transaccion: ${tx}` } });
+  const res = await processApprovedPayment(mpTx(refFor('EST-RE8', 30000000), tx, 30000000), H, deps);
+  assert.equal(body(res).duplicate, true);
+  assert.equal(calls.emails.length, 1);
+  assert.equal(calls.emails[0].bookingCode, '3083720');
 });

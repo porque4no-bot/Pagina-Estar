@@ -422,11 +422,18 @@ async function findReservationByReference(reference, dateArrival) {
   }
 }
 
-async function insertReservation(payload) {
+/* opts.deadlineMs (opcional, epoch ms): límite absoluto para TODOS los
+   intentos. Lo usa la ruta directa de Mercado Pago para no pasarse del tiempo de
+   la función de Netlify (si la matan a mitad de camino no queda ni pendiente ni
+   alerta). Sin deadline (Wompi, cotizaciones) el comportamiento no cambia. */
+const INSERT_MIN_ATTEMPT_MS = 2500;
+async function insertReservation(payload, opts = {}) {
+  const deadline = Number(opts && opts.deadlineMs) > 0 ? Number(opts.deadlineMs) : 0;
+  const attemptTimeout = () => (deadline ? Math.min(10000, deadline - Date.now() - 500) : 10000);
   const makeRequest = async (pkey) => {
     const body = { ...payload, key: pkey };
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10000);
+    const tid = setTimeout(() => ctrl.abort(), Math.max(1000, attemptTimeout()));
     try {
       const r = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -447,6 +454,11 @@ async function insertReservation(payload) {
   let mayHaveCommitted = false;
   try {
     for (let attempt = 1; attempt <= INSERT_MAX_ATTEMPTS; attempt++) {
+      if (deadline && attempt > 1 && attemptTimeout() < INSERT_MIN_ATTEMPT_MS) {
+        /* No alcanza el tiempo para otro intento: se rinde ya (el llamador deja
+           el pendiente + alerta) en vez de que Netlify corte la función. */
+        throw lastErr || new Error('insert/reservation: sin tiempo para reintentar');
+      }
       if (mayHaveCommitted) {
         const existing = await findReservationByReference(payload && payload.reference, payload && payload.date_arrival);
         if (existing) {
@@ -483,7 +495,7 @@ async function insertReservation(payload) {
     /* Antes de declarar el fallo: si el último intento fue un timeout, la reserva
        pudo quedar creada. Una última verificación por reference evita alertar (y
        dejar en pendiente) una reserva que en realidad sí existe. */
-    if (mayHaveCommitted) {
+    if (mayHaveCommitted && (!deadline || deadline - Date.now() > 1500)) {
       const existing = await findReservationByReference(payload && payload.reference, payload && payload.date_arrival);
       if (existing) {
         console.warn(`[otasync] insert/reservation: tras el fallo se encontró la reserva ya creada para reference ${payload.reference} (id ${existing.idReservations}).`);

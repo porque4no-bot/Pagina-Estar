@@ -316,7 +316,10 @@ async function fetchPayment(paymentId, { fetchImpl = fetch, env = process.env } 
   if (!accessToken) throw new Error('MERCADOPAGO_ACCESS_TOKEN is not configured');
 
   const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 12000);
+  /* 5 s (antes 12): la función síncrona de Netlify se corta a los ~10 s y
+     después de esto todavía hay que crear la reserva. Un timeout aquí responde
+     502 y MP reintenta (el tx no se marcó). */
+  const tid = setTimeout(() => ctrl.abort(), 5000);
   let res;
   try {
     res = await fetchImpl(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
@@ -339,7 +342,12 @@ async function fetchPayment(paymentId, { fetchImpl = fetch, env = process.env } 
   return data;
 }
 
+/* Límite de tiempo de la invocación (ms desde que entra el aviso). La ruta
+   directa reparte lo que quede entre sus consultas a OTASync y el insert. */
+const WEBHOOK_BUDGET_MS = 9000;
+
 async function handleWebhook(event, overrides = {}) {
+  const startedAt = Date.now();
   const deps = {
     env: process.env,
     fetchImpl: fetch,
@@ -465,7 +473,9 @@ async function handleWebhook(event, overrides = {}) {
      quote total or the encoded direct-reference amount) — the client price is
      never trusted. */
   try {
-    return await deps.processApprovedPayment(transaction, headers());
+    return await deps.processApprovedPayment(transaction, headers(), {
+      deadlineMs: startedAt + (Number(env.MP_FUNCTION_BUDGET_MS) || WEBHOOK_BUDGET_MS)
+    });
   } catch (e) {
     console.error('[mercadopago-webhook] reservation processing failed:', e.message);
     return response(500, { error: 'Failed to process approved payment' });
