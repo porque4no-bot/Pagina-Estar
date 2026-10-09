@@ -230,7 +230,12 @@ const defaultDeps = {
   notifyOrderTeam,
   upsertPartner: _upsertPartner,
   createHelpdeskTicket: _createHelpdeskTicket,
-  reportAlert: _reportAlert
+  reportAlert: _reportAlert,
+  /* Frente cancel: cancelar desde la app reutiliza el MISMO flujo de la web
+     (registro de reembolso + alerta al equipo + acuse al huésped). Lazy para no
+     cargar OTASync/correo en cada acción del guest app. */
+  submitCancellationRequest: (args) => require('./request-cancellation').submitCancellationRequest(args),
+  hasPmsCredentials: () => require('./_otasync').hasOtasyncCreds()
 };
 
 /* Decide which provider settles an online service order. The env mode is the
@@ -650,6 +655,59 @@ exports.handler = async event => {
         await deps.notifyOrderTeam(record);
       } catch (mailErr) {
         console.error('[guest-action] order team notification failed:', mailErr.message);
+      }
+    }
+
+    /* Frente cancel: una solicitud de CANCELACIÓN desde la app sigue el mismo
+       flujo de la web (request-cancellation): registro de reembolso por revisar,
+       alerta al equipo y acuse al huésped. Antes quedaba solo como evento. La
+       sesión firmada ya probó la identidad (código + apellido) → preVerified.
+       Best-effort: el evento ya quedó guardado arriba; si Kunas o el correo
+       fallan, se alerta al equipo para que no se pierda. */
+    if (type === 'reservation_change' && record.requestKind === 'cancel') {
+      try {
+        if (!deps.hasPmsCredentials()) {
+          response.cancellation = { submitted: false, code: 'pms_unavailable' };
+        } else {
+          const result = await deps.submitCancellationRequest({
+            bookingCode: session.sub,
+            preVerified: true,
+            clientIp: extractClientIp(event),
+            source: 'guest-app',
+            /* Solo si la app lo mandó explícito; si no, rige el idioma de la reserva. */
+            lang: ['en', 'es'].includes(body.lang) ? body.lang : undefined
+          });
+          response.cancellation = { submitted: Boolean(result && result.ok), code: (result && result.code) || 'unknown' };
+        }
+      } catch (cancelErr) {
+        console.error('[guest-action] cancellation request failed:', cancelErr.message);
+        response.cancellation = { submitted: false, code: 'error' };
+      }
+      /* Todo resultado que no sea "registrada" (submitted / already_requested)
+         significa que nadie del flujo normal se enteró: not_cancellable (p. ej.
+         reserva ya en checked_in), not_found, pms_unavailable, notify_failed o
+         error. Se alerta (→ tarea en Hoy) para que recepción lo gestione a mano;
+         la app del huésped muestra "Solicitud recibida" igual. */
+      const CANCEL_OK = ['submitted', 'already_requested'];
+      if (!CANCEL_OK.includes(response.cancellation.code)) {
+        const why = {
+          not_cancellable: 'la reserva no está en un estado cancelable en Kunas (¿ya hizo check-in?)',
+          not_found: 'no se encontró la reserva en Kunas',
+          pms_unavailable: 'Kunas no está configurado/disponible',
+          notify_failed: 'no se pudo avisar al equipo por correo',
+          error: 'error inesperado al procesarla'
+        }[response.cancellation.code] || `resultado ${response.cancellation.code}`;
+        try {
+          await deps.reportAlert({
+            kind: 'guest_cancel_request_failed',
+            severity: 'error',
+            message: `Cancelación pedida desde la app del huésped sin procesar — reserva ${record.bookingCode}: ${why}. Gestionarla a mano con el huésped.`,
+            context: { bookingCode: record.bookingCode, eventId: record.eventId, code: response.cancellation.code },
+            dedupeKey: `guest_cancel_request_failed:${record.bookingCode}`
+          });
+        } catch (alertErr) {
+          console.error('[guest-action] cancellation alert failed:', alertErr.message);
+        }
       }
     }
 

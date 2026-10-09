@@ -473,6 +473,17 @@
 }
 .rf-timeline li:last-child { border-bottom: none; }
 .rf-timeline .rf-ts { font-family: var(--font-label); font-size: 10.5px; color: var(--ink-500); letter-spacing: 0.05em; margin-bottom: 2px; }
+/* Frente cancel: qué hace "Aprobar", sugerencia por política, estado en Kunas */
+.rf-plan { margin: 0; padding-left: 18px; font-family: var(--font-body); font-size: 12.5px; line-height: 1.6; color: var(--ink-700); }
+.rf-plan li { margin: 2px 0; }
+.rf-ok { color: var(--olive-700); font-weight: 600; }
+.rf-pending { color: var(--terracotta-700); font-weight: 600; }
+.rf-suggest { background: var(--olive-100); border: 1px solid var(--olive-300); border-radius: 8px; padding: 11px 14px; font-family: var(--font-body); font-size: 12.5px; line-height: 1.5; color: var(--ink-700); }
+.rf-suggest .rf-actions { margin-top: 8px; }
+.rf-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 560px) { .rf-row2 { grid-template-columns: 1fr; } }
+.rf-check { display: flex; gap: 8px; align-items: flex-start; font-family: var(--font-body); font-size: 12.5px; color: var(--ink-700); margin-top: 8px; }
+.rf-btn-sm { padding: 7px 12px !important; font-size: 10.5px !important; }
 
 /* ── Audit history modal ── */
 .audit-backdrop {
@@ -1002,11 +1013,13 @@
 
     <!-- ══════════════ VIEW: Reembolsos ══════════════ -->
     <div id="viewReembolsos" style="display:none">
-      <div class="rf-note" style="margin-bottom:20px">
-        Por ahora <strong>todos los reembolsos se tramitan manualmente</strong> (Wompi y Mercado Pago no permiten reembolso automático en esta cuenta).
+      <div class="rf-note" style="margin-bottom:20px" id="rfIntro">
+        <strong>"Aprobar" hace todo:</strong> cancela la reserva en Kunas, devuelve la plata y le avisa al huésped por correo.
+        Lo que el sistema no pueda hacer solo (según los interruptores de Configuración) queda como <strong>tarea en la pestaña Hoy</strong>.
         El monto se define <strong>según la política de cancelación de la tarifa</strong>
         (Estricta: gratis hasta 7 días antes · Flexible: gratis hasta 24 h antes; fuera de plazo se cobra 1ª noche + impuestos + 3,5%)
-        y se procesa por el mismo medio de pago en un <strong>máximo de 15 días hábiles</strong>.
+        —el panel lo sugiere— y se devuelve por el mismo medio de pago en un <strong>máximo de 15 días hábiles</strong>.
+        <span id="rfConfigLine"></span>
       </div>
 
       <div class="lista-toolbar">
@@ -1017,7 +1030,10 @@
           <button type="button" class="rf-chip" data-filter="done">Reembolsados <span class="rf-chip-count">0</span></button>
           <button type="button" class="rf-chip" data-filter="denied">Denegados <span class="rf-chip-count">0</span></button>
         </div>
-        <button type="button" id="refreshRefundsBtn" class="btn btn-ghost-dark" style="padding:10px 16px; font-size:11px; margin-left:auto;">Actualizar</button>
+        <div style="margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" id="newSpecialRefundBtn" class="btn btn-ghost-dark" style="padding:10px 16px; font-size:11px; display:none;">Nuevo caso especial</button>
+          <button type="button" id="refreshRefundsBtn" class="btn btn-ghost-dark" style="padding:10px 16px; font-size:11px;">Actualizar</button>
+        </div>
       </div>
 
       <div id="rfLoading" style="display:none; padding:48px; text-align:center; font-family:var(--font-label); font-size:12px; color:var(--ink-500); letter-spacing:0.08em;">Cargando reembolsos…</div>
@@ -1953,9 +1969,11 @@ function opsRow(it){
     actions = '<button type="button" class="btn btn-ghost-dark hoy-op-retry" data-event="'+hoyEsc(ctx.eventId)+'" data-id="'+hoyEsc(it.id)+'" style="padding:5px 10px;font-size:11px;margin-right:6px;">Reintentar folio</button>' + actions;
   }
   const detail = ctx.bookingCode ? (' · reserva '+hoyEsc(ctx.bookingCode)) : '';
+  /* Frente cancel: las tareas de reembolso/cancelación traen el paso a paso. */
+  const howto = ctx.instructions ? '<br><span style="color:var(--fg-muted);font-size:12px;">↳ '+hoyEsc(ctx.instructions)+'</span>' : '';
   return '<div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">'
     + '<div><strong>'+sev+' '+hoyEsc(it.kind)+'</strong>'+detail
-    + '<br><span style="color:var(--fg-muted);font-size:12px;">'+hoyEsc(it.title||'')+' · '+when+'</span></div>'
+    + '<br><span style="color:var(--fg-muted);font-size:12px;">'+hoyEsc(it.title||'')+' · '+when+'</span>'+howto+'</div>'
     + '<div style="white-space:nowrap;">'+actions+'</div></div>';
 }
 async function loadOps(){
@@ -2923,11 +2941,23 @@ const REFUND_ROUTE_LABEL = {
   GATEWAY_ASSISTED: 'Wompi · tarjeta',
   MANUAL_BANK: 'Transferencia'
 };
+const REFUND_KIND_LABEL = { cancellation: 'Cancelación', special: 'Caso especial' };
+/* Cómo se devuelve la plata por medio de pago (Wompi no tiene API de reembolso:
+   anulación desde su dashboard el MISMO día o ticket a soporte). */
 const REFUND_ROUTE_HOWTO = {
-  GATEWAY_AUTO: 'Reembolso por Mercado Pago: hazlo desde el panel de MP (Tu negocio → Actividad → reembolsar) y registra aquí el ID del reembolso.',
-  GATEWAY_ASSISTED: 'Wompi no tiene API de reembolso: abre un ticket en soporte Wompi para revertir la tarjeta y registra aquí el número de caso.',
-  MANUAL_BANK: 'Reembolso por transferencia: solicita al huésped los datos bancarios del titular y registra el comprobante al marcarlo como reembolsado.'
+  GATEWAY_AUTO: 'Mercado Pago: con el auto-reembolso activo se devuelve solo al aprobar. Si no, hazlo desde el panel de MP (Tu negocio → Ventas/Actividad → el pago → Devolver dinero) y registra aquí el número de la devolución.',
+  GATEWAY_ASSISTED: 'Wompi no permite reembolsar por API. Si el pago es de HOY: dashboard de Wompi → Transacciones → la transacción → "Anular transacción". Si ya pasó el día: ticket a soporte de Wompi con el código de autorización, la fecha, los últimos 4 dígitos y el valor (abajo). Registra aquí el número de caso.',
+  MANUAL_BANK: 'Transferencia bancaria: el huésped indica su cuenta (formulario o WhatsApp/correo); transfiere desde la cuenta del hotel y registra el comprobante al marcarlo como reembolsado.'
 };
+/* Medio de pago que el admin completa cuando falta (proveedor|método). */
+const RF_PAYMENT_OPTIONS = [
+  ['', '— Elige el medio de pago —'],
+  ['mercadopago|credit_card', 'Mercado Pago · tarjeta o saldo MP'],
+  ['mercadopago|pse', 'Mercado Pago · PSE / efectivo'],
+  ['wompi|CARD', 'Wompi · tarjeta'],
+  ['wompi|PSE', 'Wompi · PSE / Nequi / Bancolombia'],
+  ['otro|transfer', 'Transferencia / efectivo / datáfono']
+];
 const RF_BUCKETS = {
   all: () => true,
   review: r => r.status === 'NEEDS_REVIEW',
@@ -2937,6 +2967,7 @@ const RF_BUCKETS = {
 };
 let REFUNDS_CACHE = [];
 let RF_FILTER = 'all';
+let RF_CONFIG = null;
 
 function fmtCents(c) { return c == null ? '—' : formatCOP(c / 100); }
 function fmtDateTime(iso) {
@@ -2946,15 +2977,31 @@ function fmtDateTime(iso) {
   return d.toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+/* Permisos de quien mira el panel (los botones se muestran según esto; el
+   servidor vuelve a validar cada acción). */
+function rfPerms() {
+  return {
+    approve: hasPerm('refunds.approve'),
+    deny: hasPerm('refunds.deny'),
+    setAmount: hasPerm('refunds.set_amount'),
+    markDone: hasPerm('refunds.mark_done')
+  };
+}
+
 async function loadRefunds() {
   const setBlock = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
   setBlock('rfLoading', true); setBlock('rfEmpty', false); setBlock('rfError', false); setBlock('rfTableWrap', false);
+  const ns = document.getElementById('newSpecialRefundBtn');
+  if (ns) ns.style.display = hasPerm('refunds.approve') ? '' : 'none';
   try {
     const token = await window.getAuthToken();
     const res = await fetch('/api/get-pending-refunds', { headers: { 'Authorization': `Bearer ${token}` } });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || 'Error al cargar');
     REFUNDS_CACHE = json.refunds || [];
+    RF_CONFIG = json.config || null;
+    const cl = document.getElementById('rfConfigLine');
+    if (cl) cl.innerHTML = rfConfigLine(RF_CONFIG);
     setBlock('rfLoading', false);
     renderRefunds();
   } catch (err) {
@@ -2963,6 +3010,14 @@ async function loadRefunds() {
     el.textContent = '✗ ' + err.message;
     el.style.display = '';
   }
+}
+
+function rfConfigLine(cfg) {
+  if (!cfg) return '';
+  const on = '<span class="rf-ok">automático</span>', off = '<span class="rf-pending">tarea manual</span>';
+  return '<br>Hoy: cancelar en Kunas → ' + (cfg.autoCancelPms ? on : off)
+    + ' · devolver por Mercado Pago → ' + (cfg.mpAutoRefund ? on : off)
+    + ' · formulario de cuenta bancaria → ' + (cfg.bankForm ? '<span class="rf-ok">activo</span>' : '<span class="rf-pending">apagado</span>') + '.';
 }
 
 function renderRefunds() {
@@ -2980,9 +3035,10 @@ function renderRefunds() {
   document.getElementById('rfBody').innerHTML = rows.map(r => {
     const stay = (r.checkIn && r.checkOut) ? `${fmtShortDate(r.checkIn)} → ${fmtShortDate(r.checkOut)}` : '—';
     const stCls = 'badge-' + String(r.status || '').toLowerCase();
+    const kind = r.kind === 'special' ? '<br><span style="font-size:11px;color:var(--ink-500)">Caso especial</span>' : '';
     return `
       <tr data-code="${escHtml(r.bookingCode)}">
-        <td class="lista-id" data-label="Código">${escHtml(r.bookingCode)}</td>
+        <td class="lista-id" data-label="Código">${escHtml(r.bookingCode)}${kind}</td>
         <td data-label="Huésped">${escHtml(r.guestName || '—')}<br><span style="font-size:11px;color:var(--ink-500)">${escHtml(r.guestEmail || '')}</span></td>
         <td style="white-space:nowrap" data-label="Estadía">${stay}</td>
         <td class="lista-total" data-label="Pagado">${fmtCents(r.originalAmountCents)}</td>
@@ -3016,24 +3072,115 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape' && document.getElementById('refundBackdrop').classList.contains('is-open')) rfClose();
 });
 
-function openRefund(code) {
-  const r = REFUNDS_CACHE.find(x => x.bookingCode === code);
-  if (!r) return;
-  document.getElementById('rfModalCode').textContent = r.bookingCode + ' · ' + (REFUND_STATUS_LABEL[r.status] || r.status);
-  const body = document.getElementById('rfModalBody');
+/* ¿El número de pago de MP es confiable (no lo digitó un admin)? Igual que el servidor. */
+function rfTrustedTx(r) { return !!(r && r.transactionId && r.transactionIdSource !== 'admin'); }
+
+/* Lista "qué pasa al aprobar" según los interruptores y el medio de pago. */
+function refundApprovePlan(r, cfg, kind, cancelSpecial) {
+  cfg = cfg || {};
+  const items = [];
+  const willCancel = kind === 'special' ? !!cancelSpecial : r.cancelReservation !== false;
+  if (r.reservationCanceled) items.push('<span class="rf-ok">La reserva ya está cancelada en Kunas.</span>');
+  else if (!willCancel) items.push('No se cancela la reserva en Kunas (caso especial).');
+  else if (cfg.autoCancelPms) items.push('<span class="rf-ok">Se cancela automáticamente en Kunas</span> (libera el inventario).');
+  else items.push('<span class="rf-pending">Queda una tarea en Hoy:</span> cancelar la reserva a mano en Kunas.');
+  if (r.route === 'GATEWAY_AUTO') {
+    if (cfg.mpAutoRefund && rfTrustedTx(r)) items.push('<span class="rf-ok">La plata se devuelve automáticamente por Mercado Pago.</span>');
+    else items.push('<span class="rf-pending">Queda una tarea en Hoy:</span> devolver desde el panel de Mercado Pago' + (cfg.mpAutoRefund ? ' (el número de pago no viene de MP).' : ' (auto-reembolso apagado).'));
+  } else if (r.route === 'GATEWAY_ASSISTED') {
+    items.push('<span class="rf-pending">Queda una tarea en Hoy:</span> Wompi no reembolsa por API → anular en su dashboard (mismo día) o ticket a soporte.');
+  } else {
+    items.push(cfg.bankForm
+      ? 'Se le pide al huésped su cuenta bancaria con un enlace seguro; cuando la envíe, queda la tarea de transferir.'
+      : '<span class="rf-pending">Queda una tarea en Hoy:</span> pedirle la cuenta bancaria al huésped y transferir.');
+  }
+  items.push(r.guestEmail ? 'Se le envía un correo al huésped con el monto, el medio y el plazo (15 días hábiles).' : 'El huésped no tiene correo registrado: avísale por WhatsApp.');
+  return '<ul class="rf-plan">' + items.map(i => '<li>' + i + '</li>').join('') + '</ul>';
+}
+
+/* Sugerencia de monto según la política (calculada en el servidor). */
+function refundPolicyBlock(r) {
+  const p = r.policy;
+  if (!p) return '';
+  let btns = '';
+  if (p.amountCents != null && p.amountCents > 0) {
+    btns = `<div class="rf-actions"><button type="button" class="btn btn-ghost-dark rf-btn-sm" data-rf-suggest="${Math.round(p.amountCents / 100)}">Usar ${fmtCents(p.amountCents)}</button></div>`;
+  } else if (p.alternatives) {
+    btns = `<div class="rf-actions">
+      <button type="button" class="btn btn-ghost-dark rf-btn-sm" data-rf-suggest="${Math.round(p.alternatives.strict / 100)}">Si es Estricta: ${fmtCents(p.alternatives.strict)}</button>
+      <button type="button" class="btn btn-ghost-dark rf-btn-sm" data-rf-suggest="${Math.round(p.alternatives.flexible / 100)}">Si es Flexible: ${fmtCents(p.alternatives.flexible)}</button>
+    </div>`;
+  }
+  const amount = p.amountCents != null ? ` Sugerido: <strong>${fmtCents(p.amountCents)}</strong>.` : '';
+  const zero = p.amountCents === 0 ? ' Si confirmas, usa <strong>Denegar</strong> (no aplica reembolso; la reserva igual se cancela).' : '';
+  const when = (typeof p.hoursBefore === 'number')
+    ? ` <span style="color:var(--ink-500)">(pidió la cancelación ${p.hoursBefore >= 0 ? Math.round(p.hoursBefore) + ' h antes del check-in' : Math.round(-p.hoursBefore) + ' h después de la hora de check-in'})</span>` : '';
+  return `<div class="rf-suggest" id="rfPolicyBox"><strong>Política:</strong> ${escHtml(p.text || '')}${when}${amount}${zero}${btns}</div>`;
+}
+
+/* Estado de la reserva en Kunas tras la decisión + botones para cerrarla. */
+function refundPmsBlock(r, perms, cfg) {
+  if (r.status === 'NEEDS_REVIEW' || r.cancelReservation === false || /^COT-/i.test(String(r.bookingCode || ''))) return '';
+  if (r.reservationCanceled) {
+    const res = r.reservationCancelResult || {};
+    return `<div class="rf-section"><h4>Reserva en Kunas</h4><div class="rf-note"><span class="rf-ok">Cancelada</span>${res.manual ? ' a mano' : ' automáticamente'}${r.reservationCanceledAt ? ' el ' + fmtDateTime(r.reservationCanceledAt) : ''}.</div></div>`;
+  }
+  const btns = [];
+  if (perms.markDone) btns.push('<button type="button" class="btn btn-ghost-dark rf-btn-sm" id="rfPmsManualBtn">Ya la cancelé en Kunas</button>');
+  if (perms.approve && cfg && cfg.autoCancelPms) btns.push('<button type="button" class="btn btn-ghost-dark rf-btn-sm" id="rfPmsRetryBtn">Reintentar cancelación automática</button>');
+  return `<div class="rf-section"><h4>Reserva en Kunas</h4><div class="rf-note"><span class="rf-pending">Pendiente de cancelar en Kunas.</span> ${cfg && cfg.autoCancelPms ? 'La cancelación automática no se confirmó: reintenta o cancélala a mano.' : 'La cancelación automática está apagada: cancélala a mano en Kunas para liberar el inventario.'}</div>${btns.length ? '<div class="rf-actions">' + btns.join('') + '</div>' : ''}</div>`;
+}
+
+function refundBankBlock(r) {
+  if (r.status === 'NEEDS_BANK_DETAILS') {
+    return `<div class="rf-section"><h4>Datos bancarios del huésped</h4><div class="rf-note">Esperando que el huésped complete el formulario.${r.bankFormUrl ? '<br>Enlace para reenviarle:<br><code style="word-break:break-all">' + escHtml(r.bankFormUrl) + '</code>' : ' (El formulario está apagado: pídele la cuenta por WhatsApp o correo.)'}</div></div>`;
+  }
+  if (r.bankDetails) {
+    const b = r.bankDetails;
+    return `<div class="rf-section"><h4>Datos bancarios para la transferencia</h4><dl class="rf-grid">
+      <dt>Banco</dt><dd>${escHtml(b.bankName || '—')}</dd>
+      <dt>Tipo de cuenta</dt><dd>${escHtml(b.accountType || '—')}</dd>
+      <dt>Número</dt><dd>${escHtml(b.accountNumber || '—')}</dd>
+      <dt>Titular</dt><dd>${escHtml(b.holderName || '—')}</dd>
+      <dt>Documento</dt><dd>${escHtml(b.docType || '')} ${escHtml(b.docNumber || '')}</dd>
+    </dl><div class="rf-note" style="margin-top:8px">Dato sensible: se guarda cifrado y solo lo ve quien tramita el reembolso.</div></div>`;
+  }
+  if (r.bankDetailsSummary) {
+    const s = r.bankDetailsSummary;
+    return `<div class="rf-section"><h4>Datos bancarios</h4><dl class="rf-grid">
+      <dt>Banco</dt><dd>${escHtml(s.bankName || '—')}</dd>
+      <dt>Cuenta</dt><dd>${escHtml(s.accountType || '')} ····${escHtml(s.accountLast4 || '')}</dd>
+    </dl><div class="rf-note" style="margin-top:8px">Los números completos solo los ve quien tiene permiso para marcar reembolsos.</div></div>`;
+  }
+  return '';
+}
+
+/* HTML completo del detalle. Puro (sin DOM): r = registro, perms = rfPerms(),
+   cfg = config del servidor. Los botones aparecen según el permiso. */
+function renderRefundModal(r, perms, cfg) {
+  perms = perms || {};
   const isTerminal = r.status === 'DONE' || r.status === 'DENIED';
   const isReview = r.status === 'NEEDS_REVIEW';
   const stay = (r.checkIn && r.checkOut) ? `${fmtShortDate(r.checkIn)} → ${fmtShortDate(r.checkOut)}` : '—';
   const maxCop = r.originalAmountCents ? Math.round(r.originalAmountCents / 100) : '';
-  const presetAmount = r.refundAmountCents != null ? Math.round(r.refundAmountCents / 100)
-    : (r.originalAmountCents ? Math.round(r.originalAmountCents / 100) : '');
+  const p = r.policy || {};
+  /* Monto prellenado: el ya fijado, o el sugerido por la política. Si la política
+     da 0 (no-show / tardía de 1 noche) o el plan es desconocido, se deja VACÍO
+     para que el admin decida a conciencia (nunca un 100% por descuido). */
+  let presetAmount = '';
+  if (r.refundAmountCents != null) presetAmount = Math.round(r.refundAmountCents / 100);
+  else if (p.amountCents != null) presetAmount = p.amountCents > 0 ? Math.round(p.amountCents / 100) : '';
+  else if (p.rule !== 'unknown_plan' && r.originalAmountCents) presetAmount = Math.round(r.originalAmountCents / 100);
+  const kind = r.kind === 'special' ? 'special' : 'cancellation';
 
   const info = `<dl class="rf-grid">
+    <dt>Tipo</dt><dd>${REFUND_KIND_LABEL[kind]}</dd>
     <dt>Huésped</dt><dd>${escHtml(r.guestName || '—')}</dd>
     <dt>Email</dt><dd>${escHtml(r.guestEmail || '—')}</dd>
     <dt>Habitación</dt><dd>${escHtml(r.roomName || '—')}</dd>
     <dt>Estadía</dt><dd>${stay}</dd>
-    <dt>Pagado</dt><dd>${fmtCents(r.originalAmountCents)}</dd>
+    ${r.reference ? `<dt>Código web</dt><dd>${escHtml(r.reference)}</dd>` : ''}
+    <dt>Pagado</dt><dd>${fmtCents(r.originalAmountCents)}${r.originalAmountSource === 'pms_total' ? ' <span style="color:var(--ink-500)">(total de Kunas, verifícalo)</span>' : (r.originalAmountSource === 'admin' ? ' <span style="color:var(--ink-500)">(ingresado a mano)</span>' : '')}</dd>
     <dt>Medio de pago</dt><dd>${escHtml(r.paymentProvider || '—')}${r.paymentMethod ? ' · ' + escHtml(r.paymentMethod) : ''}</dd>
     ${r.ratePlan ? `<dt>Plan</dt><dd>${r.ratePlan === 'flexible' ? 'Flexible <span style="color:var(--olive)">(100% hasta 24 h antes)</span>' : 'Estricta <span style="color:var(--olive)">(100% hasta 7 días antes)</span>'}</dd>` : ''}
     <dt>Ruta</dt><dd>${escHtml(REFUND_ROUTE_LABEL[r.route] || r.route || '—')}</dd>
@@ -3042,94 +3189,225 @@ function openRefund(code) {
     ${r.payoutRef ? `<dt>Referencia</dt><dd>${escHtml(r.payoutRef)}</dd>` : ''}
   </dl>`;
 
-  const howto = isTerminal ? '' : `<div class="rf-section"><div class="rf-note">${escHtml(REFUND_ROUTE_HOWTO[r.route] || '')} Plazo máximo: <strong>15 días hábiles</strong>. El monto se define según la política de la tarifa (Estricta: gratis hasta 7 días antes · Flexible: gratis hasta 24 h antes; fuera de plazo se cobra 1ª noche + impuestos + 3,5%).</div></div>`;
-
-  /* A9: bank-details capture state for manual-transfer refunds. */
-  let bankBlock = '';
-  if (r.status === 'NEEDS_BANK_DETAILS') {
-    bankBlock = `<div class="rf-section"><h4>Datos bancarios del huésped</h4><div class="rf-note">Esperando que el huésped complete el formulario.${r.bankFormUrl ? '<br>Enlace para reenviarle:<br><code style="word-break:break-all">' + escHtml(r.bankFormUrl) + '</code>' : ' (Activa REFUND_BANK_FORM_ENABLED para enviar el enlace automáticamente.)'}</div></div>`;
-  } else if (r.status === 'BANK_DETAILS_READY' && r.bankDetails) {
-    const b = r.bankDetails;
-    bankBlock = `<div class="rf-section"><h4>Datos bancarios para la transferencia</h4><dl class="rf-grid">
-      <dt>Banco</dt><dd>${escHtml(b.bankName || '—')}</dd>
-      <dt>Tipo de cuenta</dt><dd>${escHtml(b.accountType || '—')}</dd>
-      <dt>Número</dt><dd>${escHtml(b.accountNumber || '—')}</dd>
-      <dt>Titular</dt><dd>${escHtml(b.holderName || '—')}</dd>
-      <dt>Documento</dt><dd>${escHtml(b.docType || '')} ${escHtml(b.docNumber || '')}</dd>
-    </dl></div>`;
-  }
+  const howto = isTerminal ? '' : `<div class="rf-section"><div class="rf-note">${escHtml(REFUND_ROUTE_HOWTO[r.route] || REFUND_ROUTE_HOWTO.MANUAL_BANK)} Plazo máximo: <strong>15 días hábiles</strong>.</div></div>`;
 
   /* Datos del pago capturados al cobrar (lo que pide soporte Wompi para revertir una tarjeta). */
   let payBlock = '';
   if (r.transactionId || r.cardLast4 || r.authCode || r.paymentDate) {
     payBlock = `<div class="rf-section"><h4>Datos del pago (para el reembolso)</h4><dl class="rf-grid">
-      ${r.transactionId ? `<dt>ID transacción</dt><dd style="word-break:break-all">${escHtml(r.transactionId)}</dd>` : ''}
+      ${r.transactionId ? `<dt>ID transacción</dt><dd style="word-break:break-all">${escHtml(r.transactionId)}${r.transactionIdSource === 'admin' ? ' <span style="color:var(--ink-500)">(ingresado a mano)</span>' : ''}</dd>` : ''}
       ${(r.cardBrand || r.cardLast4) ? `<dt>Tarjeta</dt><dd>${escHtml(r.cardBrand || '')}${r.cardLast4 ? ' ····' + escHtml(r.cardLast4) : ''}</dd>` : ''}
       ${r.authCode ? `<dt>Cód. autorización</dt><dd>${escHtml(r.authCode)}</dd>` : ''}
       ${r.paymentDate ? `<dt>Fecha del pago</dt><dd>${escHtml(r.paymentDate)}</dd>` : ''}
       <dt>Valor</dt><dd>${fmtCents(r.originalAmountCents)}</dd>
-    </dl><div class="rf-note">Datos que pide el soporte de Wompi para revertir una tarjeta (capturados al momento del pago).</div></div>`;
+    </dl></div>`;
   }
 
-  const taField = '<div class="field" style="margin-top:12px"><label for="rfNotes">Nota interna</label><textarea id="rfNotes" class="it-input" rows="2" style="min-width:unset; width:100%; resize:vertical; font-family:var(--font-body)"></textarea></div>';
+  const taField = '<div class="field" style="margin-top:12px"><label for="rfNotes">Nota interna (no se le envía al huésped)</label><textarea id="rfNotes" class="it-input" rows="2" style="min-width:unset; width:100%; resize:vertical; font-family:var(--font-body)"></textarea></div>';
   let actions;
   if (isReview) {
-    actions = `<div class="rf-section">
-      <h4>Definir y aprobar</h4>
-      <div class="field"><label for="rfAmount">Monto a reembolsar (COP)${maxCop !== '' ? ' — máx. ' + formatCOP(maxCop) : ''}</label>
-        <input id="rfAmount" type="number" class="it-input" style="min-width:unset; width:100%" min="0" ${maxCop !== '' ? 'max="' + maxCop + '"' : ''} value="${presetAmount}"></div>
+    if (!perms.approve && !perms.deny) {
+      actions = '<div class="rf-section"><div class="rf-note">Puedes ver esta solicitud, pero aprobarla o denegarla requiere permiso de tesorería/administración.</div></div>';
+    } else {
+      const missingPaid = !r.originalAmountCents;
+      /* El selector aparece si falta el proveedor O el método (p. ej. un pago de
+         Mercado Pago recuperado de la nota de Kunas trae proveedor e id, pero no
+         el método). Con el proveedor conocido, solo se ofrecen sus opciones. */
+      const missingProvider = !r.paymentProvider || !r.paymentMethod;
+      const missingTx = !r.transactionId;
+      const payOptions = r.paymentProvider
+        ? RF_PAYMENT_OPTIONS.filter(o => !o[0] || o[0].indexOf(r.paymentProvider + '|') === 0)
+        : RF_PAYMENT_OPTIONS;
+      const paidField = missingPaid ? `<div class="field"><label for="rfPaid">Monto pagado (COP) — verifícalo en Mercado Pago / Wompi</label>
+          <input id="rfPaid" type="number" class="it-input" style="min-width:unset; width:100%" min="0" placeholder="Ej. 330000"></div>` : '';
+      const providerField = missingProvider ? `<div class="field"><label for="rfPayMethod">Medio de pago${r.paymentProvider ? ' (' + escHtml(r.paymentProvider) + ': confirma el método)' : ''}</label>
+          <select id="rfPayMethod" class="it-input" style="min-width:unset; width:100%">${payOptions.map(o => `<option value="${o[0]}">${escHtml(o[1])}</option>`).join('')}</select></div>` : '';
+      const txField = missingTx ? `<div class="field"><label for="rfPayTx">N.º de pago / transacción (opcional)</label>
+          <input id="rfPayTx" type="text" class="it-input" style="min-width:unset; width:100%" placeholder="Del panel de Mercado Pago / Wompi"></div>` : '';
+      const missingBlock = (paidField || providerField || txField)
+        ? `<div class="rf-section"><h4>Datos del pago que faltan</h4><div class="rf-note" style="margin-bottom:10px">No encontramos todos los datos del pago (reserva vieja o pago de otro canal). Complétalos para fijar el tope y la ruta del reembolso.</div><div class="rf-row2">${paidField}${providerField}</div>${txField}</div>` : '';
+      actions = `${missingBlock}<div class="rf-section">
+      <h4>Decidir</h4>
+      <div class="rf-row2">
+        <div class="field"><label for="rfKind">Tipo de solicitud</label>
+          <select id="rfKind" class="it-input" style="min-width:unset; width:100%">
+            <option value="cancellation"${kind === 'cancellation' ? ' selected' : ''}>Cancelación — monto por política</option>
+            <option value="special"${kind === 'special' ? ' selected' : ''}>Caso especial — tú fijas el monto</option>
+          </select></div>
+        <div class="field"><label for="rfAmount">Monto a reembolsar (COP)${maxCop !== '' ? ' — máx. ' + formatCOP(maxCop) : ''}</label>
+          <input id="rfAmount" type="number" class="it-input" style="min-width:unset; width:100%" min="0" ${maxCop !== '' ? 'max="' + maxCop + '"' : ''} value="${presetAmount}"></div>
+      </div>
+      <label class="rf-check" id="rfCancelSpecialWrap" style="${kind === 'special' ? '' : 'display:none'}"><input type="checkbox" id="rfCancelSpecial"${r.cancelReservation ? ' checked' : ''}> Cancelar también la reserva en Kunas</label>
+      <div style="margin-top:10px" id="rfPolicyWrap">${kind === 'cancellation' ? refundPolicyBlock(r) : ''}</div>
+      <div class="rf-section" style="margin-top:14px"><h4>Al aprobar</h4><div id="rfPlan">${refundApprovePlan(r, cfg, kind, r.cancelReservation)}</div></div>
+      <div class="field" style="margin-top:12px"><label for="rfReason">Motivo para el huésped (va en el correo si deniegas)</label><textarea id="rfReason" class="it-input" rows="2" style="min-width:unset; width:100%; resize:vertical; font-family:var(--font-body)" placeholder="Ej. La cancelación se pidió después del plazo de la tarifa Estricta (7 días antes)."></textarea></div>
       ${taField}
       <div class="rf-actions">
-        <button type="button" class="btn btn-ink" id="rfApproveBtn" style="padding:11px 18px; font-size:11px;">Aprobar reembolso</button>
-        <button type="button" class="btn btn-ghost-dark" id="rfDenyBtn" style="padding:11px 18px; font-size:11px;">Denegar</button>
+        ${perms.approve ? '<button type="button" class="btn btn-ink" id="rfApproveBtn" style="padding:11px 18px; font-size:11px;">Aprobar y ejecutar</button>' : ''}
+        ${perms.deny ? '<button type="button" class="btn btn-ghost-dark" id="rfDenyBtn" style="padding:11px 18px; font-size:11px;">Denegar</button>' : ''}
       </div></div>`;
+    }
   } else if (!isTerminal) {
-    actions = `<div class="rf-section">
+    const retry = (r.status === 'FAILED' && r.route === 'GATEWAY_AUTO' && perms.approve && cfg && cfg.mpAutoRefund && rfTrustedTx(r))
+      ? '<button type="button" class="btn btn-ghost-dark" id="rfRetryGatewayBtn" style="padding:11px 18px; font-size:11px;">Reintentar en Mercado Pago</button>' : '';
+    if (perms.markDone) {
+      actions = `<div class="rf-section">
       <h4>Tramitar</h4>
-      <div class="field"><label for="rfPayoutRef">Referencia del pago / ticket (opcional)</label>
-        <input id="rfPayoutRef" type="text" class="it-input" style="min-width:unset; width:100%" placeholder="Ej. ID reembolso MP, # ticket Wompi, comprobante"></div>
+      ${r.refundExecution && !r.refundExecution.ok ? `<div class="rf-note" style="margin-bottom:10px"><span class="rf-pending">El reembolso automático falló:</span> ${escHtml(r.refundExecution.error || '')}. Hazlo desde el panel de Mercado Pago o reintenta.</div>` : ''}
+      <div class="field"><label for="rfPayoutRef">Referencia de la devolución / ticket / comprobante (se incluye en el correo al huésped)</label>
+        <input id="rfPayoutRef" type="text" class="it-input" style="min-width:unset; width:100%" placeholder="Ej. N.º de devolución MP, caso Wompi, comprobante de transferencia"></div>
       ${taField}
       <div class="rf-actions">
+        ${retry}
         ${r.status !== 'PROCESSING' ? '<button type="button" class="btn btn-ghost-dark" id="rfProcessingBtn" style="padding:11px 18px; font-size:11px;">Marcar en proceso</button>' : ''}
         <button type="button" class="btn btn-ink" id="rfDoneBtn" style="padding:11px 18px; font-size:11px;">Marcar reembolsado</button>
       </div></div>`;
+    } else {
+      actions = `<div class="rf-section"><div class="rf-note">El reembolso está en curso. Marcarlo como reembolsado requiere el permiso de tesorería.</div>${retry ? '<div class="rf-actions">' + retry + '</div>' : ''}</div>`;
+    }
   } else {
     actions = `<div class="rf-section"><div class="rf-note">Solicitud cerrada (${escHtml(REFUND_STATUS_LABEL[r.status])}).${r.completedAt ? ' Reembolsado el ' + fmtDateTime(r.completedAt) + '.' : ''}${r.deniedReason ? ' Motivo: ' + escHtml(r.deniedReason) + '.' : ''}</div></div>`.replace('a. m..', 'a. m.').replace('p. m..', 'p. m.');
   }
 
+  const notices = Array.isArray(r.guestNotices) && r.guestNotices.length
+    ? `<div class="rf-section"><h4>Correos al huésped</h4><ul class="rf-timeline">${r.guestNotices.map(n => `<li><div class="rf-ts">${fmtDateTime(n.at)}</div>${escHtml({ approved: 'Reembolso aprobado', denied: 'Denegado / cancelación registrada', done: 'Reembolso realizado' }[n.type] || n.type)} — ${n.sent ? '<span class="rf-ok">enviado</span>' : '<span class="rf-pending">no enviado (' + escHtml(n.reason || 'error') + ')</span>'}</li>`).join('')}</ul></div>`
+    : '';
+
   const log = Array.isArray(r.auditLog) ? r.auditLog.slice().reverse() : [];
   const timeline = `<div class="rf-section"><h4>Historial</h4><ul class="rf-timeline">${
-    log.map(e => `<li><div class="rf-ts">${fmtDateTime(e.ts)} · ${escHtml(e.actor || 'sistema')}</div>${escHtml(e.notes || '')}${e.oldStatus ? ` <span style="color:var(--ink-500)">(${escHtml(REFUND_STATUS_LABEL[e.oldStatus] || e.oldStatus)} → ${escHtml(REFUND_STATUS_LABEL[e.newStatus] || e.newStatus)})</span>` : ''}</li>`).join('') || '<li>Sin movimientos.</li>'
+    log.map(e => `<li><div class="rf-ts">${fmtDateTime(e.ts)} · ${escHtml(e.actor || 'sistema')}</div>${escHtml(e.notes || '')}${e.oldStatus && e.oldStatus !== e.newStatus ? ` <span style="color:var(--ink-500)">(${escHtml(REFUND_STATUS_LABEL[e.oldStatus] || e.oldStatus)} → ${escHtml(REFUND_STATUS_LABEL[e.newStatus] || e.newStatus)})</span>` : ''}</li>`).join('') || '<li>Sin movimientos.</li>'
   }</ul></div>`;
 
-  body.innerHTML = info + payBlock + howto + bankBlock + actions + timeline;
-  rfOpen();
+  return info + refundPmsBlock(r, perms, cfg) + payBlock + howto + refundBankBlock(r) + actions + notices + timeline;
+}
 
-  const approve = document.getElementById('rfApproveBtn');
+function openRefund(code) {
+  const r = REFUNDS_CACHE.find(x => x.bookingCode === code);
+  if (!r) return;
+  document.getElementById('rfTitle').textContent = 'Reembolso';
+  document.getElementById('rfModalCode').textContent = r.bookingCode + ' · ' + (REFUND_STATUS_LABEL[r.status] || r.status);
+  const perms = rfPerms();
+  const body = document.getElementById('rfModalBody');
+  body.innerHTML = renderRefundModal(r, perms, RF_CONFIG);
+  rfOpen();
+  const $ = (id) => document.getElementById(id);
+  const val = (id) => { const el = $(id); return el ? el.value : ''; };
+  const maxCop = r.originalAmountCents ? Math.round(r.originalAmountCents / 100) : '';
+
+  /* Sugerencias de la política → rellenan el monto. */
+  body.querySelectorAll('[data-rf-suggest]').forEach(b => b.addEventListener('click', () => {
+    const a = $('rfAmount'); if (a) a.value = b.dataset.rfSuggest;
+  }));
+  /* Cambiar el tipo actualiza el bloque de política y el "qué pasa al aprobar". */
+  const kindSel = $('rfKind');
+  const refreshPlan = () => {
+    const k = kindSel ? kindSel.value : 'cancellation';
+    const cs = $('rfCancelSpecial');
+    const wrap = $('rfCancelSpecialWrap'); if (wrap) wrap.style.display = k === 'special' ? '' : 'none';
+    const pw = $('rfPolicyWrap'); if (pw) pw.innerHTML = k === 'cancellation' ? refundPolicyBlock(r) : '';
+    pw && pw.querySelectorAll('[data-rf-suggest]').forEach(b => b.addEventListener('click', () => { const a = $('rfAmount'); if (a) a.value = b.dataset.rfSuggest; }));
+    const plan = $('rfPlan'); if (plan) plan.innerHTML = refundApprovePlan(r, RF_CONFIG, k, cs && cs.checked);
+  };
+  if (kindSel) kindSel.addEventListener('change', refreshPlan);
+  const cs = $('rfCancelSpecial'); if (cs) cs.addEventListener('change', refreshPlan);
+
+  const approve = $('rfApproveBtn');
   if (approve) approve.addEventListener('click', () => {
-    const amt = parseInt(document.getElementById('rfAmount').value, 10);
-    if (!Number.isFinite(amt) || amt <= 0) { alert('Ingresa un monto válido.'); return; }
-    if (maxCop !== '' && amt > maxCop) { alert('El reembolso no puede superar lo pagado (' + formatCOP(maxCop) + ').'); return; }
-    refundAction(code, 'approve', { amountCents: amt * 100, notes: document.getElementById('rfNotes').value });
+    const amt = parseInt(val('rfAmount'), 10);
+    if (!Number.isFinite(amt) || amt <= 0) { alert('Ingresa un monto válido. Si no aplica reembolso, usa "Denegar".'); return; }
+    const extra = { amountCents: amt * 100, notes: val('rfNotes'), kind: kindSel ? kindSel.value : undefined, cancelReservation: !!(cs && cs.checked) };
+    let cap = maxCop;
+    if (!r.originalAmountCents) {
+      const paid = parseInt(val('rfPaid'), 10);
+      if (!Number.isFinite(paid) || paid <= 0) { alert('Ingresa el monto que pagó el huésped (verificado en la pasarela).'); return; }
+      extra.originalAmountCents = paid * 100; cap = paid;
+    }
+    if (cap !== '' && amt > cap) { alert('El reembolso no puede superar lo pagado (' + formatCOP(cap) + ').'); return; }
+    const pm = val('rfPayMethod');
+    const tx = val('rfPayTx').trim();
+    if (pm || tx) {
+      const parts = pm ? pm.split('|') : [];
+      extra.payment = { provider: parts[0] || undefined, method: parts[1] || undefined, transactionId: tx || undefined };
+    }
+    if (!confirm('¿Aprobar el reembolso de ' + formatCOP(amt) + ' para ' + code + '?\n\nSe ejecuta lo indicado en "Al aprobar" y se le envía un correo al huésped.')) return;
+    refundAction(code, 'approve', extra);
   });
-  const deny = document.getElementById('rfDenyBtn');
+  const deny = $('rfDenyBtn');
   if (deny) deny.addEventListener('click', () => {
-    if (!confirm('¿Denegar el reembolso de ' + code + '? El huésped no recibirá devolución.')) return;
-    refundAction(code, 'deny', { notes: document.getElementById('rfNotes').value });
+    const reason = val('rfReason').trim();
+    if (!reason) { alert('Escribe el motivo para el huésped (va en el correo).'); return; }
+    if (!confirm('¿Denegar el reembolso de ' + code + '? El huésped recibe un correo con el motivo' + (r.cancelReservation === false ? '.' : ' y la reserva se cancela en Kunas (o queda la tarea).'))) return;
+    refundAction(code, 'deny', { notes: val('rfNotes'), reason });
   });
-  const proc = document.getElementById('rfProcessingBtn');
+  const proc = $('rfProcessingBtn');
   if (proc) proc.addEventListener('click', () => {
-    refundAction(code, 'mark-processing', { notes: document.getElementById('rfNotes').value });
+    refundAction(code, 'mark-processing', { notes: val('rfNotes') });
   });
-  const done = document.getElementById('rfDoneBtn');
+  const done = $('rfDoneBtn');
   if (done) done.addEventListener('click', () => {
-    if (!confirm('¿Confirmas que el reembolso de ' + code + ' ya fue pagado al huésped?')) return;
-    const refEl = document.getElementById('rfPayoutRef');
-    refundAction(code, 'mark-done', { notes: document.getElementById('rfNotes').value, payoutRef: refEl ? refEl.value : '' });
+    if (!confirm('¿Confirmas que el reembolso de ' + code + ' ya fue pagado al huésped? Se le envía un correo avisándole.')) return;
+    refundAction(code, 'mark-done', { notes: val('rfNotes'), payoutRef: val('rfPayoutRef') });
+  });
+  const retry = $('rfRetryGatewayBtn');
+  if (retry) retry.addEventListener('click', () => {
+    if (!confirm('¿Reintentar el reembolso en Mercado Pago para ' + code + '?')) return;
+    refundAction(code, 'retry-gateway', {});
+  });
+  const pmsManual = $('rfPmsManualBtn');
+  if (pmsManual) pmsManual.addEventListener('click', () => {
+    if (!confirm('¿Confirmas que ya cancelaste la reserva ' + code + ' en Kunas?')) return;
+    refundAction(code, 'pms-cancel', { manual: true });
+  });
+  const pmsRetry = $('rfPmsRetryBtn');
+  if (pmsRetry) pmsRetry.addEventListener('click', () => {
+    refundAction(code, 'pms-cancel', { manual: false });
   });
 }
 
-async function refundAction(code, action, extra) {
+/* ── Nuevo caso especial (cobro duplicado, compensación, overbooking…) ── */
+function renderSpecialForm() {
+  return `<div class="rf-note">Un <strong>caso especial</strong> es un reembolso que no sale de la política de cancelación: cobro duplicado, compensación, overbooking… Tú fijas el monto al aprobarlo. Si la reserva existe en Kunas, los datos del huésped y del pago se completan solos.</div>
+    <div class="rf-section">
+      <div class="rf-row2">
+        <div class="field"><label for="rfsCode">Código de la reserva (Kunas)</label><input id="rfsCode" type="text" class="it-input" style="min-width:unset; width:100%" placeholder="Ej. 3273564"></div>
+        <div class="field"><label for="rfsPaid">Monto pagado (COP), si no se encuentra el pago</label><input id="rfsPaid" type="number" class="it-input" style="min-width:unset; width:100%" min="0"></div>
+      </div>
+      <div class="rf-row2">
+        <div class="field"><label for="rfsName">Nombre del huésped (si no está en Kunas)</label><input id="rfsName" type="text" class="it-input" style="min-width:unset; width:100%"></div>
+        <div class="field"><label for="rfsEmail">Correo del huésped</label><input id="rfsEmail" type="email" class="it-input" style="min-width:unset; width:100%"></div>
+      </div>
+      <div class="field"><label for="rfsLang">Idioma de los correos</label><select id="rfsLang" class="it-input" style="min-width:unset; width:100%"><option value="es">Español</option><option value="en">English</option></select></div>
+      <div class="field" style="margin-top:12px"><label for="rfsReason">Motivo</label><textarea id="rfsReason" class="it-input" rows="2" style="min-width:unset; width:100%; resize:vertical; font-family:var(--font-body)" placeholder="Ej. Mercado Pago cobró dos veces la misma reserva"></textarea></div>
+      <label class="rf-check"><input type="checkbox" id="rfsCancel"> Cancelar también la reserva en Kunas al decidir</label>
+      <div class="rf-actions"><button type="button" class="btn btn-ink" id="rfsCreateBtn" style="padding:11px 18px; font-size:11px;">Crear caso especial</button></div>
+    </div>`;
+}
+
+function openSpecialForm() {
+  document.getElementById('rfTitle').textContent = 'Nuevo caso especial';
+  document.getElementById('rfModalCode').textContent = 'Reembolso fuera de la política de cancelación';
+  document.getElementById('rfModalBody').innerHTML = renderSpecialForm();
+  rfOpen();
+  document.getElementById('rfsCreateBtn').addEventListener('click', async () => {
+    const v = (id) => (document.getElementById(id).value || '').trim();
+    const code = v('rfsCode');
+    if (!code) { alert('Escribe el código de la reserva.'); return; }
+    if (!v('rfsReason')) { alert('Escribe el motivo.'); return; }
+    const paid = parseInt(v('rfsPaid'), 10);
+    const ok = await refundAction(code, 'create-special', {
+      reason: v('rfsReason'), guestName: v('rfsName'), guestEmail: v('rfsEmail'), lang: v('rfsLang'),
+      originalAmountCents: Number.isFinite(paid) && paid > 0 ? paid * 100 : undefined,
+      cancelReservation: document.getElementById('rfsCancel').checked
+    }, { keepOpen: true });
+    if (ok) { await loadRefunds(); RF_FILTER = 'review'; renderRefunds(); openRefund(code); }
+  });
+}
+document.getElementById('newSpecialRefundBtn').addEventListener('click', openSpecialForm);
+
+/* Devuelve true si la acción salió bien. Muestra lo que pasó (tareas creadas,
+   correo enviado) para que el admin sepa qué queda pendiente. */
+async function refundAction(code, action, extra, opts) {
+  opts = opts || {};
   try {
     const token = await window.getAuthToken();
     const res = await fetch('/api/refund-admin-action', {
@@ -3139,11 +3417,18 @@ async function refundAction(code, action, extra) {
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || 'Error');
-    showToast('Reembolso actualizado ✓');
-    rfClose();
-    loadRefunds();
+    const bits = [];
+    if (json.pms && json.pms.mode === 'auto') bits.push(json.pms.ok ? 'reserva cancelada en Kunas' : 'Kunas no confirmó la cancelación (revisa Hoy)');
+    if (json.pms && json.pms.mode === 'task') bits.push('tarea: cancelar en Kunas');
+    if (json.gateway) bits.push(json.gateway.ok ? 'devolución enviada a Mercado Pago' : 'Mercado Pago falló (quedó tarea)');
+    if (json.payTask && json.payTask.queued) bits.push('tarea: devolver la plata');
+    if (json.guestNotice) bits.push(json.guestNotice.sent ? 'correo enviado al huésped' : 'correo al huésped NO enviado');
+    showToast('Reembolso actualizado ✓' + (bits.length ? ' — ' + bits.join(' · ') : ''), bits.length ? 6000 : undefined);
+    if (!opts.keepOpen) { rfClose(); loadRefunds(); }
+    return true;
   } catch (err) {
     alert('✗ ' + err.message);
+    return false;
   }
 }
 

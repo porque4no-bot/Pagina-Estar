@@ -624,3 +624,142 @@ module.exports = {
   cancellationAckHtml, cancellationConfirmedHtml, adminCancellationHtml,
   paymentPendingHtml, paymentRejectedHtml
 };
+
+/* Frente cancel — correos al huésped sobre su reembolso (aprobado / denegado /
+   realizado), ES + EN. refund = registro de _refunds-store (bookingCode,
+   guestName, checkIn, checkOut, kind, route, refundAmountCents, payoutRef…).
+   El medio y el plazo (15 días hábiles) salen del registro, no del texto. */
+function refundMediumText(refund, lang) {
+  const r = refund || {};
+  const en = lang === 'en';
+  if (r.route === 'GATEWAY_AUTO') {
+    return en ? 'to the same card or Mercado Pago account you paid with'
+      : 'a la misma tarjeta o cuenta de Mercado Pago con la que pagaste';
+  }
+  if (r.route === 'GATEWAY_ASSISTED') {
+    return en ? 'to the same card you paid with' : 'a la misma tarjeta con la que pagaste';
+  }
+  return en ? 'by bank transfer to the account you give us' : 'por transferencia bancaria a la cuenta que nos indiques';
+}
+
+function refundStayText(refund, lang) {
+  const r = refund || {};
+  if (!r.checkIn) return '';
+  const fmt = lang === 'en' ? formatDateEN : formatDateES;
+  return ` (${fmt(r.checkIn)} → ${fmt(r.checkOut)})`;
+}
+
+function refundAmountBox(refund, lang) {
+  const r = refund || {};
+  const amount = r.refundAmountCents != null ? formatCOP(r.refundAmountCents / 100) : '—';
+  return box(lang === 'en' ? 'Refund amount' : 'Valor del reembolso',
+    `<tr><td style="padding:2px 18px 16px;font-family:${SERIF};font-size:22px;font-weight:700;color:${C.ink};">${esc(amount)} <span style="font-family:${SANS};font-size:12px;font-weight:400;color:${C.muted};">COP</span></td></tr>`);
+}
+
+function refundApprovedHtml({ refund, lang, formUrl, slaDays }) {
+  const r = refund || {};
+  const en = lang === 'en';
+  const days = slaDays || 15;
+  const special = r.kind === 'special';
+  const code = esc(r.bookingCode || '');
+  const stay = refundStayText(r, lang);
+  const medium = refundMediumText(r, lang);
+  const manual = r.route !== 'GATEWAY_AUTO' && r.route !== 'GATEWAY_ASSISTED';
+  if (en) {
+    const intro = special
+      ? `We approved a refund for your booking <strong>${code}</strong>${stay}.`
+      : `We approved the cancellation of your booking <strong>${code}</strong>${stay} and the corresponding refund under your rate's policy.`;
+    const bank = manual
+      ? (formUrl
+        ? `${para('Please tell us the bank account where you want to receive it:')}${ctaCenter(ctaButton(formUrl, 'Enter my bank account'))}`
+        : para('We will contact you to ask for the bank account where you want to receive it.'))
+      : '';
+    const body = `
+      ${greeting(r.guestName, 'en')}
+      ${para(intro)}
+      ${refundAmountBox(r, 'en')}
+      ${para(`We'll send it <strong>${medium}</strong>, within a maximum of <strong>${days} business days</strong>${manual ? ' after we receive your bank details' : ''}. Depending on your bank, it may take a few extra days to show up.`)}
+      ${bank}
+      ${fineprint('If you have any questions about this refund, reply to this email or message us on WhatsApp.')}`;
+    return emailShell({ lang: 'en', band: { color: C.olive, eyebrow: 'Refund approved', code: r.bookingCode || '' }, bodyHtml: body });
+  }
+  const intro = special
+    ? `Aprobamos un reembolso para tu reserva <strong>${code}</strong>${stay}.`
+    : `Aprobamos la cancelación de tu reserva <strong>${code}</strong>${stay} y el reembolso que corresponde según la política de tu tarifa.`;
+  const bank = manual
+    ? (formUrl
+      ? `${para('Por favor indícanos la cuenta bancaria donde quieres recibirlo:')}${ctaCenter(ctaButton(formUrl, 'Indicar mi cuenta bancaria'))}`
+      : para('Te contactaremos para pedirte la cuenta bancaria donde quieres recibirlo.'))
+    : '';
+  const body = `
+    ${greeting(r.guestName, 'es')}
+    ${para(intro)}
+    ${refundAmountBox(r, 'es')}
+    ${para(`Lo haremos <strong>${medium}</strong>, en un máximo de <strong>${days} días hábiles</strong>${manual ? ' después de recibir tus datos bancarios' : ''}. Según tu banco, puede tardar unos días más en verse reflejado.`)}
+    ${bank}
+    ${fineprint('Si tienes dudas sobre este reembolso, responde este correo o escríbenos por WhatsApp.')}`;
+  return emailShell({ lang: 'es', band: { color: C.olive, eyebrow: 'Reembolso aprobado', code: r.bookingCode || '' }, bodyHtml: body });
+}
+
+function refundDeniedHtml({ refund, lang, reason }) {
+  const r = refund || {};
+  const en = lang === 'en';
+  const special = r.kind === 'special';
+  const code = esc(r.bookingCode || '');
+  const stay = refundStayText(r, lang);
+  const why = String(reason || '').trim();
+  const reasonBox = (label) => (why
+    ? box(label, `<tr><td style="padding:2px 18px 16px;font-family:${SERIF};font-size:14px;line-height:1.6;color:${C.body};">${esc(why)}</td></tr>`)
+    : '');
+  if (en) {
+    const intro = special
+      ? `We reviewed your refund request for booking <strong>${code}</strong>${stay} and, in this case, a refund does not apply.`
+      : `Your cancellation of booking <strong>${code}</strong>${stay} is registered. Under your rate's cancellation policy, in this case <strong>no refund applies</strong>.`;
+    const body = `
+      ${greeting(r.guestName, 'en')}
+      ${para(intro)}
+      ${reasonBox('Reason')}
+      ${para('If you think this is a mistake, reply to this email and we will review it again.')}
+      ${whatsappLine('en', 'Questions about this decision?')}`;
+    return emailShell({ lang: 'en', band: { color: C.terra, eyebrow: special ? 'Refund request reviewed' : 'Cancellation registered', code: r.bookingCode || '' }, bodyHtml: body });
+  }
+  const intro = special
+    ? `Revisamos tu solicitud de reembolso para la reserva <strong>${code}</strong>${stay} y, en este caso, no aplica reembolso.`
+    : `Tu cancelación de la reserva <strong>${code}</strong>${stay} quedó registrada. Según la política de cancelación de tu tarifa, en este caso <strong>no aplica reembolso</strong>.`;
+  const body = `
+    ${greeting(r.guestName, 'es')}
+    ${para(intro)}
+    ${reasonBox('Motivo')}
+    ${para('Si crees que hay un error, responde este correo y lo revisamos de nuevo.')}
+    ${whatsappLine('es', '¿Dudas con esta decisión?')}`;
+  return emailShell({ lang: 'es', band: { color: C.terra, eyebrow: special ? 'Solicitud de reembolso revisada' : 'Cancelación registrada', code: r.bookingCode || '' }, bodyHtml: body });
+}
+
+function refundDoneHtml({ refund, lang }) {
+  const r = refund || {};
+  const en = lang === 'en';
+  const code = esc(r.bookingCode || '');
+  const medium = refundMediumText(r, lang);
+  const ref = String(r.payoutRef || '').trim();
+  const refLine = ref ? fineprint(`${en ? 'Reference' : 'Referencia'}: <strong>${esc(ref)}</strong>`) : '';
+  if (en) {
+    const body = `
+      ${greeting(r.guestName, 'en')}
+      ${para(`We sent the refund for your booking <strong>${code}</strong> ${medium}.`)}
+      ${refundAmountBox(r, 'en')}
+      ${para('Depending on your bank, it may take a few days to show up in your statement.')}
+      ${refLine}
+      ${whatsappLine('en', "Don't see it after a few days?")}`;
+    return emailShell({ lang: 'en', band: { color: C.olive, eyebrow: 'Refund sent', code: r.bookingCode || '' }, bodyHtml: body });
+  }
+  const body = `
+    ${greeting(r.guestName, 'es')}
+    ${para(`Ya realizamos el reembolso de tu reserva <strong>${code}</strong> ${medium}.`)}
+    ${refundAmountBox(r, 'es')}
+    ${para('Según tu banco, puede tardar unos días en verse reflejado en tu extracto.')}
+    ${refLine}
+    ${whatsappLine('es', '¿No lo ves después de unos días?')}`;
+  return emailShell({ lang: 'es', band: { color: C.olive, eyebrow: 'Reembolso realizado', code: r.bookingCode || '' }, bodyHtml: body });
+}
+
+Object.assign(module.exports, { refundApprovedHtml, refundDeniedHtml, refundDoneHtml, refundMediumText });

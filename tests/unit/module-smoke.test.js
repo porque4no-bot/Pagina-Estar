@@ -26,7 +26,7 @@ const MODULES = [
   'guest-action', 'guest-checkin', 'guest-drive', 'guest-session', 'guest-sync',
   'list-quotes', 'mercadopago-webhook', 'otasync-webhook', 'purge-guest-data',
   'quote-availability', 'read-quote-audit', 'reconcile-payments',
-  '_refunds-store', 'refund-admin-action',
+  '_refunds-store', '_refund-flow', 'refund-admin-action', 'get-pending-refunds',
   'request-cancellation', 'request-quote', 'retry-quote-booking', 'revalidate-quotes',
   'send-confirmation', 'send-quote-email', 'send-stay-emails', 'submit-bank-details', 'update-quote',
   'upload-drive-credentials', 'whatsapp-probe', 'whatsapp-webhook', 'wompi-webhook'

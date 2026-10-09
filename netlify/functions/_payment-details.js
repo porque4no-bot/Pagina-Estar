@@ -71,7 +71,31 @@ function extractMercadoPagoPaymentDetails(transaction) {
     cardLast4: t.cardLast4 || null,
     authCode: t.authorizationCode || null,
     installments: t.installments != null ? Number(t.installments) : null,
-    paymentDate: t.paymentDate || null
+    paymentDate: t.paymentDate || new Date().toISOString()
+  };
+}
+
+/* Frente cancel: transacción YA NORMALIZADA por _payments.normalizeTransaction
+   (ruta de Mercado Pago). Antes MP no dejaba ningún registro durable, así que
+   pasados 7 días (booking-results) el reembolso automático no encontraba el
+   número de pago. MP reembolsa por ese id (POST /v1/payments/{id}/refunds). */
+function isNormalizedTransaction(t) {
+  return !!(t && typeof t === 'object' && t.provider && t.amountCents != null && t.amount_in_cents == null);
+}
+
+function extractNormalizedPaymentDetails(transaction) {
+  const t = transaction || {};
+  return {
+    provider: String(t.provider || '').toLowerCase() || null,
+    transactionId: t.id != null && t.id !== '' ? String(t.id) : null,
+    reference: t.reference || null,
+    method: t.paymentMethod || null,
+    amountInCents: t.amountCents != null ? Number(t.amountCents) : null,
+    currency: t.currency || null,
+    cardBrand: null,
+    cardLast4: null,
+    authCode: null,
+    paymentDate: new Date().toISOString()
   };
 }
 
@@ -83,8 +107,12 @@ function extractMercadoPagoPaymentDetails(transaction) {
 async function savePaymentDetails(bookingCode, transaction, extra) {
   if (!bookingCode) return { saved: false };
   try {
+    /* MP (frente mp) → snapshot completo (tipo, últimos 4, autorización, cuotas);
+       otra transacción ya normalizada (frente cancel) → genérico; si no, Wompi crudo. */
     const details = (transaction && transaction.provider === 'mercadopago')
       ? extractMercadoPagoPaymentDetails(transaction)
+      : isNormalizedTransaction(transaction)
+        ? extractNormalizedPaymentDetails(transaction)
       : extractWompiPaymentDetails(transaction);
     if (extra && typeof extra === 'object') Object.assign(details, extra);
     details.bookingCode = String(bookingCode);
@@ -108,5 +136,6 @@ async function getPaymentDetails(bookingCode) {
 }
 
 module.exports = {
-  extractWompiPaymentDetails, extractMercadoPagoPaymentDetails, savePaymentDetails, getPaymentDetails, paymentDetailsStore
+  extractWompiPaymentDetails, extractMercadoPagoPaymentDetails, extractNormalizedPaymentDetails,
+  isNormalizedTransaction, savePaymentDetails, getPaymentDetails, paymentDetailsStore
 };
