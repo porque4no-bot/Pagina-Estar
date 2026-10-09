@@ -410,3 +410,30 @@ test('error de red no lanza y alerta; dos reservas que fallan generan dos alerta
   } finally { cap.restore(); }
   assert.deepEqual(cap.alerts.map(a => a.dedupeKey), ['confirmation-email-failed:3300002', 'confirmation-email-failed:3300003']);
 });
+
+/* Revisión: el servidor es el único que envía la confirmación; un rechazo por
+   validación deja la reserva pagada sin correo → debe alertar a recepción. */
+test('rechazos de validación alertan por reserva (sin el correo completo)', async () => {
+  const cap = captureAlerts();
+  const store = fakeStore();
+  const captured = {};
+  try {
+    await withEnv({ RESEND_API_KEY: 're_key' }, async () => {
+      const r1 = await sendConfirmationEmail(params({ bookingCode: '3300010', guestEmail: 'ana;"x"@correo.com' }), { fetch: okFetch(captured), getStore: () => store });
+      assert.equal(r1.reason, 'invalid-email');
+      const r2 = await sendConfirmationEmail(params({ bookingCode: 'RES 1<x>' }), { fetch: okFetch(captured), getStore: () => store });
+      assert.equal(r2.reason, 'invalid-booking-code');
+      const r3 = await sendConfirmationEmail(params({ bookingCode: '3300011', guestEmail: '' }), { fetch: okFetch(captured), getStore: () => store });
+      assert.equal(r3.reason, 'missing-fields');
+    });
+  } finally { cap.restore(); }
+  assert.equal(captured.calls || 0, 0, 'no se envía nada');
+  assert.deepEqual(cap.alerts.map(a => a.context.reason), ['invalid-email', 'invalid-booking-code', 'missing-fields']);
+  assert.deepEqual(cap.alerts.map(a => a.dedupeKey), [
+    'confirmation-email-failed:3300010',
+    'confirmation-email-failed:RES1x',
+    'confirmation-email-failed:3300011'
+  ]);
+  assert.ok(cap.alerts.every(a => a.kind === 'confirmation_email_failed'));
+  assert.doesNotMatch(JSON.stringify(cap.alerts), /ana;"x"@correo\.com/, 'el correo va ofuscado');
+});

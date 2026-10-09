@@ -26,8 +26,8 @@ function makeBlobs(seed = {}) {
   return { getStore, buckets };
 }
 
-function load({ flag = true, lock = { acquired: true }, insertImpl, avail = { '31348': 5 }, seed = {} } = {}) {
-  const calls = { insert: 0, lockAcquired: 0, lockReleased: 0, emails: [] };
+function load({ flag = true, lock = { acquired: true }, insertImpl, avail = { '31348': 5 }, seed = {}, confirmImpl } = {}) {
+  const calls = { insert: 0, lockAcquired: 0, lockReleased: 0, emails: [], confirmations: [] };
   const blobs = makeBlobs(seed);
 
   fake(BLOBS, { getStore: blobs.getStore });
@@ -56,6 +56,13 @@ function load({ flag = true, lock = { acquired: true }, insertImpl, avail = { '3
     adminPendingHtml: () => '<p>pending</p>'
   });
   fake(R('_analytics'), { trackPurchase: async () => {} });
+  fake(R('send-confirmation'), {
+    sendConfirmationEmail: async (p) => {
+      calls.confirmations.push(p);
+      if (confirmImpl) return confirmImpl(p);
+      return { sent: true };
+    }
+  });
   fake(R('_quotes-store'), {
     getQuoteStore: () => ({}), loadQuote: async () => null, saveQuote: async () => {},
     effectiveStatus: () => 'activa', computeQuoteTotal: () => ({ totalCents: 0 })
@@ -68,7 +75,7 @@ function load({ flag = true, lock = { acquired: true }, insertImpl, avail = { '3
   const payments = require('../../netlify/functions/_payments');
   const cleanup = () => {
     if (saved === undefined) delete process.env.MP_DIRECT_RESILIENT_ENABLED; else process.env.MP_DIRECT_RESILIENT_ENABLED = saved;
-    for (const m of ['_otasync', '_quote-lock', '_email', '_analytics', '_quotes-store', '_payments']) delete require.cache[R(m)];
+    for (const m of ['_otasync', '_quote-lock', '_email', '_analytics', '_quotes-store', '_payments', 'send-confirmation']) delete require.cache[R(m)];
     delete require.cache[BLOBS];
   };
   return { payments, blobs, calls, cleanup };
@@ -186,4 +193,74 @@ test('flag ON: re-entrega del MISMO tx con el lock tomado → duplicate silencio
     assert.equal(ctx.calls.insert, 0);
     assert.equal(ctx.calls.emails.length, 0, 'no alerta de doble pago por una re-entrega');
   } finally { ctx.cleanup(); }
+});
+
+/* Revisión pend-confirm: el navegador ya no pide el correo de confirmación, así
+   que el camino de Mercado Pago (hoy el 100% de los pagos web) DEBE enviarlo
+   desde el servidor tras crear la reserva, con el id final de OTASync. */
+test('MP flag ON: tras crear la reserva envía UNA confirmación con el id de OTASync', async () => {
+  const ctx = load({});
+  try {
+    const ref = refFor(ctx.payments, 'EST-C1', 30000000, { extrasMask: '1000000' });
+    const res = await ctx.payments.processApprovedPayment(mpTx(ref, 'MP-C1', 30000000), {});
+    assert.equal(JSON.parse(res.body).success, true);
+    assert.equal(ctx.calls.confirmations.length, 1);
+    const p = ctx.calls.confirmations[0];
+    assert.equal(p.bookingCode, 'RES-MP-1', 'usa el id final de OTASync, no el EST-');
+    assert.equal(p.guestEmail, 'a@x.co');
+    assert.equal(p.guestName, 'Ana R');
+    assert.equal(p.checkIn, '2026-08-01');
+    assert.equal(p.checkOut, '2026-08-03');
+    assert.equal(p.nights, 2);
+    assert.equal(p.breakfast, true, 'desayuno sale del extrasMask');
+    assert.equal(p.via, 'mercadopago');
+    assert.equal(p.dedupeKey, undefined, 'el llamador no fija la clave anti-duplicados');
+  } finally { ctx.cleanup(); }
+});
+
+test('MP flag OFF (producción hoy): también envía la confirmación tras crear la reserva', async () => {
+  const ctx = load({ flag: false });
+  const origFetch = global.fetch;
+  global.fetch = async () => new Response(JSON.stringify({ id_reservations: 'RES-RAW2' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  try {
+    const ref = refFor(ctx.payments, 'EST-C2', 30000000);
+    await ctx.payments.processApprovedPayment(mpTx(ref, 'MP-C2', 30000000), {});
+    assert.equal(ctx.calls.confirmations.length, 1);
+    assert.equal(ctx.calls.confirmations[0].bookingCode, 'RES-RAW2');
+    assert.equal(ctx.calls.confirmations[0].breakfast, false);
+  } finally { global.fetch = origFetch; ctx.cleanup(); }
+});
+
+test('MP: sin reserva creada (insert falla o pago duplicado) NO envía "Reserva confirmada"', async () => {
+  const failing = load({ insertImpl: async () => { throw new Error('OTASync caído'); } });
+  try {
+    const ref = refFor(failing.payments, 'EST-C3', 30000000);
+    await failing.payments.processApprovedPayment(mpTx(ref, 'MP-C3', 30000000), {});
+    assert.equal(failing.calls.confirmations.length, 0);
+  } finally { failing.cleanup(); }
+  const dup = load({ lock: { acquired: false, ownerTx: 'MP-OTRO' } });
+  try {
+    const ref = refFor(dup.payments, 'EST-C4', 30000000);
+    await dup.payments.processApprovedPayment(mpTx(ref, 'MP-C4', 30000000), {});
+    assert.equal(dup.calls.confirmations.length, 0);
+  } finally { dup.cleanup(); }
+});
+
+test('MP: si el correo de confirmación lanza, el webhook igual responde éxito', async () => {
+  const ctx = load({ confirmImpl: async () => { throw new Error('Resend caído'); } });
+  try {
+    const ref = refFor(ctx.payments, 'EST-C5', 30000000);
+    const res = await ctx.payments.processApprovedPayment(mpTx(ref, 'MP-C5', 30000000), {});
+    assert.equal(res.statusCode, 200);
+    assert.equal(JSON.parse(res.body).bookingCode, 'RES-MP-1');
+    assert.equal(ctx.calls.confirmations.length, 1);
+  } finally { ctx.cleanup(); }
+});
+
+test('mercadopago-webhook delega la reserva en _payments.processApprovedPayment (que envía la confirmación)', () => {
+  const fs = require('node:fs');
+  const src = fs.readFileSync(R('mercadopago-webhook'), 'utf8');
+  assert.match(src, /processApprovedPayment/);
+  const pay = fs.readFileSync(R('_payments'), 'utf8');
+  assert.match(pay, /await sendDirectConfirmation\(\{/);
 });

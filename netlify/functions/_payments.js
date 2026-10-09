@@ -169,6 +169,41 @@ function sanitizePhone(raw) {
   return raw.replace(/[^\d+\s]/g, '').trim().substring(0, 20);
 }
 
+/* Correo de confirmación de una reserva DIRECTA pagada por Mercado Pago. El
+   servidor es el único que lo envía (el navegador ya no lo pide), así que este
+   camino lo dispara tras crear la reserva, con el id final de OTASync — espejo
+   de wompi-webhook.sendDirectBookingConfirmation. Idempotente (send-confirmation
+   deduplica por código de reserva) y NUNCA lanza: la plata ya entró y la reserva
+   existe; un fallo del correo genera la alerta confirmation_email_failed dentro
+   de sendConfirmationEmail. `require` perezoso para no cargar Resend/pases en
+   los demás usos de este módulo. */
+async function sendDirectConfirmation({ decoded, bookingCode, roomName, nights, paidAmount, totalAmount, via }) {
+  try {
+    if (!decoded) return { sent: false, reason: 'no-decoded' };
+    const { sendConfirmationEmail } = require('./send-confirmation');
+    const { EXTRAS_KEYS } = require('./_pricing');
+    const breakfastIdx = EXTRAS_KEYS.indexOf('desayuno');
+    const breakfast = breakfastIdx >= 0 && String(decoded.extrasMask || '')[breakfastIdx] === '1';
+    return await sendConfirmationEmail({
+      guestEmail: decoded.email,
+      guestName: `${decoded.firstName || ''} ${decoded.lastName || ''}`.trim() || decoded.email,
+      bookingCode,
+      roomName,
+      checkIn: decoded.checkin,
+      checkOut: decoded.checkout,
+      nights,
+      totalAmount,
+      paidAmount,
+      phone: sanitizePhone(decoded.phone),
+      breakfast,
+      via: via || 'mercadopago'
+    });
+  } catch (e) {
+    console.error(`[payments] confirmation email failed (non-fatal): ${e.message}. bookingCode=${bookingCode}`);
+    return { sent: false, reason: 'error', error: e.message };
+  }
+}
+
 function escapeHtml(str) {
   if (!str || typeof str !== 'string') return '';
   return str
@@ -666,6 +701,18 @@ async function processDirectPayment(transaction, corsHeaders) {
     } catch (e) { /* non-fatal */ }
   }
 
+  /* Confirmación al huésped: SOLO desde el servidor y SOLO con la reserva ya
+     creada (id final de OTASync). Nunca lanza. */
+  await sendDirectConfirmation({
+    decoded,
+    bookingCode: finalBookingCode,
+    roomName,
+    nights,
+    paidAmount,
+    totalAmount: roomPrice,
+    via: transaction.provider
+  });
+
   /* A-6: server-side conversion (Measurement Protocol). */
   try {
     await trackPurchase({
@@ -729,6 +776,7 @@ module.exports = {
   createDirectReference,
   decodeDirectReference,
   processApprovedPayment,
+  sendDirectConfirmation,
   alreadyProcessed,
   markProcessed,
   timingSafeEqualString

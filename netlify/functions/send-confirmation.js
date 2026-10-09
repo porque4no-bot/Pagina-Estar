@@ -504,13 +504,21 @@ async function sendConfirmationEmail(params, deps = {}) {
   const dedupeKey = confirmationDedupeKey(bookingCode);
   const to = String(guestEmail || '').trim();
 
+  /* Rechazos de validación: el servidor es el ÚNICO que envía la confirmación
+     (ya no hay respaldo desde el navegador), así que una reserva pagada que se
+     queda sin correo por un dato inválido debe llegar a recepción como tarea en
+     el ops-queue. La alerta lleva el correo ofuscado, nunca completo. */
+  const alertCode = String(dedupeKey || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) || 'sin-codigo';
   if (!to || !dedupeKey) {
+    await alertConfirmationFailure(alertCode, 'missing-fields', !to ? 'Sin correo del huésped' : 'Sin código de reserva');
     return { sent: false, reason: 'missing-fields' };
   }
   if (!EMAIL_RE.test(to) || to.length > 254) {
+    await alertConfirmationFailure(alertCode, 'invalid-email', `Correo inválido: ${obfuscateEmail(to)}`);
     return { sent: false, reason: 'invalid-email' };
   }
   if (!BOOKING_CODE_RE.test(dedupeKey)) {
+    await alertConfirmationFailure(alertCode, 'invalid-booking-code', 'Código de reserva con formato inválido');
     return { sent: false, reason: 'invalid-booking-code' };
   }
 
