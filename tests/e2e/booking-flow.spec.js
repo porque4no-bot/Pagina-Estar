@@ -366,7 +366,8 @@ test('English confirmation: the online check-in button opens the English guest a
   await page.goto(`/en/reservar.html?payment=success&payment_id=556&external_reference=${encodeURIComponent(ref)}`);
   const link = page.locator('a.be-checkin-link');
   await expect(link).toHaveAttribute('href', '/en/guest.html?code=3273600');
-  await link.click();
+  /* El enlace abre otra pestaña: se sigue el href en esta. */
+  await page.goto(await link.getAttribute('href'));
   await expect(page).toHaveURL(/\/en\/guest\.html/);
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.locator('#bookingCode')).toHaveValue('3273600');
