@@ -68,8 +68,8 @@ async function recentlyAlerted(getStore, key, ttlMs, now) {
   }
 }
 
-/* Marks the fingerprint as alerted at `now`. Called ONLY after a successful
-   send. Best-effort: a Blobs failure just means the next alert isn't deduped. */
+/* Marks the fingerprint as alerted at `now` (helper/compat; reportAlert usa
+   claimAlert, que reclama atómicamente y libera si el envío falla). Best-effort: a Blobs failure just means the next alert isn't deduped. */
 async function markAlerted(getStore, key, now) {
   const store = dedupStore(getStore);
   if (!store) return false;
@@ -78,6 +78,48 @@ async function markAlerted(getStore, key, now) {
     return true;
   } catch (e) {
     return false;
+  }
+}
+
+/* Reclamo ATÓMICO del fingerprint ANTES de enviar (set onlyIfNew, o re-armado
+   con onlyIfMatch/etag si el sello anterior ya venció). Así dos invocaciones
+   concurrentes con el mismo fingerprint no envían las dos (ráfagas de webhooks).
+   Devuelve { claimed, release }: si el envío falla, release() libera la clave
+   (sello at:0) para que el siguiente intento sí avise — se conserva el arreglo de
+   "no silenciar una alerta que no salió". Fail-OPEN: un error de Blobs => claimed
+   true con release no-op (preferimos un duplicado a una alerta perdida). */
+async function claimAlert(getStore, key, ttlMs, now) {
+  const noop = async () => {};
+  const store = dedupStore(getStore);
+  if (!store) return { claimed: true, release: noop };
+  const value = JSON.stringify({ at: now });
+  const release = async () => {
+    try {
+      const cur = await store.getWithMetadata(key, { type: 'json' });
+      /* Solo liberamos NUESTRO sello (otro proceso pudo re-armar después). */
+      if (!cur || !cur.data || cur.data.at !== now) return;
+      const opts = cur.etag ? { onlyIfMatch: cur.etag } : {};
+      await store.set(key, JSON.stringify({ at: 0 }), opts);
+    } catch (e) { /* best-effort */ }
+  };
+  try {
+    const created = await store.set(key, value, { onlyIfNew: true });
+    if (!created || created.modified !== false) return { claimed: true, release };
+  } catch (e) {
+    return { claimed: true, release: noop };
+  }
+  /* La clave existe: suprimir si el sello es reciente; si venció (o fue liberado
+     con at:0), re-armar de forma condicional para ganar el reclamo. */
+  try {
+    const cur = await store.getWithMetadata(key, { type: 'json' });
+    const at = (cur && cur.data && cur.data.at) || 0;
+    if (at && now - at <= ttlMs) return { claimed: false, release: noop };
+    const opts = cur && cur.etag ? { onlyIfMatch: cur.etag } : { onlyIfNew: true };
+    const rearmed = await store.set(key, value, opts);
+    if (!rearmed || rearmed.modified !== false) return { claimed: true, release };
+    return { claimed: false, release: noop }; /* otro proceso ganó el re-armado */
+  } catch (e) {
+    return { claimed: true, release: noop };
   }
 }
 
@@ -119,19 +161,26 @@ async function reportAlert({ kind, severity = 'error', message, context = {}, de
     const ttlMs = 1000 * (ttlSec || parseInt(process.env.ALERT_DEDUPE_TTL_SEC, 10) || DEFAULT_TTL_SEC);
     const fp = dedupeKey || `${kind}:${stableHash(message + '|' + JSON.stringify(context))}`;
 
-    if (await recentlyAlerted(getStore, fp, ttlMs, now)) return { alerted: false, reason: 'deduped' };
+    const claim = await claimAlert(getStore, fp, ttlMs, now);
+    if (!claim.claimed) return { alerted: false, reason: 'deduped' };
 
     const to = process.env.ALERT_EMAIL || adminEmail();
     const at = new Date(now).toISOString();
     const subject = `${severityMark(severity)} [Estar alerta] ${kind} — ${String(message || '').slice(0, 80)}`;
-    const sent = await sendEmail({ to, subject, html: alertHtml({ kind, severity, message, context, at }) });
+    let sent;
+    try {
+      sent = await sendEmail({ to, subject, html: alertHtml({ kind, severity, message, context, at }) });
+    } catch (e) {
+      await claim.release(); /* no salió: no silenciar la siguiente */
+      throw e;
+    }
     /* sendEmail no lanza: devuelve { sent:false } si Resend falla o no hay
-       llave. En ese caso NO se marca el dedupe, para que el siguiente intento
+       llave. En ese caso se LIBERA el reclamo, para que el siguiente intento
        sí avise (antes quedaba silenciado una hora sin haber salido nada). */
     if (sent && sent.sent === false) {
+      await claim.release();
       return { alerted: false, reason: 'send_failed' };
     }
-    await markAlerted(getStore, fp, now);
     return { alerted: true };
   } catch (e) {
     try { logger.error('[alert] reportAlert threw (swallowed):', e.message); } catch (_) {}
@@ -140,4 +189,4 @@ async function reportAlert({ kind, severity = 'error', message, context = {}, de
 }
 
 module.exports = { reportAlert };
-module.exports._test = { stableHash, alertHtml, shouldSend, recentlyAlerted, markAlerted, DEFAULT_TTL_SEC };
+module.exports._test = { stableHash, alertHtml, shouldSend, claimAlert, recentlyAlerted, markAlerted, DEFAULT_TTL_SEC };

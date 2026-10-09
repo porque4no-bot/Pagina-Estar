@@ -210,7 +210,7 @@
             (canUpgrade
               ? '<p class="hint">Esta tarifa no incluye desayuno. Puedes agregarlo y se carga a la cuenta.</p>' +
                 '<div class="actions"><button class="btn" id="upgradeBtn">Agregar desayuno</button></div>'
-              : '<p class="hint">Esta tarifa no incluye desayuno. Si el huésped quiere desayunar, remítelo a recepción para agregarlo a su cuenta.</p>') +
+              : '<p class="hint">Esta tarifa no incluye desayuno. Si el huésped quiere desayunar, avísale al administrador del hotel para que lo agregue a su cuenta (desde este usuario no se puede cobrar).</p>') +
           '</div>';
         var ub = $('upgradeBtn');
         if (ub) ub.addEventListener('click', function () { upgrade(status.bookingCode); });

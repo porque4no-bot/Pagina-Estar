@@ -21,7 +21,7 @@
 const { json, corsHeaders, parseJsonBody } = require('./_guest-app');
 const { authorize } = require('./_authz');
 const { getChecklistItem, auditPhoto, evaluateDecision } = require('./_cleaning-audit');
-const { saveAudit, savePhoto, apartmentSlug, todayBogota } = require('./_cleaning-store');
+const { saveAudit, getAudit, savePhoto, apartmentSlug, todayBogota } = require('./_cleaning-store');
 const drive = require('./_google-drive');
 
 const MAX_BODY_BYTES = 8 * 1024 * 1024;   /* ~8 MB: cubre una foto comprimida en base64 */
@@ -79,9 +79,29 @@ const deps = {
   uploadToDrive: args => uploadToDrive(args),
   savePhoto: args => savePhoto(args),
   saveAudit: args => saveAudit(args),
-  reportAlert: args => require('./_alert').reportAlert(args),
-  resolveTask: (id, by) => require('./_ops-queue').resolve(id, by)
+  getAudit: (slug, item, date) => getAudit(slug, item, date),
+  reportAlert: args => require('./_alert').reportAlert(args)
 };
+
+/* Rastro de observaciones: una foto nueva SOBRESCRIBE el registro del día
+   (misma clave apto:ítem:fecha). Si el registro anterior fue 'advertida', se
+   conserva como observación previa para que recepción vea qué se señaló y quién
+   lo corrigió. Nunca se pierde una advertida. */
+function carryPreviousWarnings(prev) {
+  if (!prev) return [];
+  const history = Array.isArray(prev.observacionesPrevias) ? prev.observacionesPrevias.slice(-9) : [];
+  if (prev.decision === 'advertida') {
+    history.push({
+      decision: prev.decision,
+      problemas: (prev.verdict && prev.verdict.problemas) || [],
+      sugerencia: (prev.verdict && prev.verdict.sugerencia) || '',
+      staffEmail: prev.staffEmail || '',
+      auditedAt: prev.auditedAt || null,
+      driveLink: prev.driveLink || null
+    });
+  }
+  return history;
+}
 
 /* advertida → tarea en la cola operativa (y correo al equipo si ALERT_ENABLED).
    Best-effort: nunca tumba el registro de la foto. Devuelve true si se pidió. */
@@ -166,6 +186,10 @@ exports.handler = async event => {
       console.error('[validate-cleaning-photo] respaldo de imagen en Blobs falló:', e.message);
     }
 
+    let prev = null;
+    try { prev = await deps.getAudit(slug, item.id, date); } catch (e) { prev = null; }
+    const observacionesPrevias = carryPreviousWarnings(prev);
+
     const record = await deps.saveAudit({
       apartment: apartmentLabel,
       apartmentSlug: slug,
@@ -176,20 +200,20 @@ exports.handler = async event => {
       decision,
       verdict: clean,
       driveFileId: driveInfo ? driveInfo.id : null,
-      driveLink: driveInfo ? driveInfo.link : null
+      driveLink: driveInfo ? driveInfo.link : null,
+      observacionesPrevias
     });
 
-    /* Seguimiento operativo: advertida abre tarea; aprobada cierra la que
-       hubiera quedado abierta del mismo apartamento+ítem+día. */
+    /* Seguimiento operativo: advertida abre tarea. Una 'aprobada' posterior NO
+       la cierra: la persona de aseo es quien está siendo supervisada, así que la
+       tarea la cierra recepción desde la pestaña Hoy (staff-ops, con su permiso)
+       tras verificar la corrección. */
     let followUp = false;
     if (decision === 'advertida') {
       followUp = await openCleaningTask({
         apartmentLabel, slug, item, date, verdict: clean,
         staffEmail: auth.email, driveLink: record.driveLink
       });
-    } else if (decision === 'aprobada') {
-      try { await deps.resolveTask(cleaningTaskKey(slug, item.id, date), auth.email); }
-      catch (e) { /* best-effort */ }
     }
 
     return json(200, {
@@ -209,4 +233,4 @@ exports.handler = async event => {
   }
 };
 
-exports._test = { deps, cleaningTaskKey, parseImage };
+exports._test = { deps, cleaningTaskKey, parseImage, carryPreviousWarnings };

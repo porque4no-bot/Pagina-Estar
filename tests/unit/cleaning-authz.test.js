@@ -7,7 +7,8 @@
  * cleaning.audit (rol 'aseo').
  *
  * Además: 'advertida' abre una tarea en la cola operativa (vía reportAlert, con
- * dedupe por apartamento+ítem+día) y 'aprobada' cierra la que hubiera quedado.
+ * dedupe por apartamento+ítem+día). Una 'aprobada' posterior NO la cierra (la
+ * cierra recepción) y el registro conserva la advertida como observación previa.
  * Sin red ni Blobs: _authz se stubbea por require.cache y el resto por deps. */
 
 const test = require('node:test');
@@ -38,8 +39,9 @@ const IMG = 'data:image/jpeg;base64,' + Buffer.from('fake-jpeg-bytes').toString(
 
 /* Deps falsas: registran llamadas; nada sale a la red ni a Blobs. */
 let calls;
-function fakeDeps(verdict) {
+function fakeDeps(verdict, prev = null) {
   calls = { alerts: [], resolved: [], saved: [] };
+  deps.getAudit = async () => prev;
   deps.auditPhoto = async () => verdict;
   deps.uploadToDrive = async () => ({ id: 'drv1', link: 'https://drive.example/drv1' });
   deps.savePhoto = async () => {};
@@ -105,14 +107,37 @@ test('advertida → se guarda y abre UNA tarea en la cola (reportAlert) con dedu
   assert.equal(calls.resolved.length, 0);
 });
 
-test('aprobada → se guarda y cierra la tarea pendiente del mismo apto+ítem+día (sin alertar)', async () => {
+test('aprobada → se guarda y NO cierra la tarea de la advertida (la cierra recepción)', async () => {
   fakeDeps(VERDICT_OK);
   const res = await post({ apartment: '101', item: 'cama', image: IMG });
   const body = JSON.parse(res.body);
   assert.equal(body.decision, 'aprobada');
   assert.equal(body.followUp, false);
   assert.equal(calls.alerts.length, 0);
-  assert.deepEqual(calls.resolved, [{ id: cleaningTaskKey('101', 'cama', todayBogota()), by: 'aseo@estar.com' }]);
+  assert.equal(calls.resolved.length, 0, 'la persona supervisada no puede cerrar su propia tarea');
+});
+
+test('aprobada tras advertida → conserva la observación previa en el registro', async () => {
+  const prev = {
+    decision: 'advertida', staffEmail: 'aseo@estar.com', auditedAt: '2026-10-08T14:00:00Z',
+    driveLink: 'https://drive.example/old', verdict: { problemas: ['Sanitario sucio'], sugerencia: 'Repasar' }
+  };
+  fakeDeps(VERDICT_OK, prev);
+  await post({ apartment: '101', item: 'bano', image: IMG });
+  const rec = calls.saved[0];
+  assert.equal(rec.decision, 'aprobada');
+  assert.equal(rec.observacionesPrevias.length, 1);
+  assert.deepEqual(rec.observacionesPrevias[0].problemas, ['Sanitario sucio']);
+  assert.equal(rec.observacionesPrevias[0].driveLink, 'https://drive.example/old');
+  assert.equal(calls.resolved.length, 0);
+});
+
+test('carryPreviousWarnings acumula el historial y no arrastra aprobadas', () => {
+  const { carryPreviousWarnings } = photoMod._test;
+  assert.deepEqual(carryPreviousWarnings(null), []);
+  assert.deepEqual(carryPreviousWarnings({ decision: 'aprobada' }), []);
+  const h = carryPreviousWarnings({ decision: 'aprobada', observacionesPrevias: [{ decision: 'advertida' }] });
+  assert.equal(h.length, 1, 'una aprobada intermedia no borra el rastro');
 });
 
 test('rechazada → no se guarda, ni tarea ni cierre', async () => {

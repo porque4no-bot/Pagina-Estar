@@ -75,7 +75,7 @@ exports.handler = async (event) => {
 
   /* Calienta el snapshot de overrides del panel (TTLOCK_ENABLED /
      TTLOCK_LOCKS_JSON se leen en sync dentro de _ttlock). */
-  await preload();
+  await preload({ fresh: true }); /* sin caché: el mapa recién guardado desde el panel se ve de inmediato */
 
   const c = ttlock.ttlockConfig();
   const mapping = ttlock.describeLocksMap();

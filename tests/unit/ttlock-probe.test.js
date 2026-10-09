@@ -15,11 +15,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-/* Blobs vacío (sin overrides del panel). */
+/* Blobs sin overrides del panel por defecto; `panelOverrides` simula lo que el
+   proceso de admin-settings haya guardado (otro Lambda). */
+let panelOverrides = null;
 const blobsPath = require.resolve('@netlify/blobs');
 require.cache[blobsPath] = {
   id: blobsPath, filename: blobsPath, loaded: true,
-  exports: { getStore: () => ({ async get() { return null; }, async set() { return { modified: true }; } }) }
+  exports: { getStore: () => ({ async get() { return panelOverrides ? JSON.stringify(panelOverrides) : null; }, async set() { return { modified: true }; } }) }
 };
 
 const authzPath = require.resolve('../../netlify/functions/_authz');
@@ -197,4 +199,20 @@ test('crossCheck no pisa una clave ya mapeada con una sugerencia', () => {
   const out = crossCheck(locks, { entries: [{ key: '101', lockId: 1 }] });
   assert.deepEqual(out.suggested, { 101: 1 });
   assert.deepEqual(out.pendingWithoutKey, [2]);
+});
+
+test('mapa recién guardado desde el panel (otro proceso) se ve en la siguiente prueba, sin esperar la caché de 30 s', async () => {
+  panelOverrides = null;
+  const r1 = JSON.parse((await get()).body);
+  assert.equal(r1.mapping.defined, false);
+  /* admin-settings (otro Lambda) guarda el mapa; la caché de ESTE proceso sigue caliente. */
+  panelOverrides = { TTLOCK_LOCKS_JSON: '{"101":1234567}' };
+  try {
+    const r2 = JSON.parse((await get()).body);
+    assert.equal(r2.mapping.defined, true, 'el probe relee los overrides sin caché');
+    assert.deepEqual(r2.mapping.entries.map(e => [e.key, e.lockId]), [['101', 1234567]]);
+  } finally {
+    panelOverrides = null;
+    await require('../../netlify/functions/_settings').preload({ fresh: true });
+  }
 });

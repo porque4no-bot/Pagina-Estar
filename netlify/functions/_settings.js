@@ -162,7 +162,10 @@ async function loadOverrides(deps = {}) {
   const now = (deps.now || Date.now)(); /* reloj inyectable; por defecto el real */
   /* Con el store real (producción) cachea ~30s por proceso; con un store
      inyectado (tests) siempre relee, para no arrastrar snapshots entre casos. */
-  if (!deps.store && _cache.data && now - _cache.at < CACHE_TTL_MS) return _cache.data;
+  /* deps.fresh: salta la caché del proceso (p.ej. ttlock-probe justo después de
+     que el panel guardó un override desde OTRO proceso: setSetting solo invalida
+     la caché del proceso de admin-settings). El store es consistency:'strong'. */
+  if (!deps.store && !deps.fresh && _cache.data && now - _cache.at < CACHE_TTL_MS) return _cache.data;
   try {
     const store = deps.store || settingsStore();
     const raw = await store.get(STORE);

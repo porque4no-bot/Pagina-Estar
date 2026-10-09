@@ -60,7 +60,7 @@ test('desayuno: el tercero (status+redeem) no ve "Agregar desayuno" ni el conteo
   await page.click('#lookupBtn');
   await expect(page.getByText('Sin desayuno incluido')).toBeVisible();
   await expect(page.locator('#upgradeBtn')).toHaveCount(0);
-  await expect(page.getByText(/remítelo a recepción/)).toBeVisible();
+  await expect(page.getByText(/avísale al administrador del hotel/)).toBeVisible();
   await expect(page.locator('#countsPanel')).toBeHidden();
   expect(dayCalls).toBe(0);
 });
