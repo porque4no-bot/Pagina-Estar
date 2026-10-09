@@ -395,7 +395,11 @@ exports.handler = async (event) => {
      vieja / booking-results vencido / payment-details ausente), el que APORTE el
      admin en body.originalAmountCents (verificado por él desde Wompi/MP). Se
      persiste con auditoría para no bloquear el flujo por completo. */
-  let knownOriginal = (refund.originalAmountCents && refund.originalAmountCents > 0) ? refund.originalAmountCents : 0;
+  /* El total de Kunas (originalAmountSource 'pms_total') NO es un pago recibido
+     por la web: puede ser dinero que cobró una OTA o que se paga en el hotel, o
+     incluir el IVA que no se cobró en línea. No sirve como tope: el admin debe
+     ingresar el monto verificado. */
+  let knownOriginal = (refund.originalAmountCents && refund.originalAmountCents > 0 && refund.originalAmountSource !== 'pms_total') ? refund.originalAmountCents : 0;
   let backfilledOriginal = false;
   if (!knownOriginal && body.originalAmountCents != null) {
     const oc = parseInt(body.originalAmountCents, 10);
@@ -512,6 +516,21 @@ exports.handler = async (event) => {
     /* Datos del pago que completa el admin (solo huecos) + tipo de solicitud. */
     const fix = paymentFixPatch(refund, body.payment);
     const effective = { ...refund, ...fix };
+
+    /* Un pago se devuelve UNA vez: si otra solicitud (p. ej. la de una reserva
+       duplicada con el mismo código EST) ya aprobó o reembolsó este mismo pago,
+       no se aprueba otra devolución sobre él. */
+    if (effective.transactionId) {
+      let others = [];
+      try {
+        others = await require('./_refunds-store').findRefundsByTransaction(effective.transactionId, bookingCode);
+      } catch (e) { others = []; }
+      if (others.length) {
+        return reply(409, {
+          error: `Este pago (${effective.transactionId}) ya tiene un reembolso aprobado o hecho en la reserva ${others[0].bookingCode}. No se puede devolver dos veces; si es una reserva duplicada, deniega esta solicitud o crea un caso especial sin pago.`
+        });
+      }
+    }
     const kindPatch = {};
     if (body.kind === 'special' || body.kind === 'cancellation') {
       kindPatch.kind = body.kind;

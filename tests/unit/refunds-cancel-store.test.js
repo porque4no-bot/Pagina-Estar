@@ -261,3 +261,31 @@ test('producción sin clave de cifrado: falla CERRADO (no guarda en claro)', () 
     if (saved.netlify === undefined) delete process.env.NETLIFY; else process.env.NETLIFY = saved.netlify;
   }
 });
+
+/* ── Revisión final de integración ─────────────────────────────────────── */
+
+test('recoverPaymentInfo: el pago hallado por código EST que es de OTRA reserva (duplicado de MP) no se usa', async () => {
+  reset();
+  await memStore('booking-results').set('direct-EST-DUP1', JSON.stringify({
+    bookingCode: '3273560', otasyncId: '3273560', provider: 'mercadopago',
+    paymentMethod: 'visa', transactionId: 'MP-ONE', amountInCents: 40000000
+  }));
+  await memStore('payment-details').set('EST-DUP1', JSON.stringify({
+    bookingCode: 'EST-DUP1', otasyncId: '3273560', provider: 'mercadopago', transactionId: 'MP-ONE', amountInCents: 40000000
+  }));
+  const dup = await recoverPaymentInfo('3273564', { reference: 'EST-DUP1' });
+  assert.equal(dup.transactionId, undefined);
+  assert.equal(dup.originalAmountCents, undefined);
+  assert.equal(dup.paymentOtherReservation, '3273560');
+  const own = await recoverPaymentInfo('3273560', { reference: 'EST-DUP1' });
+  assert.equal(own.transactionId, 'MP-ONE');
+  assert.equal(own.originalAmountSource, 'payment');
+});
+
+test('policySuggestion: con el total de Kunas (sin pago web) no sugiere monto ni botón', () => {
+  const p = policySuggestion({ ratePlan: 'flexible', checkIn: '2026-11-20', nights: 2, requestedAt: '2026-11-01T10:00:00Z', originalAmountCents: 33000000, originalAmountSource: 'pms_total' });
+  assert.equal(p.amountCents, null);
+  assert.equal(p.rule, 'unverified_amount');
+  assert.equal(p.alternatives, undefined);
+  assert.match(p.text, /OTA/);
+});

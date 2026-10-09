@@ -39,7 +39,8 @@ exports.handler = async (event) => {
       try {
         view.policy = policySuggestion({
           ratePlan: r.ratePlan, checkIn: r.checkIn, nights: r.nights,
-          requestedAt: r.createdAt, originalAmountCents: r.originalAmountCents
+          requestedAt: r.createdAt, originalAmountCents: r.originalAmountCents,
+          originalAmountSource: r.originalAmountSource
         }, now);
       } catch (e) { view.policy = null; }
       return view;

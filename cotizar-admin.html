@@ -4311,6 +4311,13 @@ function refundBankBlock(r) {
   return '';
 }
 
+/* Monto pagado CONFIABLE (pasarela o ingresado por el admin). El total de Kunas
+   (originalAmountSource 'pms_total') no cuenta: puede no ser dinero recibido. */
+function rfVerifiedPaid(r) {
+  if (!r || !r.originalAmountCents || r.originalAmountSource === 'pms_total') return 0;
+  return r.originalAmountCents;
+}
+
 /* HTML completo del detalle. Puro (sin DOM): r = registro, perms = rfPerms(),
    cfg = config del servidor. Los botones aparecen según el permiso. */
 function renderRefundModal(r, perms, cfg) {
@@ -4318,7 +4325,10 @@ function renderRefundModal(r, perms, cfg) {
   const isTerminal = r.status === 'DONE' || r.status === 'DENIED';
   const isReview = r.status === 'NEEDS_REVIEW';
   const stay = (r.checkIn && r.checkOut) ? `${fmtShortDate(r.checkIn)} → ${fmtShortDate(r.checkOut)}` : '—';
-  const maxCop = r.originalAmountCents ? Math.round(r.originalAmountCents / 100) : '';
+  /* El total de Kunas (pms_total) NO es un pago recibido: puede ser de una OTA
+     o pagarse en el hotel. No sirve como tope ni como sugerencia. */
+  const verifiedPaid = rfVerifiedPaid(r);
+  const maxCop = verifiedPaid ? Math.round(verifiedPaid / 100) : '';
   const p = r.policy || {};
   /* Monto prellenado: el ya fijado, o el sugerido por la política. Si la política
      da 0 (no-show / tardía de 1 noche) o el plan es desconocido, se deja VACÍO
@@ -4326,7 +4336,7 @@ function renderRefundModal(r, perms, cfg) {
   let presetAmount = '';
   if (r.refundAmountCents != null) presetAmount = Math.round(r.refundAmountCents / 100);
   else if (p.amountCents != null) presetAmount = p.amountCents > 0 ? Math.round(p.amountCents / 100) : '';
-  else if (p.rule !== 'unknown_plan' && r.originalAmountCents) presetAmount = Math.round(r.originalAmountCents / 100);
+  else if (p.rule !== 'unknown_plan' && p.rule !== 'unverified_amount' && verifiedPaid) presetAmount = Math.round(verifiedPaid / 100);
   const kind = r.kind === 'special' ? 'special' : 'cancellation';
 
   const info = `<dl class="rf-grid">
@@ -4336,6 +4346,7 @@ function renderRefundModal(r, perms, cfg) {
     <dt>Habitación</dt><dd>${escHtml(r.roomName || '—')}</dd>
     <dt>Estadía</dt><dd>${stay}</dd>
     ${r.reference ? `<dt>Código web</dt><dd>${escHtml(r.reference)}</dd>` : ''}
+    ${r.paymentOtherReservation ? `<dt>Ojo</dt><dd style="color:var(--terracotta)">El pago con este código web es de la reserva ${escHtml(r.paymentOtherReservation)} (posible reserva duplicada): no se toma como pago de esta.</dd>` : ''}
     <dt>Pagado</dt><dd>${fmtCents(r.originalAmountCents)}${r.originalAmountSource === 'pms_total' ? ' <span style="color:var(--ink-500)">(total de Kunas, verifícalo)</span>' : (r.originalAmountSource === 'admin' ? ' <span style="color:var(--ink-500)">(ingresado a mano)</span>' : '')}</dd>
     <dt>Medio de pago</dt><dd>${escHtml(r.paymentProvider || '—')}${r.paymentMethod ? ' · ' + escHtml(r.paymentMethod) : ''}</dd>
     ${r.ratePlan ? `<dt>Plan</dt><dd>${r.ratePlan === 'flexible' ? 'Flexible <span style="color:var(--olive)">(100% hasta 24 h antes)</span>' : 'Estricta <span style="color:var(--olive)">(100% hasta 7 días antes)</span>'}</dd>` : ''}
@@ -4365,7 +4376,8 @@ function renderRefundModal(r, perms, cfg) {
     if (!perms.approve && !perms.deny) {
       actions = '<div class="rf-section"><div class="rf-note">Puedes ver esta solicitud, pero aprobarla o denegarla requiere permiso de tesorería/administración.</div></div>';
     } else {
-      const missingPaid = !r.originalAmountCents;
+      const missingPaid = !verifiedPaid;
+      const fromPms = r.originalAmountSource === 'pms_total';
       /* El selector aparece si falta el proveedor O el método (p. ej. un pago de
          Mercado Pago recuperado de la nota de Kunas trae proveedor e id, pero no
          el método). Con el proveedor conocido, solo se ofrecen sus opciones. */
@@ -4374,7 +4386,7 @@ function renderRefundModal(r, perms, cfg) {
       const payOptions = r.paymentProvider
         ? RF_PAYMENT_OPTIONS.filter(o => !o[0] || o[0].indexOf(r.paymentProvider + '|') === 0)
         : RF_PAYMENT_OPTIONS;
-      const paidField = missingPaid ? `<div class="field"><label for="rfPaid">Monto pagado (COP) — verifícalo en Mercado Pago / Wompi</label>
+      const paidField = missingPaid ? `<div class="field"><label for="rfPaid">${fromPms ? 'Monto que pagó el huésped (COP) — ' + escHtml(fmtCents(r.originalAmountCents)) + ' es el total de Kunas, no un pago web: si pagó a una OTA (Booking, Expedia…) la devolución la hace la OTA y aquí se deniega; si pagó en el hotel, ingresa lo cobrado' : 'Monto pagado (COP) — verifícalo en Mercado Pago / Wompi'}</label>
           <input id="rfPaid" type="number" class="it-input" style="min-width:unset; width:100%" min="0" placeholder="Ej. 330000"></div>` : '';
       const providerField = missingProvider ? `<div class="field"><label for="rfPayMethod">Medio de pago${r.paymentProvider ? ' (' + escHtml(r.paymentProvider) + ': confirma el método)' : ''}</label>
           <select id="rfPayMethod" class="it-input" style="min-width:unset; width:100%">${payOptions.map(o => `<option value="${o[0]}">${escHtml(o[1])}</option>`).join('')}</select></div>` : '';
@@ -4448,7 +4460,7 @@ function openRefund(code) {
   rfOpen();
   const $ = (id) => document.getElementById(id);
   const val = (id) => { const el = $(id); return el ? el.value : ''; };
-  const maxCop = r.originalAmountCents ? Math.round(r.originalAmountCents / 100) : '';
+  const maxCop = rfVerifiedPaid(r) ? Math.round(rfVerifiedPaid(r) / 100) : '';
 
   /* Sugerencias de la política → rellenan el monto. */
   body.querySelectorAll('[data-rf-suggest]').forEach(b => b.addEventListener('click', () => {
@@ -4473,7 +4485,7 @@ function openRefund(code) {
     if (!Number.isFinite(amt) || amt <= 0) { alert('Ingresa un monto válido. Si no aplica reembolso, usa "Denegar".'); return; }
     const extra = { amountCents: amt * 100, notes: val('rfNotes'), kind: kindSel ? kindSel.value : undefined, cancelReservation: !!(cs && cs.checked) };
     let cap = maxCop;
-    if (!r.originalAmountCents) {
+    if (!rfVerifiedPaid(r)) {
       const paid = parseInt(val('rfPaid'), 10);
       if (!Number.isFinite(paid) || paid <= 0) { alert('Ingresa el monto que pagó el huésped (verificado en la pasarela).'); return; }
       extra.originalAmountCents = paid * 100; cap = paid;

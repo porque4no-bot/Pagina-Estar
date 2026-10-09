@@ -1116,9 +1116,12 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
     /* Snapshot durable de los datos del pago (id MP, método, últimos 4, fecha,
        valor, plan) para el reembolso: booking-results no los guarda todos. */
     try {
-      await deps.savePaymentDetails(finalBookingCode, transaction, { ratePlan: ratePlan || null });
+      /* otasyncId: con la reference se puede saber a qué reserva pertenece el pago
+         (los reembolsos no toman el pago de una reserva duplicada). */
+      const otasyncId = (data && data.id_reservations) ? String(data.id_reservations) : null;
+      await deps.savePaymentDetails(finalBookingCode, transaction, { ratePlan: ratePlan || null, otasyncId });
       if (code && String(code) !== String(finalBookingCode)) {
-        await deps.savePaymentDetails(code, transaction, { ratePlan: ratePlan || null });
+        await deps.savePaymentDetails(code, transaction, { ratePlan: ratePlan || null, otasyncId });
       }
     } catch (e) { /* best-effort */ }
 

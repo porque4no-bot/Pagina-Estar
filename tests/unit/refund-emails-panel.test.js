@@ -124,7 +124,7 @@ function sandbox() {
     'const REFUND_STATUS_LABEL =', 'const REFUND_ROUTE_LABEL =', 'const REFUND_KIND_LABEL =', 'const REFUND_ROUTE_HOWTO =',
     'const RF_PAYMENT_OPTIONS =',
     'function rfTrustedTx(', 'function refundApprovePlan(', 'function refundPolicyBlock(', 'function refundPmsBlock(',
-    'function refundBankBlock(', 'function renderRefundModal('
+    'function refundBankBlock(', 'function rfVerifiedPaid(', 'function renderRefundModal('
   ].map(h => extractBlock(html, h));
   const ctx = {};
   vm.createContext(ctx);
@@ -249,4 +249,17 @@ test('correos al huésped quedan listados en el detalle', () => {
 test('la pestaña muestra "Nuevo caso especial" y el detalle se arma con hasPerm', () => {
   assert.match(html, /id="newSpecialRefundBtn"/);
   assert.match(html, /function rfPerms\(\)[\s\S]*hasPerm\('refunds\.approve'\)[\s\S]*hasPerm\('refunds\.mark_done'\)/);
+});
+
+test('sin pago web (total de Kunas): no prellena el 100% y pide el monto que pagó el huésped', () => {
+  const out = ctx.renderRefundModal({
+    ...REVIEW, paymentProvider: null, paymentMethod: null, transactionId: null,
+    originalAmountCents: 33000000, originalAmountSource: 'pms_total', refundAmountCents: null,
+    policy: { amountCents: null, rule: 'unverified_amount', text: 'No hay pago web registrado para esta reserva.' }
+  }, ALLP, {});
+  assert.match(out, /id="rfPaid"/);
+  assert.match(out, /total de Kunas, no un pago web/);
+  assert.match(out, /id="rfAmount"[^>]*value=""/);
+  assert.doesNotMatch(out, /data-rf-suggest/);
+  assert.doesNotMatch(out, /max="330000"/);
 });

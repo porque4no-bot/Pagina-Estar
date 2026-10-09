@@ -105,8 +105,25 @@ function parsePaymentFromPmsNote(note) {
    reserva en OTASync), primero en booking-results (7 días) y luego en
    payment-details (durable ~13 meses). Como último recurso se lee el id de la
    transacción de la nota de la reserva (opts.note). Nunca lanza. */
+/* ¿El registro de pago encontrado por `key` es de ESTA reserva? Por el id de
+   OTASync siempre lo es. Por el código EST (reference) solo si el registro apunta
+   a esta misma reserva de OTASync: Mercado Pago duplicó reservas con la misma
+   reference (p. ej. 3273560 y 3273564) y un solo cobro; sin este cruce las dos
+   solicitudes tomaban el mismo pago como tope. Si el registro no dice a qué
+   reserva pertenece, se acepta. Devuelve { ok, otherId }. */
+function paymentBelongsTo(target, key, rec) {
+  if (!rec || key === target) return { ok: true };
+  const ids = [];
+  if (rec.otasyncId) ids.push(String(rec.otasyncId));
+  if (rec.bookingCode && String(rec.bookingCode) !== String(key)) ids.push(String(rec.bookingCode));
+  if (!ids.length) return { ok: true };
+  if (ids.includes(String(target))) return { ok: true };
+  return { ok: false, otherId: ids[0] };
+}
+
 async function recoverPaymentInfo(bookingCode, opts = {}) {
   const out = {};
+  const target = String(bookingCode || '').trim();
   const keys = [];
   for (const k of [bookingCode, opts.reference]) {
     const v = String(k || '').trim();
@@ -130,6 +147,12 @@ async function recoverPaymentInfo(bookingCode, opts = {}) {
       try { raw = await store.get(`direct-${key}`); } catch (e) { raw = null; }
       if (!raw) continue;
       const r = JSON.parse(raw);
+      const own = paymentBelongsTo(target, key, r);
+      if (!own.ok) {
+        out.paymentOtherReservation = out.paymentOtherReservation || own.otherId;
+        matchedBy.push(`booking-results:${key}:otra-reserva`);
+        continue;
+      }
       out.paymentProvider = out.paymentProvider || r.provider || null;
       out.paymentMethod = out.paymentMethod || r.paymentMethod || null;
       out.transactionId = out.transactionId || r.transactionId || null;
@@ -146,6 +169,12 @@ async function recoverPaymentInfo(bookingCode, opts = {}) {
     for (const key of keys) {
       const d = await getPaymentDetails(key);
       if (!d) continue;
+      const own = paymentBelongsTo(target, key, d);
+      if (!own.ok) {
+        out.paymentOtherReservation = out.paymentOtherReservation || own.otherId;
+        matchedBy.push(`payment-details:${key}:otra-reserva`);
+        continue;
+      }
       out.paymentProvider = out.paymentProvider || d.provider || null;
       out.paymentMethod = out.paymentMethod || d.method || null;
       out.transactionId = out.transactionId || d.transactionId || null;
@@ -232,6 +261,9 @@ async function createRefundRequest({ booking, paymentInfo, clientIp, source, rea
     originalAmountSource: pay.originalAmountCents != null ? (pay.originalAmountSource || 'payment')
       : (pmsTotalCents ? 'pms_total' : null),
     paymentLookup: Array.isArray(pay.paymentLookup) ? pay.paymentLookup : null,
+    /* El pago con este código EST pertenece a OTRA reserva de OTASync (reserva
+       duplicada por MP): no se usa como tope ni como medio de reembolso. */
+    paymentOtherReservation: pay.paymentOtherReservation || null,
     refundAmountCents: null,
     refundReason: reason || null,
     status: STATUS.NEEDS_REVIEW,
@@ -256,6 +288,17 @@ async function createRefundRequest({ booking, paymentInfo, clientIp, source, rea
     if (process.env.DEBUG) console.warn('[refunds-store] create failed:', e.message);
     return { created: false, refund: null };
   }
+}
+
+/* Otras solicitudes (aprobadas, en trámite o reembolsadas) que usan el mismo
+   pago. Un pago se devuelve una sola vez. */
+const COMMITTED_STATUSES = ['APPROVED', 'NEEDS_BANK_DETAILS', 'BANK_DETAILS_READY', 'PROCESSING', 'PENDING_PROVIDER', 'DONE'];
+async function findRefundsByTransaction(transactionId, exceptBookingCode) {
+  if (!transactionId) return [];
+  const all = await listRefunds(null);
+  return all.filter(r => r && r.transactionId && String(r.transactionId) === String(transactionId)
+    && String(r.bookingCode) !== String(exceptBookingCode || '')
+    && COMMITTED_STATUSES.includes(r.status));
 }
 
 async function getRefund(bookingCode) {
@@ -536,10 +579,19 @@ function lateRefund(paidCents, nights) {
   return { amountCents: floorPesos(paidCents - firstNight - fee), firstNightCents: firstNight, feeCents: fee };
 }
 
-function policySuggestion({ ratePlan, checkIn, nights, requestedAt, originalAmountCents }, nowMs) {
+function policySuggestion({ ratePlan, checkIn, nights, requestedAt, originalAmountCents, originalAmountSource }, nowMs) {
   const paid = parseInt(originalAmountCents, 10);
   if (!Number.isFinite(paid) || paid <= 0) {
     return { amountCents: null, rule: 'unknown_amount', text: 'Falta el monto pagado: ingrésalo para calcular la política.' };
+  }
+  /* El total de la reserva en Kunas no es un pago recibido por la web (puede ser
+     de una OTA, pagarse en el hotel o incluir el IVA que no se cobró en línea):
+     no se sugiere ningún monto. */
+  if (originalAmountSource === 'pms_total') {
+    return {
+      amountCents: null, rule: 'unverified_amount',
+      text: 'No hay pago web registrado para esta reserva: el valor mostrado es el total de Kunas. Verifica cuánto pagó el huésped y por qué canal (si fue por una OTA, la devolución la hace la OTA).'
+    };
   }
   const ci = checkInMoment(checkIn);
   if (ci == null) {
@@ -579,7 +631,7 @@ module.exports = {
   STATUS, ROUTE, KIND, REFUND_SLA_BUSINESS_DAYS, refundRoute,
   getRefundStore, recoverPaymentInfo, parsePaymentFromPmsNote,
   createRefundRequest, getRefund, listRefunds, transitionStatus,
-  policySuggestion, checkInMoment,
+  policySuggestion, checkInMoment, paymentBelongsTo, findRefundsByTransaction,
   bankDetailsSummary, maskBankDetails, sealBankDetailsFields, openBankDetails, redactRefund, migrateLegacyBankDetails,
   signBankDetailsToken, verifyBankDetailsToken, sanitizeBankDetails, saveBankDetails, bankFormTokenSecret
 };

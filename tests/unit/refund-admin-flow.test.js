@@ -414,7 +414,7 @@ test('registro viejo MP en MANUAL_BANK sin método: el admin elige el método y 
   reset();
   seed({ bookingCode: 'NOTE-2', paymentProvider: 'mercadopago', paymentMethod: null, route: 'MANUAL_BANK',
     transactionId: '55443323', transactionIdSource: 'pms-note', originalAmountCents: 30000000, originalAmountSource: 'pms_total' });
-  const r = await call({ bookingCode: 'NOTE-2', action: 'approve', amountCents: 30000000, payment: { provider: 'mercadopago', method: 'credit_card' } });
+  const r = await call({ bookingCode: 'NOTE-2', action: 'approve', amountCents: 30000000, originalAmountCents: 30000000, payment: { provider: 'mercadopago', method: 'credit_card' } });
   assert.equal(r.status, 200);
   const rec = await stored('NOTE-2');
   assert.equal(rec.route, 'GATEWAY_AUTO');
@@ -477,4 +477,35 @@ test('reintento de MP: tras un rechazo definitivo cambia la clave; tras un timeo
   const keys = mp.calls.map(c => c.idempotencyKey);
   assert.deepEqual(keys, ['REF-IK-1-refund-0', 'REF-IK-1-refund-0', 'REF-IK-1-refund-1']);
   assert.equal((await stored('IK-1')).status, 'DONE');
+});
+
+/* ── Revisión final de integración ─────────────────────────────────────── */
+
+test('total de Kunas (pms_total) NO sirve de tope: aprobar exige el monto pagado verificado', async () => {
+  reset();
+  seed({ bookingCode: 'OTA-1', paymentProvider: null, paymentMethod: null, route: 'MANUAL_BANK',
+    transactionId: null, originalAmountCents: 33000000, originalAmountSource: 'pms_total' });
+  const blocked = await call({ bookingCode: 'OTA-1', action: 'approve', amountCents: 33000000 });
+  assert.equal(blocked.status, 400);
+  assert.match(blocked.body.error, /monto pagado original/);
+  assert.equal((await stored('OTA-1')).status, 'NEEDS_REVIEW');
+  const ok = await call({ bookingCode: 'OTA-1', action: 'approve', amountCents: 10000000, originalAmountCents: 10000000 });
+  assert.equal(ok.status, 200);
+  const rec = await stored('OTA-1');
+  assert.equal(rec.originalAmountCents, 10000000);
+  assert.equal(rec.originalAmountSource, 'admin');
+});
+
+test('un mismo pago no se reembolsa dos veces (reserva duplicada con el mismo código EST)', async () => {
+  reset();
+  seed({ bookingCode: '3273560', paymentProvider: 'mercadopago', paymentMethod: 'visa', route: 'GATEWAY_AUTO',
+    transactionId: 'MP-ONE', transactionIdSource: 'payment', originalAmountCents: 40000000, originalAmountSource: 'payment',
+    status: 'APPROVED', refundAmountCents: 40000000 });
+  seed({ bookingCode: '3273564', paymentProvider: 'mercadopago', paymentMethod: 'visa', route: 'GATEWAY_AUTO',
+    transactionId: 'MP-ONE', transactionIdSource: 'payment', originalAmountCents: 40000000, originalAmountSource: 'payment' });
+  const r = await call({ bookingCode: '3273564', action: 'approve', amountCents: 40000000 });
+  assert.equal(r.status, 409);
+  assert.match(r.body.error, /3273560/);
+  assert.equal((await stored('3273564')).status, 'NEEDS_REVIEW');
+  assert.equal(mp.calls.length, 0);
 });
