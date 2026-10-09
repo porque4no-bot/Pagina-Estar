@@ -310,6 +310,11 @@ async function sendDirectBookingConfirmation(args, overrides = {}) {
   const { decoded, displayBookingCode, roomName, nights, paidAmount, totalAmount } = args || {};
   try {
     if (!decoded || !decoded.email) return { sent: false, reason: 'no-email' };
+    /* Idioma guardado al firmar el pago (create-wompi-signature). */
+    let lang = 'es';
+    try {
+      lang = await (overrides.readBookingLang || require('./_booking-lang').readBookingLang)(decoded.bookingCode);
+    } catch (e) { lang = 'es'; }
     const breakfastIdx = EXTRAS_KEYS.indexOf('desayuno');
     const breakfast = breakfastIdx >= 0 && String(decoded.extrasMask || '')[breakfastIdx] === '1';
     return await send({
@@ -324,7 +329,8 @@ async function sendDirectBookingConfirmation(args, overrides = {}) {
       paidAmount,
       phone: sanitizePhone(decoded.phone),
       breakfast,
-      via: 'webhook'
+      via: 'webhook',
+      lang
     });
   } catch (e) {
     console.error(`[wompi-webhook] confirmation email failed (non-fatal): ${e.message}. bookingCode=${displayBookingCode}`);

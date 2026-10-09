@@ -289,7 +289,7 @@ test('persistDirectSideData: mismos stores/claves que Wompi; la nota solo con GU
     { bookingCode: 'EST-SD1', email: 'a@x.co', discountCode: 'RESENA10', amountCents: 100, notes: 'n', marketingOptIn: true },
     { getStore: blobs.getStore, flag: async () => false }
   );
-  assert.deepEqual(out, { discount: true, notes: false, marketing: true });
+  assert.deepEqual(out, { discount: true, notes: false, marketing: true, lang: false });
   assert.equal(blobs.read('booking-discounts', 'disc-EST-SD1').code, 'RESENA10');
   assert.equal(blobs.read('booking-marketing', 'mkt-EST-SD1').accepted, true);
   assert.equal(blobs.read('booking-notes', 'note-EST-SD1'), null);

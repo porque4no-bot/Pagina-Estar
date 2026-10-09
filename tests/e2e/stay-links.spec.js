@@ -70,7 +70,7 @@ test('"Mi estadía" / "My stay" en el encabezado del home ES y EN (escritorio)',
   const en = page.locator('.header-actions .guest-entry-link');
   await expect(en).toBeVisible();
   await expect(en).toHaveText('My stay');
-  await expect(en).toHaveAttribute('href', '../guest.html');
+  await expect(en).toHaveAttribute('href', 'guest.html');
   /* en escritorio el ítem del menú queda oculto (no se duplica) */
   await expect(page.locator('.nav-list .nav-guest-item')).toBeHidden();
 });
@@ -83,7 +83,8 @@ test('"My stay" aparece en el menú móvil del sitio en inglés y lleva a la app
   await expect(item).toBeVisible();
   await expect(item).toHaveText('My stay');
   await item.click();
-  await expect(page).toHaveURL(/\/guest\.html$/);
+  /* La versión en inglés de la app (/en/guest.html), no la española. */
+  await expect(page).toHaveURL(/\/en\/guest\.html$/);
 });
 
 test('el pie de página enlaza a "Mi estadía" (ES) y "My stay" (EN)', async ({ page }) => {
@@ -94,5 +95,5 @@ test('el pie de página enlaza a "Mi estadía" (ES) y "My stay" (EN)', async ({ 
   await page.goto('/en/faq.html');
   const en = page.locator('.site-footer a[data-i18n="footer_mi_estadia"]');
   await expect(en).toHaveText('My stay (online check-in)');
-  await expect(en).toHaveAttribute('href', '../guest.html');
+  await expect(en).toHaveAttribute('href', 'guest.html');
 });

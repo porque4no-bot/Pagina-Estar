@@ -352,6 +352,26 @@ test('returning from Mercado Pago without the draft still checks the status and 
   await expect(page.locator('body')).not.toContainText('Confirmación enviada');
 });
 
+/* Revisión final: en inglés el botón de check-in abre la app EN (/en/guest.html). */
+test('English confirmation: the online check-in button opens the English guest app with the code', async ({ page }) => {
+  const ref = mpReference(['2', D1, D4, '2', '31349', 'Ann', 'Lee', 'ann@example.com', '3000000000',
+    '0000000', 'EST-ENCK1', '0', '0', '79500000']);
+  await page.route('**/api/booking-status**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ status: 'confirmed', ref: 'EST-ENCK1', bookingCode: '3273600', otasyncId: 3273600, reservationPending: false })
+  }));
+  await page.route('**/api/guest-session', route => route.fulfill({ status: 404, contentType: 'application/json', body: '{}' }));
+
+  await page.goto(`/en/reservar.html?payment=success&payment_id=556&external_reference=${encodeURIComponent(ref)}`);
+  const link = page.locator('a.be-checkin-link');
+  await expect(link).toHaveAttribute('href', '/en/guest.html?code=3273600');
+  await link.click();
+  await expect(page).toHaveURL(/\/en\/guest\.html/);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('#bookingCode')).toHaveValue('3273600');
+});
+
 test('returning from Mercado Pago with a pending payment says "in process", not "approved"', async ({ page }) => {
   await page.addInitScript(([ci, co]) => {
     try {

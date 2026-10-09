@@ -1078,7 +1078,9 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
             /* Frente C: opt-in de marketing (Ley 1581). Viaja en el body, NO en
                la referencia; el server lo persiste y, con opt-in, el webhook lo
                cablea a Odoo (tag + lista de Email Marketing). */
-            marketingOptIn: Boolean(booking.guest && booking.guest.marketingOptIn)
+            marketingOptIn: Boolean(booking.guest && booking.guest.marketingOptIn),
+            /* Idioma del huésped: el webhook manda la confirmación en ese idioma. */
+            lang
           })
         });
         sigData = await sigRes.json();
@@ -1525,9 +1527,9 @@ function Confirmation({ booking, search, code, paymentDetails, outcome = 'confir
   const isError = outcome === 'declined' || outcome === 'soldout';
 
   /* App del huésped (check-in en línea) con el código prellenado: solo cuando la
-     reserva ya existe en el PMS (antes no la encontraría). Ruta absoluta porque
-     la app vive solo en la raíz (/guest.html), también para /en/. */
-  const checkinHref = `/guest.html?code=${encodeURIComponent(code || '')}`;
+     reserva ya existe en el PMS (antes no la encontraría). En inglés abre la
+     versión /en/guest.html (generada en el build). */
+  const checkinHref = `${lang === 'en' ? '/en' : ''}/guest.html?code=${encodeURIComponent(code || '')}`;
 
   return (
     <div className={`be-confirmation be-confirmation-${outcome}`}>

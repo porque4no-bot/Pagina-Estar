@@ -438,11 +438,12 @@ test('preArrivalHtml: enlace al check-in con el código prellenado, recepción y
   assert.match(es, /desayuno/i);
   assert.doesNotMatch(es, FALSE_PROMISES);
   const en = preArrivalHtml({ resv: resv({ idReservations: '45821' }), lang: 'en' });
-  assert.ok(en.includes('guest.html?code=45821&amp;tab=checkin'));
+  assert.ok(en.includes('https://estar.com.co/en/guest.html?code=45821&amp;tab=checkin'), 'el correo en inglés lleva a la app en inglés');
   assert.match(en, /last name/);
   assert.match(en, /6:00–10:00 am and 4:00–10:00 pm/);
   assert.doesNotMatch(en, FALSE_PROMISES);
   assert.equal(guestCheckinUrl('A B'), 'https://estar.com.co/guest.html?code=A%20B&tab=checkin');
+  assert.equal(guestCheckinUrl('A B', 'en'), 'https://estar.com.co/en/guest.html?code=A%20B&tab=checkin');
 });
 
 test('preArrivalHtml con varias reservas lista un enlace de check-in por código', () => {
@@ -504,13 +505,14 @@ test('"Mi estadía" está en el menú y el pie de todas las páginas públicas, 
     const html = read(f);
     if (!html.includes('data-i18n="footer_grupos"')) continue; /* páginas sin el pie público */
     checked++;
-    const guestHref = f.startsWith('en/') || f === '_room-template.en.html' ? '../guest.html' : 'guest.html';
+    /* En /en/ el enlace es relativo (guest.html → /en/guest.html, la app en inglés). */
+    const guestHref = 'guest.html';
     assert.ok(html.includes(`<li class="nav-guest-item"><a href="${guestHref}" data-i18n="nav_mi_estadia">`), `${f}: falta en el menú`);
     assert.ok(html.includes(`<a href="${guestHref}" data-i18n="footer_mi_estadia">`), `${f}: falta en el pie`);
   }
   assert.ok(checked >= 30, `solo se revisaron ${checked} páginas`);
   assert.match(read('index.html'), /href="guest\.html" class="guest-entry-link" data-i18n="nav_mi_estadia"/);
-  assert.match(read('en/index.html'), /href="\.\.\/guest\.html" class="guest-entry-link" data-i18n="nav_mi_estadia">My stay</);
+  assert.match(read('en/index.html'), /href="guest\.html" class="guest-entry-link" data-i18n="nav_mi_estadia">My stay</);
   const es = JSON.parse(read('i18n/shell.es.json'));
   const en = JSON.parse(read('i18n/shell.en.json'));
   assert.equal(es.nav_mi_estadia, 'Mi estadía');

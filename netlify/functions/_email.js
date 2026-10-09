@@ -794,14 +794,16 @@ const STAY_RECEPTION_HOURS = {
 /* Enlace a "Mi estadía" (guest.html) con el código de reserva prellenado. El
    apellido del titular sigue siendo obligatorio (segundo factor): el código solo
    no da acceso. tab=checkin abre directo la pestaña de check-in tras entrar. */
-function guestAppUrl(code, tab) {
+function guestAppUrl(code, tab, lang) {
+  /* La versión en inglés vive en /en/guest.html (build-guest-en.js). */
+  const base = lang === 'en' ? `${SITE}/en/guest.html` : GUEST_APP_LINK;
   const c = String(code || '').trim();
-  if (!c) return GUEST_APP_LINK;
-  return `${GUEST_APP_LINK}?code=${encodeURIComponent(c)}${tab ? `&tab=${encodeURIComponent(tab)}` : ''}`;
+  if (!c) return base;
+  return `${base}?code=${encodeURIComponent(c)}${tab ? `&tab=${encodeURIComponent(tab)}` : ''}`;
 }
 
-function guestCheckinUrl(code) {
-  return guestAppUrl(code, 'checkin');
+function guestCheckinUrl(code, lang) {
+  return guestAppUrl(code, 'checkin', lang);
 }
 
 function waLinkWithText(text) {
@@ -864,13 +866,13 @@ function preArrivalHtml({ resv, lang }) {
       : (en
         ? 'Save time on arrival: do your <strong>online check-in</strong> now. Register your guests with their ID and sign the stay agreement in a few minutes.'
         : 'Ahorra tiempo al llegar: haz tu <strong>check-in en línea</strong> ahora. Registras a los huéspedes con su documento y firmas el contrato de hospedaje en pocos minutos.');
-    checkin = `${para(how)}${ctaCenter(ctaButton(guestCheckinUrl(code), en ? 'Start my online check-in' : 'Hacer mi check-in en línea'))}`;
+    checkin = `${para(how)}${ctaCenter(ctaButton(guestCheckinUrl(code, en ? 'en' : 'es'), en ? 'Start my online check-in' : 'Hacer mi check-in en línea'))}`;
   } else {
     const rows = codes.map(code => `
       <tr><td style="padding:0 18px;"><div style="border-top:1px solid ${C.border};height:1px;font-size:0;line-height:0;">&nbsp;</div></td></tr>
       <tr><td style="padding:12px 18px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr>
         <td style="font-family:${SANS};font-size:14px;color:${C.ink};">${en ? 'Booking' : 'Reserva'} <strong>${esc(code)}</strong></td>
-        <td align="right"><a href="${esc(guestCheckinUrl(code))}" style="font-family:${SANS};font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${C.olive};text-decoration:none;">${en ? 'Check in →' : 'Hacer check-in →'}</a></td>
+        <td align="right"><a href="${esc(guestCheckinUrl(code, en ? 'en' : 'es'))}" style="font-family:${SANS};font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${C.olive};text-decoration:none;">${en ? 'Check in →' : 'Hacer check-in →'}</a></td>
       </tr></tbody></table></td></tr>`).join('');
     checkin = `${para(en
       ? `Save time on arrival: do the <strong>online check-in</strong> for each of your ${codes.length} bookings. Register the guests with their ID and sign the stay agreement; sign in with each booking code and the main guest's last name.`
@@ -894,7 +896,7 @@ function preArrivalHtml({ resv, lang }) {
     <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
     ${arrival}
     ${mapCard(en ? 'en' : 'es')}
-    ${stayAppCard(en ? 'en' : 'es', guestAppUrl(codes[0]))}
+    ${stayAppCard(en ? 'en' : 'es', guestAppUrl(codes[0], null, en ? 'en' : 'es'))}
     ${whatsappLine(en ? 'en' : 'es')}`;
   return emailShell({
     lang: en ? 'en' : 'es',

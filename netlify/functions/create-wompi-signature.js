@@ -216,6 +216,12 @@ exports.handler = async (event) => {
        the reservation is created. Ley 1581: only persist a positive opt-in; a
        missing/false value means NO marketing and we store nothing. The flag never
        travels inside the Wompi reference. Best-effort, never blocks the signature. */
+    /* Idioma del huésped para la confirmación que manda el webhook (solo 'en'
+       se guarda; sin registro = español). Best-effort. */
+    if (decoded.bookingCode && String(body.lang || '').toLowerCase() === 'en') {
+      await require('./_booking-lang').saveBookingLang(decoded.bookingCode, 'en');
+    }
+
     if (marketingOptIn && decoded.bookingCode) {
       try {
         const mktStore = getStore({ name: 'booking-marketing', consistency: 'strong' });

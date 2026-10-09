@@ -88,11 +88,15 @@ function parseMarketingOptIn(raw) {
    Wompi) para que mercadopago-webhook los use al crear la reserva: código de
    descuento aplicado (para consumir el uso), nota del huésped y opt-in de
    marketing. Best-effort: nunca bloquea la preferencia. */
-async function persistDirectSideData({ bookingCode, email, discountCode, amountCents, notes, marketingOptIn }, deps = {}) {
+async function persistDirectSideData({ bookingCode, email, discountCode, amountCents, notes, marketingOptIn, lang }, deps = {}) {
   const getStoreImpl = deps.getStore || ((name) => require('@netlify/blobs').getStore({ name, consistency: 'strong' }));
   const flagImpl = deps.flag || require('./_settings').flag;
-  const saved = { discount: false, notes: false, marketing: false };
+  const saved = { discount: false, notes: false, marketing: false, lang: false };
   if (!bookingCode) return saved;
+  /* Idioma del huésped: el webhook manda la confirmación en ese idioma. */
+  if (String(lang || '').toLowerCase() === 'en') {
+    saved.lang = await require('./_booking-lang').saveBookingLang(bookingCode, 'en', { getStore: getStoreImpl });
+  }
   if (discountCode) {
     try {
       await getStoreImpl('booking-discounts').set(`disc-${bookingCode}`, JSON.stringify({
@@ -325,7 +329,8 @@ async function preferenceForDirectBooking(body, event, overrides = {}) {
     discountCode: discountApplied ? discountCode : '',
     amountCents,
     notes: sanitizeIncomingNotes(body.notes),
-    marketingOptIn: parseMarketingOptIn(body.marketingOptIn)
+    marketingOptIn: parseMarketingOptIn(body.marketingOptIn),
+    lang: body.lang
   });
 
   const base = originFromEvent(event);

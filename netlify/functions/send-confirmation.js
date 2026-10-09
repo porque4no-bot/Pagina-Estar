@@ -102,10 +102,12 @@ function siteBaseUrl() {
 /* Enlace a la app del huésped con el código de reserva prellenado
    (guest-app.js lee ?code= y lo pone en el formulario de ingreso; el apellido
    sigue siendo obligatorio como 2º factor). */
-function guestAppUrl(bookingCode, base) {
+function guestAppUrl(bookingCode, base, lang) {
   const origin = (base || siteBaseUrl()).replace(/\/$/, '');
+  /* La versión en inglés de la app vive en /en/guest.html. */
+  const page = lang === 'en' ? `${origin}/en/guest.html` : `${origin}/guest.html`;
   const code = String(bookingCode || '').trim();
-  return code ? `${origin}/guest.html?code=${encodeURIComponent(code)}` : `${origin}/guest.html`;
+  return code ? `${page}?code=${encodeURIComponent(code)}` : page;
 }
 
 /* Clave anti-duplicados DERIVADA EN EL SERVIDOR del código de reserva (el id
@@ -578,7 +580,7 @@ async function sendConfirmationEmail(params, deps = {}) {
       paidAmount: parseFloat(paidAmount) || parseFloat(totalAmount) || 0,
       phone: phone || '',
       passUrl,
-      guestAppUrl: guestAppUrl(dedupeKey, base),
+      guestAppUrl: guestAppUrl(dedupeKey, base, lang),
       lang
     });
   } catch (e) {

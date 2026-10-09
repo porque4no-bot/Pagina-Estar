@@ -231,7 +231,7 @@ function sanitizePhone(raw) {
    existe; un fallo del correo genera la alerta confirmation_email_failed dentro
    de sendConfirmationEmail. `require` perezoso para no cargar Resend/pases en
    los demás usos de este módulo. */
-async function sendDirectConfirmation({ decoded, bookingCode, roomName, nights, paidAmount, totalAmount, via }, sender) {
+async function sendDirectConfirmation({ decoded, bookingCode, roomName, nights, paidAmount, totalAmount, via, lang }, sender) {
   try {
     if (!decoded) return { sent: false, reason: 'no-decoded' };
     const sendConfirmationEmail = typeof sender === 'function' ? sender : require('./send-confirmation').sendConfirmationEmail;
@@ -250,7 +250,8 @@ async function sendDirectConfirmation({ decoded, bookingCode, roomName, nights, 
       paidAmount,
       phone: sanitizePhone(decoded.phone),
       breakfast,
-      via: via || 'mercadopago'
+      via: via || 'mercadopago',
+      lang: lang === 'en' ? 'en' : 'es'
     });
   } catch (e) {
     console.error(`[payments] confirmation email failed (non-fatal): ${e.message}. bookingCode=${bookingCode}`);
@@ -562,8 +563,11 @@ async function processQuotePayment(transaction, corsHeaders, deps) {
    stores y claves que la ruta Wompi): código de descuento aplicado, nota del
    huésped y opt-in de marketing. Best-effort: sin blob = sin dato. */
 async function loadDirectSideData(bookingCode, deps) {
-  const out = { discount: null, notes: '', marketingOptIn: null };
+  const out = { discount: null, notes: '', marketingOptIn: null, lang: 'es' };
   if (!bookingCode) return out;
+  try {
+    out.lang = await require('./_booking-lang').readBookingLang(bookingCode, { getStore: (n) => tryStore(n, deps) });
+  } catch (e) { out.lang = 'es'; }
   const disc = tryStore('booking-discounts', deps);
   if (disc) {
     try {
@@ -966,9 +970,10 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
            sendConfirmationEmail deduplica por código, así que nunca sale doble. */
         try {
           const b = buildDirectReservationPayload({ decoded, transaction, pkey: '', creds: {}, roomDetails: loadRoomDetails(), ratePlan: decoded.ratePlan || null, guestNote: '' });
+          const lang = await require('./_booking-lang').readBookingLang(code, { getStore: (n) => tryStore(n, deps) });
           await sendDirectConfirmation({
             decoded, bookingCode: String(found.idReservations), roomName: b.roomName, nights: b.nights,
-            paidAmount: b.paidAmount, totalAmount: b.roomPrice, via: transaction.provider
+            paidAmount: b.paidAmount, totalAmount: b.roomPrice, via: transaction.provider, lang
           }, deps.sendConfirmationEmail);
         } catch (e) { /* best-effort */ }
       }
@@ -1109,7 +1114,8 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
         nights,
         paidAmount,
         totalAmount: roomPrice,
-        via: transaction.provider
+        via: transaction.provider,
+        lang: side.lang
       }, deps.sendConfirmationEmail);
     }
 

@@ -558,3 +558,14 @@ test('re-entrega del mismo tx cuando la reserva ya existía en OTASync → reenv
   assert.equal(calls.emails.length, 1);
   assert.equal(calls.emails[0].bookingCode, '3083720');
 });
+
+test('confirmación de Mercado Pago en el idioma guardado al crear la preferencia (inglés)', async () => {
+  const blobs = memBlobs({ 'booking-lang': { 'lang-EST-LANG1': { lang: 'en' } } });
+  const { deps, calls } = makeDeps({ blobs });
+  await processApprovedPayment(mpTx(refFor('EST-LANG1', 30000000), nextTx(), 30000000), H, deps);
+  assert.equal(calls.emails.length, 1);
+  assert.equal(calls.emails[0].lang, 'en');
+  const other = makeDeps({});
+  await processApprovedPayment(mpTx(refFor('EST-LANG2', 30000000), nextTx(), 30000000), H, other.deps);
+  assert.equal(other.calls.emails[0].lang, 'es', 'sin registro = español');
+});

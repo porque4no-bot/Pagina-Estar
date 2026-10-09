@@ -279,6 +279,7 @@ test('guestAppUrl codifica el código y respeta la base configurada', () => {
   assert.equal(guestAppUrl('EST-1', 'https://x.test/'), 'https://x.test/guest.html?code=EST-1');
   assert.equal(guestAppUrl('a b', 'https://x.test'), 'https://x.test/guest.html?code=a%20b');
   assert.equal(guestAppUrl('', 'https://x.test'), 'https://x.test/guest.html');
+  assert.equal(guestAppUrl('EST-1', 'https://x.test', 'en'), 'https://x.test/en/guest.html?code=EST-1', 'confirmación en inglés → app en inglés');
   assert.equal(formatDate('2026-12-24', 'es'), '24 de diciembre de 2026');
   assert.equal(formatDate('2026-12-24', 'en'), 'December 24, 2026');
 });
