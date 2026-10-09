@@ -64,6 +64,7 @@ function dependencies(quote, overrides = {}) {
     }),
     /* Default lock stub — acquire always succeeds, like the in-memory case. */
     acquireQuoteLock: async () => ({ acquired: true }),
+    enqueueOpsTask: async () => {},
     ...overrides
   };
 }
@@ -89,6 +90,7 @@ test('a refused lock blocks the booking and alerts the admin', async () => {
   await withOtasyncCredentials(async () => {
     const quote = baseQuote();
     const emails = [];
+    const tasks = [];
     let fetched = false;
     const saved = [];
 
@@ -98,6 +100,7 @@ test('a refused lock blocks the booking and alerts the admin', async () => {
       dependencies(quote, {
         acquireQuoteLock: async () => ({ acquired: false, ownerTx: 'TX-FIRST', startedAt: 12345 }),
         sendEmail: async (msg) => emails.push(msg),
+        enqueueOpsTask: async (t) => tasks.push(t),
         saveQuote: async (_s, q) => saved.push(q),
         fetch: async () => { fetched = true; throw new Error('must not fetch'); }
       })
@@ -111,6 +114,12 @@ test('a refused lock blocks the booking and alerts the admin', async () => {
     assert.equal(saved.length, 0);
     assert.equal(emails.length, 1);
     assert.match(emails[0].subject, /Doble pago/);
+    /* Además del correo, una TAREA en el panel (ops-queue), deduplicada por tx. */
+    assert.equal(tasks.length, 1);
+    assert.equal(tasks[0].kind, 'payment_double_charge');
+    assert.equal(tasks[0].severity, 'critical');
+    assert.equal(tasks[0].dedupeKey, 'pay-double-TX-SECOND');
+    assert.equal(tasks[0].context.secondTransaction, 'TX-SECOND');
   });
 });
 

@@ -91,6 +91,15 @@
     .be-body { display: flex; gap: 32px; align-items: flex-start; }
     .be-steps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
     .be-summary-col { display: none; width: 300px; flex-shrink: 0; position: sticky; top: 100px; }
+    /* ─── mobile sticky summary (phones only) ───────────────────────── */
+    .be-mobile-summary { display: none; }
+    .be-msum-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; border: none; cursor: pointer; text-align: left; background: var(--ink); color: var(--white); border-radius: var(--radius-lg); padding: 12px 16px; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
+    .be-msum-info { display: flex; flex-direction: column; gap: 2px; }
+    .be-msum-meta { font-family: var(--font-label); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; opacity: .7; }
+    .be-msum-total { font-family: var(--font-heading); font-weight: 700; font-size: 18px; }
+    .be-msum-chevron { transition: transform 200ms; }
+    .be-mobile-summary.open .be-msum-chevron { transform: rotate(180deg); }
+    .be-msum-panel { margin-top: 8px; }
 
     /* ─── step wrapper ──────────────────────────────────────────────── */
     .be-step { background: var(--white); border: 1px solid var(--paper-400); border-radius: var(--radius-lg); overflow: hidden; transition: box-shadow 240ms, border-color 240ms; }
@@ -274,6 +283,16 @@
     .be-room-card.be-room-unavailable .be-btn-primary { pointer-events: none; }
     .be-room-status-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(175, 109, 59, 0.9); color: var(--white); font-family: var(--font-label); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; padding: 6px 12px; border-radius: var(--radius-pill); z-index: 2; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
     .be-room-unavailable-msg { margin-top: 10px; padding: 12px; background: var(--paper-200); border-radius: var(--radius-md); font-family: var(--font-body); font-size: 12px; color: var(--ink-500); line-height: 1.5; border-left: 3px solid var(--terracotta); }
+    /* ─── tarifa explícita, cupo y estados del pago ─────────────────── */
+    .be-rate-heading { font-family: var(--font-label); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--ink-500); margin: 0 0 6px; }
+    .be-rate-opt:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
+    .be-rate-hint { font-family: var(--font-body); font-size: 12px; color: var(--terracotta-700); margin: 8px 0 0; line-height: 1.4; }
+    .be-room-card.be-room-card-preselected { border-color: var(--olive); box-shadow: 0 0 0 1px var(--olive); }
+    .be-field-help { font-family: var(--font-body); font-size: 12px; color: var(--ink-300); line-height: 1.4; }
+    .be-checkbox-label a { color: var(--terracotta-700); text-decoration: underline; }
+    .be-confirm-polling { display: flex; align-items: center; gap: 6px; margin: 0; font-family: var(--font-body); font-size: 12px; color: var(--ink-500); }
+    .be-confirm-polling .be-spinner-small { border-color: var(--paper-400); border-top-color: var(--olive); margin-right: 0; }
+    a.be-btn-primary.be-checkin-link, a.be-btn-primary.be-checkin-link:visited, a.be-btn-primary.be-checkin-link:hover { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--white); }
 
     /* ─── room images ───────────────────────────────────────────────── */
     .be-room-photo-img { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; transition: transform 0.4s ease; z-index: 0; }
@@ -310,6 +329,7 @@
       .be-manage-details > div { border-right: none; }
       .be-progress-label { display: none; }
       [data-theme="editorial"] .be-summary-col { display: none; }
+      [data-theme="editorial"] .be-mobile-summary { display: block; position: sticky; top: 8px; z-index: 40; margin-bottom: 12px; }
       [data-theme="editorial"] .be-page-inner { padding: 16px 12px 64px; }
       .be-page-inner { padding: 16px 12px 64px; }
       .be-step-header  { padding: 14px 16px; }
@@ -356,6 +376,7 @@
       <li><a href="explora.html" data-i18n="nav_explorar">Explore</a></li>
       <li><a href="empresas.html" data-i18n="nav_empresas">Companies</a></li>
       <li><a href="grupos.html" data-i18n="nav_grupos">Groups</a></li>
+      <li class="nav-guest-item"><a href="guest.html" data-i18n="nav_mi_estadia">My stay</a></li>
     </ul></nav>
     <div class="header-actions">
       <button type="button" class="lang-toggle" data-i18n="lang_btn">ES</button>
@@ -382,6 +403,7 @@
           <li><a href="index.html" data-i18n="footer_apartaestudios">Studio apartments</a></li>
           <li><a href="vivir.html" data-i18n="footer_vivir">Extended Stay</a></li>
           <li><a href="grupos.html" data-i18n="footer_grupos">Groups &amp; events</a></li>
+          <li><a href="guest.html" data-i18n="footer_mi_estadia">My stay (online check-in)</a></li>
         </ul>
       </div>
       <div class="footer-col">
@@ -554,8 +576,15 @@
   function dateDiff(a,b){const d1=new Date(a+'T00:00:00'),d2=new Date(b+'T00:00:00');return Math.max(1,Math.round((d2-d1)/86400000))}
   function formatCOP(n){return '$ '+Number(n).toLocaleString('es-CO').replace(/,/g,'.')}
   function fmtDate(s){if(!s)return '';const d=new Date(s+'T00:00:00');const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`}
-  function getToday(){return new Date().toISOString().split('T')[0]}
-  function getOffset(n){const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().split('T')[0]}
+  /* TODAY in Colombia (UTC-5). toISOString() works in UTC: on a device in
+     Colombian time it returned TOMORROW from 7 pm to midnight, so today could
+     not be picked as check-in (last-minute window). Keep these helpers
+     IDENTICAL to reservar.html — motor-app uses addDays/getToday/getOffset
+     ("Modify search" crashed in English because addDays was missing here). */
+  function bogotaToday(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/Bogota'})}
+  function getToday(){return bogotaToday()}
+  function addDays(iso,n){const d=new Date((iso||bogotaToday())+'T00:00:00');d.setDate(d.getDate()+n);const y=d.getFullYear(),m=('0'+(d.getMonth()+1)).slice(-2),day=('0'+d.getDate()).slice(-2);return `${y}-${m}-${day}`}
+  function getOffset(n){return addDays(bogotaToday(),n)}
   function genCode(){return 'EST-'+Math.random().toString(36).slice(2,7).toUpperCase()}
   function calcTotal(room,rate,extras,search){
     if(!room)return null;

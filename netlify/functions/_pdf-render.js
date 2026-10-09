@@ -4,27 +4,37 @@
  * fast regardless of how often the function bundle changes.
  *
  * API: renderContractPDF(record) → Promise<Buffer>
- *   record — the payload.record object from a guest-contract event.
+ *   record — the payload.record object from a guest-contract event (or the
+ *   unsigned contract document for a draft: no signedAt / draft:true).
+ *
+ * Clauses and the consent wording come from _contract-template.js (single
+ * source), in the record's language (lang 'es' | 'en'). When the record carries
+ * the signature evidence (signedAt, eventId, contractHash…) the PDF prints it so
+ * the guest's copy references the SHA-256 of the exact contract text they read.
  */
 
 const PDFDocument = require('pdfkit');
+const { CONTRACT_CLAUSES, CONSENT_TEXT, roomLabel } = require('./_contract-template');
 
 const OLIVE  = '#9b9065';
 const INK    = '#1f1f1f';
 const MUTED  = '#555555';
 const BORDER = '#e1ddca';
 const STAMP_BG = '#f6f3e7';
+const TERRA = '#af6d3b';
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
 function str(v) { return (v === null || v === undefined) ? '—' : String(v); }
 
-function formatDate(value) {
+function localeFor(lang) { return lang === 'en' ? 'en-US' : 'es-CO'; }
+
+function formatDate(value, lang) {
   if (!value) return '—';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return str(value);
   try {
-    return d.toLocaleString('es-CO', {
+    return d.toLocaleString(localeFor(lang), {
       timeZone: 'America/Bogota',
       year: 'numeric', month: 'long', day: '2-digit',
       hour: '2-digit', minute: '2-digit'
@@ -32,16 +42,25 @@ function formatDate(value) {
   } catch { return d.toISOString(); }
 }
 
-function formatDateOnly(value) {
+function formatDateOnly(value, lang) {
   if (!value) return '—';
-  const d = new Date(value);
+  /* YYYY-MM-DD → mediodía en Bogotá para que nunca se corra un día. */
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(String(value))
+    ? new Date(`${value}T12:00:00-05:00`)
+    : new Date(value);
   if (Number.isNaN(d.getTime())) return str(value);
   try {
-    return d.toLocaleDateString('es-CO', {
+    return d.toLocaleDateString(localeFor(lang), {
       timeZone: 'America/Bogota',
       year: 'numeric', month: 'long', day: '2-digit'
     });
   } catch { return d.toISOString().slice(0, 10); }
+}
+
+/* DD/MM/AAAA para la tabla de huéspedes (la fecha larga no cabe en la columna). */
+function formatDateShort(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : str(value || '—');
 }
 
 function formatMoney(amount) {
@@ -98,6 +117,89 @@ function contractCapacity(record) {
   return guests;
 }
 
+const PDF_LABELS = {
+  es: {
+    title: 'Contrato de Hospedaje',
+    contractNo: 'Contrato N.º',
+    version: 'Versión',
+    issued: 'Emitido',
+    booking: 'Datos de la reserva',
+    bookingCode: 'Código de reserva',
+    checkIn: 'Fecha de ingreso (check-in)',
+    checkOut: 'Fecha de salida (check-out)',
+    room: 'Apartaestudio',
+    capacity: 'Capacidad de huéspedes',
+    occupants: 'Huéspedes registrados',
+    phone: 'Teléfono de contacto',
+    email: 'Correo electrónico',
+    payment: 'Información de pago',
+    total: 'Valor total del hospedaje',
+    payMethod: 'Medio de pago',
+    txId: 'Identificador de transacción',
+    clauses: 'Cláusulas del contrato',
+    consent: 'Consentimiento y firma electrónica',
+    evidence: 'Evidencia de la firma electrónica',
+    eventId: 'ID de evento',
+    signer: 'Firmante',
+    signedAt: 'Firmado',
+    readAt: 'Lectura confirmada',
+    ip: 'IP del dispositivo',
+    hash: 'Huella SHA-256 del contrato leído',
+    acceptance: 'Aceptación',
+    yes: 'Sí',
+    no: 'No',
+    pending: 'Pendiente de firma',
+    draft: 'BORRADOR — PENDIENTE DE FIRMA. Este documento no tiene validez hasta que lo firmes en la app.',
+    tableHeaders: ['#', 'Nombre', 'Documento', 'Nacionalidad', 'Nacimiento', 'Rol'],
+    primary: 'Principal',
+    companion: 'Acompañante',
+    docFallback: 'Documento de identidad',
+    guestFallback: 'Huésped',
+    roleHotel: 'RNT 276306 — Manizales, Colombia',
+    footer: 'Hotel Estar · RNT 276306 · Manizales, Caldas — Colombia\nDocumento generado automáticamente. Conserve esta copia junto con su comprobante de pago.'
+  },
+  en: {
+    title: 'Hospitality Agreement',
+    contractNo: 'Agreement No.',
+    version: 'Version',
+    issued: 'Issued',
+    booking: 'Booking details',
+    bookingCode: 'Reservation code',
+    checkIn: 'Check-in date',
+    checkOut: 'Check-out date',
+    room: 'Studio',
+    capacity: 'Guest capacity',
+    occupants: 'Registered guests',
+    phone: 'Contact phone',
+    email: 'Email',
+    payment: 'Payment information',
+    total: 'Total stay value',
+    payMethod: 'Payment method',
+    txId: 'Transaction ID',
+    clauses: 'Contract clauses',
+    consent: 'Consent and electronic signature',
+    evidence: 'Electronic signature evidence',
+    eventId: 'Event ID',
+    signer: 'Signer',
+    signedAt: 'Signed',
+    readAt: 'Reading confirmed',
+    ip: 'Device IP',
+    hash: 'SHA-256 fingerprint of the contract read',
+    acceptance: 'Acceptance',
+    yes: 'Yes',
+    no: 'No',
+    pending: 'Pending signature',
+    draft: 'DRAFT — PENDING SIGNATURE. This document is not valid until you sign it in the app.',
+    tableHeaders: ['#', 'Name', 'Document', 'Nationality', 'Date of birth', 'Role'],
+    primary: 'Primary',
+    companion: 'Companion',
+    docFallback: 'Identity document',
+    guestFallback: 'Guest',
+    roleHotel: 'RNT 276306 — Manizales, Colombia',
+    footer: 'Hotel Estar · RNT 276306 · Manizales, Caldas — Colombia\nDocument generated automatically. Keep this copy along with your payment receipt.'
+  }
+};
+
 /* ── layout helpers ──────────────────────────────────────────────────────── */
 
 const MARGIN = 50;
@@ -136,8 +238,8 @@ function clause(doc, num, title, body) {
   doc.y += 2;
 }
 
-function guestTable(doc, guests) {
-  const headers = ['#', 'Nombre', 'Documento', 'Nacionalidad', 'Nacimiento', 'Rol'];
+function guestTable(doc, guests, labels, lang) {
+  const headers = labels.tableHeaders;
   const widths = [22, 124, 108, 78, 78, 68];
   const rowH = 24;
   const drawRow = (cells, y, header = false) => {
@@ -170,8 +272,8 @@ function guestTable(doc, guests) {
       guest.name,
       `${guest.documentType} ${guest.documentNumber}`.trim(),
       guest.nationality,
-      formatDateOnly(guest.birthDate),
-      guest.isPrimary ? 'Principal' : 'Acompañante'
+      formatDateShort(guest.birthDate),
+      guest.isPrimary ? labels.primary : labels.companion
     ], y);
     y += rowH;
   });
@@ -182,24 +284,27 @@ function guestTable(doc, guests) {
 
 function renderContractPDF(record = {}) {
   return new Promise((resolve, reject) => {
+    const lang            = pick(record, 'lang') === 'en' ? 'en' : 'es';
+    const L               = PDF_LABELS[lang];
     const bookingCode     = pick(record, 'bookingCode') || 'SIN-RESERVA';
-    const guestName       = pick(record, 'signedName', 'guestName') || 'Huésped';
     const primaryGuest    = primaryContractGuest(record);
-    const documentType    = pick(record, 'documentType') || 'Documento de identidad';
-    const documentNumber  = pick(record, 'documentNumber', 'documentId');
+    const primaryName     = normalizeGuestName(primaryGuest);
+    const guestName       = pick(record, 'signedName', 'guestName') || primaryName || L.guestFallback;
+    const documentType    = pick(record, 'documentType') || pick(primaryGuest, 'documentType') || L.docFallback;
+    const documentNumber  = pick(record, 'documentNumber', 'documentId') || pick(primaryGuest, 'documentNumber');
     const phone           = pick(record, 'phone') || pick(primaryGuest, 'phone');
     const email           = pick(record, 'email') || pick(primaryGuest, 'email');
     const checkIn         = pick(record, 'checkIn', 'requestedCheckIn');
     const checkOut        = pick(record, 'checkOut', 'requestedCheckOut');
-    const roomName        = pick(record, 'roomName', 'room');
+    const roomName        = roomLabel(record, '');
     const capacity        = contractCapacity(record);
     const totalAmount     = pick(record, 'total', 'totalAmount', 'amount');
     const paymentProvider = pick(record, 'paymentProvider', 'paymentMethod');
     const transactionId   = pick(record, 'transactionId', 'paymentReference');
     const contractVersion = pick(record, 'contractVersion') || 'ESTAR-HOSPEDAJE-2026-01';
-    const signedAt        = pick(record, 'signedAt') || new Date().toISOString();
-    const consentText     = pick(record, 'consentText') ||
-      'Firma electrónica simple aceptada desde la guest app de Hotel Estar.';
+    const signedAt        = pick(record, 'signedAt');
+    const isDraft         = Boolean(record.draft) || !signedAt;
+    const consentText     = pick(record, 'consentText') || CONSENT_TEXT[lang];
     const eventId         = pick(record, 'eventId');
     const guests          = contractGuests(record, {
       name: guestName,
@@ -214,9 +319,9 @@ function renderContractPDF(record = {}) {
       size: 'A4',
       margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
       info: {
-        Title: `Contrato de Hospedaje — ${bookingCode}`,
+        Title: `${L.title} — ${bookingCode}`,
         Author: 'Hotel Estar',
-        Subject: 'Contrato de Hospedaje'
+        Subject: L.title
       }
     });
 
@@ -231,16 +336,16 @@ function renderContractPDF(record = {}) {
     doc.font('Helvetica-Bold').fontSize(20).fillColor(OLIVE)
       .text('Hotel Estar', MARGIN, MARGIN, { continued: false });
     doc.font('Helvetica').fontSize(8).fillColor(MUTED)
-      .text('APARTAESTUDIOS — MANIZALES', MARGIN);
+      .text(lang === 'en' ? 'STUDIOS — MANIZALES' : 'APARTAESTUDIOS — MANIZALES', MARGIN);
 
     const metaX = doc.page.width - MARGIN - 160;
     doc.font('Helvetica').fontSize(8.5).fillColor(MUTED)
-      .text(`Contrato N.º`, metaX, MARGIN, { width: 160, align: 'right' });
+      .text(L.contractNo, metaX, MARGIN, { width: 160, align: 'right' });
     doc.font('Helvetica-Bold').fontSize(8.5).fillColor(INK)
       .text(bookingCode, metaX, doc.y, { width: 160, align: 'right' });
     doc.font('Helvetica').fontSize(8).fillColor(MUTED)
-      .text(`Versión: ${contractVersion}`, metaX, doc.y, { width: 160, align: 'right' });
-    doc.text(`Emitido: ${formatDate(signedAt)}`, metaX, doc.y, { width: 160, align: 'right' });
+      .text(`${L.version}: ${contractVersion}`, metaX, doc.y, { width: 160, align: 'right' });
+    doc.text(`${L.issued}: ${signedAt ? formatDate(signedAt, lang) : L.pending}`, metaX, doc.y, { width: 160, align: 'right' });
 
     const headerLineY = Math.max(doc.y, 100) + 6;
     doc.moveTo(MARGIN, headerLineY)
@@ -250,61 +355,71 @@ function renderContractPDF(record = {}) {
 
     /* ── TITLE ──────────────────────────────────────────────────────────── */
     doc.font('Helvetica-Bold').fontSize(16).fillColor(INK)
-      .text('Contrato de Hospedaje', MARGIN, doc.y, { width: contentW, align: 'center' });
-    doc.y += 14;
+      .text(L.title, MARGIN, doc.y, { width: contentW, align: 'center' });
+    doc.y += 8;
+    if (isDraft) {
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(TERRA)
+        .text(L.draft, MARGIN, doc.y, { width: contentW, align: 'center' });
+    }
+    doc.y += 6;
 
     /* ── DATOS DE LA RESERVA ─────────────────────────────────────────────── */
-    sectionHeading(doc, 'Datos de la reserva');
-    kvRow(doc, 'Código de reserva', bookingCode);
-    kvRow(doc, 'Fecha de ingreso (check-in)', formatDateOnly(checkIn));
-    kvRow(doc, 'Fecha de salida (check-out)', formatDateOnly(checkOut));
-    kvRow(doc, 'Apartaestudio', roomName);
-    kvRow(doc, 'Capacidad de huéspedes', capacity);
+    sectionHeading(doc, L.booking);
+    kvRow(doc, L.bookingCode, bookingCode);
+    kvRow(doc, L.checkIn, formatDateOnly(checkIn, lang));
+    kvRow(doc, L.checkOut, formatDateOnly(checkOut, lang));
+    kvRow(doc, L.room, roomName);
+    kvRow(doc, L.capacity, capacity);
 
     /* ── HUÉSPEDES ───────────────────────────────────────────────────────── */
-    sectionHeading(doc, 'Huéspedes registrados');
-    guestTable(doc, guests);
-    kvRow(doc, 'Teléfono de contacto', phone);
-    kvRow(doc, 'Correo electrónico', email);
+    sectionHeading(doc, L.occupants);
+    guestTable(doc, guests, L, lang);
+    kvRow(doc, L.phone, phone);
+    kvRow(doc, L.email, email);
 
-    /* ── INFORMACIÓN DE PAGO ─────────────────────────────────────────────── */
-    sectionHeading(doc, 'Información de pago');
-    kvRow(doc, 'Valor total del hospedaje', formatMoney(totalAmount));
-    kvRow(doc, 'Medio de pago', paymentProvider);
-    kvRow(doc, 'Identificador de transacción', transactionId);
+    /* ── INFORMACIÓN DE PAGO (solo filas con dato) ───────────────────────── */
+    if (totalAmount !== '' || paymentProvider || transactionId) {
+      sectionHeading(doc, L.payment);
+      if (totalAmount !== '') kvRow(doc, L.total, formatMoney(totalAmount));
+      if (paymentProvider) kvRow(doc, L.payMethod, paymentProvider);
+      if (transactionId) kvRow(doc, L.txId, transactionId);
+    }
 
     /* ── CLÁUSULAS ───────────────────────────────────────────────────────── */
-    sectionHeading(doc, 'Cláusulas del contrato');
-    clause(doc, 'PRIMERA', 'Objeto',
-      `Hotel Estar, identificado con RNT 276306, otorga al huésped el uso temporal del apartaestudio identificado en este contrato, en calidad de hospedaje turístico, durante las fechas señaladas. El huésped declara conocer y aceptar las características del inmueble y las condiciones del servicio.`);
-    clause(doc, 'SEGUNDA', 'Uso del inmueble',
-      `El huésped utilizará el apartaestudio exclusivamente para fines de alojamiento personal y no podrá destinarlo a actividades comerciales, industriales, ilícitas o distintas a la naturaleza del servicio contratado. Queda prohibido subarrendar o ceder, total o parcialmente, el derecho de uso a terceros.`);
-    clause(doc, 'TERCERA', 'Convivencia y silencio',
-      `Por tratarse de un edificio residencial, el huésped se obliga a respetar el reglamento de propiedad horizontal, mantener un comportamiento respetuoso con los demás residentes y guardar silencio entre las 10:00 p.m. y las 7:00 a.m. No se permiten fiestas, reuniones que excedan la capacidad declarada ni el ingreso de personas no registradas.`);
-    clause(doc, 'CUARTA', 'Cuidado y daños',
-      `El huésped es responsable del cuidado del apartaestudio, su mobiliario, enseres y dotación. Cualquier daño, pérdida o deterioro distinto al desgaste normal por uso será reportado al huésped y su valor podrá ser cobrado al momento del check-out o a través del medio de pago registrado.`);
-    clause(doc, 'QUINTA', 'Horarios y entrega',
-      `El check-in se realiza a partir de las 3:00 p.m. y el check-out hasta las 11:00 a. m. del día de salida. Toda permanencia posterior sin acuerdo previo causará un cargo adicional. Hotel Estar podrá retener objetos olvidados hasta por 30 días, transcurridos los cuales se dispondrá de ellos según política interna.`);
+    sectionHeading(doc, L.clauses);
+    CONTRACT_CLAUSES.forEach(c => clause(doc, c.num, c.title[lang], c[lang]));
 
     /* ── CONSENTIMIENTO ──────────────────────────────────────────────────── */
-    sectionHeading(doc, 'Consentimiento y firma electrónica');
+    sectionHeading(doc, L.consent);
     doc.font('Helvetica').fontSize(9.5).fillColor(INK)
       .text(consentText, MARGIN, doc.y, { width: contentW, align: 'justify' });
     doc.y += 6;
 
+    /* ── EVIDENCIA (firma electrónica, Ley 527) ──────────────────────────── */
+    const evidence = isDraft
+      ? [`${L.acceptance}: ${L.pending}`]
+      : [
+        `${L.eventId}: ${str(eventId)}  ·  ${L.acceptance}: ${record.acceptedTerms ? L.yes : L.no}`,
+        `${L.signer}: ${guestName}  ·  ${L.signedAt}: ${formatDate(signedAt, lang)}`,
+        record.acknowledgedAt ? `${L.readAt}: ${formatDate(record.acknowledgedAt, lang)}` : '',
+        record.clientIp && record.clientIp !== 'unknown' ? `${L.ip}: ${record.clientIp}` : '',
+        record.contractHash ? `${L.hash}: ${record.contractHash}` : ''
+      ].filter(Boolean);
+    if (doc.y + 30 + evidence.length * 12 > doc.page.height - MARGIN - 40) doc.addPage();
+    sectionHeading(doc, L.evidence);
     const stampY = doc.y;
-    const stampH = 36;
+    const stampH = 12 + evidence.length * 12;
     doc.rect(MARGIN, stampY, contentW, stampH).fill(STAMP_BG);
     doc.moveTo(MARGIN, stampY).lineTo(MARGIN, stampY + stampH)
       .strokeColor(OLIVE).lineWidth(2.5).stroke();
-    doc.font('Helvetica').fontSize(8.5).fillColor(MUTED)
-      .text(
-        `ID de evento: ${str(eventId)}  ·  Aceptación: ${record.acceptedTerms ? 'Sí' : 'No'}  ·  Firmado: ${formatDate(signedAt)}`,
-        MARGIN + 10, stampY + 8, { width: contentW - 16 }
-      );
+    doc.font('Helvetica').fontSize(8).fillColor(MUTED);
+    evidence.forEach((line, index) => {
+      doc.text(line, MARGIN + 10, stampY + 6 + index * 12, { width: contentW - 16, lineBreak: false, ellipsis: true });
+    });
     doc.y = stampY + stampH + 20;
 
     /* ── FIRMAS ──────────────────────────────────────────────────────────── */
+    if (doc.y + 80 > doc.page.height - MARGIN - 40) doc.addPage();
     const sigW = (contentW - 40) / 2;
     const sigLineY = doc.y + 40;
 
@@ -321,17 +436,14 @@ function renderContractPDF(record = {}) {
     doc.font('Helvetica-Bold').fontSize(9).fillColor(INK)
       .text('Hotel Estar', MARGIN + sigW + 40, sigLineY + 5, { width: sigW, align: 'center' });
     doc.font('Helvetica').fontSize(8).fillColor(MUTED)
-      .text('RNT 276306 — Manizales, Colombia', MARGIN + sigW + 40, doc.y, { width: sigW, align: 'center' });
+      .text(L.roleHotel, MARGIN + sigW + 40, doc.y, { width: sigW, align: 'center' });
 
     /* ── FOOTER ──────────────────────────────────────────────────────────── */
     const footerY = doc.page.height - MARGIN - 24;
     doc.moveTo(MARGIN, footerY).lineTo(doc.page.width - MARGIN, footerY)
       .strokeColor(BORDER).lineWidth(0.5).stroke();
     doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
-      .text(
-        'Hotel Estar · RNT 276306 · Manizales, Caldas — Colombia\nDocumento generado automáticamente. Conserve esta copia junto con su comprobante de pago.',
-        MARGIN, footerY + 5, { width: contentW, align: 'center' }
-      );
+      .text(L.footer, MARGIN, footerY + 5, { width: contentW, align: 'center', lineBreak: true });
 
     doc.end();
   });

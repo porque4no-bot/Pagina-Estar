@@ -322,39 +322,6 @@ function quoteExpiringHtml({ quote, quoteUrl }) {
   return emailShell({ lang: 'es', band: { color: C.terra, eyebrow: 'Tu cotización vence pronto', code: quote.quoteId }, bodyHtml: body });
 }
 
-/* A10 — pre-arrival reminder (sent by the send-stay-emails cron). Bilingual.
-   Carries the digital check-in CTA (FAQ: link 1 day before → codes after). */
-function preArrivalHtml({ resv, lang }) {
-  const r = resv || {};
-  const fmt = lang === 'en' ? formatDateEN : formatDateES;
-  const stay = `${fmt(r.dateArrival)} → ${fmt(r.dateDeparture)}`;
-  const checkinUrl = r.checkinUrl || GUEST_APP_LINK;
-  if (lang === 'en') {
-    const bf = r.hasBreakfast ? para("Your booking includes breakfast — we'll have it ready every morning.") : '';
-    const body = `
-      ${greeting(r.firstName, 'en')}
-      ${para(`Your stay at estar is coming up: <strong>${stay}</strong>. Check-in is from <strong>3:00 pm</strong> and check-out until <strong>11:00 am</strong>. Check-in is 100% digital — complete it the day before and you'll get your smart access codes (building + studio). No keys, no front desk.`)}
-      ${bf}
-      ${ctaCenter(ctaButton(checkinUrl, 'Start my check-in'))}
-      <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
-      ${mapCard('en')}
-      ${guestAppCard('en', r.guestAppUrl)}
-      ${whatsappLine('en')}`;
-    return emailShell({ lang: 'en', band: { color: C.tan, textColor: C.ink, eyebrow: 'We look forward to your stay' }, bodyHtml: body });
-  }
-  const bf = r.hasBreakfast ? para('Tu reserva incluye desayuno — lo tendremos listo cada mañana.') : '';
-  const body = `
-    ${greeting(r.firstName, 'es')}
-    ${para(`Tu estadía en estar está cerca: <strong>${stay}</strong>. El check-in es desde las <strong>3:00 p. m.</strong> y el check-out hasta las <strong>11:00 a. m.</strong> El check-in es 100% digital — complétalo el día antes y recibirás tus códigos de acceso (edificio y apartaestudio). Sin llaves ni recepción.`)}
-    ${bf}
-    ${ctaCenter(ctaButton(checkinUrl, 'Hacer mi check-in'))}
-    <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
-    ${mapCard('es')}
-    ${guestAppCard('es', r.guestAppUrl)}
-    ${whatsappLine('es')}`;
-  return emailShell({ lang: 'es', band: { color: C.tan, textColor: C.ink, eyebrow: 'Te esperamos pronto' }, bodyHtml: body });
-}
-
 /* Access codes — delivered after the guest completes digital check-in (FAQ).
    codes = { building, studio, studioLabel }. passUrl optional (breakfast QRs).
    Not wired to a trigger yet — the smart-lock code source is owner-pending. */
@@ -400,37 +367,6 @@ function accessCodesHtml({ resv, codes, passUrl, lang }) {
     ${guestAppCard(lang, r.guestAppUrl)}
     ${whatsappLine(lang, en ? 'Trouble getting in?' : '¿Algún problema para entrar?')}`;
   return emailShell({ lang: lang || 'es', band: { color: C.olive, eyebrow: en ? 'Your check-in is ready' : 'Tu check-in está listo', code: r.bookingCode }, bodyHtml: body });
-}
-
-/* A10 — post-stay thank you + review ask (sent by the send-stay-emails cron).
-   npsUrl (opt): when present, adds a "tell us about your stay" NPS survey CTA
-   (Odoo Fase 3). Gated by NPS_ENABLED in send-stay-emails; nothing shown if absent. */
-function postStayHtml({ resv, lang, npsUrl }) {
-  const r = resv || {};
-  const reviewUrl = process.env.REVIEW_LINK_URL || WA_LINK;
-  const hasReview = !!process.env.REVIEW_LINK_URL;
-  if (lang === 'en') {
-    const npsBlock = npsUrl ? `
-      <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
-      ${para('How did your stay go? A 1-minute survey helps us keep improving.')}
-      ${ctaCenter(ctaButton(npsUrl, 'Tell us about your stay', 'secondary'))}` : '';
-    const body = `
-      ${greeting(r.firstName, 'en')}
-      ${para(`Thank you for choosing estar. We hope Manizales treated you well and that your studio felt like home. ${hasReview ? 'If you have a minute, a short review helps other travelers find us.' : "We'd love to hear how it went."}`)}
-      ${ctaCenter(ctaButton(reviewUrl, hasReview ? 'Leave a review' : 'Send us feedback'))}
-      ${npsBlock}`;
-    return emailShell({ lang: 'en', band: { color: C.olive, eyebrow: 'Thank you for staying with us' }, bodyHtml: body });
-  }
-  const npsBlock = npsUrl ? `
-    <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
-    ${para('¿Cómo estuvo tu estadía? Una encuesta de 1 minuto nos ayuda a seguir mejorando.')}
-    ${ctaCenter(ctaButton(npsUrl, 'Cuéntanos cómo estuvo tu estadía', 'secondary'))}` : '';
-  const body = `
-    ${greeting(r.firstName, 'es')}
-    ${para(`Gracias por elegir estar. Esperamos que Manizales te haya tratado bien y que tu apartaestudio se sintiera como en casa. ${hasReview ? 'Si tienes un minuto, una reseña corta nos ayuda a que otros viajeros nos encuentren.' : 'Nos encantaría saber cómo te fue.'}`)}
-    ${ctaCenter(ctaButton(reviewUrl, hasReview ? 'Dejar una reseña' : 'Enviarnos tu opinión'))}
-    ${npsBlock}`;
-  return emailShell({ lang: 'es', band: { color: C.olive, eyebrow: 'Gracias por tu estadía' }, bodyHtml: body });
 }
 
 /* A9 — ask the guest for the bank account to receive a manual refund. */
@@ -624,3 +560,498 @@ module.exports = {
   cancellationAckHtml, cancellationConfirmedHtml, adminCancellationHtml,
   paymentPendingHtml, paymentRejectedHtml
 };
+
+/* Frente cancel — correos al huésped sobre su reembolso (aprobado / denegado /
+   realizado), ES + EN. refund = registro de _refunds-store (bookingCode,
+   guestName, checkIn, checkOut, kind, route, refundAmountCents, payoutRef…).
+   El medio y el plazo (15 días hábiles) salen del registro, no del texto. */
+function refundMediumText(refund, lang) {
+  const r = refund || {};
+  const en = lang === 'en';
+  if (r.route === 'GATEWAY_AUTO') {
+    return en ? 'to the same card or Mercado Pago account you paid with'
+      : 'a la misma tarjeta o cuenta de Mercado Pago con la que pagaste';
+  }
+  if (r.route === 'GATEWAY_ASSISTED') {
+    return en ? 'to the same card you paid with' : 'a la misma tarjeta con la que pagaste';
+  }
+  return en ? 'by bank transfer to the account you give us' : 'por transferencia bancaria a la cuenta que nos indiques';
+}
+
+function refundStayText(refund, lang) {
+  const r = refund || {};
+  if (!r.checkIn) return '';
+  const fmt = lang === 'en' ? formatDateEN : formatDateES;
+  return ` (${fmt(r.checkIn)} → ${fmt(r.checkOut)})`;
+}
+
+function refundAmountBox(refund, lang) {
+  const r = refund || {};
+  const amount = r.refundAmountCents != null ? formatCOP(r.refundAmountCents / 100) : '—';
+  return box(lang === 'en' ? 'Refund amount' : 'Valor del reembolso',
+    `<tr><td style="padding:2px 18px 16px;font-family:${SERIF};font-size:22px;font-weight:700;color:${C.ink};">${esc(amount)} <span style="font-family:${SANS};font-size:12px;font-weight:400;color:${C.muted};">COP</span></td></tr>`);
+}
+
+function refundApprovedHtml({ refund, lang, formUrl, slaDays }) {
+  const r = refund || {};
+  const en = lang === 'en';
+  const days = slaDays || 15;
+  const special = r.kind === 'special';
+  const code = esc(r.bookingCode || '');
+  const stay = refundStayText(r, lang);
+  const medium = refundMediumText(r, lang);
+  const manual = r.route !== 'GATEWAY_AUTO' && r.route !== 'GATEWAY_ASSISTED';
+  if (en) {
+    const intro = special
+      ? `We approved a refund for your booking <strong>${code}</strong>${stay}.`
+      : `We approved the cancellation of your booking <strong>${code}</strong>${stay} and the corresponding refund under your rate's policy.`;
+    const bank = manual
+      ? (formUrl
+        ? `${para('Please tell us the bank account where you want to receive it:')}${ctaCenter(ctaButton(formUrl, 'Enter my bank account'))}`
+        : para('We will contact you to ask for the bank account where you want to receive it.'))
+      : '';
+    const body = `
+      ${greeting(r.guestName, 'en')}
+      ${para(intro)}
+      ${refundAmountBox(r, 'en')}
+      ${para(`We'll send it <strong>${medium}</strong>, within a maximum of <strong>${days} business days</strong>${manual ? ' after we receive your bank details' : ''}. Depending on your bank, it may take a few extra days to show up.`)}
+      ${bank}
+      ${fineprint('If you have any questions about this refund, reply to this email or message us on WhatsApp.')}`;
+    return emailShell({ lang: 'en', band: { color: C.olive, eyebrow: 'Refund approved', code: r.bookingCode || '' }, bodyHtml: body });
+  }
+  const intro = special
+    ? `Aprobamos un reembolso para tu reserva <strong>${code}</strong>${stay}.`
+    : `Aprobamos la cancelación de tu reserva <strong>${code}</strong>${stay} y el reembolso que corresponde según la política de tu tarifa.`;
+  const bank = manual
+    ? (formUrl
+      ? `${para('Por favor indícanos la cuenta bancaria donde quieres recibirlo:')}${ctaCenter(ctaButton(formUrl, 'Indicar mi cuenta bancaria'))}`
+      : para('Te contactaremos para pedirte la cuenta bancaria donde quieres recibirlo.'))
+    : '';
+  const body = `
+    ${greeting(r.guestName, 'es')}
+    ${para(intro)}
+    ${refundAmountBox(r, 'es')}
+    ${para(`Lo haremos <strong>${medium}</strong>, en un máximo de <strong>${days} días hábiles</strong>${manual ? ' después de recibir tus datos bancarios' : ''}. Según tu banco, puede tardar unos días más en verse reflejado.`)}
+    ${bank}
+    ${fineprint('Si tienes dudas sobre este reembolso, responde este correo o escríbenos por WhatsApp.')}`;
+  return emailShell({ lang: 'es', band: { color: C.olive, eyebrow: 'Reembolso aprobado', code: r.bookingCode || '' }, bodyHtml: body });
+}
+
+function refundDeniedHtml({ refund, lang, reason }) {
+  const r = refund || {};
+  const en = lang === 'en';
+  const special = r.kind === 'special';
+  const code = esc(r.bookingCode || '');
+  const stay = refundStayText(r, lang);
+  const why = String(reason || '').trim();
+  const reasonBox = (label) => (why
+    ? box(label, `<tr><td style="padding:2px 18px 16px;font-family:${SERIF};font-size:14px;line-height:1.6;color:${C.body};">${esc(why)}</td></tr>`)
+    : '');
+  if (en) {
+    const intro = special
+      ? `We reviewed your refund request for booking <strong>${code}</strong>${stay} and, in this case, a refund does not apply.`
+      : `Your cancellation of booking <strong>${code}</strong>${stay} is registered. Under your rate's cancellation policy, in this case <strong>no refund applies</strong>.`;
+    const body = `
+      ${greeting(r.guestName, 'en')}
+      ${para(intro)}
+      ${reasonBox('Reason')}
+      ${para('If you think this is a mistake, reply to this email and we will review it again.')}
+      ${whatsappLine('en', 'Questions about this decision?')}`;
+    return emailShell({ lang: 'en', band: { color: C.terra, eyebrow: special ? 'Refund request reviewed' : 'Cancellation registered', code: r.bookingCode || '' }, bodyHtml: body });
+  }
+  const intro = special
+    ? `Revisamos tu solicitud de reembolso para la reserva <strong>${code}</strong>${stay} y, en este caso, no aplica reembolso.`
+    : `Tu cancelación de la reserva <strong>${code}</strong>${stay} quedó registrada. Según la política de cancelación de tu tarifa, en este caso <strong>no aplica reembolso</strong>.`;
+  const body = `
+    ${greeting(r.guestName, 'es')}
+    ${para(intro)}
+    ${reasonBox('Motivo')}
+    ${para('Si crees que hay un error, responde este correo y lo revisamos de nuevo.')}
+    ${whatsappLine('es', '¿Dudas con esta decisión?')}`;
+  return emailShell({ lang: 'es', band: { color: C.terra, eyebrow: special ? 'Solicitud de reembolso revisada' : 'Cancelación registrada', code: r.bookingCode || '' }, bodyHtml: body });
+}
+
+function refundDoneHtml({ refund, lang }) {
+  const r = refund || {};
+  const en = lang === 'en';
+  const code = esc(r.bookingCode || '');
+  const medium = refundMediumText(r, lang);
+  const ref = String(r.payoutRef || '').trim();
+  const refLine = ref ? fineprint(`${en ? 'Reference' : 'Referencia'}: <strong>${esc(ref)}</strong>`) : '';
+  if (en) {
+    const body = `
+      ${greeting(r.guestName, 'en')}
+      ${para(`We sent the refund for your booking <strong>${code}</strong> ${medium}.`)}
+      ${refundAmountBox(r, 'en')}
+      ${para('Depending on your bank, it may take a few days to show up in your statement.')}
+      ${refLine}
+      ${whatsappLine('en', "Don't see it after a few days?")}`;
+    return emailShell({ lang: 'en', band: { color: C.olive, eyebrow: 'Refund sent', code: r.bookingCode || '' }, bodyHtml: body });
+  }
+  const body = `
+    ${greeting(r.guestName, 'es')}
+    ${para(`Ya realizamos el reembolso de tu reserva <strong>${code}</strong> ${medium}.`)}
+    ${refundAmountBox(r, 'es')}
+    ${para('Según tu banco, puede tardar unos días en verse reflejado en tu extracto.')}
+    ${refLine}
+    ${whatsappLine('es', '¿No lo ves después de unos días?')}`;
+  return emailShell({ lang: 'es', band: { color: C.olive, eyebrow: 'Reembolso realizado', code: r.bookingCode || '' }, bodyHtml: body });
+}
+
+Object.assign(module.exports, { refundApprovedHtml, refundDeniedHtml, refundDoneHtml, refundMediumText });
+
+/* Frente codes */
+/* Correo al huésped con su CÓDIGO DE DESCUENTO personal (emitido desde una regla
+   en /admin → Códigos) o de agradecimiento por una RESEÑA aprobada. Plantilla
+   ES/EN bajo la marca (emailShell). kind: 'review' | 'personal'.
+   blackoutDates = [{from,to}] (fechas en que el código no aplica). */
+function discountCodeBookUrl(code, lang) {
+  const base = lang === 'en' ? `${SITE}/en/reservar.html` : `${SITE}/reservar.html`;
+  return `${base}?codigo=${encodeURIComponent(String(code || ''))}`;
+}
+
+function discountCodeEmailSubject({ kind, lang } = {}) {
+  const en = lang === 'en';
+  if (kind === 'review') {
+    return en ? 'Thank you for your review: your estar discount code' : 'Gracias por tu reseña: tu código de descuento en estar';
+  }
+  return en ? 'Your personal estar discount code' : 'Tu código de descuento personal en estar';
+}
+
+function discountCodeEmailHtml({ kind, lang, guestName, code, discountText, validTo, minNights, blackoutDates, boundEmail, singleUse } = {}) {
+  const en = lang === 'en';
+  const fmt = en ? formatDateEN : formatDateES;
+  const isReview = kind === 'review';
+  const row = (html) => `<tr><td style="padding:0 18px 10px;font-family:${SERIF};font-size:14px;line-height:1.55;color:${C.ink};">${html}</td></tr>`;
+  const ranges = (Array.isArray(blackoutDates) ? blackoutDates : [])
+    .map(b => (typeof b === 'string' ? { from: b, to: b } : b))
+    .filter(b => b && b.from)
+    .map(b => (b.to && b.to !== b.from) ? `${fmt(b.from)} → ${fmt(b.to)}` : fmt(b.from));
+  const t = en ? {
+    eyebrow: isReview ? 'Thank you for your review' : 'A gift for you',
+    intro: isReview
+      ? `Thank you for taking the time to share how your stay at estar went. As a thank-you, here is a code with <strong>${esc(discountText)}</strong> for your next direct booking on our website.`
+      : `Here is a personal code with <strong>${esc(discountText)}</strong> for your next direct booking at estar.`,
+    label: 'Your code',
+    until: (d) => `Valid until <strong>${esc(fmt(d))}</strong>.`,
+    min: (n) => `Minimum stay: <strong>${esc(String(n))} ${Number(n) === 1 ? 'night' : 'nights'}</strong>.`,
+    single: 'Single use.',
+    bound: (e) => `Linked to your email <strong>${esc(e)}</strong>: use this same email when you book.`,
+    blackout: (l) => `Not valid on: ${esc(l)}.`,
+    cta: 'Book with my code',
+    fine: 'Valid only for bookings made on estar.com.co. Not combinable with other promotions and not redeemable for cash. Enter the code in the payment step.',
+    wa: 'Questions about your code?'
+  } : {
+    eyebrow: isReview ? 'Gracias por tu reseña' : 'Un regalo para ti',
+    intro: isReview
+      ? `Gracias por tomarte el tiempo de contar cómo fue tu estadía en estar. Como agradecimiento, te regalamos un código con <strong>${esc(discountText)}</strong> para tu próxima reserva directa en nuestra web.`
+      : `Te compartimos un código personal con <strong>${esc(discountText)}</strong> para tu próxima reserva directa en estar.`,
+    label: 'Tu código',
+    until: (d) => `Válido hasta el <strong>${esc(fmt(d))}</strong>.`,
+    min: (n) => `Estadía mínima: <strong>${esc(String(n))} ${Number(n) === 1 ? 'noche' : 'noches'}</strong>.`,
+    single: 'Un solo uso.',
+    bound: (e) => `Ligado a tu correo <strong>${esc(e)}</strong>: usa este mismo correo al reservar.`,
+    blackout: (l) => `No aplica en: ${esc(l)}.`,
+    cta: 'Reservar con mi código',
+    fine: 'Aplica solo a reservas hechas en estar.com.co. No es acumulable con otras promociones ni canjeable por dinero. Ingresa el código en el paso de pago.',
+    wa: '¿Dudas con tu código?'
+  };
+  const rows = [
+    `<div style="font-family:${SANS};font-size:22px;font-weight:700;letter-spacing:.14em;color:${C.ink};">${esc(code)}</div>`,
+    validTo ? t.until(validTo) : '',
+    minNights ? t.min(minNights) : '',
+    singleUse ? t.single : '',
+    boundEmail ? t.bound(boundEmail) : '',
+    ranges.length ? t.blackout(ranges.join(' · ')) : ''
+  ].filter(Boolean).map(row).join('');
+  const body = `
+    ${greeting(guestName, en ? 'en' : 'es')}
+    ${para(t.intro)}
+    ${box(t.label, rows + '<tr><td style="height:6px;font-size:0;line-height:0;">&nbsp;</td></tr>')}
+    ${ctaCenter(ctaButton(discountCodeBookUrl(code, en ? 'en' : 'es'), t.cta))}
+    ${fineprint(t.fine)}
+    ${whatsappLine(en ? 'en' : 'es', t.wa)}`;
+  return emailShell({ lang: en ? 'en' : 'es', band: { color: C.olive, eyebrow: t.eyebrow, code }, bodyHtml: body });
+}
+
+module.exports.discountCodeEmailHtml = discountCodeEmailHtml;
+module.exports.discountCodeEmailSubject = discountCodeEmailSubject;
+module.exports.discountCodeBookUrl = discountCodeBookUrl;
+/* Frente stay */
+/* ── Correos de estadía: pre-llegada y post-estadía (cron send-stay-emails) ──
+   Reemplazan a las plantillas A10 anteriores, que prometían códigos de acceso
+   automáticos ("sin llaves ni recepción"): las chapas TTLock NO están activas, así
+   que eso era una promesa falsa. El copy de aquí es verificable: check-in en línea
+   con el código de reserva prellenado, horario real de recepción y cómo llegar.
+   Se declaran con `function`, así que el module.exports de arriba las exporta por
+   hoisting con los mismos nombres de siempre (preArrivalHtml / postStayHtml). */
+
+const STAY_RECEPTION_HOURS = {
+  es: 'de 6:00 a 10:00 a. m. y de 4:00 a 10:00 p. m.',
+  en: '6:00–10:00 am and 4:00–10:00 pm'
+};
+
+/* Enlace a "Mi estadía" (guest.html) con el código de reserva prellenado. El
+   apellido del titular sigue siendo obligatorio (segundo factor): el código solo
+   no da acceso. tab=checkin abre directo la pestaña de check-in tras entrar. */
+function guestAppUrl(code, tab, lang) {
+  /* La versión en inglés vive en /en/guest.html (build-guest-en.js). */
+  const base = lang === 'en' ? `${SITE}/en/guest.html` : GUEST_APP_LINK;
+  const c = String(code || '').trim();
+  if (!c) return base;
+  return `${base}?code=${encodeURIComponent(c)}${tab ? `&tab=${encodeURIComponent(tab)}` : ''}`;
+}
+
+function guestCheckinUrl(code, lang) {
+  return guestAppUrl(code, 'checkin', lang);
+}
+
+function waLinkWithText(text) {
+  return `${WA_LINK}&text=${encodeURIComponent(text)}`;
+}
+
+/* Tarjeta "Mi estadía" con copy exacto (lo que la app SÍ hace hoy). */
+function stayAppCard(lang, url) {
+  const t = lang === 'en'
+    ? { label: 'My stay', desc: 'Your online check-in, extra services and our Manizales tips, all in one place.', cta: 'Open' }
+    : { label: 'Mi estadía', desc: 'Tu check-in en línea, servicios adicionales y nuestras recomendaciones de Manizales, en un solo lugar.', cta: 'Abrir' };
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 4px;border:1px solid ${C.border};border-radius:10px;border-collapse:separate;">
+    <tbody><tr><td style="padding:15px 16px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr>
+      <td style="vertical-align:middle;">
+        <div style="font-family:${SANS};font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:${C.olive};margin-bottom:4px;">${t.label}</div>
+        <div style="font-family:${SERIF};font-size:13px;line-height:1.45;color:${C.body};">${t.desc}</div>
+      </td>
+      <td align="right" style="vertical-align:middle;padding-left:12px;"><a href="${esc(url || GUEST_APP_LINK)}" style="display:inline-block;padding:11px 18px;background:${C.dark};border-radius:8px;font-family:${SANS};font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#ffffff;text-decoration:none;white-space:nowrap;">${t.cta}</a></td>
+    </tr></tbody></table></td></tr></tbody></table>`;
+}
+
+function stayBoxRow(html) {
+  return `<tr><td style="padding:0 18px 12px;font-family:${SERIF};font-size:14px;line-height:1.6;color:${C.body};">${html}</td></tr>`;
+}
+
+/* Códigos de reserva del correo: resv.bookingCodes (varias reservas del mismo
+   huésped agrupadas en un solo correo) o el id de la reserva. Máx. 6. */
+function stayCodes(r) {
+  const list = Array.isArray(r.bookingCodes) && r.bookingCodes.length
+    ? r.bookingCodes
+    : [r.idReservations || r.bookingCode];
+  return list.map(c => String(c || '').trim()).filter(Boolean).slice(0, 6);
+}
+
+/* Pre-llegada (N días antes; default 2). resv = fila normalizada de OTASync
+   (+ bookingCodes opcional). */
+function preArrivalHtml({ resv, lang }) {
+  const r = resv || {};
+  const en = lang === 'en';
+  const fmt = en ? formatDateEN : formatDateES;
+  const stay = `${fmt(r.dateArrival)} → ${fmt(r.dateDeparture)}`;
+  const codes = stayCodes(r);
+  const single = codes.length <= 1;
+  const hours = en ? STAY_RECEPTION_HOURS.en : STAY_RECEPTION_HOURS.es;
+
+  const intro = en
+    ? `Your stay at estar is coming up: <strong>${stay}</strong>. Check-in is from <strong>3:00 pm</strong> and check-out is until <strong>11:00 am</strong>.`
+    : `Tu estadía en estar está cerca: <strong>${stay}</strong>. El check-in es desde las <strong>3:00 p. m.</strong> y el check-out hasta las <strong>11:00 a. m.</strong>`;
+  const bf = r.hasBreakfast
+    ? para(en ? "Your booking includes breakfast — we'll have it ready every morning." : 'Tu reserva incluye desayuno — lo tendremos listo cada mañana.')
+    : '';
+
+  let checkin;
+  if (single) {
+    const code = codes[0] || '';
+    const how = code
+      ? (en
+        ? `Save time on arrival: do your <strong>online check-in</strong> now. Register your guests with their ID and sign the stay agreement in a few minutes. Sign in with your booking code <strong>${esc(code)}</strong> and the main guest's last name.`
+        : `Ahorra tiempo al llegar: haz tu <strong>check-in en línea</strong> ahora. Registras a los huéspedes con su documento y firmas el contrato de hospedaje en pocos minutos. Entra con tu código de reserva <strong>${esc(code)}</strong> y el apellido del titular.`)
+      : (en
+        ? 'Save time on arrival: do your <strong>online check-in</strong> now. Register your guests with their ID and sign the stay agreement in a few minutes.'
+        : 'Ahorra tiempo al llegar: haz tu <strong>check-in en línea</strong> ahora. Registras a los huéspedes con su documento y firmas el contrato de hospedaje en pocos minutos.');
+    checkin = `${para(how)}${ctaCenter(ctaButton(guestCheckinUrl(code, en ? 'en' : 'es'), en ? 'Start my online check-in' : 'Hacer mi check-in en línea'))}`;
+  } else {
+    const rows = codes.map(code => `
+      <tr><td style="padding:0 18px;"><div style="border-top:1px solid ${C.border};height:1px;font-size:0;line-height:0;">&nbsp;</div></td></tr>
+      <tr><td style="padding:12px 18px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tbody><tr>
+        <td style="font-family:${SANS};font-size:14px;color:${C.ink};">${en ? 'Booking' : 'Reserva'} <strong>${esc(code)}</strong></td>
+        <td align="right"><a href="${esc(guestCheckinUrl(code, en ? 'en' : 'es'))}" style="font-family:${SANS};font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${C.olive};text-decoration:none;">${en ? 'Check in →' : 'Hacer check-in →'}</a></td>
+      </tr></tbody></table></td></tr>`).join('');
+    checkin = `${para(en
+      ? `Save time on arrival: do the <strong>online check-in</strong> for each of your ${codes.length} bookings. Register the guests with their ID and sign the stay agreement; sign in with each booking code and the main guest's last name.`
+      : `Ahorra tiempo al llegar: haz el <strong>check-in en línea</strong> de cada una de tus ${codes.length} reservas. Registras a los huéspedes con su documento y firmas el contrato; entra con el código de cada reserva y el apellido del titular.`)}
+      ${box(en ? 'Your bookings' : 'Tus reservas', rows)}`;
+  }
+
+  const arrival = box(en ? 'Your arrival' : 'Tu llegada', `
+    ${stayBoxRow(en
+      ? `Our front desk is open <strong>${hours}</strong>. We'll help you with your check-in when you arrive.`
+      : `Nuestra recepción atiende <strong>${hours}</strong>; allí te acompañamos con tu ingreso.`)}
+    ${stayBoxRow(en
+      ? `Arriving outside those hours? <a href="${esc(WA_LINK)}" style="color:${C.olive};font-weight:700;text-decoration:none;">Message us on WhatsApp</a> before you arrive and we'll arrange your check-in.`
+      : `¿Llegas fuera de ese horario? <a href="${esc(WA_LINK)}" style="color:${C.olive};font-weight:700;text-decoration:none;">Escríbenos por WhatsApp</a> antes de tu llegada y coordinamos tu ingreso.`)}`);
+
+  const body = `
+    ${greeting(r.firstName, en ? 'en' : 'es')}
+    ${para(intro)}
+    ${bf}
+    ${checkin}
+    <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
+    ${arrival}
+    ${mapCard(en ? 'en' : 'es')}
+    ${stayAppCard(en ? 'en' : 'es', guestAppUrl(codes[0], null, en ? 'en' : 'es'))}
+    ${whatsappLine(en ? 'en' : 'es')}`;
+  return emailShell({
+    lang: en ? 'en' : 'es',
+    band: { color: C.tan, textColor: C.ink, eyebrow: en ? 'We look forward to your stay' : 'Te esperamos pronto', code: single ? codes[0] : undefined },
+    bodyHtml: body
+  });
+}
+
+/* Frente guestapp */
+/* Copia del contrato de hospedaje firmado (guest app). Va con el PDF adjunto
+   (lo arma guest-action con _pdf-render) e incluye la huella SHA-256 del texto
+   que el huésped leyó, como evidencia de la firma electrónica (Ley 527).
+   Bilingüe según el idioma en que se firmó. */
+function contractCopyHtml({ record, lang }) {
+  const r = record || {};
+  const en = lang === 'en';
+  const fmt = en ? formatDateEN : formatDateES;
+  let signedAtText = '—';
+  const signed = new Date(r.signedAt || '');
+  if (!Number.isNaN(signed.getTime())) {
+    try {
+      signedAtText = signed.toLocaleString(en ? 'en-US' : 'es-CO', {
+        timeZone: 'America/Bogota', year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit'
+      });
+    } catch (_) {
+      signedAtText = signed.toISOString();
+    }
+  }
+  const room = [r.roomName, r.roomNumber && r.roomNumber !== r.roomName ? r.roomNumber : ''].filter(Boolean).join(' · ');
+  const rows = [
+    [en ? 'Booking' : 'Reserva', esc(r.bookingCode || '—')],
+    [en ? 'Stay' : 'Estadía', `${esc(fmt(r.checkIn))} → ${esc(fmt(r.checkOut))}`],
+    room ? [en ? 'Studio' : 'Apartaestudio', esc(room)] : null,
+    [en ? 'Signed by' : 'Firmado por', esc(r.signedName || '—')],
+    [en ? 'Signed on' : 'Fecha de firma', esc(signedAtText)]
+  ].filter(Boolean);
+  const hashBlock = r.contractHash
+    ? fineprint(`${en ? 'SHA-256 fingerprint of the contract you read' : 'Huella SHA-256 del contrato que leíste'}: <span style="font-family:Consolas,Menlo,monospace;word-break:break-all;">${esc(r.contractHash)}</span>`)
+    : '';
+  const body = en ? `
+    ${greeting(r.signedName, 'en')}
+    ${para('Thank you for signing your hospitality agreement. A PDF copy is attached to this email; please keep it with your booking confirmation.')}
+    ${dataRows(rows)}
+    ${hashBlock}
+    ${whatsappLine('en', 'Questions about your agreement?')}` : `
+    ${greeting(r.signedName, 'es')}
+    ${para('Gracias por firmar tu contrato de hospedaje. Adjuntamos una copia en PDF; consérvala junto con la confirmación de tu reserva.')}
+    ${dataRows(rows)}
+    ${hashBlock}
+    ${whatsappLine('es', '¿Tienes dudas sobre tu contrato?')}`;
+  return emailShell({
+    lang: en ? 'en' : 'es',
+    band: { color: C.olive, eyebrow: en ? 'Agreement signed' : 'Contrato firmado', code: r.bookingCode },
+    bodyHtml: body
+  });
+}
+
+/* Post-estadía (N días después; default 1): gracias + reseña.
+   reviews = { googleUrl, bookingUrl } (bookingUrl solo para huéspedes de
+   Booking.com: Booking solo acepta reseñas verificadas de quien reservó allí).
+   discountOffer = true → invita a reclamar un código de descuento por WhatsApp
+   tras publicar la reseña (solo huéspedes directos; lo decide send-stay-emails).
+   npsUrl (opc.) → bloque de encuesta NPS (Odoo Fase 3). */
+function postStayHtml({ resv, lang, npsUrl, reviews, discountOffer }) {
+  const r = resv || {};
+  const en = lang === 'en';
+  const rv = reviews || {};
+  const googleUrl = rv.googleUrl || process.env.REVIEW_LINK_URL || '';
+  const bookingUrl = rv.bookingUrl || '';
+  const hasReview = !!(googleUrl || bookingUrl);
+  const code = stayCodes(r)[0] || '';
+
+  let reviewHtml;
+  if (hasReview) {
+    const buttons = [
+      googleUrl ? ctaButton(googleUrl, en ? 'Review on Google' : 'Reseña en Google', 'primary') : '',
+      bookingUrl ? ctaButton(bookingUrl, en ? 'Review on Booking.com' : 'Reseña en Booking.com', 'secondary') : ''
+    ].filter(Boolean);
+    /* apilados (uno por línea): lado a lado se parten en pantallas de celular */
+    const buttonsHtml = buttons.map(b => ctaCenter(b)).join('<div style="height:10px;font-size:0;line-height:0;">&nbsp;</div>');
+    reviewHtml = `
+      ${para(en
+        ? 'Could you spare a minute? Your review helps other travelers find us and helps us keep improving.'
+        : '¿Nos regalas un minuto? Tu reseña ayuda a otros viajeros a encontrarnos y a nosotros a seguir mejorando.')}
+      ${buttonsHtml}
+      ${bookingUrl ? fineprint(en
+        ? 'Booking.com will also send you its own invitation to rate your stay.'
+        : 'Booking.com también te enviará su propia invitación para calificar tu estadía.') : ''}`;
+  } else {
+    reviewHtml = `
+      ${para(en ? "We'd love to hear how it went." : 'Nos encantaría saber cómo te fue.')}
+      ${ctaCenter(ctaButton(WA_LINK, en ? 'Send us feedback' : 'Enviarnos tu opinión'))}`;
+  }
+
+  const discountHtml = (discountOffer && hasReview) ? `
+    <div style="height:16px;font-size:0;line-height:0;">&nbsp;</div>
+    <div style="background:${C.cream};border-radius:12px;padding:20px;text-align:center;">
+      <div style="font-family:${SANS};font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:${C.olive};margin-bottom:8px;">${en ? 'A thank-you from us' : 'Un detalle de nuestra parte'}</div>
+      <p style="margin:0 0 16px;font-family:${SERIF};font-size:14px;line-height:1.65;color:${C.body};">${en
+        ? 'Once your review is published — whatever your opinion — send us the link or a screenshot on WhatsApp and we\'ll send you a <strong>discount code</strong> for your next direct booking at estar.com.co.'
+        : 'Cuando publiques tu reseña —sea cual sea tu opinión—, envíanos por WhatsApp el enlace o una captura y te enviamos un <strong>código de descuento</strong> para tu próxima reserva directa en estar.com.co.'}</p>
+      ${ctaButton(waLinkWithText(en
+        ? `Hi, I left a review of my stay at estar${code ? ` (booking ${code})` : ''}. Could you send me my discount code?`
+        : `Hola, ya dejé mi reseña de mi estadía en estar${code ? ` (reserva ${code})` : ''}. ¿Me envían mi código de descuento?`), en ? 'I left my review' : 'Ya dejé mi reseña', 'dark')}
+    </div>` : '';
+
+  const npsBlock = npsUrl ? `
+    <div style="height:14px;font-size:0;line-height:0;">&nbsp;</div>
+    ${para(en ? 'How did your stay go? A 1-minute survey helps us keep improving.' : '¿Cómo estuvo tu estadía? Una encuesta de 1 minuto nos ayuda a seguir mejorando.')}
+    ${ctaCenter(ctaButton(npsUrl, en ? 'Tell us about your stay' : 'Cuéntanos cómo estuvo tu estadía', 'secondary'))}` : '';
+
+  const body = `
+    ${greeting(r.firstName, en ? 'en' : 'es')}
+    ${para(en
+      ? 'Thank you for choosing estar. We hope Manizales treated you well and that your studio felt like home.'
+      : 'Gracias por elegir estar. Esperamos que Manizales te haya tratado bien y que tu apartaestudio se sintiera como en casa.')}
+    ${reviewHtml}
+    ${discountHtml}
+    ${npsBlock}`;
+  return emailShell({
+    lang: en ? 'en' : 'es',
+    band: { color: C.olive, eyebrow: en ? 'Thank you for staying with us' : 'Gracias por tu estadía' },
+    bodyHtml: body
+  });
+}
+
+module.exports.guestAppUrl = guestAppUrl;
+module.exports.guestCheckinUrl = guestCheckinUrl;
+module.exports.STAY_RECEPTION_HOURS = STAY_RECEPTION_HOURS;
+module.exports.contractCopyHtml = contractCopyHtml;
+/* Frente site */
+/* Aviso al equipo: nueva postulación desde "Trabaja con nosotros" (trabaja.html /
+   en/trabaja.html). El postulante NO entra al maestro de clientes de Odoo: su dato
+   tiene otra finalidad (selección de personal, ver privacidad.html). Todo lo que
+   viene del formulario es texto del público → siempre escapado; el enlace a la
+   hoja de vida solo se vuelve <a> si es http(s). */
+function jobApplicationHtml({ application }) {
+  const a = application || {};
+  const attr = (s) => esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const link = (href, label) => `<a href="${attr(href)}" style="color:${C.olive};font-weight:700;text-decoration:none;word-break:break-all;">${esc(label)}</a>`;
+  const cv = a.hojaVidaUrl ? link(a.hojaVidaUrl, a.hojaVidaUrl) : esc(a.hojaVida || '—');
+  const rows = [
+    ['Nombre', esc(a.nombre || '—')],
+    ['Correo', a.email ? link(`mailto:${a.email}`, a.email) : '—'],
+    ['Área de interés', esc(a.area || '—')],
+    ['Hoja de vida / portafolio', cv],
+    ['Idioma del formulario', a.lang === 'en' ? 'Inglés' : 'Español'],
+    ['Acepta la política de datos', a.aceptaPolitica ? 'Sí' : 'No']
+  ];
+  const mensaje = a.mensaje ? esc(a.mensaje).replace(/\r?\n/g, '<br>') : '';
+  const body = `
+    <p style="margin:0 0 22px;font-family:${SANS};font-size:14px;line-height:1.65;color:${C.body};">Llegó una postulación desde <strong style="color:#28292b;">Trabaja con nosotros</strong> en el sitio.</p>
+    ${dataRows(rows)}
+    ${mensaje ? calloutBox(C.olive, 'Sobre la persona', mensaje) : ''}
+    <p style="margin:20px 0 0;font-family:${SANS};font-size:12px;line-height:1.6;color:${C.muted};">Dato personal para selección de personal: úsalo solo para este proceso y no lo reenvíes fuera del equipo. La copia original queda en Netlify Forms (vacantes-empleo). Si la persona pide eliminar su postulación, bórrala de Netlify Forms y de este buzón (así lo promete la política de privacidad).</p>`;
+  return internalShell({ accent: C.olive, kicker: 'Selección de personal', title: `Nueva postulación — ${a.nombre || a.email || 'sin nombre'}`, bodyHtml: body });
+}
+module.exports.jobApplicationHtml = jobApplicationHtml;

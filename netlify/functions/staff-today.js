@@ -1,6 +1,7 @@
 require('./_env');
 const { authorize } = require('./_authz');
 const { getReservationsByDate, hasOtasyncCreds, isHoldReservation } = require('./_otasync');
+const hoy = require('./_staff-hoy');
 
 /*
  * staff-today — Staff App v1 (read-only), Sprint 1 (Mesa Redonda: el mayor vacío
@@ -11,6 +12,10 @@ const { getReservationsByDate, hasOtasyncCreds, isHoldReservation } = require('.
  *       · salidas   (date_departure = fecha)
  *       · en casa   (date_arrival <= fecha < date_departure)
  *   - cola de reembolsos pendientes (solo si el rol tiene refunds.view).
+ *   - (Frente Hoy) por reserva: canal, teléfono, saldo del folio, pago en línea
+ *     y su estado (booking-results / payment-details), ¿check-in hecho? y marca
+ *     de revisión manual (guest-checkins), pedidos "cargar a la cuenta" sin cobrar
+ *     y documentos por verificar (ops-queue). Ver _staff-hoy.js.
  *
  * Auth: guests.checkin.view (recepción + admin). La cocina usa el panel de
  * desayunos aparte. Read-only: NO escribe en OTASync ni en Blobs.
@@ -53,18 +58,125 @@ function shiftDate(isoDate, deltaDays) {
 
 const ACTIVE_STATUSES = new Set(['confirmed', 'tentative', 'pending', '']);
 
-/* Forma mínima y operativa de una reserva (sin sobre-exponer PII). */
-function publicReservation(r) {
+/* Ventana hacia atrás (desde la llegada más antigua del tablero) en la que se
+   buscan check-ins: el huésped puede hacer el check-in en línea días antes. */
+const CHECKIN_LOOKBACK_DAYS = 30;
+
+/* Forma operativa de una reserva para recepción. `extra` trae el cruce con lo
+   que guarda el sistema (pago en línea, check-in, tareas). Sin correo ni datos
+   de documento: el detalle del check-in va por staff-checkin-view (auditado). */
+function publicReservation(r, extra = {}) {
+  const payment = extra.payment || null;
+  const checkins = Array.isArray(extra.checkins) ? extra.checkins : [];
+  const latest = checkins[0] || null;
+  const tasks = extra.tasks || { pendingOrders: [], verifyDocument: 0 };
+  const pendingOrders = Array.isArray(tasks.pendingOrders) ? tasks.pendingOrders : [];
   return {
     bookingCode: r.idReservations,
     guestName: `${r.firstName || ''} ${r.lastName || ''}`.trim(),
     roomName: r.roomName || '',
+    roomNumber: r.roomNumber || '',
     checkIn: r.dateArrival,
     checkOut: r.dateDeparture,
     nights: r.nights,
     status: r.status,
-    hasBreakfast: r.hasBreakfast
+    hasBreakfast: r.hasBreakfast,
+    channel: hoy.channelLabel(r, payment),
+    /* Web = motor propio (referencia EST-…); las cotizaciones (COT-) tienen pago
+       en línea pero su propio correo, por eso no cuentan como web. */
+    isWeb: hoy.isWebReference(r.reference),
+    webCode: hoy.isWebReference(r.reference) ? String(r.reference).trim() : null,
+    phone: r.phone || '',
+    hasEmail: Boolean(r.email),
+    totalPrice: Number(r.totalPrice) || 0,
+    balance: Number(r.remainingAmount) || 0,
+    payment,
+    /* true = no se pudo leer el registro de pago (Blobs caído): la UI no debe
+       mostrar "sin registro de pago" en ese caso. */
+    paymentUnknown: extra.paymentUnknown === true,
+    /* true = no se pudo leer la cola de tareas: "0 pedidos" no es confiable. */
+    tasksUnknown: extra.tasksUnknown === true,
+    checkin: latest
+      ? {
+          done: true,
+          checkinId: latest.checkinId,
+          createdAt: latest.createdAt,
+          manualReview: latest.manualReview === true,
+          manualReviewGuests: latest.manualReviewGuests || 0,
+          guests: latest.guests,
+          count: checkins.length
+        }
+      : { done: false },
+    pendingOrders,
+    pendingOrdersCount: pendingOrders.length,
+    verifyDocumentTasks: Number(tasks.verifyDocument) || 0
   };
+}
+
+function uniqueByCode(list) {
+  const seen = new Map();
+  for (const r of list) if (r && r.idReservations && !seen.has(r.idReservations)) seen.set(r.idReservations, r);
+  return [...seen.values()];
+}
+
+/* Cruce best-effort con Blobs (pagos web, check-ins, cola de tareas). Cada pieza
+   falla por separado sin tumbar el tablero; `status` dice qué se pudo leer. */
+async function buildEnrichment(reservations, deps = {}) {
+  const list = uniqueByCode(reservations);
+  const codes = list.map(r => r.idReservations);
+  const status = { payments: true, checkins: true, tasks: true };
+  const payments = new Map();
+  const unknownPayments = new Set();
+  let checkinMap = new Map();
+  let taskMap = new Map();
+
+  const arrivalsMs = list.map(r => Date.parse(`${r.dateArrival}T00:00:00Z`)).filter(Number.isFinite);
+  const sinceMs = arrivalsMs.length ? Math.min(...arrivalsMs) - CHECKIN_LOOKBACK_DAYS * hoy.DAY_MS : 0;
+
+  await Promise.all([
+    (async () => {
+      /* getWebPayment LANZA si booking-results/payment-details no responden: esa
+         reserva queda "desconocida" (no "sin registro de pago") y el tablero
+         avisa lectura parcial con enrichment.payments=false. */
+      try {
+        await hoy.mapLimit(list, 8, async (r) => {
+          try {
+            const p = await hoy.getWebPayment({ reference: r.reference, bookingCode: r.idReservations }, deps);
+            /* La fila ES una reserva de Kunas: si el pago decía "sin reserva",
+               ya se creó (a mano o por reintento) → no es alarma. */
+            if (p) payments.set(r.idReservations, hoy.withReservationMatch(p, r));
+          } catch (e) {
+            status.payments = false;
+            unknownPayments.add(r.idReservations);
+          }
+        });
+      } catch (e) { status.payments = false; }
+    })(),
+    (async () => {
+      try {
+        const res = await hoy.findCheckins(codes, { sinceMs, deps });
+        checkinMap = res.byBooking;
+        if (res.unavailable) status.checkins = false;
+      } catch (e) { status.checkins = false; }
+    })(),
+    (async () => {
+      try {
+        /* strict: un fallo de la cola LANZA en vez de devolver [] — si no, el
+           tablero diría "0 pedidos por cobrar" cuando en verdad no pudo leerla. */
+        const listOpen = deps.listOpen || require('./_ops-queue').listOpen;
+        taskMap = hoy.tasksByBooking(await listOpen({ strict: true }));
+      } catch (e) { status.tasks = false; }
+    })()
+  ]);
+
+  const toPublic = (r) => publicReservation(r, {
+    payment: payments.get(r.idReservations) || null,
+    paymentUnknown: unknownPayments.has(r.idReservations),
+    tasksUnknown: !status.tasks,
+    checkins: checkinMap.get(r.idReservations) || [],
+    tasks: taskMap.get(r.idReservations)
+  });
+  return { toPublic, status };
 }
 
 exports.handler = async (event) => {
@@ -124,13 +236,16 @@ exports.handler = async (event) => {
       }
     }
 
+    const { toPublic, status: enrichment } = await buildEnrichment([...arrivals, ...inHouse, ...departures], deps);
+
     return jsonResponse(200, {
       date, isMock: false,
-      arrivals: arrivals.map(publicReservation),
-      departures: departures.map(publicReservation),
-      inHouse: inHouse.map(publicReservation),
+      arrivals: arrivals.map(toPublic),
+      departures: departures.map(toPublic),
+      inHouse: inHouse.map(toPublic),
       counts: { arrivals: arrivals.length, departures: departures.length, inHouse: inHouse.length },
-      refunds
+      refunds,
+      enrichment
     });
   } catch (e) {
     console.error('[staff-today]', e.message);
@@ -138,4 +253,11 @@ exports.handler = async (event) => {
   }
 };
 
-exports._test = { publicReservation, shiftDate, bogotaToday, isValidDate, LOOKBACK_DAYS };
+/* Deps inyectables en pruebas (stores de Blobs falsos, cola de tareas). */
+const deps = {};
+
+exports._test = {
+  publicReservation, buildEnrichment, shiftDate, bogotaToday, isValidDate, LOOKBACK_DAYS, CHECKIN_LOOKBACK_DAYS,
+  setDeps(overrides = {}) { Object.assign(deps, overrides); },
+  resetDeps() { Object.keys(deps).forEach(k => delete deps[k]); }
+};

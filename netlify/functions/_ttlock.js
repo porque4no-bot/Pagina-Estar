@@ -33,6 +33,9 @@
                            es guardar ya el MD5 para no tener el plano en Netlify.
      TTLOCK_LOCKS_JSON     mapeo apartamento→lockId, p.ej.
                            {"101":1234567,"102":1234568,"main":7654321}
+                           Gestionable desde /admin → Configuración (override
+                           del panel → env). No es secreto. Verificable con
+                           /api/ttlock-probe (lista las chapas de la cuenta).
                            (claves: número de apto como string, o 'main' para la
                            puerta principal). Acepta lockId numérico u objeto
                            { lockId, name }.
@@ -76,16 +79,29 @@ function ttlockConfig() {
   };
 }
 
+/* ¿Están las 4 credenciales cargadas? (independiente del flag). */
+function hasCredentials() {
+  const c = ttlockConfig();
+  return Boolean(c.clientId && c.clientSecret && c.username && c.passwordMd5);
+}
+
 /* Activo solo si el flag está encendido Y hay credenciales completas. */
 function isConfigured() {
   const c = ttlockConfig();
-  return Boolean(c.enabled && c.clientId && c.clientSecret && c.username && c.passwordMd5);
+  return Boolean(c.enabled && hasCredentials());
+}
+
+/* Texto crudo del mapeo apartamento→chapa. Gestionable desde /admin
+   (Configuración, override del panel → env TTLOCK_LOCKS_JSON): NO es secreto
+   (un lockId solo no abre nada sin las credenciales OAuth). */
+function rawLocksJson() {
+  return String(getSync('TTLOCK_LOCKS_JSON', '') || '').trim();
 }
 
 /* Parsea TTLOCK_LOCKS_JSON → Map normalizado: clave string → { lockId, name }.
    Acepta valores numéricos (solo lockId) u objetos { lockId, name }. */
 function parseLocksMap() {
-  const raw = process.env.TTLOCK_LOCKS_JSON;
+  const raw = rawLocksJson();
   if (!raw) return new Map();
   let obj;
   try {
@@ -141,24 +157,31 @@ function resolveLocks({ lockIds, apartment, includeMain } = {}) {
    La plataforma responde 200 con { errcode, errmsg } cuando hay error de
    negocio (token vencido, lock inexistente, sin gateway, etc.); hay que
    inspeccionar errcode además del status HTTP. */
-async function ttlockRequest(path, params, transport) {
+async function ttlockRequest(path, params, transport, reqOpts) {
   const c = ttlockConfig();
   const fetchImpl = transport || fetch;
+  const method = (reqOpts && reqOpts.method) === 'GET' ? 'GET' : 'POST';
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort(), c.timeoutMs);
-  // La Open Platform recibe los parámetros como x-www-form-urlencoded.
+  // La Open Platform recibe los parámetros como x-www-form-urlencoded (POST)
+  // o como query string (GET, consultas de solo lectura como lock/list).
   const body = new URLSearchParams();
   for (const [k, v] of Object.entries(params || {})) {
     if (v === undefined || v === null) continue;
     body.append(k, String(v));
   }
   try {
-    const res = await fetchImpl(`${c.apiBase}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
-      signal: ctrl.signal
-    });
+    const res = await fetchImpl(
+      method === 'GET' ? `${c.apiBase}${path}?${body.toString()}` : `${c.apiBase}${path}`,
+      method === 'GET'
+        ? { method: 'GET', signal: ctrl.signal }
+        : {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+          signal: ctrl.signal
+        }
+    );
     clearTimeout(tid);
     if (res && res.ok === false) throw new Error('TTLock HTTP ' + res.status);
     const data = await res.json().catch(() => ({}));
@@ -183,7 +206,11 @@ async function getAccessToken(opts) {
   if (!opts.force && _cachedToken && _cachedToken.expiresAt > now + 60000) {
     return _cachedToken;
   }
-  if (!isConfigured()) {
+  /* allowDisabled: SOLO para consultas de lectura (ttlock-probe), que deben
+     poder verificar las credenciales ANTES de encender TTLOCK_ENABLED. La
+     emisión de códigos sigue exigiendo el flag (isConfigured). */
+  const ready = opts.allowDisabled ? hasCredentials() : isConfigured();
+  if (!ready) {
     throw new Error('TTLock no configurado (faltan credenciales o TTLOCK_ENABLED != true)');
   }
   const c = ttlockConfig();
@@ -302,6 +329,65 @@ async function issueAccessCodes(input, opts) {
   return { isMock: false, codes, errors };
 }
 
+/* ── Consultas de SOLO LECTURA (ttlock-probe) ──
+   Lista las chapas de la cuenta: GET /v3/lock/list (paginado). No programa
+   nada en las chapas. Funciona con TTLOCK_ENABLED apagado (allowDisabled) para
+   poder verificar la conexión antes de encender la emisión de códigos.
+   Devuelve [{ lockId, name, alias, battery, hasGateway }] — NUNCA lockData
+   (llave de Bluetooth) ni la MAC. */
+async function listLocks(opts) {
+  opts = opts || {};
+  const transport = opts.transport;
+  const c = ttlockConfig();
+  const token = await getAccessToken({ transport, allowDisabled: true, force: opts.force });
+  const pageSize = 100;
+  const maxPages = 10;
+  const out = [];
+  for (let pageNo = 1; pageNo <= maxPages; pageNo++) {
+    const data = await ttlockRequest('/v3/lock/list', {
+      clientId: c.clientId,
+      accessToken: token.accessToken,
+      pageNo,
+      pageSize,
+      date: Date.now()
+    }, transport, { method: 'GET' });
+    const list = Array.isArray(data.list) ? data.list : [];
+    for (const l of list) {
+      const lockId = parseInt(l.lockId, 10);
+      if (!lockId) continue;
+      const battery = Number(l.electricQuantity);
+      out.push({
+        lockId,
+        name: String(l.lockName || ''),
+        alias: String(l.lockAlias || l.lockName || ''),
+        battery: Number.isFinite(battery) && battery >= 0 ? battery : null,
+        hasGateway: Number(l.hasGateway) === 1 || l.hasGateway === true
+      });
+    }
+    const pages = parseInt(data.pages, 10) || 1;
+    if (pageNo >= pages || list.length < pageSize) break;
+  }
+  return out;
+}
+
+/* Estado del mapeo apartamento→chapa para la UI (sin red): si está definido,
+   si el JSON es válido y las entradas normalizadas. */
+function describeLocksMap() {
+  const raw = rawLocksJson();
+  if (!raw) return { defined: false, valid: true, entries: [] };
+  try {
+    const obj = JSON.parse(raw);
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+      return { defined: true, valid: false, error: 'Debe ser un objeto JSON {"101": 1234567, ...}', entries: [] };
+    }
+  } catch (err) {
+    return { defined: true, valid: false, error: 'JSON inválido: ' + err.message, entries: [] };
+  }
+  const entries = [];
+  for (const [key, val] of parseLocksMap()) entries.push({ key, lockId: val.lockId, name: val.name });
+  return { defined: true, valid: true, entries };
+}
+
 /* Convierte fechas/timestamps variados a ms. Acepta number (ms o s), Date,
    o string ISO. Devuelve NaN si no se puede. */
 function toMs(value) {
@@ -319,8 +405,9 @@ function toMs(value) {
 function _resetTokenCache() { _cachedToken = null; }
 
 module.exports = {
-  ttlockConfig, isConfigured, md5Hex, resolvePasswordMd5,
-  parseLocksMap, resolveLocks, toMs,
+  ttlockConfig, isConfigured, hasCredentials, md5Hex, resolvePasswordMd5,
+  parseLocksMap, describeLocksMap, resolveLocks, toMs,
   ttlockRequest, getAccessToken, issueCodeForLock, issueAccessCodes,
+  listLocks,
   _resetTokenCache
 };

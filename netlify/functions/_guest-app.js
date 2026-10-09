@@ -30,9 +30,13 @@ function json(statusCode, body, headers = {}) {
 function parseJsonBody(event, maxBytes = 20000) {
   const body = event.body || '';
   const size = Buffer.byteLength(body, event.isBase64Encoded ? 'base64' : 'utf8');
+  /* Mensajes en español + `code` estable: la guest app traduce por código (el
+     huésped nunca ve "Payload too large"); los paneles del staff muestran el
+     texto en español. */
   if (size > maxBytes) {
-    const error = new Error('Payload too large');
+    const error = new Error('La solicitud es demasiado grande. Usa un archivo más liviano.');
     error.statusCode = 413;
+    error.code = 'payload_too_large';
     throw error;
   }
   const decoded = event.isBase64Encoded
@@ -41,8 +45,9 @@ function parseJsonBody(event, maxBytes = 20000) {
   try {
     return JSON.parse(decoded || '{}');
   } catch (error) {
-    const invalid = new Error('Invalid JSON request body');
+    const invalid = new Error('La solicitud no tiene un formato válido.');
     invalid.statusCode = 400;
+    invalid.code = 'invalid_json';
     throw invalid;
   }
 }
@@ -137,12 +142,34 @@ function primaryGuest(raw) {
   return {};
 }
 
+/* Reserva cancelada en OTASync: el soft-cancel deja status "canceled" (o
+   "cancelled") y/o date_canceled. Una reserva así no puede entrar a la guest app
+   (ni hacer check-in, firmar o pedir servicios). */
+function isCancelledReservationRaw(raw) {
+  if (!raw) return false;
+  if (/cancel/i.test(String(raw.status || ''))) return true;
+  const canceledAt = raw.date_canceled || raw.date_cancelled;
+  return Boolean(canceledAt && String(canceledAt).trim() && !/^0{4}-0{2}-0{2}/.test(String(canceledAt)));
+}
+
+function isCancelledBooking(booking) {
+  if (!booking) return false;
+  return Boolean(booking.cancelled) || /cancel/i.test(String(booking.status || ''));
+}
+
 function normalizeReservation(raw) {
   const guest = primaryGuest(raw);
   const room = Array.isArray(raw.rooms) && raw.rooms.length ? raw.rooms[0] : {};
+  /* El detalle real de OTASync no trae `rooms` (eso es disponibilidad): el tipo
+     y el número de habitación vienen en guests[] (room_type_name / room_number)
+     o en reservation_rooms[]. */
+  const resvRoom = Array.isArray(raw.reservation_rooms) && raw.reservation_rooms.length ? raw.reservation_rooms[0] : {};
   const checkIn = raw.date_arrival || raw.checkin || '';
   const checkOut = raw.date_departure || raw.checkout || '';
-  const status = String(raw.status || 'confirmed').toLowerCase();
+  const cancelled = isCancelledReservationRaw(raw);
+  const status = cancelled && !/cancel/i.test(String(raw.status || ''))
+    ? 'cancelled'
+    : String(raw.status || 'confirmed').toLowerCase();
   /* "motivo de viaje" is not a first-class OTASync reservation field: the booking
      engine encodes the traveller's motive in the Wompi reference and, when stored
      at all, OTASync surfaces it through a free-text custom field. We read the most
@@ -156,14 +183,15 @@ function normalizeReservation(raw) {
     guestName: `${guest.first_name || ''} ${guest.last_name || ''}`.trim(),
     guestLastName: String(guest.last_name || ''),
     guestEmail: String(guest.email || guest.mail || raw.email || ''),
-    roomName: room.room_type || room.name || 'Apartaestudio',
-    roomNumber: room.room_number || room.name || '',
+    roomName: room.room_type || room.name || guest.room_type_name || resvRoom.room_type_name || resvRoom.room_type || 'Apartaestudio',
+    roomNumber: String(room.room_number || room.name || guest.room_number || resvRoom.room_number || ''),
     capacity: Number(raw.total_guests || raw.adults || 1) || 1,
     checkIn,
     checkOut,
     nights: calcNights(checkIn, checkOut),
     totalAmount: Number(raw.total_price || raw.rooms_price || 0),
     motive,
+    cancelled,
     canCancel: ['confirmed', 'pending'].includes(status),
     canModify: ['confirmed', 'pending'].includes(status)
   };
@@ -203,6 +231,7 @@ async function getReservation(bookingCode, accessKey) {
   if (isDemoMode()) return demoReservation(bookingCode, accessKey);
   const error = new Error('Guest app PMS credentials are not configured');
   error.statusCode = 503;
+  error.code = 'service_unavailable';
   throw error;
 }
 
@@ -222,6 +251,31 @@ async function getReservationDetail(bookingCode, accessKey) {
   const error = new Error('Guest app PMS credentials are not configured');
   error.statusCode = 503;
   throw error;
+}
+
+/* Re-verificación del estado de la reserva en las ACCIONES con efecto (enviar
+   el check-in, ver/firmar el contrato, pedir servicios). guest-session solo
+   bloquea al emitir el token; el token dura 24 h, así que una cancelación
+   aprobada después de entrar no cerraba la app. Política:
+   - reserva cancelada en OTASync, o que ya no existe (404) → 403 booking_cancelled;
+   - OTASync no responde / sin credenciales → se deja pasar (fail-open): el
+     segundo factor ya se validó al emitir la sesión y un tropiezo del PMS no
+     debe impedirle el check-in a un huésped legítimo. */
+async function assertBookingActive(bookingCode, lookup = getReservation) {
+  let booking;
+  try {
+    booking = await lookup(String(bookingCode || ''), '');
+  } catch (error) {
+    console.warn('[guest-app] booking status re-check skipped:', error.message);
+    return { checked: false };
+  }
+  if (!booking || isCancelledBooking(booking)) {
+    const error = new Error('Esta reserva fue cancelada, así que no es posible hacer el check-in ni pedir servicios. Si crees que es un error, escríbenos por WhatsApp.');
+    error.statusCode = 403;
+    error.code = 'booking_cancelled';
+    throw error;
+  }
+  return { checked: true, booking };
 }
 
 function normalizeComparable(value) {
@@ -276,7 +330,10 @@ function signGuestToken(booking, ttlSeconds = 24 * 60 * 60) {
      checkIn / checkOut / roomNumber / motive are signed in too so guest-checkin
      can persist the reservation context into the SIRE/TRA record from a trusted
      source instead of a client-supplied value. Absent on pre-existing tokens
-     (tokens roll over within 24h); guest-checkin falls back to '' for each. */
+     (tokens roll over within 24h); guest-checkin falls back to '' for each.
+
+     roomName is signed in so the hospitality contract (guest-action) names the
+     studio from a trusted source; without it the contract showed "—". */
   const payload = {
     sub: booking.bookingCode,
     guest: booking.guestName,
@@ -285,6 +342,7 @@ function signGuestToken(booking, ttlSeconds = 24 * 60 * 60) {
     totalAmount: Number(booking.totalAmount) || 0,
     checkIn: String(booking.checkIn || ''),
     checkOut: String(booking.checkOut || ''),
+    roomName: String(booking.roomName || ''),
     roomNumber: String(booking.roomNumber || ''),
     motive: String(booking.motive || ''),
     exp: Math.floor(Date.now() / 1000) + ttlSeconds
@@ -311,6 +369,12 @@ function verifyGuestToken(token) {
   try {
     const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
     if (!payload.sub || !payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
+    /* Un token con scope es de OTRA audiencia (p. ej. el enlace del formulario
+       bancario de reembolso): nunca abre una sesión del huésped. */
+    if (payload.scope) return null;
+    /* Enlace bancario del formato viejo (payload EXACTO {sub, exp}, firmado con
+       la misma clave): tampoco es una sesión. Las sesiones llevan más campos. */
+    if (Object.keys(payload).sort().join(',') === 'exp,sub') return null;
     return payload;
   } catch (error) {
     return null;
@@ -327,8 +391,9 @@ function guestTokenFromEvent(event) {
 function requireGuest(event) {
   const payload = verifyGuestToken(guestTokenFromEvent(event));
   if (!payload) {
-    const error = new Error('Guest session is invalid or expired');
+    const error = new Error('Tu sesión expiró o no es válida. Vuelve a ingresar con tu código de reserva.');
     error.statusCode = 401;
+    error.code = 'session_expired';
     throw error;
   }
   return payload;
@@ -471,13 +536,18 @@ async function archiveGuestPayload(payload) {
 
 module.exports = {
   archiveGuestPayload,
+  assertBookingActive,
   cleanText,
   corsHeaders,
+  fetchOtasyncReservation,
   getReservation,
   getReservationDetail,
   guestStore,
+  isCancelledBooking,
+  isCancelledReservationRaw,
   isDemoMode,
   json,
+  normalizeReservation,
   matchesAccessKey,
   openBinaryFromStore,
   parseJsonBody,
@@ -486,5 +556,6 @@ module.exports = {
   sealBinaryForStore,
   signGuestToken,
   syncGuestEvent,
-  unprotectRecord
+  unprotectRecord,
+  verifyGuestToken
 };

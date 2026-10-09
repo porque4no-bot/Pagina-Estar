@@ -10,6 +10,7 @@ const {
   computeQuoteTotal
 } = require('./_quotes-store');
 const { verifyDirectBookingAmount } = require('./_direct-pricing');
+const { normalizeCode } = require('./_discount-store');
 const { GUEST_ORDER_REF_RE } = require('./_guest-payments');
 const crypto = require('crypto');
 
@@ -44,6 +45,86 @@ function originFromEvent(event) {
 
 function clean(value, max) {
   return String(value || '').trim().slice(0, max || 200);
+}
+
+/* URL de notificación del webhook. `source_news=webhooks` le pide a Mercado Pago
+   que mande SOLO el formato Webhooks (no además el IPN legado con
+   topic=merchant_order/payment): una sola notificación por evento de pago. */
+function notificationUrl(base) {
+  return `${base}/api/mercadopago-webhook?source_news=webhooks`;
+}
+
+/* back_urls de la reserva directa. El huésped que reservó en /en/ vuelve a
+   /en/reservar.html (antes volvía siempre a la versión en español). Las
+   variables MERCADOPAGO_*_URL siguen mandando para el español; para inglés se
+   deriva la misma URL con el prefijo /en/. */
+function directBackUrls(base, lang, env = process.env) {
+  const isEn = String(lang || '').toLowerCase() === 'en';
+  const page = isEn ? '/en/reservar.html' : '/reservar.html';
+  const pick = (envUrl, status) => {
+    const fallback = `${base}${page}?payment=${status}`;
+    if (!envUrl) return fallback;
+    if (!isEn) return envUrl;
+    if (/\/en\/reservar\.html/.test(envUrl)) return envUrl;
+    return /\/reservar\.html/.test(envUrl) ? envUrl.replace('/reservar.html', '/en/reservar.html') : fallback;
+  };
+  return {
+    success: pick(env.MERCADOPAGO_SUCCESS_URL, 'success'),
+    failure: pick(env.MERCADOPAGO_FAILURE_URL, 'failure'),
+    pending: pick(env.MERCADOPAGO_PENDING_URL, 'pending')
+  };
+}
+
+/* Mismas reglas que create-wompi-signature (nota A8 y opt-in Ley 1581). */
+function sanitizeIncomingNotes(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw.replace(/[<>\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
+}
+function parseMarketingOptIn(raw) {
+  return raw === true || raw === 'true' || raw === 1 || raw === '1';
+}
+
+/* Persiste los datos laterales de la reserva (mismos stores y claves que la ruta
+   Wompi) para que mercadopago-webhook los use al crear la reserva: código de
+   descuento aplicado (para consumir el uso), nota del huésped y opt-in de
+   marketing. Best-effort: nunca bloquea la preferencia. */
+async function persistDirectSideData({ bookingCode, email, discountCode, amountCents, notes, marketingOptIn, lang }, deps = {}) {
+  const getStoreImpl = deps.getStore || ((name) => require('@netlify/blobs').getStore({ name, consistency: 'strong' }));
+  const flagImpl = deps.flag || require('./_settings').flag;
+  const saved = { discount: false, notes: false, marketing: false, lang: false };
+  if (!bookingCode) return saved;
+  /* Idioma del huésped: el webhook manda la confirmación en ese idioma. */
+  if (String(lang || '').toLowerCase() === 'en') {
+    saved.lang = await require('./_booking-lang').saveBookingLang(bookingCode, 'en', { getStore: getStoreImpl });
+  }
+  if (discountCode) {
+    try {
+      await getStoreImpl('booking-discounts').set(`disc-${bookingCode}`, JSON.stringify({
+        code: discountCode, email: email || '', signedAmountCents: amountCents,
+        provider: 'mercadopago', createdAt: new Date().toISOString()
+      }));
+      saved.discount = true;
+    } catch (e) { console.warn('[create-mercadopago-preference] discount persist failed (non-fatal):', e.message); }
+  }
+  if (notes) {
+    let on = false;
+    try { on = await flagImpl('GUEST_NOTES_TO_PMS_ENABLED'); } catch (e) { on = false; }
+    if (on) {
+      try {
+        await getStoreImpl('booking-notes').set(`note-${bookingCode}`, JSON.stringify({ notes, createdAt: new Date().toISOString() }));
+        saved.notes = true;
+      } catch (e) { console.warn('[create-mercadopago-preference] note persist failed (non-fatal):', e.message); }
+    }
+  }
+  if (marketingOptIn) {
+    try {
+      await getStoreImpl('booking-marketing').set(`mkt-${bookingCode}`, JSON.stringify({
+        accepted: true, email: email || '', channel: 'motor-reserva-directa', createdAt: new Date().toISOString()
+      }));
+      saved.marketing = true;
+    } catch (e) { console.warn('[create-mercadopago-preference] marketing opt-in persist failed (non-fatal):', e.message); }
+  }
+  return saved;
 }
 
 function shouldUseSandboxCheckout(event) {
@@ -149,7 +230,7 @@ async function preferenceForQuote(body, event) {
     },
     back_urls: { success: successUrl, failure: failureUrl, pending: pendingUrl },
     auto_return: 'approved',
-    notification_url: `${base}/api/mercadopago-webhook`,
+    notification_url: notificationUrl(base),
     metadata: { quote_id: quoteId, expected_amount_cents: totalCents, source: 'quote' }
   };
 
@@ -167,13 +248,29 @@ async function preferenceForQuote(body, event) {
   });
 }
 
-async function preferenceForDirectBooking(body, event) {
+async function preferenceForDirectBooking(body, event, overrides = {}) {
+  const deps = {
+    verifyDirectBookingAmount,
+    createPreference,
+    flag: require('./_settings').flag,
+    persistDirectSideData,
+    ...overrides
+  };
   const bookingCode = clean(body.bookingCode, 40);
   const amountCents = Math.max(0, parseInt(body.amountCents, 10) || 0);
   if (!bookingCode || amountCents <= 0) return json(400, { error: 'Missing bookingCode or amountCents' });
   if (!body.checkin || !body.checkout || !body.roomTypeId || !body.firstName || !body.lastName || !body.email || !body.phone) {
     return json(400, { error: 'Missing reservation fields' });
   }
+
+  /* Código de descuento (Frente A), igual que la ruta Wompi: solo con
+     DISCOUNT_CODES_ENABLED; se revalida aquí y el monto a cobrar es el YA
+     descontado (verificado contra OTASync). Antes MP ignoraba el código: el motor
+     mandaba el monto completo y el huésped pagaba sin descuento. */
+  let discountCode = '';
+  let discountOn = false;
+  try { discountOn = await deps.flag('DISCOUNT_CODES_ENABLED'); } catch (e) { discountOn = false; }
+  if (discountOn) discountCode = normalizeCode(body.discountCode);
 
   /* SERVER-SIDE PRICE VERIFICATION (C-2). The client cannot be trusted to set
      amountCents: recompute the authoritative subtotal from OTASync and refuse
@@ -184,11 +281,13 @@ async function preferenceForDirectBooking(body, event) {
     checkout: clean(body.checkout, 10),
     guestsCount: Math.max(1, parseInt(body.guestsCount, 10) || 1),
     roomTypeId: clean(body.roomTypeId, 20),
-    extrasMask: clean(body.extrasMask, 20) || '000000'
+    extrasMask: clean(body.extrasMask, 20) || '000000',
+    email: clean(body.email, 254)
   };
   let verdict;
   try {
-    verdict = await verifyDirectBookingAmount(decodedLike, amountCents);
+    verdict = await deps.verifyDirectBookingAmount(decodedLike, amountCents,
+      discountCode ? { discountCode, email: decodedLike.email } : {});
   } catch (e) {
     console.error('[create-mercadopago-preference] price recompute failed:', e.message);
     return json(503, { error: 'price_check_unavailable' });
@@ -215,13 +314,27 @@ async function preferenceForDirectBooking(body, event) {
     bookingCode,
     isColombian: !!body.isColombian,
     isBusiness: !!body.isBusiness,
-    amountCents
+    amountCents,
+    /* Plan elegido (respaldo): el webhook lo deriva del MONTO pagado; este
+       campo solo se usa si no puede recomputarlo. */
+    ratePlan: verdict.matchedPlan || (String(body.ratePlan || '').toLowerCase() === 'flexible' ? 'flexible' : 'best')
+  });
+
+  /* Datos laterales para el webhook (mismos stores que Wompi): descuento
+     aplicado (para consumir el uso tras crear la reserva), nota y opt-in. */
+  const discountApplied = !!(discountCode && verdict.discount && verdict.discount.applied);
+  await deps.persistDirectSideData({
+    bookingCode,
+    email: clean(body.email, 254),
+    discountCode: discountApplied ? discountCode : '',
+    amountCents,
+    notes: sanitizeIncomingNotes(body.notes),
+    marketingOptIn: parseMarketingOptIn(body.marketingOptIn),
+    lang: body.lang
   });
 
   const base = originFromEvent(event);
-  const successUrl = process.env.MERCADOPAGO_SUCCESS_URL || `${base}/reservar.html?payment=success`;
-  const failureUrl = process.env.MERCADOPAGO_FAILURE_URL || `${base}/reservar.html?payment=failure`;
-  const pendingUrl = process.env.MERCADOPAGO_PENDING_URL || `${base}/reservar.html?payment=pending`;
+  const backUrls = directBackUrls(base, body.lang);
 
   const preference = {
     external_reference: reference,
@@ -238,13 +351,16 @@ async function preferenceForDirectBooking(body, event) {
       email: clean(body.email, 254),
       phone: { number: clean(body.phone, 50) }
     },
-    back_urls: { success: successUrl, failure: failureUrl, pending: pendingUrl },
+    back_urls: backUrls,
     auto_return: 'approved',
-    notification_url: `${base}/api/mercadopago-webhook`,
-    metadata: { booking_code: bookingCode, expected_amount_cents: amountCents, source: 'direct' }
+    notification_url: notificationUrl(base),
+    metadata: {
+      booking_code: bookingCode, expected_amount_cents: amountCents, source: 'direct',
+      ...(discountApplied ? { discount_code: discountCode } : {})
+    }
   };
 
-  const mp = await createPreference(preference);
+  const mp = await deps.createPreference(preference);
   const checkout = selectedCheckoutPoint(mp, event);
   return json(200, {
     provider: 'mercadopago',
@@ -269,6 +385,15 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body || '{}'); }
   catch (e) { return json(400, { error: 'Invalid JSON request body' }); }
 
+  /* Lambda-compat de Netlify: conectar Blobs con el contexto del evento (los
+     datos laterales de la reserva se guardan en Blobs). Best-effort. */
+  if (event.blobs) {
+    try {
+      const blobs = require('@netlify/blobs');
+      if (typeof blobs.connectLambda === 'function') blobs.connectLambda(event);
+    } catch (e) { /* best-effort */ }
+  }
+
   /* Guest-app service orders (GST-...) are NOT created here. Their amount is the
      server-computed catalogue total of an authenticated guest order, so the
      preference is built inside the authenticated guest-action flow
@@ -292,4 +417,9 @@ exports.handler = async (event) => {
         : e.message.replace(/^Mercado Pago preference failed with status \d+:\s*/, '')
     });
   }
+};
+
+exports._test = {
+  preferenceForDirectBooking, directBackUrls, notificationUrl, persistDirectSideData,
+  sanitizeIncomingNotes, parseMarketingOptIn
 };

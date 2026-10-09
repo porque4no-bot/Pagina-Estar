@@ -42,9 +42,15 @@
     "currenciesAccepted": "COP",
     "address": {
       "@type": "PostalAddress",
+      "streetAddress": "Cl. 61 #23-36, La Estrella",
       "addressLocality": "Manizales",
       "addressRegion": "Caldas",
       "addressCountry": "CO"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 5.059565041000265,
+      "longitude": -75.48809828183073
     },
     "hasMap": "https://maps.app.goo.gl/QwDXDmpE7NwV4m1ZA",
     "checkinTime": "15:00",
@@ -65,18 +71,59 @@
       {"@type": "LocationFeatureSpecification", "name": "Digital check-in", "value": true}
     ],
     "containsPlace": [
-      {"@type": "HotelRoom", "name": "Clásica", "url": "https://estar.com.co/clasica.html"},
-      {"@type": "HotelRoom", "name": "Selección", "url": "https://estar.com.co/seleccion.html"},
-      {"@type": "HotelRoom", "name": "Reserva", "url": "https://estar.com.co/reserva.html"},
-      {"@type": "HotelRoom", "name": "Origen", "url": "https://estar.com.co/origen.html"},
-      {"@type": "HotelRoom", "name": "Especial", "url": "https://estar.com.co/especial.html"}
-    ],
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "9.0",
-      "reviewCount": "126",
-      "bestRating": "10"
-    }
+      {
+        "@type": "HotelRoom",
+        "name": "Clásica",
+        "description": "Double bed, fully equipped kitchen and private bathroom with shower. The essence of estar, in 29 m².",
+        "url": "https://estar.com.co/en/clasica.html",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
+        "bed": [{"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 29, "unitCode": "MTK"}
+      },
+      {
+        "@type": "HotelRoom",
+        "name": "Selección",
+        "description": "Studio with city views and three beds — king, double and single — for up to 5 guests.",
+        "url": "https://estar.com.co/en/seleccion.html",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 5},
+        "bed": [
+          {"@type": "BedDetails", "typeOfBed": "King size", "numberOfBeds": 1},
+          {"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1},
+          {"@type": "BedDetails", "typeOfBed": "Single", "numberOfBeds": 1}
+        ],
+        "floorSize": {"@type": "QuantitativeValue", "value": 36, "unitCode": "MTK"}
+      },
+      {
+        "@type": "HotelRoom",
+        "name": "Reserva",
+        "description": "Cozy studio with city views. Double bed, equipped kitchen and private bathroom in a well-planned 24 m².",
+        "url": "https://estar.com.co/en/reserva.html",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
+        "bed": [{"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 24, "unitCode": "MTK"}
+      },
+      {
+        "@type": "HotelRoom",
+        "name": "Origen",
+        "description": "Studio with city views. Double bed plus single bed for up to 3 guests, full kitchen and private bathroom.",
+        "url": "https://estar.com.co/en/origen.html",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 3},
+        "bed": [
+          {"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1},
+          {"@type": "BedDetails", "typeOfBed": "Single", "numberOfBeds": 1}
+        ],
+        "floorSize": {"@type": "QuantitativeValue", "value": 29, "unitCode": "MTK"}
+      },
+      {
+        "@type": "HotelRoom",
+        "name": "Especial",
+        "description": "Studio with city views. Double bed, equipped kitchen and private bathroom in 27 m².",
+        "url": "https://estar.com.co/en/especial.html",
+        "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
+        "bed": [{"@type": "BedDetails", "typeOfBed": "Double", "numberOfBeds": 1}],
+        "floorSize": {"@type": "QuantitativeValue", "value": 27, "unitCode": "MTK"}
+      }
+    ]
   },
   {
     "@context": "https://schema.org",
@@ -105,10 +152,12 @@
         <li><a href="explora.html" data-i18n="nav_explorar">Explore</a></li>
         <li><a href="empresas.html" data-i18n="nav_empresas">Companies</a></li>
         <li><a href="grupos.html" data-i18n="nav_grupos">Groups</a></li>
+        <li class="nav-guest-item"><a href="guest.html" data-i18n="nav_mi_estadia">My stay</a></li>
       </ul>
     </nav>
 
     <div class="header-actions">
+      <a href="guest.html" class="guest-entry-link" data-i18n="nav_mi_estadia">My stay</a>
       <a href="../index.html" class="lang-toggle">ES</a>
       <a href="#reservar" class="book-btn" data-i18n="book_btn">Book</a>
       <button class="menu-btn" aria-label="Menu">
@@ -157,7 +206,7 @@
       <span class="hp-unit lang-en" lang="en">/ night</span>
     </div>
     <div class="hero-cancel" data-reveal>
-      <a href="../cancelacion.html" class="hero-cancel-link">
+      <a href="cancelacion.html" class="hero-cancel-link">
         <span class="lang-es" lang="es">✓ Cancelación gratuita hasta 24 h antes</span>
         <span class="lang-en" lang="en">✓ Free cancellation up to 24h before</span>
       </a>
@@ -888,6 +937,7 @@
           <li><a href="index.html" data-i18n="footer_apartaestudios">Studio apartments</a></li>
           <li><a href="vivir.html" data-i18n="footer_vivir">Extended Stay</a></li>
           <li><a href="grupos.html" data-i18n="footer_grupos">Groups &amp; events</a></li>
+          <li><a href="guest.html" data-i18n="footer_mi_estadia">My stay (online check-in)</a></li>
         </ul>
       </div>
       <div class="footer-col">
@@ -951,7 +1001,7 @@
   </div>
 </footer>
 
-<!-- ============================== PRICE & REVIEWS FETCH ============================== -->
+<!-- ============================== PRICE FETCH ============================== -->
 <script>
 (function(){
   var idToSlug={'31348':'clasica','31349':'seleccion','31350':'reserva','31351':'origen','31352':'especial'};

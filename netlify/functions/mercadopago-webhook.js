@@ -211,13 +211,48 @@ async function handleGuestServicePayment(transaction, corsHeaders, overrides = {
 
 function getPaymentId(event, body) {
   const qs = event.queryStringParameters || {};
-  return String(
-    qs['data.id'] ||
+  let id = qs['data.id'] ||
     qs.id ||
     (body && body.data && body.data.id) ||
     (body && body.id) ||
-    ''
-  );
+    '';
+  /* IPN por cuerpo: { resource: '.../payments/123', topic: 'payment' } */
+  if (!id && body && typeof body.resource === 'string') {
+    const m = body.resource.match(/(\d+)\s*$/);
+    if (m) id = m[1];
+  }
+  return String(id || '');
+}
+
+/* Mercado Pago manda DOS familias de aviso para el mismo cobro:
+     - Webhooks:  ?data.id=<pago>&type=payment  · body { type:'payment', action:'payment.updated', data:{id} }
+     - IPN (legado): ?topic=payment&id=<pago>   o  ?topic=merchant_order&id=<orden>
+   Antes se tomaba qs.id sin mirar el topic: un aviso merchant_order se buscaba
+   como si fuera un pago → 404 → respondíamos 502 → MP reintentaba sin fin. Solo
+   los avisos de PAGO se procesan; el resto se reconoce con 200 y se ignora. Sin
+   topic (formato viejo) se asume pago, como antes. */
+function classifyNotification(event, body) {
+  const qs = event.queryStringParameters || {};
+  const b = body || {};
+  const action = String(b.action || '');
+  const topic = String(
+    qs.topic || qs.type || b.topic || b.type || (action.includes('.') ? action.split('.')[0] : '') || ''
+  ).toLowerCase().trim();
+  if (topic && topic !== 'payment') return { kind: 'ignore', topic };
+  return { kind: 'payment', topic: topic || 'payment', id: getPaymentId(event, b) };
+}
+
+/* Lambda-compat de Netlify: conectar Blobs con el contexto que trae el evento
+   (documentado por @netlify/blobs). Sin esto, un getStore sin credenciales
+   explícitas puede fallar y la deduplicación caería a memoria. Best-effort. */
+function connectBlobs(event) {
+  if (!event || !event.blobs) return;
+  try {
+    const blobs = require('@netlify/blobs');
+    if (typeof blobs.connectLambda === 'function') blobs.connectLambda(event);
+  } catch (e) {
+    if (process.env.DEBUG) console.warn('[mercadopago-webhook] connectLambda failed:', e.message);
+  }
 }
 
 /* Signature verification.
@@ -281,7 +316,10 @@ async function fetchPayment(paymentId, { fetchImpl = fetch, env = process.env } 
   if (!accessToken) throw new Error('MERCADOPAGO_ACCESS_TOKEN is not configured');
 
   const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 12000);
+  /* 5 s (antes 12): la función síncrona de Netlify se corta a los ~10 s y
+     después de esto todavía hay que crear la reserva. Un timeout aquí responde
+     502 y MP reintenta (el tx no se marcó). */
+  const tid = setTimeout(() => ctrl.abort(), 5000);
   let res;
   try {
     res = await fetchImpl(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
@@ -296,11 +334,20 @@ async function fetchPayment(paymentId, { fetchImpl = fetch, env = process.env } 
   }
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`Mercado Pago payment lookup failed with status ${res.status}: ${JSON.stringify(data).slice(0, 500)}`);
+  if (!res.ok) {
+    const err = new Error(`Mercado Pago payment lookup failed with status ${res.status}: ${JSON.stringify(data).slice(0, 500)}`);
+    err.status = res.status;
+    throw err;
+  }
   return data;
 }
 
+/* Límite de tiempo de la invocación (ms desde que entra el aviso). La ruta
+   directa reparte lo que quede entre sus consultas a OTASync y el insert. */
+const WEBHOOK_BUDGET_MS = 9000;
+
 async function handleWebhook(event, overrides = {}) {
+  const startedAt = Date.now();
   const deps = {
     env: process.env,
     fetchImpl: fetch,
@@ -322,7 +369,21 @@ async function handleWebhook(event, overrides = {}) {
   try { body = JSON.parse(event.body || '{}'); }
   catch (e) { return response(400, { error: 'Invalid JSON request body' }); }
 
-  const paymentId = getPaymentId(event, body);
+  connectBlobs(event);
+
+  /* Solo avisos de PAGO. merchant_order, chargebacks, etc. → 200 sin efecto
+     (antes: 404 → 502 → reintentos sin fin de MP). */
+  const notif = classifyNotification(event, body);
+  if (notif.kind === 'ignore') {
+    if (/chargeback/.test(notif.topic)) {
+      console.warn(`[mercadopago-webhook] aviso de contracargo recibido (topic=${notif.topic}); revisar en el panel de Mercado Pago.`);
+    } else if (env.DEBUG) {
+      console.log(`[mercadopago-webhook] aviso ignorado (topic=${notif.topic})`);
+    }
+    return response(200, { received: true, ignored: notif.topic });
+  }
+
+  const paymentId = notif.id;
   const sig = verifyMercadoPagoSignature(event, paymentId, env);
   if (!sig.ok) return response(sig.statusCode, { error: sig.message });
   if (!paymentId) return response(400, { error: 'Missing payment id' });
@@ -334,6 +395,12 @@ async function handleWebhook(event, overrides = {}) {
   try {
     payment = await fetchPayment(paymentId, { fetchImpl: deps.fetchImpl, env });
   } catch (e) {
+    if (e && e.status === 404) {
+      /* No existe un pago con ese id (aviso de prueba, id ajeno o de otro tipo):
+         nada que hacer. 200 para que MP no reintente indefinidamente. */
+      console.warn(`[mercadopago-webhook] payment ${paymentId} not found at the MP API; ignoring.`);
+      return response(200, { received: true, ignored: 'payment_not_found' });
+    }
     console.error('[mercadopago-webhook]', e.message);
     return response(502, { error: 'Failed to verify payment with Mercado Pago' });
   }
@@ -406,7 +473,9 @@ async function handleWebhook(event, overrides = {}) {
      quote total or the encoded direct-reference amount) — the client price is
      never trusted. */
   try {
-    return await deps.processApprovedPayment(transaction, headers());
+    return await deps.processApprovedPayment(transaction, headers(), {
+      deadlineMs: startedAt + (Number(env.MP_FUNCTION_BUDGET_MS) || WEBHOOK_BUDGET_MS)
+    });
   } catch (e) {
     console.error('[mercadopago-webhook] reservation processing failed:', e.message);
     return response(500, { error: 'Failed to process approved payment' });
@@ -420,5 +489,7 @@ exports._test = {
   verifyMercadoPagoSignature,
   fetchPayment,
   notifyGuestPaymentOutcome,
-  handleGuestServicePayment
+  handleGuestServicePayment,
+  classifyNotification,
+  getPaymentId
 };

@@ -42,6 +42,7 @@
       <li><a href="explora.html" data-i18n="nav_explorar">Explore</a></li>
       <li><a href="empresas.html" class="is-current" data-i18n="nav_empresas">Companies</a></li>
       <li><a href="grupos.html" data-i18n="nav_grupos">Groups</a></li>
+      <li class="nav-guest-item"><a href="guest.html" data-i18n="nav_mi_estadia">My stay</a></li>
     </ul></nav>
     <div class="header-actions">
       <a href="../empresas.html" class="lang-toggle">ES</a>
@@ -219,6 +220,12 @@
           </div>
           <div class="field checkbox-field">
             <label class="checkbox-label">
+              <input type="checkbox" id="rqPolitica" name="aceptar_politica" required>
+              <span>I accept the <a href="privacidad.html" target="_blank" rel="noopener">Privacy Policy</a> and the processing of my data to prepare this quote.</span>
+            </label>
+          </div>
+          <div class="field checkbox-field">
+            <label class="checkbox-label">
               <input type="checkbox" name="marketingOptIn">
               <span>I'd like to receive offers, news and recommendations from Estar by email or WhatsApp. <span style="display:block;opacity:.75;">Optional. You can unsubscribe anytime.</span></span>
             </label>
@@ -393,6 +400,7 @@
           <li><a href="index.html" data-i18n="footer_apartaestudios">Studio apartments</a></li>
           <li><a href="vivir.html" data-i18n="footer_vivir">Extended Stay</a></li>
           <li><a href="grupos.html" data-i18n="footer_grupos">Groups &amp; events</a></li>
+          <li><a href="guest.html" data-i18n="footer_mi_estadia">My stay (online check-in)</a></li>
         </ul>
       </div>
       <div class="footer-col">
@@ -459,6 +467,7 @@
         numHabitaciones: document.getElementById('rqNumHab').value,
         tipoEstadia: document.getElementById('rqTipo').value,
         comentarios: document.getElementById('rqComentarios').value.trim(),
+        marketingOptIn: !!(form.querySelector('input[name="marketingOptIn"]') || {}).checked,
         website: ''
       };
       try {
@@ -468,6 +477,10 @@
           body: JSON.stringify(data)
         });
         if (!res.ok) throw new Error('Error');
+        /* Conversión (GA4 con Consent Mode, sin datos personales) — shell.js. */
+        if (typeof window.estarTrack === 'function') {
+          window.estarTrack('generate_lead', { form_name: 'cotizacion-corporativa', lead_type: 'cotizacion_corporativa', page_language: 'en' }, 'Lead');
+        }
         form.style.display = 'none';
         document.getElementById('requestQuoteSuccess').style.display = 'block';
       } catch (err) {

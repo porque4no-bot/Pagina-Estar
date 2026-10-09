@@ -22,9 +22,10 @@ test('guest tokens identify the reservation and reject tampering', () => {
   });
   assert.equal(session.sub, booking.bookingCode);
 
+  /* Mensaje en español + código estable (la guest app traduce por código). */
   assert.throws(() => guestHelpers.requireGuest({
     headers: { authorization: `Bearer ${token}x` }
-  }), /invalid or expired/i);
+  }), error => error.statusCode === 401 && error.code === 'session_expired' && /sesión/i.test(error.message));
 });
 
 test('guest session validates required fields and opens a demo reservation', async () => {

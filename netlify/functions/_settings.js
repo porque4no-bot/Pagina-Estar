@@ -16,11 +16,15 @@ const STORE = 'app-settings';
 const CACHE_TTL_MS = 30000; /* override surte efecto en <=30s sin redeploy */
 
 /* Catálogo editable. type: bool | enum | number | text. group para la UI.
+   `default` (opcional) = el valor que el CÓDIGO asume cuando la clave no está
+   definida ni en el panel ni en Netlify (p.ej. ALERT_ENABLED: sin definir =
+   activo). Solo es informativo para la UI (getAllEffective): las funciones
+   siguen leyendo con su propio fallback. Mantenerlo igual al fallback real.
    NUNCA agregar aquí secretos/llaves/credenciales. */
 const MANAGEABLE = {
   // Operación / correos
-  ALERT_ENABLED:                 { type: 'bool', group: 'Operación', label: 'Alertas operativas',
-                                   desc: 'Envía un correo al equipo cuando algo falla en el sistema (un pago que no cuadra, un correo que no salió, etc.). Recomendado dejarlo activo.' },
+  ALERT_ENABLED:                 { type: 'bool', group: 'Operación', label: 'Alertas operativas', default: 'true',
+                                   desc: 'Envía un correo al equipo cuando algo falla en el sistema (un pago que no cuadra, un correo que no salió, etc.). Recomendado dejarlo activo. Sin definir = ACTIVO (solo se apaga con un "false" explícito).' },
   ADMIN_NOTIFY_EMAIL:            { type: 'text', group: 'Operación', label: 'Correo de avisos del equipo',
                                    desc: 'Dirección donde llegan los correos operativos y de escalamiento (alertas, pedidos del huésped, cancelaciones, etc.). NO es un correo de acceso al panel — eso se gestiona en Usuarios.' },
   STAY_EMAILS_ENABLED:           { type: 'bool', group: 'Operación', label: 'Correos pre-llegada / post-estadía',
@@ -29,6 +33,12 @@ const MANAGEABLE = {
                                    desc: 'Cuántos días ANTES del check-in se manda el correo de pre-llegada.' },
   STAY_EMAILS_POST_DAYS:         { type: 'number', group: 'Operación', label: 'Días después (post-estadía)',
                                    desc: 'Cuántos días DESPUÉS del checkout se manda el correo de post-estadía (donde va la encuesta NPS).' },
+  GOOGLE_REVIEW_URL:             { type: 'text', group: 'Operación', label: 'Enlace de reseña en Google',
+                                   desc: 'Botón "Reseña en Google" del correo post-estadía. Si se deja vacío se usa el enlace directo de escribir reseña de estar (g.page/r/CW6uBmyymSHlEBM/review). Si se pega sin https:// se completa solo; si el valor no es un enlace válido se ignora y se usa el enlace por defecto (nunca se queda el correo sin botón de reseña).' },
+  BOOKING_REVIEW_URL:            { type: 'text', group: 'Operación', label: 'Enlace de reseña en Booking.com',
+                                   desc: 'Botón "Reseña en Booking.com" del correo post-estadía. Solo se muestra a huéspedes que reservaron por Booking.com (Booking únicamente acepta reseñas verificadas). Si se deja vacío o el valor no es un enlace válido se usa la ficha de estar en Booking (si se pega sin https:// se completa solo).' },
+  STAY_REVIEW_DISCOUNT_ENABLED:  { type: 'bool', group: 'Operación', label: 'Código de descuento por dejar reseña',
+                                   desc: 'Decisión pendiente del dueño (por eso viene apagado). El correo post-estadía invita al huésped DIRECTO (web/recepción; nunca OTA, ni Booking ni Expedia) a mandar por WhatsApp su reseña publicada para recibir un código de descuento. Enciéndelo solo cuando el equipo tenga listo el código que va a entregar (pestaña Códigos). Ojo: Google y Booking prohíben reseñas incentivadas; el texto aclara "sea cual sea tu opinión", pero el riesgo existe.' },
   QUOTE_EXPIRY_REMINDER_ENABLED: { type: 'bool', group: 'Operación', label: 'Recordatorio "tu cotización vence"',
                                    desc: 'Le envía un recordatorio al cliente corporativo cuando su cotización está por vencer.' },
   GUEST_NOTES_TO_PMS_ENABLED:    { type: 'bool', group: 'Operación', label: 'Nota del huésped → OTASync',
@@ -41,15 +51,15 @@ const MANAGEABLE = {
                                    desc: 'Teléfonos que el bot llama cuando un caso es urgente, en formato internacional y separados por coma. Ej: +573218598686,+573057465544,+573163292157. Recepción primero, luego dueños. (Los números NO son secretos; las credenciales de Twilio sí, y esas viven solo en Netlify.)' },
   // Pagos / reembolsos
   REFUND_GATEWAY_AUTO_ENABLED:   { type: 'bool', group: 'Pagos', label: 'Auto-reembolso Mercado Pago al aprobar',
-                                   desc: 'Cuando apruebas un reembolso de Mercado Pago en el panel, se ejecuta solo. Wompi NO tiene API → sigue siendo ticket manual.' },
+                                   desc: 'Cuando apruebas un reembolso de Mercado Pago en el panel, se ejecuta solo. Apagado: queda una tarea en "Hoy" para devolverlo desde el panel de Mercado Pago. Wompi NO tiene API → siempre es tarea (anular en su dashboard el mismo día o ticket a soporte).' },
   REFUND_BANK_FORM_ENABLED:      { type: 'bool', group: 'Pagos', label: 'Formulario de cuenta para reembolso manual',
                                    desc: 'Habilita el formulario donde el huésped indica su cuenta bancaria para reembolsos por transferencia.' },
   DISCOUNT_CODES_ENABLED:        { type: 'bool', group: 'Pagos', label: 'Motor de códigos de descuento',
                                    desc: 'Muestra el campo "código de descuento" en el motor de reservas y activa la validación de los cupones.' },
   OTASYNC_AUTO_CANCEL_ENABLED:   { type: 'bool', group: 'Pagos', label: 'Cancelar la reserva en OTASync al procesar el reembolso',
-                                   desc: 'Cuando apruebas o deniegas la cancelación en el panel, la reserva se marca como cancelada en OTASync (libera el inventario). Sin esto, hay que cancelarla a mano. Probar con una reserva real antes de encender.' },
-  MP_DIRECT_RESILIENT_ENABLED:   { type: 'bool', group: 'Pagos', label: 'Ruta directa de Mercado Pago resiliente (igual que Wompi)',
-                                   desc: 'Activa lock anti-doble-reserva, idempotencia por estadía, reintentos y "pago sin reserva" recuperable en la ruta directa de Mercado Pago. Solo aplica si cobras con Mercado Pago (rollback). Probar en sandbox MP antes de encender.' },
+                                   desc: 'Cuando apruebas o deniegas la cancelación en el panel, la reserva se marca como cancelada en OTASync (libera el inventario). Sin esto, queda una tarea en "Hoy" para cancelarla a mano en Kunas. Probar con una reserva real antes de encender.' },
+  MP_DIRECT_RESILIENT_ENABLED:   { type: 'bool', group: 'Pagos', label: 'Ruta directa de Mercado Pago resiliente (igual que Wompi)', default: 'true',
+                                   desc: 'Protege las reservas pagadas por Mercado Pago (hoy, todos los pagos de la web): evita reservas duplicadas cuando Mercado Pago reenvía el aviso, reintenta si OTASync falla y deja el "pago sin reserva" como tarea recuperable. ENCENDIDO por defecto (aunque no esté definido); apágalo solo para volver al comportamiento anterior.' },
   // Guest app
   GUEST_SERVICE_PAYMENT_MODE:    { type: 'enum', group: 'Guest app', label: 'Pago de servicios en línea',
                                    options: ['room_charge', 'payment_link', 'wompi', 'mercadopago', 'both'],
@@ -63,10 +73,12 @@ const MANAGEABLE = {
                                    desc: 'Permite al comedor AGREGAR desayuno a una reserva que no lo tenía; se cobra al folio de la reserva.' },
   TTLOCK_ENABLED:                { type: 'bool', group: 'Desayuno / chapas', label: 'Emitir códigos de chapa (TTLock)',
                                    desc: 'Genera y envía al huésped los códigos temporales de las chapas por reserva. Requiere cargar las credenciales de TTLock.' },
+  TTLOCK_LOCKS_JSON:             { type: 'text', group: 'Desayuno / chapas', label: 'Mapa apartamento → chapa (TTLock)',
+                                   desc: 'Qué chapa (lockId de TTLock) corresponde a cada apartamento, en JSON. Ej: {"101":1234567,"102":1234568,"main":7654321} ("main" = puerta principal). Las claves deben ser el número del apartamento tal como aparece en Kunas. Usa "Probar conexión TTLock" (abajo) para ver los lockId de tu cuenta y copiar un mapa sugerido. No es un secreto: un lockId solo no abre nada.' },
   // WhatsApp
   WHATSAPP_BOT_ENABLED:          { type: 'bool', group: 'WhatsApp', label: 'Bot de WhatsApp responde',
                                    desc: 'El bot contesta automáticamente los mensajes de WhatsApp. Apágalo para que nadie reciba respuestas automáticas.' },
-  WHATSAPP_GUARD_ENABLED:        { type: 'bool', group: 'WhatsApp', label: 'Guardián de seguridad del bot',
+  WHATSAPP_GUARD_ENABLED:        { type: 'bool', group: 'WhatsApp', label: 'Guardián de seguridad del bot', default: 'true',
                                    desc: 'Filtro que revisa cada mensaje antes de que el bot responda, para bloquear intentos de fraude o de engañar al bot.' },
   WHATSAPP_AI_MODEL:             { type: 'enum', group: 'WhatsApp', label: 'Modelo de IA del bot',
                                    options: ['claude-haiku-4-5', 'claude-sonnet-4-6', 'claude-opus-4-8'],
@@ -87,7 +99,16 @@ const MANAGEABLE = {
   TRA_ENABLED:                   { type: 'bool', group: 'Recepción/Legal', label: 'Reportar estadías al TRA (MinCIT)',
                                    desc: 'Reporta cada estadía (todos los huéspedes) al Registro Nacional de Turismo vía la API del TRA. Requiere cargar el token del RNT en Netlify. Confirmar los campos con el MinCIT antes de encender.' },
   SIRE_ENABLED:                  { type: 'bool', group: 'Recepción/Legal', label: 'Generar archivo SIRE (extranjeros)',
-                                   desc: 'Habilita la generación del archivo plano de SIRE (Migración Colombia) para huéspedes extranjeros. SIRE no tiene API: el archivo se sube a mano al portal. Confirmar el formato con el portal antes de encender.' },
+                                   desc: 'Habilita la exportación del archivo plano de SIRE (Migración Colombia) con los huéspedes extranjeros del check-in en línea. SIRE no tiene API: el servidor del grupo (VPS) descarga el archivo y lo sube al portal. Apagado, la exportación responde "apagado" y no se sube nada. Confirmar el formato con el portal (ensayo) antes de encender.' },
+  /* Frente sire: formato del archivo, calibrable tras el ensayo sin redeploy. NO son secretos. */
+  SIRE_DATE_FORMAT:              { type: 'enum', group: 'Recepción/Legal', label: 'SIRE: formato de fecha del archivo',
+                                   options: ['YYYY-MM-DD', 'DD/MM/YYYY', 'YYYYMMDD', 'DD-MM-YYYY'],
+                                   desc: 'Cómo se escriben las fechas (movimiento y nacimiento) en el archivo de SIRE. Por defecto YYYY-MM-DD; las guías de proveedores sugieren DD/MM/YYYY. Ajustarlo a lo que muestre la guía del portal en el ensayo.' },
+  SIRE_DELIMITER:                { type: 'enum', group: 'Recepción/Legal', label: 'SIRE: separador de columnas',
+                                   options: ['\\t', '|', ';', ','],
+                                   desc: 'Separador entre columnas del archivo de SIRE. \\t = tabulador (por defecto, lo más probable). Ajustarlo a lo que muestre la guía del portal en el ensayo.' },
+  SIRE_REPORT_START:             { type: 'text', group: 'Recepción/Legal', label: 'SIRE: reportar desde (fecha)',
+                                   desc: 'Fecha (YYYY-MM-DD) desde la que el servidor del grupo reporta los movimientos al SIRE. Lo anterior se reportó a mano y NO se sube. Poner la fecha de la primera subida real. Sin esta fecha la exportación no entrega archivo.' },
   LEGAL_DOCS_ENABLED:            { type: 'bool', group: 'Recepción/Legal', label: 'Registro de documentos legales',
                                    desc: 'Muestra el registro de documentos legales de la empresa (RUT, RNT, Cámara de Comercio, certificaciones bancarias) con alertas de vigencia. Lee la carpeta de Google Drive configurada.' },
   LEGAL_DOCS_REQUEST_CONTACT:    { type: 'text', group: 'Recepción/Legal', label: 'Contacto para solicitar documentos',
@@ -156,7 +177,10 @@ async function loadOverrides(deps = {}) {
   const now = (deps.now || Date.now)(); /* reloj inyectable; por defecto el real */
   /* Con el store real (producción) cachea ~30s por proceso; con un store
      inyectado (tests) siempre relee, para no arrastrar snapshots entre casos. */
-  if (!deps.store && _cache.data && now - _cache.at < CACHE_TTL_MS) return _cache.data;
+  /* deps.fresh: salta la caché del proceso (p.ej. ttlock-probe justo después de
+     que el panel guardó un override desde OTRO proceso: setSetting solo invalida
+     la caché del proceso de admin-settings). El store es consistency:'strong'. */
+  if (!deps.store && !deps.fresh && _cache.data && now - _cache.at < CACHE_TTL_MS) return _cache.data;
   try {
     const store = deps.store || settingsStore();
     const raw = await store.get(STORE);
@@ -215,18 +239,24 @@ async function setSetting(key, value, deps = {}) {
   return current;
 }
 
-/* Para la UI: valor efectivo + de dónde viene + metadata, por clave gestionable. */
+/* Para la UI: valor efectivo + de dónde viene + metadata, por clave gestionable.
+   Si la clave no está en el panel ni en Netlify y el catálogo declara un
+   `default`, se reporta ESE valor (source 'por defecto') — así la UI no muestra
+   "apagado" algo que en realidad está activo (caso ALERT_ENABLED). */
 async function getAllEffective(deps = {}) {
   const ov = await loadOverrides(deps);
   const out = {};
   for (const [key, meta] of Object.entries(MANAGEABLE)) {
     const hasOverride = ov && ov[key] !== undefined && ov[key] !== null && String(ov[key]) !== '';
     const envVal = process.env[key];
-    out[key] = {
-      meta,
-      value: hasOverride ? ov[key] : (envVal !== undefined ? envVal : ''),
-      source: hasOverride ? 'panel' : (envVal !== undefined && envVal !== '' ? 'netlify' : 'sin definir')
-    };
+    const hasEnv = envVal !== undefined && envVal !== '';
+    const hasDefault = meta.default !== undefined;
+    let value, source;
+    if (hasOverride) { value = ov[key]; source = 'panel'; }
+    else if (hasEnv) { value = envVal; source = 'netlify'; }
+    else if (hasDefault) { value = String(meta.default); source = 'por defecto'; }
+    else { value = envVal !== undefined ? envVal : ''; source = 'sin definir'; }
+    out[key] = { meta, value, source };
   }
   return out;
 }

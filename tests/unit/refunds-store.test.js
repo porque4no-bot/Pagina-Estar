@@ -10,6 +10,11 @@ test('refundRoute: Mercado Pago card/account is gateway-auto', () => {
   assert.equal(refundRoute('mercadopago', 'debit_card'), ROUTE.GATEWAY_AUTO);
 });
 
+test('refundRoute: Mercado Pago with UNKNOWN method (recovered from the PMS note) goes through the gateway', () => {
+  assert.equal(refundRoute('mercadopago', null), ROUTE.GATEWAY_AUTO);
+  assert.equal(refundRoute('mercadopago', ''), ROUTE.GATEWAY_AUTO);
+});
+
 test('refundRoute: Mercado Pago offline methods are manual', () => {
   assert.equal(refundRoute('mercadopago', 'pse'), ROUTE.MANUAL_BANK);
   assert.equal(refundRoute('mercadopago', 'ticket'), ROUTE.MANUAL_BANK);

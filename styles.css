@@ -306,6 +306,11 @@ body[data-header="dark"] .site-header:not(.is-scrolled) .guest-entry-link { colo
 @media (max-width: 900px) {
   .guest-entry-link { display: none; }
 }
+/* "Mi estadía" dentro del menú: solo en el menú móvil (en escritorio el acceso
+   va en el encabezado del home y en el pie de página). */
+@media (min-width: 1024px) {
+  .nav-list .nav-guest-item { display: none; }
+}
 .lang-toggle {
   font-family: var(--font-label);
   font-weight: 700;
@@ -4721,6 +4726,21 @@ html[lang="en"] .lang-es { display: none !important; }
   outline: 2px solid var(--white, #fff);
   outline-offset: 2px;
 }
+/* "Configurar cookies" (consent.js lo agrega junto a la política en el footer):
+   botón con apariencia de enlace, hereda la tipografía del .footer-bot. */
+.cookie-settings-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: color var(--dur-base) var(--ease-out);
+}
+.cookie-settings-link:hover { color: var(--paper); }
 
 /* ── Accesibilidad: Focus Visible ────────────────────── */
 :focus-visible {

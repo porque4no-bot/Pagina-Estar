@@ -2,7 +2,7 @@ require('./_env');
 const { authorize } = require('./_authz');
 const {
   ALL_PERMISSIONS, PERMISSION_SET, isValidPermission,
-  DEFAULT_ROLES, BUILTIN_ROLE_IDS, permissionsForRoles
+  DEFAULT_ROLES, BUILTIN_ROLE_IDS, ROLE_LABELS, permissionsForRoles
 } = require('./_permissions');
 const iam = require('./_iam-store');
 
@@ -97,7 +97,9 @@ exports.handler = async (event) => {
     /* ── Roles ── */
     if (action === 'list-roles') {
       const custom = await iam.listRoles();
-      return ok(headers, { builtins: DEFAULT_ROLES, custom, catalog: ALL_PERMISSIONS });
+      /* labels: nombre visible de los roles integrados (p.ej. 'cocina' se
+         muestra "Desayunos (tercero)") para que la UI no enseñe el id interno. */
+      return ok(headers, { builtins: DEFAULT_ROLES, custom, catalog: ALL_PERMISSIONS, labels: ROLE_LABELS });
     }
     if (action === 'upsert-role') {
       const id = String(body.id || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');

@@ -9,8 +9,9 @@ const { getSync } = require('./_settings'); // SIRE_ENABLED gestionable desde /a
  *   SIRE **NO tiene API pública**. El reporte se hace subiendo un archivo de
  *   texto (.txt) al portal de Migración Colombia. Este módulo SOLO arma ese
  *   texto a partir de las reservas y sus huéspedes — NO sube nada, NO llama a
- *   ninguna red. La subida al portal la hace una persona a mano (o, en el
- *   futuro, un job aparte). Por eso es una utilidad "pura": la generación del
+ *   ninguna red. Lo usa `sire-export.js` (exportación autenticada que descarga
+ *   el subidor del VPS del grupo, tools/sire-uploader/) y, si hace falta, una
+ *   persona para subir a mano. Por eso es una utilidad "pura": la generación del
  *   texto se puede probar siempre, con o sin credenciales.
  *
  * Qué genera:
@@ -43,18 +44,37 @@ const { getSync } = require('./_settings'); // SIRE_ENABLED gestionable desde /a
  *   SIRE_DELIMITER      separador de columnas (default TAB '\t')
  *   SIRE_ENABLED        'true' para habilitar (isConfigured); la generación pura
  *                       funciona igual con esto apagado (para pruebas/preview)
+ *   SIRE_DATE_FORMAT    formato de las fechas: YYYY-MM-DD (default) | DD/MM/YYYY
+ *                       | YYYYMMDD | DD-MM-YYYY. ⚠️ TODO(SIRE): las guías de
+ *                       proveedores sugieren DD/MM/YYYY; confirmar en el ensayo.
+ *   SIRE_COLUMNS        orden de columnas, claves separadas por coma (opcional;
+ *                       default = COLUMNS). Permite, p.ej., cambiar `apellidos`
+ *                       por `primer_apellido,segundo_apellido` sin tocar código.
+ *   SIRE_DELIMITER / SIRE_DATE_FORMAT también son gestionables desde /admin.
  */
 
 const flagOn = v => String(v == null ? '' : v).trim().toLowerCase() === 'true';
 
+/* Formatos de fecha admitidos (la fecha interna es siempre ISO YYYY-MM-DD). */
+const DATE_FORMATS = ['YYYY-MM-DD', 'DD/MM/YYYY', 'YYYYMMDD', 'DD-MM-YYYY'];
+
+function normalizeDateFormat(raw) {
+  const s = String(raw == null ? '' : raw).trim().toUpperCase().replace(/A/g, 'Y');
+  return DATE_FORMATS.includes(s) ? s : 'YYYY-MM-DD';
+}
+
 function sireConfig() {
+  const columns = parseColumns(getSync('SIRE_COLUMNS', ''));
   return {
     hotelCode: (process.env.SIRE_HOTEL_CODE || '').trim(),
     cityCode: (process.env.SIRE_CITY_CODE || '').trim(),
     hotelAddress: (process.env.SIRE_HOTEL_ADDRESS || '').trim(),
     /* Default TAB. Se lee crudo para poder aceptar '\t' escrito literalmente en
        una env var (Netlify guarda "\t" como texto, no como tabulación real). */
-    delimiter: normalizeDelimiter(process.env.SIRE_DELIMITER),
+    delimiter: normalizeDelimiter(getSync('SIRE_DELIMITER', '')),
+    dateFormat: normalizeDateFormat(getSync('SIRE_DATE_FORMAT', '')),
+    columns: columns.ok ? columns.keys : null,
+    columnsError: columns.ok ? '' : columns.error,
     enabled: flagOn(getSync('SIRE_ENABLED', ''))
   };
 }
@@ -103,6 +123,20 @@ function fmtDate(value) {
   return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 }
 
+/* Fecha ISO (YYYY-MM-DD) → el formato configurado para el archivo. Si la fecha
+   no es ISO válida devuelve '' (la celda queda vacía y se reporta como faltante). */
+function formatDate(value, format) {
+  const iso = fmtDate(value);
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  switch (normalizeDateFormat(format)) {
+    case 'DD/MM/YYYY': return `${d}/${m}/${y}`;
+    case 'YYYYMMDD': return `${y}${m}${d}`;
+    case 'DD-MM-YYYY': return `${d}-${m}-${y}`;
+    default: return iso;
+  }
+}
+
 /* Toma la primera clave presente de una lista de alias (tolera distintas formas
    de nombrar el mismo campo en reservas/huéspedes de distintas fuentes). */
 function pick(obj, keys, fallback = '') {
@@ -136,23 +170,87 @@ const COLUMNS = [
   { key: 'apellidos',              get: h => pick(h, ['lastName', 'apellidos', 'last_name', 'surname']) },
   { key: 'nombres',                get: h => pick(h, ['firstName', 'nombres', 'first_name', 'name']) },
   { key: 'tipo_movimiento',        get: (h, r, cfg, ctx) => ctx.movement },
-  { key: 'fecha_movimiento',       get: (h, r, cfg, ctx) => ctx.movementDate },
+  { key: 'fecha_movimiento',       get: (h, r, cfg, ctx) => formatDate(ctx.movementDate, cfg.dateFormat) },
   { key: 'codigo_procedencia',     get: h => pick(h, ['originCode', 'codigoProcedencia', 'codigo_procedencia', 'originCity', 'originCountry', 'procedencia']) },
   { key: 'codigo_destino',         get: h => pick(h, ['destinationCode', 'codigoDestino', 'codigo_destino', 'destination', 'destino']) },
-  { key: 'fecha_nacimiento',       get: h => fmtDate(pick(h, ['birthDate', 'fechaNacimiento', 'fecha_nacimiento', 'dateOfBirth'])) }
+  { key: 'fecha_nacimiento',       get: (h, r, cfg) => formatDate(pick(h, ['birthDate', 'fechaNacimiento', 'fecha_nacimiento', 'dateOfBirth']), cfg.dateFormat) }
 ];
 
+/* Apellidos partidos: el check-in guarda UN campo `lastName`; si el portal pide
+   primer y segundo apellido por separado (SIRE_COLUMNS), el primero es la primera
+   palabra y el segundo el resto. Un huésped puede traerlos ya separados. */
+function splitSurnames(h) {
+  const first = pick(h, ['firstSurname', 'primerApellido', 'primer_apellido']);
+  const second = pick(h, ['secondSurname', 'segundoApellido', 'segundo_apellido']);
+  if (first) return { first: String(first), second: String(second || '') };
+  const parts = String(pick(h, ['lastName', 'apellidos', 'last_name', 'surname'])).trim().split(/\s+/).filter(Boolean);
+  return { first: parts[0] || '', second: parts.slice(1).join(' ') };
+}
+
+/* Columnas disponibles para SIRE_COLUMNS además de las del orden por defecto. */
+const EXTRA_COLUMNS = [
+  { key: 'primer_apellido',  get: h => splitSurnames(h).first },
+  { key: 'segundo_apellido', get: h => splitSurnames(h).second, optional: true }
+];
+
+const ALL_COLUMNS = new Map([...COLUMNS, ...EXTRA_COLUMNS].map(c => [c.key, c]));
+
+/* Valida una lista de columnas escrita en SIRE_COLUMNS ("a,b,c"). Vacío = orden
+   por defecto. Una clave desconocida invalida la lista (se usa el default y se
+   reporta el error), para no generar un archivo con columnas corridas. */
+function parseColumns(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return { ok: true, keys: null };
+  const keys = s.split(',').map(k => k.trim()).filter(Boolean);
+  const unknown = keys.filter(k => !ALL_COLUMNS.has(k));
+  if (unknown.length) return { ok: false, keys: null, error: `SIRE_COLUMNS tiene columnas desconocidas: ${unknown.join(', ')}` };
+  if (new Set(keys).size !== keys.length) return { ok: false, keys: null, error: 'SIRE_COLUMNS repite columnas' };
+  return { ok: true, keys };
+}
+
+/* Columnas activas (en orden) para una config. */
+function activeColumns(cfg) {
+  const keys = cfg && Array.isArray(cfg.columns) && cfg.columns.length ? cfg.columns : null;
+  if (!keys) return COLUMNS;
+  return keys.map(k => ALL_COLUMNS.get(k)).filter(Boolean);
+}
+
 /* Nombres de columna en orden (útil para encabezados de previsualización). */
-function columnNames() {
-  return COLUMNS.map(c => c.key);
+function columnNames(cfg) {
+  return activeColumns(cfg).map(c => c.key);
 }
 
 /* Arma UNA fila (string ya delimitada) para un huésped + reserva + movimiento. */
 function buildRow(huesped, reserva, movement, movementDate, cfg) {
   const ctx = { movement, movementDate };
-  return COLUMNS
+  return activeColumns(cfg)
     .map(col => cell(col.get(huesped, reserva, cfg, ctx), cfg.delimiter))
     .join(cfg.delimiter);
+}
+
+/* Columnas que quedarían VACÍAS en la fila de un movimiento. Sirve para no subir
+   una fila incompleta (el portal la rechazaría) y avisar qué falta. Las columnas
+   marcadas `optional` (p.ej. segundo apellido) no cuentan. */
+function missingColumns(huesped, reserva, movement, movementDate, cfg) {
+  const ctx = { movement, movementDate };
+  return activeColumns(cfg)
+    .filter(col => !col.optional)
+    .filter(col => !cell(col.get(huesped, reserva, cfg, ctx), cfg.delimiter))
+    .map(col => col.key);
+}
+
+/* UNA fila para un movimiento concreto ('E' o 'S'). La fecha del movimiento sale
+   de la reserva (check-in para E, check-out para S). Devuelve
+   { row, movementDate, missing } — `missing` lista las columnas vacías. */
+function movementRow(huesped, reserva, movement, opts = {}) {
+  const cfg = opts.config || sireConfig();
+  const { checkIn, checkOut } = reservationDates(reserva || {});
+  const movementDate = movement === 'S' ? checkOut : checkIn;
+  return {
+    row: buildRow(huesped, reserva, movement, movementDate, cfg),
+    movementDate,
+    missing: missingColumns(huesped, reserva, movement, movementDate, cfg)
+  };
 }
 
 /* Devuelve las DOS filas de un huésped: [ E (entrada/check-in), S (salida/
@@ -210,7 +308,7 @@ function buildSireFile(input = {}, opts = {}) {
         rows.push(...movementRows(huesped, reserva, { config: cfg }));
       }
     }
-    const lines = opts.header ? [columnNames().join(cfg.delimiter), ...rows] : rows;
+    const lines = opts.header ? [columnNames(cfg).join(cfg.delimiter), ...rows] : rows;
     return {
       ok: true,
       rows,
@@ -228,10 +326,17 @@ module.exports = {
   isConfigured,
   buildSireFile,
   movementRows,
+  movementRow,
+  missingColumns,
   columnNames,
   sireConfig,
   fmtDate,
+  formatDate,
   normalizeDelimiter,
+  normalizeDateFormat,
+  parseColumns,
+  reservationDates,
+  DATE_FORMATS,
   /* expuesto para tests / usos avanzados */
-  _internal: { buildRow, normalizeInput, reservationDates, cell, pick, COLUMNS }
+  _internal: { buildRow, normalizeInput, reservationDates, cell, pick, COLUMNS, EXTRA_COLUMNS, splitSurnames }
 };

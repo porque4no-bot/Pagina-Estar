@@ -274,11 +274,26 @@ async function upsertPartner(data, opts) {
     let domain = null;
     if (values.vat) domain = [['vat', '=', values.vat]];
     else if (values.email) domain = [['email', '=ilike', values.email]];
+    /* Empresa sin NIT ni correo propio (p. ej. el formulario público de
+       convenios, que solo trae el correo de la PERSONA de contacto): se busca
+       por nombre entre las EMPRESAS. Nunca por el correo del contacto, que
+       podría ser la ficha de un huésped/persona y quedaría sobrescrita. */
+    else if (data.dedupeByCompanyName && values.name && values.is_company) {
+      domain = [['name', '=ilike', values.name], ['is_company', '=', true]];
+    }
 
     let existingId = null;
     if (domain) {
       const found = await executeKw('res.partner', 'search', [domain], withCtx({ limit: 1 }), transport);
       if (Array.isArray(found) && found.length) existingId = found[0];
+    }
+    /* Empresa existente encontrada por nombre desde un formulario público: no
+       se reescriben nombre ni nota (la nota puede tener historial o evidencias
+       de consentimiento); el detalle de la solicitud va en el lead. Solo se
+       añaden etiquetas. */
+    if (existingId && data.dedupeByCompanyName && !values.vat) {
+      delete values.name;
+      delete values.comment;
     }
 
     /* Etiquetas de contacto (segmentación tipo CRM SIN necesitar el módulo CRM):

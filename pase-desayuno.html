@@ -79,11 +79,15 @@
       var room = [b.roomNumber, b.roomName].filter(Boolean).join(' · ') || '—';
       var html = '';
 
-      html += '<div class="info">' +
-        '<div class="row"><span class="k">Huésped</span><span class="v">' + esc(b.guestName || '—') + '</span></div>' +
-        '<div class="row"><span class="k">Apartamento</span><span class="v">' + esc(room) + '</span></div>' +
-        (b.checkIn ? '<div class="row"><span class="k">Estadía</span><span class="v">' + esc(fmtDate(b.checkIn)) + ' → ' + esc(fmtDate(b.checkOut)) + '</span></div>' : '') +
-        '</div>';
+      /* limited: pase antiguo (v1) — el servidor no entrega datos del huésped,
+         solo el código de la reserva. */
+      html += data.limited
+        ? '<div class="info"><div class="row"><span class="k">Reserva</span><span class="v">' + esc(b.bookingCode || '—') + '</span></div></div>'
+        : '<div class="info">' +
+          '<div class="row"><span class="k">Huésped</span><span class="v">' + esc(b.guestName || '—') + '</span></div>' +
+          '<div class="row"><span class="k">Apartamento</span><span class="v">' + esc(room) + '</span></div>' +
+          (b.checkIn ? '<div class="row"><span class="k">Estadía</span><span class="v">' + esc(fmtDate(b.checkIn)) + ' → ' + esc(fmtDate(b.checkOut)) + '</span></div>' : '') +
+          '</div>';
 
       if (data.hasBreakfast) {
         html += '<div class="banner ok">Desayuno incluido · ' + data.perDay + (data.perDay === 1 ? ' persona' : ' personas') + ' por día</div>';

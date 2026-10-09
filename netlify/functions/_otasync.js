@@ -413,7 +413,7 @@ async function findReservationByReference(reference, dateArrival) {
   if (!ref || !arr) return null;
   try {
     const { reservations } = await getReservationsByDate({
-      filterBy: 'date_arrival', dfrom: arr, dto: arr, arrivals: 1
+      filterBy: 'date_arrival', dfrom: arr, dto: arr, arrivals: 1, includeNote: true
     });
     return (reservations || []).find(r => r.reference === ref) || null;
   } catch (e) {
@@ -422,11 +422,18 @@ async function findReservationByReference(reference, dateArrival) {
   }
 }
 
-async function insertReservation(payload) {
+/* opts.deadlineMs (opcional, epoch ms): límite absoluto para TODOS los
+   intentos. Lo usa la ruta directa de Mercado Pago para no pasarse del tiempo de
+   la función de Netlify (si la matan a mitad de camino no queda ni pendiente ni
+   alerta). Sin deadline (Wompi, cotizaciones) el comportamiento no cambia. */
+const INSERT_MIN_ATTEMPT_MS = 2500;
+async function insertReservation(payload, opts = {}) {
+  const deadline = Number(opts && opts.deadlineMs) > 0 ? Number(opts.deadlineMs) : 0;
+  const attemptTimeout = () => (deadline ? Math.min(10000, deadline - Date.now() - 500) : 10000);
   const makeRequest = async (pkey) => {
     const body = { ...payload, key: pkey };
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10000);
+    const tid = setTimeout(() => ctrl.abort(), Math.max(1000, attemptTimeout()));
     try {
       const r = await fetch('https://app.otasync.me/api/reservation/insert/reservation', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -447,6 +454,11 @@ async function insertReservation(payload) {
   let mayHaveCommitted = false;
   try {
     for (let attempt = 1; attempt <= INSERT_MAX_ATTEMPTS; attempt++) {
+      if (deadline && attempt > 1 && attemptTimeout() < INSERT_MIN_ATTEMPT_MS) {
+        /* No alcanza el tiempo para otro intento: se rinde ya (el llamador deja
+           el pendiente + alerta) en vez de que Netlify corte la función. */
+        throw lastErr || new Error('insert/reservation: sin tiempo para reintentar');
+      }
       if (mayHaveCommitted) {
         const existing = await findReservationByReference(payload && payload.reference, payload && payload.date_arrival);
         if (existing) {
@@ -483,7 +495,7 @@ async function insertReservation(payload) {
     /* Antes de declarar el fallo: si el último intento fue un timeout, la reserva
        pudo quedar creada. Una última verificación por reference evita alertar (y
        dejar en pendiente) una reserva que en realidad sí existe. */
-    if (mayHaveCommitted) {
+    if (mayHaveCommitted && (!deadline || deadline - Date.now() > 1500)) {
       const existing = await findReservationByReference(payload && payload.reference, payload && payload.date_arrival);
       if (existing) {
         console.warn(`[otasync] insert/reservation: tras el fallo se encontró la reserva ya creada para reference ${payload.reference} (id ${existing.idReservations}).`);
@@ -910,12 +922,21 @@ function normalizeReservation(r) {
     lastName: r.last_name || '',
     email: String(r.email || '').trim(),
     phone: r.phone || '',
+    /* canal de origen (Booking.com, Expedia, Airbnb, "Pagina web"…): los correos de
+       estadía lo usan para tratar distinto a los huéspedes de OTA (correo relay). */
+    channel: String(r.channel_name || '').trim(),
     country: String(r.country || '').trim(),
     nights: parseInt(r.nights, 10) || 0,
     hasBreakfast: reservaTieneDesayuno(r),
     roomName: (r.rooms && r.rooms[0] && r.rooms[0].name) || '',
     reference: String(r.reference || ''),
-    lang: inferLang(r.country)
+    lang: inferLang(r.country),
+    /* Frente Hoy (panel de recepción): canal, número de apto y saldo del folio,
+       tal como los lista reservation/data/reservations. Aditivo, solo lectura. */
+    channel: String(r.channel_name || r.channel || '').trim(),
+    roomNumber: String((r.rooms && r.rooms[0] && r.rooms[0].room_number) || '').trim(),
+    totalPrice: Number(r.total_price) || 0,
+    remainingAmount: Number(r.remaining_amount) || 0
   };
 }
 
@@ -933,7 +954,7 @@ function isHoldReservation(r) {
 
 const RESERVATIONS_MAX_PAGES = 20;
 
-async function getReservationsByDate({ filterBy, dfrom, dto, arrivals = 0, departures = 0, status = '0' } = {}) {
+async function getReservationsByDate({ filterBy, dfrom, dto, arrivals = 0, departures = 0, status = '0', includeNote = false } = {}) {
   if (!hasOtasyncCreds()) return { reservations: [], isMock: true };
   const { token, propertyId } = otasyncCreds();
   const out = [];
@@ -968,7 +989,11 @@ async function getReservationsByDate({ filterBy, dfrom, dto, arrivals = 0, depar
     if (!res.ok) throw new Error(`reservations returned status ${res.status}`);
     const data = await res.json();
     const list = Array.isArray(data.reservations) ? data.reservations : [];
-    list.forEach(r => out.push(normalizeReservation(r)));
+    /* includeNote: solo para uso INTERNO del servidor (findReservationByReference
+       lee el 'ID Transaccion' de la nota). Nunca se expone a paneles/clientes. */
+    list.forEach(r => out.push(includeNote
+      ? { ...normalizeReservation(r), note: String((r && (r.note || r.notes)) || '') }
+      : normalizeReservation(r)));
     totalPages = Number(data.total_pages_number) || 1;
     page++;
   } while (page <= totalPages && page <= RESERVATIONS_MAX_PAGES);
@@ -979,7 +1004,7 @@ module.exports = {
   getReservationsByDate, normalizeReservation, isHoldReservation, inferLang, reservaTieneDesayuno,
   otasyncCreds, hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
   buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, cancelReservation, createConfirmedReservation,
-  insertReservation,
+  insertReservation, findReservationByReference,
   getDynamicPricing, EXTRA_GUEST_SURCHARGE,
   getExtras, insertExtra, ensureGuestServiceExtra, getReservationFirstRoom,
   addReservationExtra, addReservationPayment, postOrderExtrasToFolio

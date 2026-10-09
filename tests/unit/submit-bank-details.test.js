@@ -5,6 +5,7 @@ const assert = require('node:assert');
 
 process.env.REFUND_BANK_FORM_ENABLED = 'true';
 process.env.REFUND_LINK_SECRET = 'test-submit-secret';
+process.env.GUEST_APP_DATA_ENCRYPTION_KEY = 'test-submit-vault-key'; // Frente cancel: datos bancarios cifrados
 delete process.env.RESEND_API_KEY; // keep treasury email a no-op
 
 /* Shared in-memory @netlify/blobs mock (refunds store + rate-limit buckets). */
@@ -36,7 +37,7 @@ function memStore(name) {
 const blobsPath = require.resolve('@netlify/blobs');
 require.cache[blobsPath] = { id: blobsPath, filename: blobsPath, loaded: true, exports: { getStore: (opts) => memStore(opts.name) } };
 
-const { signBankDetailsToken, getRefund } = require('../../netlify/functions/_refunds-store');
+const { signBankDetailsToken, getRefund, openBankDetails } = require('../../netlify/functions/_refunds-store');
 const { handler } = require('../../netlify/functions/submit-bank-details');
 
 function seedRefund(code, over) {
@@ -90,7 +91,15 @@ test('happy path: saves details and moves refund to BANK_DETAILS_READY', async (
   assert.deepEqual(JSON.parse(r.body), { ok: true });
   const refund = await getRefund('EST-OK');
   assert.equal(refund.status, 'BANK_DETAILS_READY');
-  assert.equal(refund.bankDetails.accountNumber, '12345');
+  /* Frente cancel: en reposo van CIFRADOS (sin texto en claro) y se abren con la clave. */
+  assert.equal(refund.bankDetails, undefined);
+  assert.equal(refund.bankDetailsEncrypted, true);
+  assert.ok(!memStore('refunds')._m.get('EST-OK').value.includes('Ana Ruiz'));
+  assert.equal(openBankDetails(refund).accountNumber, '12345');
+  assert.equal(refund.bankDetailsSummary.accountLast4, '2345');
+  /* y queda la tarea de transferir en la cola (pestaña Hoy) */
+  const tasks = Array.from(memStore('ops-queue')._m.values()).map(e => JSON.parse(e.value));
+  assert.ok(tasks.some(t => t.kind === 'refund_transfer' && /ya envió su cuenta/.test(t.title)));
 });
 
 test('second submit after READY → not ok (already), no re-disclosure', async () => {

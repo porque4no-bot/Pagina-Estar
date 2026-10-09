@@ -29,7 +29,7 @@ function load({ flagOn, cancelImpl, refund }) {
       transitions.push({ bookingCode, status, by, note, patch });
       return { refund: { bookingCode, status, ...(patch || {}) } };
     },
-    STATUS: { DONE: 'done', DENIED: 'denied', APPROVED: 'approved', NEEDS_BANK_DETAILS: 'needs_bank', PROCESSING: 'processing', PENDING_PROVIDER: 'pending_provider', FAILED: 'failed' },
+    STATUS: { NEEDS_REVIEW: 'NEEDS_REVIEW', DONE: 'done', DENIED: 'denied', APPROVED: 'approved', NEEDS_BANK_DETAILS: 'needs_bank', PROCESSING: 'processing', PENDING_PROVIDER: 'pending_provider', FAILED: 'failed' },
     ROUTE: { MANUAL_BANK: 'manual_bank', GATEWAY_AUTO: 'gateway_auto', GATEWAY_ASSISTED: 'gateway_assisted' }
   });
   fakeModule(P('_otasync'), {

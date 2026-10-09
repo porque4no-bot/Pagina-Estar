@@ -140,21 +140,6 @@ test('guest-action order: 400 when items list is empty or all invalid', async ()
   assert.equal(badIds.statusCode, 400);
 });
 
-test('guest-action contract: persists event with guests and returns 201', async () => {
-  const token = validToken();
-  const res = await guestAction(makeEvent({
-    type: 'contract',
-    signedName: 'María López',
-    acceptedTerms: true,
-    guests: [{ guest: { firstName: 'María', lastName: 'López', documentNumber: 'CC123' }, isPrimary: true }],
-    contractVersion: 'ESTAR-HOSPEDAJE-2026-01'
-  }, token));
-  assert.equal(res.statusCode, 201);
-  const data = body(res);
-  assert.equal(data.ok, true);
-  assert.match(data.eventId, /^GST-/);
-});
-
 test('guest-action contract: 400 when signedName is empty', async () => {
   const token = validToken();
   const res = await guestAction(makeEvent({
@@ -184,110 +169,8 @@ test('guest-action contract: 400 when acceptedTerms is not exactly true', async 
   assert.equal(stringTrue.statusCode, 400);
 });
 
-test('guest-action contract: persists Ley 527 audit trail (IP, UA, hash, version)', async () => {
-  const token = validToken();
-  const captured = [];
-  guestActionModule._test.setDeps({
-    protectRecord: record => record,
-    guestStore: () => ({
-      setJSON: async (key, value) => { captured.push({ key, value }); }
-    }),
-    archiveGuestPayload: async () => ({ delivered: false, configured: false }),
-    syncGuestEvent: async () => ({ delivered: false })
-  });
-  const event = {
-    httpMethod: 'POST',
-    headers: {
-      'x-nf-client-connection-ip': '203.0.113.42',
-      'user-agent': 'Mozilla/5.0 (Macintosh; Apple) Test/1.0',
-      authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify({
-      type: 'contract',
-      signedName: 'María López',
-      acceptedTerms: true,
-      guests: [{ guest: { firstName: 'María', lastName: 'López', documentType: 'CC', documentNumber: 'CC123' }, isPrimary: true }],
-      acknowledgedAt: new Date().toISOString(),
-      consentText: 'Declaro que he leído y acepto el contrato (test).'
-    })
-  };
-  const res = await guestAction(event);
-  assert.equal(res.statusCode, 201);
-  assert.ok(captured.length, 'event was persisted');
-  const persisted = captured[captured.length - 1].value;
-  assert.equal(persisted.type, 'contract');
-  assert.equal(persisted.clientIp, '203.0.113.42', 'IP captured from x-nf-client-connection-ip');
-  assert.match(persisted.userAgent, /Test\/1\.0/, 'user agent captured');
-  assert.equal(persisted.contractHashAlgorithm, 'sha256');
-  assert.match(persisted.contractHash, /^[a-f0-9]{64}$/, 'contract hash is sha256 hex');
-  assert.equal(persisted.contractVersion, guestActionModule._test.CURRENT_CONTRACT_VERSION);
-  assert.ok(persisted.signedAt, 'signedAt set server-side');
-  assert.ok(persisted.acknowledgedAt, 'acknowledgedAt accepted from client');
-  assert.match(persisted.consentText, /he leído y acepto/);
-  guestActionModule._test.resetDeps();
-});
-
-test('guest-action contract: falls back to x-forwarded-for and rejects bogus acknowledgedAt', async () => {
-  const token = validToken();
-  const captured = [];
-  guestActionModule._test.setDeps({
-    protectRecord: record => record,
-    guestStore: () => ({
-      setJSON: async (key, value) => { captured.push({ key, value }); }
-    }),
-    archiveGuestPayload: async () => ({ delivered: false, configured: false }),
-    syncGuestEvent: async () => ({ delivered: false })
-  });
-  const event = {
-    httpMethod: 'POST',
-    headers: {
-      'x-forwarded-for': '198.51.100.7, 10.0.0.1',
-      'user-agent': 'curl/8.0',
-      authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify({
-      type: 'contract',
-      signedName: 'María López',
-      acceptedTerms: true,
-      guests: [{ guest: { firstName: 'María', lastName: 'López' }, isPrimary: true }],
-      acknowledgedAt: 'not-a-timestamp'
-    })
-  };
-  const res = await guestAction(event);
-  assert.equal(res.statusCode, 201);
-  const persisted = captured[captured.length - 1].value;
-  assert.equal(persisted.clientIp, '198.51.100.7', 'IP from x-forwarded-for first hop');
-  assert.equal(persisted.acknowledgedAt, '', 'invalid client acknowledgedAt is dropped');
-  guestActionModule._test.resetDeps();
-});
-
-test('guest-action contract_preview: returns 200 with rendered HTML and does not persist', async () => {
-  const token = validToken();
-  const captured = [];
-  guestActionModule._test.setDeps({
-    protectRecord: record => record,
-    guestStore: () => ({
-      setJSON: async (key, value) => { captured.push({ key, value }); }
-    })
-  });
-
-  const event = makeEvent({
-    type: 'contract_preview',
-    lang: 'en',
-    guests: [{ guest: { firstName: 'John', lastName: 'Doe', documentType: 'Passport', documentNumber: '123' }, isPrimary: true }]
-  }, token);
-
-  const res = await guestAction(event);
-  assert.equal(res.statusCode, 200);
-  const data = body(res);
-  assert.equal(data.ok, true);
-  assert.match(data.html, /<!DOCTYPE html>/i);
-  assert.match(data.html, /Hospitality Agreement/i); // English title
-  assert.match(data.html, /John Doe/i); // Guest name is in it
-  assert.equal(captured.length, 0, 'No event was persisted for preview');
-
-  guestActionModule._test.resetDeps();
-});
+/* Las pruebas de firma y vista previa del contrato (con check-in, hash de la
+   vista previa, PDF y copia por correo) viven en guest-contract.test.js. */
 
 function setFolioDeps(onFolio) {
   guestActionModule._test.setDeps({

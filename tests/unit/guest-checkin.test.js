@@ -80,7 +80,12 @@ test('guest check-in submit persists 3 guests and archives each document', async
     });
 
     assert.equal(response.statusCode, 201);
-    assert.equal(persisted.length, 1);
+    /* El expediente del check-in + la entrada del índice reserva → check-in
+       (guest-checkin-index, sin PII) que usan guest-session y el contrato. */
+    assert.equal(persisted.length, 2);
+    assert.match(persisted[0].key, /^CHK-/);
+    assert.equal(persisted[1].key, 'TEST-300');
+    assert.equal(persisted[1].value.checkinId, persisted[0].key);
     assert.equal(persisted[0].value.guests.length, 3);
     assert.equal(persisted[0].value.guests[0].isPrimary, true);
     assert.equal(archived.length, 3);

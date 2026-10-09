@@ -59,7 +59,7 @@ function load({ seed = {}, fetchImpl, env = {} } = {}) {
 }
 
 function mpPayment(extRef, id, amount) {
-  return { id, external_reference: extRef, transaction_amount: amount, status: 'approved', date_created: new Date(Date.now() - 60000).toISOString() };
+  return { id, external_reference: extRef, transaction_amount: amount, status: 'approved', date_created: new Date(Date.now() - 20 * 60000).toISOString() };
 }
 
 test('fetchRecentApprovedMP: sin token → skip limpio', async () => {
@@ -156,7 +156,7 @@ test('handler: fallo del fetch MP NO impide reportar huérfanos de Wompi (try/ca
     const s = String(url);
     if (s.includes('mercadopago')) throw new Error('MP API down');
     if (s.includes('wompi') || s.includes('/transactions')) {
-      return new Response(JSON.stringify({ data: [{ id: 'W-1', reference: wRef, amount_in_cents: 20000000, created_at: new Date(Date.now() - 60000).toISOString() }], meta: {} }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ data: [{ id: 'W-1', reference: wRef, amount_in_cents: 20000000, created_at: new Date(Date.now() - 20 * 60000).toISOString() }], meta: {} }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     throw new Error('unexpected ' + url);
   };
@@ -166,5 +166,138 @@ test('handler: fallo del fetch MP NO impide reportar huérfanos de Wompi (try/ca
     const res = await ctx.recon.handler();
     const body = JSON.parse(res.body);
     assert.equal(body.orphans, 1, 'el huérfano de Wompi se reporta aunque MP falle');
+  } finally { ctx.cleanup(); }
+});
+
+/* Frente MP (oct-2026): ventana de 48 h, alerta de dinero vía reportAlert
+   (correo + tarea en el panel) y UNA sola vez por tx — no cada 30 min. */
+test('reconcile: ventana de 48 h', () => {
+  const { recon, cleanup } = load({});
+  try { assert.equal(recon._test.LOOKBACK_HOURS, 48); } finally { cleanup(); }
+});
+
+test('reconcile: el huérfano se alerta vía reportAlert UNA vez; la corrida siguiente no repite', async () => {
+  const ref = payments.createDirectReference({ checkin: '2026-11-01', checkout: '2026-11-03', guestsCount: 1, roomTypeId: '31348', firstName: 'Ana', lastName: 'R', email: 'a@x.co', phone: '300', extrasMask: '0000000', bookingCode: 'EST-MP-9', amountCents: 30000000 });
+  let searchUrl = '';
+  const fetchImpl = async (url) => {
+    if (String(url).includes('mercadopago')) {
+      searchUrl = String(url);
+      return new Response(JSON.stringify({ results: [mpPayment(ref, 'MP-9', 300000)], paging: { total: 1 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  };
+  const ctx = load({ env: { MERCADOPAGO_ACCESS_TOKEN: 'tok' }, fetchImpl });
+  const alerts = [];
+  const reportAlert = async (a) => { alerts.push(a); return { alerted: true }; };
+  try {
+    const first = JSON.parse((await ctx.recon.handler(undefined, undefined, { reportAlert })).body);
+    assert.equal(first.orphans, 1);
+    assert.equal(first.alerted, 1);
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].kind, 'payment_without_reservation');
+    assert.equal(alerts[0].severity, 'critical');
+    assert.equal(alerts[0].dedupeKey, 'pay-noreservation-MP-9', 'misma tarea que la alerta del webhook para ese tx');
+    assert.equal(alerts[0].context.reference, 'EST-MP-9');
+
+    const begin = new URL(searchUrl).searchParams.get('begin_date');
+    const hours = (Date.now() - new Date(begin).getTime()) / 3600000;
+    assert.ok(hours > 47 && hours < 49, `la búsqueda de MP cubre ~48 h (${hours.toFixed(1)})`);
+
+    const second = JSON.parse((await ctx.recon.handler(undefined, undefined, { reportAlert })).body);
+    assert.equal(second.orphans, 1, 'sigue contándose como huérfano');
+    assert.equal(second.alerted, 0, 'pero no se vuelve a alertar');
+    assert.equal(alerts.length, 1);
+  } finally { ctx.cleanup(); }
+});
+
+test('reconcile: un pago de hace 2 minutos (webhook aún trabajando) NO se alerta como huérfano', async () => {
+  const ref = payments.createDirectReference({ checkin: '2026-11-05', checkout: '2026-11-06', guestsCount: 1, roomTypeId: '31348', firstName: 'Ana', lastName: 'R', email: 'a@x.co', phone: '300', extrasMask: '0000000', bookingCode: 'EST-MP-10', amountCents: 20000000 });
+  const fresh = { id: 'MP-10', external_reference: ref, transaction_amount: 200000, status: 'approved', date_created: new Date(Date.now() - 2 * 60000).toISOString() };
+  const fetchImpl = async (url) => {
+    if (String(url).includes('mercadopago')) {
+      return new Response(JSON.stringify({ results: [fresh], paging: { total: 1 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  };
+  const ctx = load({ env: { MERCADOPAGO_ACCESS_TOKEN: 'tok' }, fetchImpl });
+  const alerts = [];
+  try {
+    const res = await ctx.recon.handler(undefined, undefined, { reportAlert: async (a) => { alerts.push(a); return {}; } });
+    assert.match(res.body, /no orphans/);
+    assert.equal(alerts.length, 0);
+    assert.ok(ctx.recon._test.MIN_AGE_MS >= 5 * 60000);
+  } finally { ctx.cleanup(); }
+});
+
+test('reconcile: un doble pago / monto incorrecto ya alertado por el webhook NO se reporta además como "pago sin reserva"', async () => {
+  const mk = (code) => payments.createDirectReference({ checkin: '2026-11-07', checkout: '2026-11-08', guestsCount: 1, roomTypeId: '31348', firstName: 'Ana', lastName: 'R', email: 'a@x.co', phone: '300', extrasMask: '0000000', bookingCode: code, amountCents: 20000000 });
+  const fetchImpl = async (url) => {
+    if (String(url).includes('mercadopago')) {
+      return new Response(JSON.stringify({ results: [mpPayment(mk('EST-B2'), 'MP-DBL', 200000), mpPayment(mk('EST-AMX'), 'MP-AMT', 1000), mpPayment(mk('EST-ORF'), 'MP-ORF', 200000)], paging: { total: 3 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  };
+  const ctx = load({
+    env: { MERCADOPAGO_ACCESS_TOKEN: 'tok' }, fetchImpl,
+    seed: { 'payment-incidents': { 'mercadopago:MP-DBL': { kind: 'payment_double_charge' }, 'mercadopago:MP-AMT': { kind: 'payment_amount_mismatch' } } }
+  });
+  const alerts = [];
+  try {
+    const body = JSON.parse((await ctx.recon.handler(undefined, undefined, { reportAlert: async (a) => { alerts.push(a); return {}; } })).body);
+    assert.equal(body.orphans, 1, 'solo el huérfano real');
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].dedupeKey, 'pay-noreservation-MP-ORF');
+  } finally { ctx.cleanup(); }
+});
+
+test('directBookingReconciled: pending sin resolver se reporta; resuelto desde el panel (resolvedAt) ya no', async () => {
+  const { directBookingReconciled } = require('../../netlify/functions/reconcile-payments')._test;
+  const store = (entry) => ({ get: async () => (entry == null ? null : JSON.stringify(entry)) });
+  assert.equal(await directBookingReconciled(store({ reservationPending: true }), 'EST-A'), false);
+  assert.equal(await directBookingReconciled(store({ reservationPending: true, resolvedAt: '2026-10-08T15:00:00Z' }), 'EST-A'), true);
+  assert.equal(await directBookingReconciled(store({ reservationPending: false }), 'EST-A'), true);
+  assert.equal(await directBookingReconciled(store(null), 'EST-A'), false);
+});
+
+/* Revisión final: antes de pedir "crear la reserva", reconcile busca en Kunas por
+   el código EST (la función pudo morir tras crearla y antes de registrarla). */
+test('reconcile: si la reserva YA existe en Kunas con ese código, la alerta dice NO crear otra', async () => {
+  const ref = payments.createDirectReference({ checkin: '2026-11-01', checkout: '2026-11-03', guestsCount: 1, roomTypeId: '31348', firstName: 'Ana', lastName: 'R', email: 'a@x.co', phone: '300', extrasMask: '0000000', bookingCode: 'EST-MP-EX', amountCents: 30000000 });
+  const fetchImpl = async (url) => {
+    if (String(url).includes('mercadopago')) {
+      return new Response(JSON.stringify({ results: [mpPayment(ref, 'MP-EX', 300000)], paging: { total: 1 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  };
+  const ctx = load({ env: { MERCADOPAGO_ACCESS_TOKEN: 'tok' }, fetchImpl });
+  const alerts = [];
+  const lookups = [];
+  const reportAlert = async (a) => { alerts.push(a); return { alerted: true }; };
+  const findReservationByReference = async (code, checkin) => { lookups.push([code, checkin]); return { idReservations: '3299001', reference: code }; };
+  try {
+    await ctx.recon.handler(undefined, undefined, { reportAlert, findReservationByReference });
+    assert.deepEqual(lookups[0], ['EST-MP-EX', '2026-11-01']);
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0].message, /3299001 SÍ existe en Kunas/);
+    assert.match(alerts[0].message, /NO crear otra/);
+    assert.equal(alerts[0].context.existingReservation, '3299001');
+  } finally { ctx.cleanup(); }
+});
+
+test('reconcile: si no aparece en Kunas, la alerta pide verificar por el código EST antes de crearla', async () => {
+  const ref = payments.createDirectReference({ checkin: '2026-11-01', checkout: '2026-11-03', guestsCount: 1, roomTypeId: '31348', firstName: 'Ana', lastName: 'R', email: 'a@x.co', phone: '300', extrasMask: '0000000', bookingCode: 'EST-MP-NX', amountCents: 30000000 });
+  const fetchImpl = async (url) => {
+    if (String(url).includes('mercadopago')) {
+      return new Response(JSON.stringify({ results: [mpPayment(ref, 'MP-NX', 300000)], paging: { total: 1 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  };
+  const ctx = load({ env: { MERCADOPAGO_ACCESS_TOKEN: 'tok' }, fetchImpl });
+  const alerts = [];
+  const reportAlert = async (a) => { alerts.push(a); return { alerted: true }; };
+  try {
+    await ctx.recon.handler(undefined, undefined, { reportAlert, findReservationByReference: async () => null });
+    assert.equal(alerts.length, 1);
+    assert.match(alerts[0].message, /verificar en Kunas buscando por el código EST-MP-NX/);
   } finally { ctx.cleanup(); }
 });

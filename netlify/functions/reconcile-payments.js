@@ -12,12 +12,12 @@
 
 const { getStore } = require('@netlify/blobs');
 const { getQuoteStore, loadQuote, effectiveStatus } = require('./_quotes-store');
-const { sendEmail, adminEmail } = require('./_email');
 /* Las referencias directas tienen formato distinto por proveedor: Wompi codifica
    "1|..." (decoder en _direct-pricing); Mercado Pago usa "MPDIR-..." (decoder en
    _payments). Probamos ambos al cruzar. */
 const { decodeDirectReference: decodeWompiDirect } = require('./_direct-pricing');
 const { decodeDirectReference: decodeMpDirect } = require('./_payments');
+const { readPaymentIncident, STORE_NAME: INCIDENTS_STORE } = require('./_payment-incidents');
 
 function getBookingResultsStore() {
   try {
@@ -39,7 +39,12 @@ async function directBookingReconciled(resultsStore, bookingCode) {
        needs manual handling, so we want it reported. */
     /* Blob corrupto → fail-safe: tratar como NO reconciliado para que el huérfano
        se reporte y se revise a mano, en vez de darlo por bueno en silencio. */
-    try { return !JSON.parse(raw).reservationPending; } catch (e) { return false; }
+    /* resolvedAt: recepción lo marcó resuelto (reserva creada a mano o dinero
+       devuelto) desde el panel Hoy — auditado en staff-audit. */
+    try {
+      const entry = JSON.parse(raw);
+      return !entry.reservationPending || Boolean(entry.resolvedAt);
+    } catch (e) { return false; }
   } catch (e) {
     return false;
   }
@@ -49,7 +54,16 @@ const WOMPI_API = process.env.WOMPI_SANDBOX === 'true'
   ? 'https://sandbox.wompi.co/v1'
   : 'https://production.wompi.co/v1';
 
-const LOOKBACK_HOURS = 6;        /* slightly longer than the cron interval     */
+/* Ventana de 48 h (antes 6 h): un pago cuyo webhook falló un viernes en la noche
+   sigue apareciendo el fin de semana. Para no repetir la MISMA alerta cada 30 min
+   durante 48 h, cada huérfano se alerta UNA sola vez (marca por tx en el store
+   'reconcile-notified'); la tarea queda abierta en el panel hasta resolverla. */
+const LOOKBACK_HOURS = 48;
+/* Gracia para el webhook: un pago aprobado hace segundos puede estar todavía
+   creando su reserva. Sin esto, una corrida que coincide con ese instante
+   alertaba un falso "pago sin reserva" (y ahora, con la alerta UNA vez por tx,
+   esa tarea falsa quedaría abierta). */
+const MIN_AGE_MS = 10 * 60 * 1000;
 const MAX_TRANSACTIONS = 100;    /* hard cap to avoid runaway pagination       */
 
 function getProcessedStore() {
@@ -161,35 +175,82 @@ async function fetchRecentApprovedMP() {
   return { transactions: all.slice(0, MAX_TRANSACTIONS) };
 }
 
-function esc(s) {
-  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function getIncidentsStore() {
+  try {
+    return getStore({ name: INCIDENTS_STORE, consistency: 'strong' });
+  } catch (e) {
+    return null;
+  }
 }
 
-function orphanAlertHtml(orphans) {
-  const rows = orphans.map(o => `
-    <tr>
-      <td>${esc(o.provider || '?')}</td>
-      <td>${esc(o.quoteId || '(none)')}</td>
-      <td>${esc(o.transactionId)}</td>
-      <td>${esc(o.reference || '(none)')}</td>
-      <td>${o.amountCents != null ? (o.amountCents / 100).toLocaleString('es-CO') : '?'}</td>
-      <td>${esc(o.createdAt || '?')}</td>
-      <td>${esc(o.reason)}</td>
-    </tr>`).join('');
-  return `
-    <h2>Pagos sin reserva en OTASync</h2>
-    <p>Encontramos ${orphans.length} transacción(es) APPROVED en las últimas
-    ${LOOKBACK_HOURS} horas que no aparecen procesadas por el webhook. Cada una
-    necesita verificación manual: confirmar en el proveedor, decidir si crear la
-    reserva en OTASync o reembolsar al huésped.</p>
-    <table border="1" cellpadding="6" cellspacing="0">
-      <tr><th>Proveedor</th><th>Quote ID</th><th>Tx</th><th>Reference</th><th>Monto (COP)</th><th>Creada</th><th>Razón</th></tr>
-      ${rows}
-    </table>
-  `;
+function getNotifiedStore() {
+  try {
+    return getStore({ name: 'reconcile-notified', consistency: 'strong' });
+  } catch (e) {
+    return null;
+  }
 }
 
-exports.handler = async () => {
+function notifiedKey(o) {
+  return `${o.provider || 'unknown'}:${o.transactionId}`;
+}
+
+async function wasNotified(store, o) {
+  if (!store) return false;
+  try { return Boolean(await store.get(notifiedKey(o))); } catch (e) { return false; }
+}
+
+async function markNotified(store, o, now) {
+  if (!store) return;
+  try {
+    await store.set(notifiedKey(o), JSON.stringify({ at: new Date(now).toISOString(), reference: o.reference || null, reason: o.reason }));
+  } catch (e) { /* best-effort: en el peor caso se repite la alerta (dedupe de _alert) */ }
+}
+
+/* Alerta de dinero por huérfano → _alert.reportAlert: correo al equipo + TAREA
+   en el panel (ops-queue). La dedupeKey es la MISMA que usa el webhook para
+   "pago sin reserva" de ese tx, así el webhook y la reconciliación comparten una
+   sola tarea por incidente. */
+async function defaultFindReservationByReference(reference, checkin) {
+  const ota = require('./_otasync');
+  if (!ota.hasOtasyncCreds()) return null;
+  return ota.findReservationByReference(reference, checkin);
+}
+
+async function alertOrphan(o, deps = {}) {
+  const report = deps.reportAlert || require('./_alert').reportAlert;
+  const amount = o.amountCents != null ? Math.round(o.amountCents / 100).toLocaleString('es-CO') : '?';
+  const ref = o.reference || o.quoteId || o.transactionId;
+  let message;
+  if (o.existingReservation) {
+    message = `Reconciliación: pago ${o.provider || '?'} aprobado — ${ref} ($${amount}). La reserva ${o.existingReservation} SÍ existe en Kunas con ese código, pero el sistema no la registró. NO crear otra: verificar que esté bien y marcar el pago como resuelto en /admin → Hoy.`;
+  } else if (o.quoteId) {
+    message = `Reconciliación: pago ${o.provider || '?'} aprobado sin reserva en OTASync — ${ref} ($${amount}). Verificar en el proveedor y crear la reserva o reembolsar.`;
+  } else {
+    message = `Reconciliación: pago ${o.provider || '?'} aprobado sin reserva registrada — ${ref} ($${amount}). Antes de crearla, verificar en Kunas buscando por el código ${ref} (puede existir); si no está, crear la reserva o reembolsar.`;
+  }
+  return report({
+    kind: 'payment_without_reservation',
+    severity: 'critical',
+    message,
+    context: {
+      existingReservation: o.existingReservation || null,
+      provider: o.provider, transactionId: o.transactionId, reference: o.reference || null,
+      quoteId: o.quoteId || null, amountCents: o.amountCents, createdAt: o.createdAt || null, reason: o.reason
+    },
+    dedupeKey: `pay-noreservation-${o.transactionId}`,
+    ttlSec: 7 * 24 * 3600
+  });
+}
+
+exports.handler = async (event, context, overrides = {}) => {
+  const deps = { now: Date.now, ...overrides };
+  if (event && event.blobs) {
+    try {
+      const blobs = require('@netlify/blobs');
+      if (typeof blobs.connectLambda === 'function') blobs.connectLambda(event);
+    } catch (e) { /* best-effort */ }
+  }
   const txStore = getProcessedStore();
 
   /* Wompi (activo) y Mercado Pago (rollback) se consultan por SEPARADO con
@@ -252,10 +313,14 @@ exports.handler = async () => {
   let quoteStore;
   try { quoteStore = getQuoteStore(); } catch (e) { quoteStore = null; }
   const resultsStore = getBookingResultsStore();
+  const incidentsStore = deps.incidentsStore !== undefined ? deps.incidentsStore : getIncidentsStore();
 
   for (const tx of transactions) {
     const ref = String(tx.reference || '');
     const isQuote = /^COT-\d{4}-[A-Z0-9]{5}$/.test(ref);
+
+    const createdMs = tx.createdAt ? new Date(tx.createdAt).getTime() : 0;
+    if (createdMs && deps.now() - createdMs < MIN_AGE_MS) continue; /* el webhook aún puede estar trabajando */
 
     if (isQuote) {
       /* ── Corporate quote path ── su lock/estado la protege: si ya está
@@ -299,6 +364,22 @@ exports.handler = async () => {
     const reconciled = await directBookingReconciled(resultsStore, decoded.bookingCode);
     if (reconciled) continue;
 
+    /* Doble pago / monto incorrecto: el webhook NO crea reserva ni escribe
+       booking-results, pero ya abrió SU tarea (pay-double-/pay-amount-<tx>, con
+       la instrucción correcta: reembolsar). Reportarlo aquí como "pago sin reserva
+       — crear la reserva" daría dos tareas contradictorias e invitaría a crear
+       una reserva duplicada. */
+    if (await readPaymentIncident(incidentsStore, tx.provider, tx.id)) continue;
+
+    /* Antes de pedir "crear la reserva": ¿ya existe en Kunas con ese código EST?
+       (p. ej. el webhook creó la reserva y la función murió por tiempo antes de
+       escribir booking-results). Crearla a mano la duplicaría. */
+    let existingInPms = null;
+    try {
+      const lookup = deps.findReservationByReference || defaultFindReservationByReference;
+      existingInPms = await lookup(decoded.bookingCode, decoded.checkin);
+    } catch (e) { existingInPms = null; }
+
     orphans.push({
       quoteId: null,
       provider: tx.provider,
@@ -306,7 +387,10 @@ exports.handler = async () => {
       reference: decoded.bookingCode,
       amountCents: tx.amountCents,
       createdAt: tx.createdAt,
-      reason: 'direct booking paid but no reservation (missing or pending in booking-results)'
+      existingReservation: existingInPms && existingInPms.idReservations ? String(existingInPms.idReservations) : null,
+      reason: existingInPms && existingInPms.idReservations
+        ? 'direct booking paid; reservation exists in OTASync but booking-results is missing/pending'
+        : 'direct booking paid but no reservation (missing or pending in booking-results)'
     });
   }
 
@@ -316,21 +400,27 @@ exports.handler = async () => {
   }
 
   console.error(`[reconcile-payments] ${orphans.length} orphan(s) detected`);
-  try {
-    await sendEmail({
-      to: adminEmail(),
-      subject: `Reconciliación de pagos — ${orphans.length} pago(s) sin reserva`,
-      html: orphanAlertHtml(orphans)
-    });
-  } catch (e) {
-    console.error('[reconcile-payments] alert email failed:', e.message);
+  /* Una alerta (correo + tarea) por huérfano, UNA sola vez por tx: las corridas
+     siguientes (cada 30 min durante la ventana de 48 h) no la repiten. */
+  const notifiedStore = getNotifiedStore();
+  let alerted = 0;
+  for (const o of orphans) {
+    if (await wasNotified(notifiedStore, o)) continue;
+    try {
+      await alertOrphan(o, deps);
+      alerted++;
+    } catch (e) {
+      console.error('[reconcile-payments] orphan alert failed:', e.message);
+      continue;
+    }
+    await markNotified(notifiedStore, o, deps.now());
   }
 
   return {
     statusCode: 200,
-    body: JSON.stringify({ orphans: orphans.length, checked: transactions.length })
+    body: JSON.stringify({ orphans: orphans.length, alerted, checked: transactions.length })
   };
 };
 
 /* Exportado para tests (mock de fetch/blobs). */
-exports._test = { fetchRecentApprovedMP, fetchRecentApproved, directBookingReconciled };
+exports._test = { fetchRecentApprovedMP, fetchRecentApproved, directBookingReconciled, alertOrphan, LOOKBACK_HOURS, MIN_AGE_MS };

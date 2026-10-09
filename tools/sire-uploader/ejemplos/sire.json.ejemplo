@@ -1,0 +1,5 @@
+{
+  "tipo_documento": "CC",
+  "numero_documento": "<numero de documento del usuario del portal SIRE>",
+  "password": "<contrasena del portal SIRE>"
+}

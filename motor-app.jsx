@@ -2,6 +2,24 @@ import React from 'react';
 import * as ReactDOM from 'react-dom/client';
 import i18nEngineEs from './i18n/motor.es.json';
 import i18nEngineEn from './i18n/motor.en.json';
+import {
+  MAX_GUESTS,
+  clampGuests,
+  roomCapacity,
+  roomFitsGuests,
+  fill,
+  phaseForPaymentStatus,
+  interpretBookingStatus,
+  interpretWompiStatus,
+  wompiApiBase,
+  nextPollDelay,
+  fastPollsDone,
+  readMpReturn,
+  PAY_PENDING_KEY,
+  readPendingPayment,
+  splitPhoneForWompi,
+  errorKeyForServerReason
+} from './motor-logic.js';
 
 const { useState, useEffect, useRef } = React;
 
@@ -59,65 +77,80 @@ function parseQueryParams() {
   const params = new URLSearchParams(window.location.search);
   const checkin = params.get('checkin') || getOffset(1);
   const checkout = params.get('checkout') || getOffset(4);
-  let guests = parseInt(params.get('guests'));
-  if (isNaN(guests) || guests < 1) guests = 2;
-  if (guests > 4) guests = 4;   /* tope: el select ofrece 1-4 y el server rechaza >4 con 400 */
-  
+  /* Tope = capacidad máxima (Selección admite 5); el select ofrece 1-5. */
+  const guests = clampGuests(params.get('guests'), 2);
+
   let roomParam = params.get('room');
   if (roomParam === 'clasic') roomParam = 'clasica'; // compatibility mapping
   
   const payment = params.get('payment') || '';
-  return { checkin, checkout, guests, roomParam, payment };
+  /* Frente codes: el correo del código personal/reseña enlaza a
+     reservar.html?codigo=XXXX para dejarlo prellenado en el paso de pago (el
+     servidor lo valida igual; esto solo ahorra escribirlo). */
+  const promoCode = String(params.get('codigo') || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 40);
+  return { checkin, checkout, guests, roomParam, payment, promoCode };
 }
 
-/* Retorno de Mercado Pago: código de reserva guardado antes del redirect, o
-   leído de external_reference (MP lo agrega a la back_url). La referencia es
-   `MPDIR-` + base64url de `2|checkin|checkout|guests|room|nombre|apellido|email|tel|extras|CODIGO|…`
-   (_payments.createDirectReference). */
+/* Retorno de Mercado Pago: código de reserva leído de external_reference (MP lo
+   agrega a la back_url) o, en su defecto, el guardado antes del redirect.
+   La decodificación vive en motor-logic.readMpReturn (probada en unit tests). */
 const MP_PENDING_KEY = 'estar-mp-pending';
-function mpReturnBookingCode() {
-  try {
-    const raw = sessionStorage.getItem(MP_PENDING_KEY);
-    if (raw) {
-      const p = JSON.parse(raw);
-      if (p && p.code && Date.now() - (p.savedAt || 0) < 2 * 60 * 60 * 1000) return String(p.code);
-    }
-  } catch (e) { /* noop */ }
-  try {
-    const ref = new URLSearchParams(window.location.search).get('external_reference') || '';
-    if (ref.indexOf('MPDIR-') !== 0) return null;
-    let b64 = ref.slice(6).replace(/-/g, '+').replace(/_/g, '/');
-    while (b64.length % 4) b64 += '=';
-    const parts = decodeURIComponent(escape(atob(b64))).split('|');
-    if (parts[10]) return parts[10];
-  } catch (e) { /* referencia ilegible: se muestra el aviso genérico */ }
-  return null;
+function readMpReturnFromPage() {
+  let stored = null;
+  try { stored = sessionStorage.getItem(MP_PENDING_KEY); } catch (e) { /* noop */ }
+  return readMpReturn(window.location.search, stored, Date.now());
 }
 
+/* Pago en curso (Wompi o Mercado Pago) guardado en sessionStorage: si el huésped
+   recarga mientras confirmamos, retomamos la consulta en vez de devolverlo al
+   paso de pago (donde podría pagar dos veces). */
+function savePendingPayment(data) {
+  try { sessionStorage.setItem(PAY_PENDING_KEY, JSON.stringify({ ...data, savedAt: Date.now() })); } catch (e) { /* noop */ }
+}
+function clearPendingPayment() {
+  try { sessionStorage.removeItem(PAY_PENDING_KEY); } catch (e) { /* noop */ }
+}
+function loadPendingPayment() {
+  try { return readPendingPayment(sessionStorage.getItem(PAY_PENDING_KEY), Date.now()); } catch (e) { return null; }
+}
+
+/* Estado de una transacción Wompi desde su API pública (solo lectura, la misma
+   que consulta el widget). Ante cualquier fallo responde 'pending' y se sigue
+   consultando booking-status, que es la fuente de verdad de la reserva. */
+async function checkWompiTransaction(txId) {
+  try {
+    const r = await fetch(`${wompiApiBase(window.WOMPI_PUBLIC_KEY)}/transactions/${encodeURIComponent(txId)}`);
+    if (!r.ok) return 'pending';
+    const d = await r.json();
+    return interpretWompiStatus(d && d.data && d.data.status);
+  } catch (e) {
+    return 'pending';
+  }
+}
+
+/* Confirmación mínima cuando no hay borrador: habitación, fechas, huésped y
+   monto salen de la referencia del pago de Mercado Pago (si la hay). */
+function minimalFromReference(ref) {
+  if (!ref) return { room: null, search: null, guest: {}, payableCents: null };
+  const room = BE_ROOMS.find(r => String(r.roomTypeId) === String(ref.roomTypeId)) || null;
+  return {
+    room,
+    search: (ref.checkin && ref.checkout) ? { checkin: ref.checkin, checkout: ref.checkout, guests: ref.guests || 1 } : null,
+    guest: { nombre: ref.firstName, apellido: ref.lastName, email: ref.email },
+    payableCents: ref.amountCents
+  };
+}
+
+/* Aviso de respaldo cuando volvemos de Mercado Pago SIN forma de identificar la
+   reserva (sin código guardado ni external_reference): no afirmamos que la
+   reserva está confirmada porque no la pudimos consultar. */
 function PaymentReturnNotice({ status, lang }) {
   if (!status) return null;
+  const t = i18nEngine[lang];
   const copy = {
-    success: {
-      icon: 'check-circle',
-      title: lang === 'es' ? 'Pago recibido' : 'Payment received',
-      text: lang === 'es'
-        ? 'Tu reserva está confirmada. En unos minutos te llegará al correo el detalle de tu estadía.'
-        : 'Your booking is confirmed. You will receive your stay details by email in a few minutes.'
-    },
-    pending: {
-      icon: 'clock',
-      title: lang === 'es' ? 'Pago pendiente' : 'Payment pending',
-      text: lang === 'es'
-        ? 'Tu pago quedó pendiente de aprobación. La reserva se confirmará automáticamente cuando Mercado Pago apruebe la transacción.'
-        : 'Your payment is pending approval. The booking will be confirmed automatically once Mercado Pago approves the transaction.'
-    },
-    failure: {
-      icon: 'alert-triangle',
-      title: lang === 'es' ? 'Pago no completado' : 'Payment not completed',
-      text: lang === 'es'
-        ? 'No se completó el pago. Puedes intentarlo de nuevo o escribirnos por WhatsApp.'
-        : 'The payment was not completed. You can try again or contact us on WhatsApp.'
-    }
+    success: { icon: 'check-circle', title: t.returnSuccessTitle, text: t.returnSuccessText },
+    pending: { icon: 'clock', title: t.returnPendingTitle, text: t.returnPendingText },
+    failure: { icon: 'alert-triangle', title: t.returnFailureTitle, text: t.returnFailureText }
   }[status];
   if (!copy) return null;
   return (
@@ -239,10 +272,9 @@ function SearchBar({ search, onSearch, lang }) {
           <div className="be-field">
             <label>{t.guests}</label>
             <select value={s.guests} onChange={e => setS({ ...s, guests: parseInt(e.target.value) })}>
-              <option value={1}>{t["1"]}</option>
-              <option value={2}>{t["2"]}</option>
-              <option value={3}>{t["3"]}</option>
-              <option value={4}>{t["4"]}</option>
+              {Array.from({ length: MAX_GUESTS }, (_, i) => i + 1).map(n => (
+                <option key={n} value={n}>{t[String(n)]}</option>
+              ))}
             </select>
           </div>
           <button type="submit" className="be-btn-primary">{t.searchBtn}</button>
@@ -323,11 +355,15 @@ function StepWrapper({ num, title, state, summaryLine, onEdit, children, lang })
 }
 
 /* ── RoomCard ─────────────────────────────────────── */
-function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) {
+function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, preselected, lang }) {
   const t = i18nEngine[lang];
   const priceBest = room.priceFlexible;
   const priceFlex = Math.round(room.priceFlexible * 1.10);
+  /* Sin tarifa elegida no se asume ninguna: el huésped elige Flexible o
+     Estricta de forma explícita antes de seleccionar el apartaestudio. */
+  const hasRate = rate === 'best' || rate === 'flexible';
   const activePrice = rate === 'best' ? priceBest : priceFlex;
+  const [rateHint, setRateHint] = useState(false);
 
   // Translate details
   const roomName = t.roomNames[room.id] || room.name;
@@ -335,7 +371,17 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
   const roomBed = t.roomBeds[room.bed] || room.bed;
   const roomView = t.roomViews[room.view] || room.view;
 
-  const isAvailable = room.available !== false; // default to true
+  /* Capacidad: con más huéspedes de los que admite, la tarjeta no se puede
+     elegir y lo dice (antes salía "Agotado" o, si venía preseleccionada desde la
+     página de la habitación, se podía pagar una Clásica para 4). */
+  const capacity = roomCapacity(room);
+  const overCapacity = !roomFitsGuests(room, guests);
+  const isAvailable = !overCapacity && room.available !== false; // default to true
+
+  function selectRoom() {
+    if (!hasRate) { setRateHint(true); return; }
+    onSelect(room, rate);
+  }
 
   // Slider state
   const [activePhoto, setActivePhoto] = useState(0);
@@ -376,7 +422,8 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
   }
 
   return (
-    <div className={`be-room-card${!isAvailable ? ' be-room-unavailable' : ''}`}>
+    <div className={`be-room-card${!isAvailable ? ' be-room-unavailable' : ''}${preselected && isAvailable ? ' be-room-card-preselected' : ''}`}
+      data-room={room.id}>
       <div 
         className="be-room-photo"
         onTouchStart={images.length > 1 ? handleTouchStart : undefined}
@@ -430,7 +477,7 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
         <div className="be-room-badge" style={{ zIndex: 1 }}>{lang === 'es' ? 'Tipología' : 'Typology'} {room.num}</div>
         {!isAvailable && (
           <div className="be-room-status-badge">
-            {t.soldOut}
+            {overCapacity ? fill(t.overCapacityBadge, { capacity }) : t.soldOut}
           </div>
         )}
       </div>
@@ -444,9 +491,11 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
         </p>
         {isAvailable ? (
           <React.Fragment>
-            <div className="be-rate-options">
-              <button type="button" className={`be-rate-opt${rate === 'flexible' ? ' active' : ''}`}
-                onClick={() => onRateChange('flexible')}>
+            <p className="be-rate-heading" id={`rate-heading-${room.id}`}>{t.chooseRate}</p>
+            <div className="be-rate-options" role="radiogroup" aria-labelledby={`rate-heading-${room.id}`}>
+              <button type="button" role="radio" aria-checked={rate === 'flexible'}
+                className={`be-rate-opt${rate === 'flexible' ? ' active' : ''}`}
+                onClick={() => { setRateHint(false); onRateChange('flexible'); }}>
                 <div className="be-rate-tag">
                   <span className="be-label">{t.flexible}</span>
                   <span className="be-badge-policy">{t.refundable}</span>
@@ -454,8 +503,9 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
                 <div className="be-rate-price">{formatCOP(priceFlex)}<span>/{t.noche}</span></div>
                 <div className="be-rate-sub">{t.freeCancel}</div>
               </button>
-              <button type="button" className={`be-rate-opt best${rate === 'best' ? ' active' : ''}`}
-                onClick={() => onRateChange('best')}>
+              <button type="button" role="radio" aria-checked={rate === 'best'}
+                className={`be-rate-opt best${rate === 'best' ? ' active' : ''}`}
+                onClick={() => { setRateHint(false); onRateChange('best'); }}>
                 <div className="be-rate-tag">
                   <span className="be-label">{t.bestPrice}</span>
                   <span className="be-badge-save">{t.save10}</span>
@@ -464,22 +514,27 @@ function RoomCard({ room, nights, guests, rate, onSelect, onRateChange, lang }) 
                 <div className="be-rate-sub">{t.strictCancel}</div>
               </button>
             </div>
+            {rateHint && !hasRate && (
+              <p className="be-rate-hint" role="alert">{t.rateRequired}</p>
+            )}
             <div className="be-room-total-row">
               <span className="be-room-total-label">
                 {nights} {nights === 1 ? t.noche : t.noches} · {guests} {guests === 1 ? t.huesped : t.huespedes}
               </span>
-              <span className="be-room-total">{formatCOP(activePrice * nights)} <span>{t.plusTax}</span></span>
+              <span className="be-room-total">
+                {hasRate ? formatCOP(activePrice * nights) : `${t.fromPrice} ${formatCOP(priceBest * nights)}`} <span>{t.plusTax}</span>
+              </span>
             </div>
             <p style={{ fontSize: 11, color: 'var(--ink-300)', fontStyle: 'italic', margin: '4px 0 8px 0', lineHeight: 1.4 }}>
-              {lang === 'es' ? '* IVA alojamiento (19%) segun nacionalidad y motivo del viaje. El desayuno paga INC 8% (no exento).' : '* Accommodation VAT (19%) depends on nationality and travel purpose. Breakfast pays 8% consumption tax (not exempt).'}
+              {lang === 'es' ? '* IVA alojamiento (19%) según nacionalidad y motivo del viaje. El desayuno paga INC 8% (no exento).' : '* Accommodation VAT (19%) depends on nationality and travel purpose. Breakfast pays 8% consumption tax (not exempt).'}
             </p>
-            <button className="be-btn-primary be-room-select-btn" onClick={() => onSelect(room, rate)}>
+            <button className="be-btn-primary be-room-select-btn" onClick={selectRoom}>
               {t.selectBtn}
             </button>
           </React.Fragment>
         ) : (
           <div className="be-room-unavailable-msg">
-            <p>{t.soldOutMsg}</p>
+            <p>{overCapacity ? fill(t.overCapacityMsg, { capacity, guests }) : t.soldOutMsg}</p>
           </div>
         )}
       </div>
@@ -625,7 +680,14 @@ function GuestForm({ guest, setGuest, onContinue, lang }) {
         <div className="be-field be-field-full">
           <label htmlFor="guest-privacy" className="be-checkbox-label">
             <input id="guest-privacy" type="checkbox" required />
-            <span>{t.privacyAgreement}</span>
+            {/* Enlaces a las políticas (pestaña nueva para no perder el formulario).
+                Rutas relativas: en /en/ resuelven a las versiones en inglés. */}
+            <span>
+              {t.privacyAccept}{' '}
+              <a href="cancelacion.html" target="_blank" rel="noopener noreferrer">{t.privacyCancelLink}</a>{' '}
+              {t.privacyAnd}{' '}
+              <a href="privacidad.html" target="_blank" rel="noopener noreferrer">{t.privacyPolicyLink}</a>
+            </span>
           </label>
         </div>
         {/* Frente C — opt-in de marketing OPCIONAL, separado del consentimiento de
@@ -713,12 +775,32 @@ function SandboxBanner({ lang }) {
   );
 }
 
+/* Medios de pago que aplican un código de descuento en el servidor.
+   Wompi: create-wompi-signature/wompi-webhook validan y consumen el código
+   (verifyDiscountCode/consumeDiscountUse). Mercado Pago (frente mp, oct-2026):
+   create-mercadopago-preference revalida el código con el correo de la reserva
+   (verifyDirectBookingAmount → verifyDiscountCode, incluido boundEmail) y cobra el
+   monto con descuento; el webhook consume el uso tras crear la reserva. */
+const DISCOUNT_PAYMENT_METHODS = ['wompi', 'mercadopago'];
+function discountAllowedFor(paymentMethod) {
+  return DISCOUNT_PAYMENT_METHODS.indexOf(paymentMethod) !== -1;
+}
+
 /* ── PaymentPanel ─────────────────────────────────── */
-function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, discountApplied, setDiscountApplied, lang }) {
+function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConfirm, discountApplied, setDiscountApplied, paymentNotice, onNoticeShown, initialDiscountCode, lang }) {
   const t = i18nEngine[lang];
   const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
   const [loading, setLoading] = useState(false);
   const [paymentError, setPaymentError] = useState(null);
+
+  /* Aviso que llega desde el seguimiento del pago (p. ej. Wompi rechazó un
+     PSE que estaba en proceso): se muestra como error del paso de pago una sola
+     vez (el padre lo limpia para que no reaparezca al volver a este paso). */
+  useEffect(() => {
+    if (!paymentNotice) return;
+    setPaymentError(paymentNotice);
+    if (onNoticeShown) onNoticeShown();
+  }, [paymentNotice]);
 
   /* ── Frente A: discount code ──────────────────────────────────
      The field stays hidden until /api/validate-discount-code reports the
@@ -726,7 +808,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
      re-validated and re-priced server-side at signing time; this is only the
      in-line UX. `applied` holds the server's confirmed { code, discountCents }. */
   const [discountEnabledUi, setDiscountEnabledUi] = useState(false);
-  const [discountInput, setDiscountInput] = useState('');
+  const [discountInput, setDiscountInput] = useState(initialDiscountCode || '');
   const [discountChecking, setDiscountChecking] = useState(false);
   /* discountApplied/setDiscountApplied ahora vienen de BookingEngine (estado
      elevado) para que el resumen/confirmación/correo vean el descuento. */
@@ -737,6 +819,16 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
   const baseSubtotalCents = calc ? Math.round(calc.subtotal * 100) : 0;
   const discountCents = discountApplied ? Math.min(discountApplied.discountCents || 0, baseSubtotalCents) : 0;
   const payableCents = Math.max(0, baseSubtotalCents - discountCents);
+  /* El medio elegido no aplica descuentos en el servidor (Mercado Pago hoy):
+     no se puede aplicar un código y uno ya aplicado se retira. */
+  const discountBlocked = !discountAllowedFor(paymentMethod);
+
+  React.useEffect(() => {
+    if (discountBlocked && discountApplied) {
+      setDiscountApplied(null);
+      setDiscountError(null);
+    }
+  }, [discountBlocked, discountApplied]);
 
   const discountReasonText = (reason) => {
     switch (reason) {
@@ -746,6 +838,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       case 'min_nights': return t.discountMinNights;
       case 'room_not_eligible': return t.discountRoom;
       case 'blackout': return t.discountBlackout;
+      case 'email_mismatch': return t.discountEmailMismatch;
       default: return t.discountInvalid;
     }
   };
@@ -773,7 +866,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
 
   const applyDiscount = async () => {
     const code = (discountInput || '').trim().toUpperCase();
-    if (!code) return;
+    if (!code || discountBlocked) return;
     setDiscountChecking(true);
     setDiscountError(null);
     setDiscountApplied(null);
@@ -815,6 +908,12 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
 
   const handlePayment = async () => {
     setPaymentError(null);
+    /* Capacidad: el servidor también lo rechaza (over_capacity), pero no
+       dejamos ni siquiera intentar el pago si no caben. */
+    if (!roomFitsGuests(booking.room, search.guests)) {
+      setPaymentError(t.overCapacityError);
+      return;
+    }
     /* A-6: payment initiated. value is what we charge online (subtotal, no IVA,
        matching the Wompi amount). */
     const gi = gaItem(booking.room, booking.rate, search);
@@ -837,7 +936,10 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
           body: JSON.stringify({
             type: 'direct',
             bookingCode: code,
-            amountCents: Math.round(calc.subtotal * 100),
+            /* Monto con el descuento ya aplicado (igual que Wompi); el servidor
+               revalida el código y el precio contra OTASync. */
+            amountCents: payableCents,
+            discountCode: discountApplied ? discountApplied.code : '',
             checkin: search.checkin,
             checkout: search.checkout,
             guestsCount: search.guests,
@@ -849,7 +951,14 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
             phone: booking.guest?.tel || '',
             extrasMask,
             isColombian,
-            isBusiness: isBusinessTrip
+            isBusiness: isBusinessTrip,
+            ratePlan: booking.rate === 'flexible' ? 'flexible' : 'best',
+            /* Nota libre y opt-in de marketing (Ley 1581): viajan en el body, el
+               servidor los guarda y el webhook los usa al crear la reserva. */
+            notes: ((booking.guest && booking.guest.notas) || '').trim().slice(0, 500),
+            marketingOptIn: Boolean(booking.guest && booking.guest.marketingOptIn),
+            /* Para volver a /en/reservar.html si el huésped reservó en inglés. */
+            lang
           })
         });
         const data = await response.json();
@@ -876,6 +985,8 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
           mpError = lang === 'es'
             ? 'Hubo un cambio en la tarifa de la habitación. Por favor, recarga la página para ver los precios actualizados.'
             : 'There was a change in the room rate. Please refresh the page to view the updated pricing.';
+        } else if (e.message === 'over_capacity') {
+          mpError = t.overCapacityError;
         } else {
           mpError = t.paymentErrorFailed;
         }
@@ -944,11 +1055,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
 
       if (encodedRef.length > 255) {
         setLoading(false);
-        setPaymentError(
-          lang === 'es'
-            ? 'Los datos de la reserva son demasiado largos para iniciar el pago. Acorta nombres, telefono o notas e intentalo de nuevo.'
-            : 'The reservation data is too long to start payment. Shorten names, phone, or notes and try again.'
-        );
+        setPaymentError(t.paymentRefTooLong);
         return;
       }
 
@@ -971,7 +1078,9 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
             /* Frente C: opt-in de marketing (Ley 1581). Viaja en el body, NO en
                la referencia; el server lo persiste y, con opt-in, el webhook lo
                cablea a Odoo (tag + lista de Email Marketing). */
-            marketingOptIn: Boolean(booking.guest && booking.guest.marketingOptIn)
+            marketingOptIn: Boolean(booking.guest && booking.guest.marketingOptIn),
+            /* Idioma del huésped: el webhook manda la confirmación en ese idioma. */
+            lang
           })
         });
         sigData = await sigRes.json();
@@ -982,22 +1091,28 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
       } catch (e) {
         console.error('[PaymentPanel] Wompi signature error:', e.message);
         setLoading(false);
-        let errorMsg;
-        if (e.message === 'sold_out') {
-          errorMsg = lang === 'es'
-            ? 'Lo sentimos, la habitación seleccionada ya no tiene disponibilidad para las fechas elegidas.'
-            : 'Sorry, the selected room is no longer available for the chosen dates.';
-        } else if (e.message === 'price_mismatch') {
-          errorMsg = lang === 'es'
-            ? 'Hubo un cambio en la tarifa de la habitación. Por favor, recarga la página para ver los precios actualizados.'
-            : 'There was a change in the room rate. Please refresh the page to view the updated pricing.';
-        } else {
-          errorMsg = lang === 'es'
+        /* Códigos del servidor (sold_out / price_mismatch / over_capacity) →
+           mensaje amable; nunca el código interno. */
+        const errorKey = errorKeyForServerReason(e.message);
+        const errorMsg = errorKey
+          ? t[errorKey]
+          : (lang === 'es'
             ? 'No se pudo preparar la firma de seguridad de Wompi. Por favor intenta de nuevo o contáctanos.'
-            : 'Could not prepare the Wompi security signature. Please try again or contact us.';
-        }
+            : 'Could not prepare the Wompi security signature. Please try again or contact us.');
         setPaymentError(errorMsg);
         return;
+      }
+
+      /* Teléfono e indicativo según el país del huésped (antes iba siempre +57
+         con el número tal cual). Si no se puede deducir, el widget lo pide. */
+      const customerData = {
+        email: booking.guest?.email || '',
+        fullName: `${booking.guest?.nombre || ''} ${booking.guest?.apellido || ''}`.trim()
+      };
+      const wompiPhone = splitPhoneForWompi(booking.guest?.tel, guestCountry(booking.guest));
+      if (wompiPhone) {
+        customerData.phoneNumber = wompiPhone.number;
+        customerData.phoneNumberPrefix = wompiPhone.prefix;
       }
 
       const checkout = new window.WidgetCheckout({
@@ -1006,37 +1121,32 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
         reference: sigData.reference,
         publicKey: wompiKey,
         signature: wompiSignature,
-        customerData: {
-          email: booking.guest?.email || '',
-          fullName: `${booking.guest?.nombre || ''} ${booking.guest?.apellido || ''}`.trim(),
-          phoneNumber: booking.guest?.tel || '',
-          phoneNumberPrefix: '+57'
-        }
+        customerData
       });
 
       checkout.open(function (result) {
         setLoading(false);
-        const transaction = result.transaction;
+        const transaction = (result && result.transaction) || {};
         console.log('Wompi Transaction Callback:', transaction);
 
-        if (transaction.status === 'APPROVED') {
+        /* APPROVED → confirmamos la reserva. PENDING (PSE, Nequi…) NO es un
+           error: el pago sigue en proceso, así que mostramos "pago en proceso"
+           y seguimos consultando (antes salía un error con "Intentar de nuevo",
+           que invitaba a pagar dos veces). */
+        if (transaction.status === 'APPROVED' || transaction.status === 'PENDING') {
           onConfirm(code, {
+            provider: 'wompi',
             id: transaction.id,
             status: transaction.status,
             paymentMethod: transaction.payment_method_type,
             reference: transaction.reference
           });
-        } else if (transaction.status === 'PENDING') {
-          setPaymentError(
-            lang === 'es'
-              ? 'Tu pago quedo pendiente de aprobacion. La reserva se confirmara cuando Wompi apruebe la transaccion.'
-              : 'Your payment is pending approval. The booking will be confirmed when Wompi approves the transaction.'
-          );
         } else if (transaction.status === 'DECLINED') {
           setPaymentError(t.paymentErrorDeclined);
-        } else {
+        } else if (transaction.status) {
           setPaymentError(t.paymentErrorFailed);
         }
+        /* Sin transacción (el huésped cerró el widget): no es un error. */
       });
 
       // Reset loading after opening so that the button is not permanently disabled
@@ -1069,7 +1179,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
               </div>
             )}
             <div className="be-summary-line">
-              <span>{mustPayIVA ? (lang === 'es' ? 'IVA a pagar en alojamiento (19%)*' : 'VAT due at property (19%)*') : (lang === 'es' ? 'IVA exento sujeto a validacion*' : 'VAT exempt, subject to validation*')}</span>
+              <span>{mustPayIVA ? (lang === 'es' ? 'IVA a pagar en alojamiento (19%)*' : 'VAT due at property (19%)*') : (lang === 'es' ? 'IVA exento sujeto a validación*' : 'VAT exempt, subject to validation*')}</span>
               <span style={!mustPayIVA ? { textDecoration: 'line-through', opacity: 0.75 } : undefined}>{formatCOP(calc.iva)}</span>
             </div>
             {calc.inc > 0 && (
@@ -1099,7 +1209,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
                 <p style={{ margin: '4px 0 0 0', opacity: 0.9 }}>
                   {lang === 'es' ? (
                     <>
-                      Hoy solo cancelas el valor neto. Al declarar origen <strong>{booking.guest?.pais || 'Otro'}</strong> y viaje por turismo/ocio, el IVA queda exento de forma preliminar. Esta exencion se valida con tu documento y motivo real de viaje; si la informacion no corresponde, el IVA ({formatCOP(calc.iva)}) se cobrara en el alojamiento.
+                      Hoy solo cancelas el valor neto. Al declarar origen <strong>{booking.guest?.pais || 'Otro'}</strong> y viaje por turismo/ocio, el IVA queda exento de forma preliminar. Esta exención se valida con tu documento y motivo real de viaje; si la información no corresponde, el IVA ({formatCOP(calc.iva)}) se cobrará en el alojamiento.
                     </>
                   ) : (
                     <>
@@ -1166,10 +1276,13 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
                 style={{ flex: '1 1 180px', minWidth: 0, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 14, textTransform: 'uppercase' }}
               />
               <button type="button" className="be-btn-secondary" style={{ padding: '10px 18px', fontSize: 13 }}
-                onClick={applyDiscount} disabled={discountChecking || loading || !discountInput.trim()}>
+                onClick={applyDiscount} disabled={discountChecking || loading || discountBlocked || !discountInput.trim()}>
                 {discountChecking ? t.discountChecking : t.discountApply}
               </button>
             </div>
+          )}
+          {discountBlocked && (
+            <p className="be-discount-method-note" style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--fg-muted)' }}>{t.discountNotWithMercadoPago}</p>
           )}
           {discountError && (
             <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--terracotta-700)' }}>{discountError}</p>
@@ -1208,7 +1321,7 @@ function PaymentPanel({ paymentMethod, setPaymentMethod, booking, search, onConf
             className="be-btn-secondary"
             style={{ alignSelf: 'flex-start' }}
             onClick={() => setPaymentError(null)}>
-            {lang === 'es' ? 'Intentar de nuevo' : 'Try again'}
+            {t.tryAgain}
           </button>
         </div>
       )}
@@ -1342,7 +1455,7 @@ function BookingSummary({ booking, search, lang }) {
             );
           })}
           <div className="be-summary-line sm">
-            <span>{mustPayIVA ? (lang === 'es' ? 'IVA a pagar en alojamiento (19%)*' : 'VAT due at property (19%)*') : (lang === 'es' ? 'IVA exento sujeto a validacion*' : 'VAT exempt, subject to validation*')}</span>
+            <span>{mustPayIVA ? (lang === 'es' ? 'IVA a pagar en alojamiento (19%)*' : 'VAT due at property (19%)*') : (lang === 'es' ? 'IVA exento sujeto a validación*' : 'VAT exempt, subject to validation*')}</span>
             <span style={!mustPayIVA ? { textDecoration: 'line-through', opacity: 0.75 } : undefined}>{formatCOP(calc.iva)}</span>
           </div>
           {calc.inc > 0 && (
@@ -1359,7 +1472,7 @@ function BookingSummary({ booking, search, lang }) {
             {lang === 'es' 
               ? (mustPayIVA
                 ? `* El IVA se paga en el alojamiento (${isBusinessTrip ? 'requerido por viaje de negocios' : 'aplica para residentes en Colombia'}).`
-                : '* Exencion preliminar para extranjero en turismo/ocio; se validara al llegar y se cobrara IVA si la informacion no corresponde.')
+                : '* Exención preliminar para extranjero en turismo/ocio; se validará al llegar y se cobrará IVA si la información no corresponde.')
               : (mustPayIVA
                 ? `* VAT is paid at the property (${isBusinessTrip ? 'required for business travel' : 'applies to Colombian residents'}).`
                 : '* Preliminary exemption for foreign tourism/leisure travel; it will be validated on arrival and VAT will be charged if the information does not match.')}
@@ -1371,64 +1484,129 @@ function BookingSummary({ booking, search, lang }) {
 }
 
 /* ── Confirmation ─────────────────────────────────── */
-function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, lang }) {
+/* outcome:
+     'confirmed'  → reserva creada (código final de la reserva).
+     'confirming' → pago aprobado; la reserva aún se está registrando (el
+                    webhook no ha terminado o quedó en revisión). Llega por correo.
+     'processing' → el pago sigue en proceso en el banco / la pasarela.
+     'declined'   → la pasarela rechazó el pago.
+     'soldout'    → el pago entró pero ya no había disponibilidad: la reserva no
+                    se crea; el equipo contacta al huésped (devolución o alternativa).
+   minimal: volvimos de Mercado Pago sin el borrador (otro navegador o venció):
+   solo mostramos lo que viene en la referencia del pago, sin desglose de IVA. */
+function Confirmation({ booking, search, code, paymentDetails, outcome = 'confirmed', polling, minimal, onManage, onNew, onRetry, lang }) {
   const t = i18nEngine[lang];
-  const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
-  const reservationPending = !!(paymentDetails && paymentDetails.reservationPending);
+  const room = booking.room || null;
+  const calc = (!minimal && room) ? calcTotal(room, booking.rate, booking.extras, search) : null;
+  const isConfirmed = outcome === 'confirmed';
 
-  const roomName = t.roomNames[booking.room.id] || booking.room.name;
+  const roomName = room ? (t.roomNames[room.id] || room.name) : '';
   const rateLabel = booking.rate === 'flexible' ? `${t.flexible} — ${t.refundable}` : `${t.bestPrice} — ${t.strictCancel}`;
 
   const isColombian = isColombianGuest(booking.guest);
   const isBusinessTrip = isBusinessGuest(booking.guest, lang);
   const mustPayIVA = mustChargeIva(booking.guest, lang);
+  const paidAmount = booking.payableCents != null
+    ? Math.round(booking.payableCents / 100)
+    : (calc ? calc.subtotal : null);
+
+  const heroTitle = {
+    confirmed: t.successTitle,
+    confirming: t.confirmingHero,
+    processing: t.processingHero,
+    declined: t.declinedHero,
+    soldout: t.confirmingHero
+  }[outcome] || t.successTitle;
+
+  const statusBox = {
+    confirming: { icon: 'clock', title: t.confirmingBoxTitle, text: t.confirmingBoxText },
+    processing: { icon: 'clock', title: t.processingBoxTitle, text: t.processingBoxText },
+    declined: { icon: 'alert-triangle', title: t.declinedHero + '.', text: t.paymentErrorDeclined },
+    soldout: { icon: 'alert-triangle', title: t.soldOutBoxTitle, text: t.soldOutBoxText }
+  }[outcome];
+  const isError = outcome === 'declined' || outcome === 'soldout';
+
+  /* App del huésped (check-in en línea) con el código prellenado: solo cuando la
+     reserva ya existe en el PMS (antes no la encontraría). En inglés abre la
+     versión /en/guest.html (generada en el build). */
+  const checkinHref = `${lang === 'en' ? '/en' : ''}/guest.html?code=${encodeURIComponent(code || '')}`;
 
   return (
-    <div className="be-confirmation">
+    <div className={`be-confirmation be-confirmation-${outcome}`}>
       <div className="be-confirm-hero">
         <span className="be-confirm-icon">✶</span>
-        <h2>{reservationPending ? (lang === 'es' ? 'Pago recibido' : 'Payment received') : t.successTitle}</h2>
-        <p>{reservationPending ? (lang === 'es' ? 'Referencia:' : 'Reference:') : t.successCode} <strong>{code}</strong></p>
-        <p style={{ marginTop: 8 }}>
-          {reservationPending
-            ? (lang === 'es' ? 'Guardamos esta referencia para seguimiento manual.' : 'We saved this reference for manual follow-up.')
-            : <>{t.successSent} <strong>{booking.guest?.email || 'tu correo'}</strong></>}
-        </p>
-      </div>
-      {reservationPending && (
-        <div className="be-info-box" style={{ marginBottom: 16, backgroundColor: 'var(--sand-100)', borderColor: 'var(--terracotta-300)' }}>
-          <Icon name="clock" size={18} />
-          <p>
-            <strong>{lang === 'es' ? 'Reserva pendiente de confirmacion.' : 'Booking pending confirmation.'}</strong>{' '}
-            {lang === 'es'
-              ? 'Tu pago fue aprobado, pero Kunas no creo la reserva automaticamente. Nuestro equipo debe confirmarla manualmente y te contactara con el codigo final.'
-              : 'Your payment was approved, but Kunas did not create the booking automatically. Our team must confirm it manually and will contact you with the final code.'}
+        <h2>{heroTitle}</h2>
+        <p>{isConfirmed ? t.successCode : t.referenceLabel} <strong>{code}</strong></p>
+        {/* El correo lo envía SOLO el servidor (webhook) cuando la reserva ya
+            existe: confirmada → "Confirmación enviada a"; mientras se confirma o
+            el pago sigue en proceso → "Te confirmaremos la reserva por correo a".
+            Sin el correo en mano (retorno de MP sin borrador) no se promete. */}
+        {isConfirmed && !minimal && booking.guest?.email && (
+          <p style={{ marginTop: 8 }}>
+            {t.successSent} <strong>{booking.guest.email}</strong>
           </p>
+        )}
+        {(outcome === 'confirming' || outcome === 'processing') && booking.guest?.email && (
+          <p style={{ marginTop: 8 }}>
+            {t.confirmByEmailAt} <strong>{booking.guest.email}</strong>
+          </p>
+        )}
+      </div>
+      {statusBox && (
+        <div className={`be-info-box be-confirm-status${isError ? ' be-info-error' : ' be-pending-box'}`} role="status"
+          style={{ marginBottom: 16, flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <Icon name={statusBox.icon} size={18} />
+            <p style={{ margin: 0 }}>
+              <strong>{statusBox.title}</strong>{' '}{statusBox.text}
+            </p>
+          </div>
+          {polling && !isError && (
+            <p className="be-confirm-polling">
+              <span className="be-spinner-small" aria-hidden="true"></span>
+              <span>{t.stillChecking}</span>
+            </p>
+          )}
+          {outcome === 'declined' && onRetry && (
+            <button type="button" className="be-btn-secondary" style={{ alignSelf: 'flex-start' }} onClick={onRetry}>
+              {t.tryAgain}
+            </button>
+          )}
         </div>
       )}
       <div className="be-confirm-card">
-        <div className="be-confirm-row">
-          <span className="be-eyebrow">{t.stepRooms}</span>
-          <p className="be-confirm-val">{lang === 'es' ? 'Tipología' : 'Typology'} {booking.room.num} — {roomName} · {booking.room.area} m²</p>
-        </div>
-        <div className="be-confirm-row two">
-          <div>
-            <span className="be-eyebrow">{t.checkin}</span>
-            <p className="be-confirm-val">{fmtDate(search.checkin)} · 3:00 pm</p>
-          </div>
-          <div>
-            <span className="be-eyebrow">{t.checkout}</span>
-            <p className="be-confirm-val">{fmtDate(search.checkout)} · 11:00 am</p>
-          </div>
-        </div>
-        <div className="be-confirm-row">
-          <span className="be-eyebrow">{lang === 'es' ? 'Tarifa' : 'Rate'}</span>
-          <p className="be-confirm-val">{rateLabel}</p>
-        </div>
-        {calc && (
+        {room && (
           <div className="be-confirm-row">
-            <span className="be-eyebrow">{lang === 'es' ? 'Pagado Hoy (Online)' : 'Paid Today (Online)'}</span>
-            <p className="be-confirm-total" style={{ fontSize: 20 }}>{formatCOP(booking.payableCents != null ? Math.round(booking.payableCents / 100) : calc.subtotal)}</p>
+            <span className="be-eyebrow">{t.stepRooms}</span>
+            <p className="be-confirm-val">{lang === 'es' ? 'Tipología' : 'Typology'} {room.num} — {roomName}{room.area ? ` · ${room.area} m²` : ''}</p>
+          </div>
+        )}
+        {search && search.checkin && search.checkout && (
+          <div className="be-confirm-row two">
+            <div>
+              <span className="be-eyebrow">{t.checkin}</span>
+              <p className="be-confirm-val">{fmtDate(search.checkin)} · 3:00 pm</p>
+            </div>
+            <div>
+              <span className="be-eyebrow">{t.checkout}</span>
+              <p className="be-confirm-val">{fmtDate(search.checkout)} · 11:00 am</p>
+            </div>
+          </div>
+        )}
+        {!minimal && booking.rate && (
+          <div className="be-confirm-row">
+            <span className="be-eyebrow">{lang === 'es' ? 'Tarifa' : 'Rate'}</span>
+            <p className="be-confirm-val">{rateLabel}</p>
+          </div>
+        )}
+        {paidAmount != null && outcome !== 'declined' && (
+          <div className="be-confirm-row">
+            <span className="be-eyebrow">
+              {outcome === 'processing'
+                ? (lang === 'es' ? 'Valor del pago (en proceso)' : 'Payment amount (in process)')
+                : (lang === 'es' ? 'Pagado hoy (en línea)' : 'Paid today (online)')}
+            </span>
+            <p className="be-confirm-total" style={{ fontSize: 20 }}>{formatCOP(paidAmount)}</p>
           </div>
         )}
         {calc && mustPayIVA && (
@@ -1454,56 +1632,75 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
             <p className="be-confirm-val" style={{ fontSize: 14, color: 'var(--olive-700)', margin: '4px 0 0 0', textDecoration: 'line-through' }}>{formatCOP(calc.iva)}</p>
             <p style={{ fontSize: 11, color: 'var(--olive-700)', margin: '4px 0 0 0', lineHeight: 1.4, fontWeight: 'bold' }}>
               {lang === 'es' 
-                ? 'Exencion preliminar por extranjero en turismo/ocio. Se validara la informacion al llegar; si no corresponde, se cobrara IVA en el alojamiento.'
+                ? 'Exención preliminar por extranjero en turismo/ocio. Se validará la información al llegar; si no corresponde, se cobrará IVA en el alojamiento.'
                 : 'Preliminary exemption for foreign tourism/leisure travel. Information will be validated on arrival; if it does not match, VAT will be charged at the property.'}
             </p>
           </div>
         )}
-        {paymentDetails && (
-          <div className="be-confirm-row" style={{ backgroundColor: 'var(--paper-200)', borderTop: '1px solid var(--paper-400)' }}>
-            <span className="be-eyebrow" style={{ color: 'var(--olive)' }}>{lang === 'es' ? 'Detalles del pago' : 'Payment details'}</span>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, flexWrap: 'wrap', gap: 10 }}>
-              <div>
-                <p className="be-confirm-val" style={{ fontSize: 13, margin: 0 }}>
-                  <strong>{lang === 'es' ? 'ID de transacción:' : 'Transaction ID:'}</strong> {paymentDetails.id}
-                </p>
-                <p className="be-confirm-val" style={{ fontSize: 13, margin: '4px 0 0 0', opacity: 0.85 }}>
-                  <strong>{lang === 'es' ? 'Medio de pago:' : 'Payment method:'}</strong> {paymentDetails.paymentMethod || 'Wompi'}
-                </p>
+        {paymentDetails && (() => {
+          /* El estado del pago sale del desenlace (no solo del callback inicial:
+             un PSE "PENDING" que luego se aprobó debe verse como Aprobado). */
+          const payApproved = outcome === 'confirmed' || outcome === 'confirming' || paymentDetails.status === 'APPROVED';
+          const payLabel = outcome === 'declined'
+            ? (lang === 'es' ? 'Rechazado' : 'Declined')
+            : payApproved
+              ? (lang === 'es' ? 'Aprobado' : 'Approved')
+              : (lang === 'es' ? 'En proceso' : 'In process');
+          return (
+            <div className="be-confirm-row" style={{ backgroundColor: 'var(--paper-200)', borderTop: '1px solid var(--paper-400)' }}>
+              <span className="be-eyebrow" style={{ color: 'var(--olive)' }}>{lang === 'es' ? 'Detalles del pago' : 'Payment details'}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                  {paymentDetails.id && (
+                    <p className="be-confirm-val" style={{ fontSize: 13, margin: 0 }}>
+                      <strong>{lang === 'es' ? 'ID de transacción:' : 'Transaction ID:'}</strong> {paymentDetails.id}
+                    </p>
+                  )}
+                  <p className="be-confirm-val" style={{ fontSize: 13, margin: '4px 0 0 0', opacity: 0.85 }}>
+                    <strong>{lang === 'es' ? 'Medio de pago:' : 'Payment method:'}</strong> {paymentDetails.paymentMethod || 'Wompi'}
+                  </p>
+                </div>
+                <span style={{
+                  backgroundColor: payApproved ? 'var(--olive-100)' : 'var(--terracotta-100)',
+                  color: payApproved ? 'var(--olive-700)' : 'var(--terracotta-700)',
+                  padding: '4px 10px',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  borderRadius: 'var(--radius-pill)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  display: 'inline-block'
+                }}>
+                  {payLabel}
+                </span>
               </div>
-              <span style={{
-                backgroundColor: paymentDetails.status === 'APPROVED' ? 'var(--olive-100)' : 'var(--terracotta-100)',
-                color: paymentDetails.status === 'APPROVED' ? 'var(--olive-700)' : 'var(--terracotta-700)',
-                padding: '4px 10px',
-                fontSize: 10,
-                fontWeight: 700,
-                borderRadius: 'var(--radius-pill)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                display: 'inline-block'
-              }}>
-                {paymentDetails.status === 'APPROVED' 
-                  ? (lang === 'es' ? 'Aprobado' : 'Approved') 
-                  : (lang === 'es' ? 'Pendiente' : 'Pending')}
-              </span>
             </div>
-            {paymentDetails.status === 'PENDING' && (
-              <p style={{ fontSize: 11, color: 'var(--ink-500)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.4, margin: '8px 0 0 0' }}>
-                {lang === 'es' 
-                  ? '✶ Tu pago está pendiente de confirmación por tu banco. Te enviaremos un correo cuando se apruebe.' 
-                  : '✶ Your payment is pending confirmation by your bank. We will email you once approved.'}
-              </p>
-            )}
+          );
+        })()}
+        {isConfirmed && (
+          <div className="be-confirm-row be-confirm-checkin">
+            <span className="be-eyebrow">{t.checkinOnline}</span>
+            <p className="be-confirm-val" style={{ fontSize: 13, fontWeight: 400, margin: '4px 0 12px 0' }}>{t.checkinOnlineDesc}</p>
+            <a className="be-btn-primary be-checkin-link" href={checkinHref} target="_blank" rel="noopener noreferrer">
+              <Icon name="scan-line" size={15} /> {t.checkinOnline}
+            </a>
           </div>
         )}
-        <div className="be-confirm-actions">
-          <button className="be-btn-secondary" onClick={onManage}>
-            <Icon name="settings" size={15} /> {t.manageBooking}
-          </button>
-          <button className="be-btn-ghost" onClick={onNew}>{t.newBooking}</button>
-        </div>
+        {/* Siempre hay salida: en 'confirming'/'processing' el huésped puede hacer
+            otra reserva (handleSearch detiene la consulta y borra el pago en
+            curso, así una recarga no lo devuelve a esta pantalla). */}
+        {onNew && (
+          <div className="be-confirm-actions">
+            {isConfirmed && (
+              <button className="be-btn-secondary" onClick={onManage}>
+                <Icon name="settings" size={15} /> {t.manageBooking}
+              </button>
+            )}
+            <button className="be-btn-ghost" onClick={onNew}>{t.newBooking}</button>
+          </div>
+        )}
       </div>
-      <div className="be-confirm-next">
+      {!isError && <div className="be-confirm-next">
         <span className="be-eyebrow">{t.beforeArrival}</span>
         <div className="be-confirm-tips">
           {[
@@ -1517,7 +1714,7 @@ function Confirmation({ booking, search, code, paymentDetails, onManage, onNew, 
             </div>
           ))}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -1602,9 +1799,13 @@ function ManageBooking({ onBack, lang }) {
       </p>
       <form onSubmit={doSearch} className="be-manage-form">
         <div className="be-field">
-          <label>{t.bookingCodeLabel}</label>
-          <input type="text" placeholder="EST-XXXXX" value={code}
+          <label htmlFor="manage-code">{t.bookingCodeLabel}</label>
+          {/* El número de reserva es el del PMS (el que llega en el correo de
+              confirmación); get-booking lo busca por ese id. */}
+          <input id="manage-code" type="text" inputMode="text" autoComplete="off" placeholder={t.bookingCodePlaceholder} value={code}
+            aria-describedby="manage-code-help"
             onChange={e => setCode(e.target.value)} required />
+          <span id="manage-code-help" className="be-field-help">{t.bookingCodeHelp}</span>
         </div>
         <div className="be-field">
           <label>{t.email}</label>
@@ -1771,17 +1972,25 @@ function BookingEngine() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Find room if pre-selected
-  const matchingRoom = BE_ROOMS.find(r => r.id === initialParams.roomParam);
-
-  const [selectedRoom, setSelectedRoom] = useState(() =>
-    (draft && draft.selectedRoom) || matchingRoom || null
-  );
-  const [selectedRate, setSelectedRate] = useState(() => (draft && draft.selectedRate) || 'flexible');
-  const [currentStep, setCurrentStep] = useState(() => {
-    if (draft && draft.currentStep) return draft.currentStep;
-    return matchingRoom ? 'extras' : 'rooms';
+  /* Habitación pedida desde su página (?room=slug). Ya NO se salta al paso 2 con
+     una tarifa asumida (Flexible quedaba elegida sin que el huésped la viera):
+     se muestra primera y resaltada en el paso 1 para que vea disponibilidad,
+     cupo y elija la tarifa. Si no caben los huéspedes, se avisa. */
+  const matchingRoom = BE_ROOMS.find(r => r.id === initialParams.roomParam) || null;
+  const [preselectedRoomId] = useState(() => (matchingRoom ? matchingRoom.id : null));
+  const [capacityNotice, setCapacityNotice] = useState(() => {
+    const guestsNow = (draft && draft.search && draft.search.guests) || initialParams.guests;
+    if (!matchingRoom || roomFitsGuests(matchingRoom, guestsNow)) return null;
+    return { roomId: matchingRoom.id, name: matchingRoom.name, capacity: roomCapacity(matchingRoom), guests: guestsNow };
   });
+
+  /* Un borrador solo retoma pasos posteriores si trae habitación, tarifa
+     elegida y cupo para los huéspedes; si no, vuelve al paso 1. */
+  const draftReady = !!(draft && draft.selectedRoom && (draft.selectedRate === 'best' || draft.selectedRate === 'flexible')
+    && roomFitsGuests(draft.selectedRoom, draft.search && draft.search.guests));
+  const [selectedRoom, setSelectedRoom] = useState(() => (draftReady ? draft.selectedRoom : null));
+  const [selectedRate, setSelectedRate] = useState(() => (draftReady ? draft.selectedRate : null));
+  const [currentStep, setCurrentStep] = useState(() => (draftReady && draft.currentStep) ? draft.currentStep : 'rooms');
   const [ratePerRoom, setRatePerRoom] = useState(() => (draft && draft.ratePerRoom) || {});
   const [extras, setExtras] = useState(() => (draft && draft.extras) || {});
   const [guestData, setGuestData] = useState(() => (draft && draft.guestData) || {});
@@ -1790,9 +1999,28 @@ function BookingEngine() {
   const [paymentMethod, setPaymentMethod] = useState(() =>
     (draft && draft.paymentMethod) || 'wompi'
   );
+
+  /* ── Seguimiento del pago ──────────────────────────────────────────────
+     Al volver de Mercado Pago (?payment=success|pending con código) o si hay un
+     pago en curso guardado (recarga durante la espera), se retoma la consulta a
+     booking-status en vez de mostrar el paso de pago otra vez. */
+  const [mpReturn] = useState(() => readMpReturnFromPage());
+  const [resumePayment] = useState(() => (mpReturn ? null : loadPendingPayment()));
+  const initialTracking = mpReturn || resumePayment;
   const [bookingCode, setBookingCode] = useState(null);
   const [paymentDetails, setPaymentDetails] = useState(null);
-  const [creatingReservation, setCreatingReservation] = useState(false);
+  const [creatingReservation, setCreatingReservation] = useState(() => !!initialTracking);
+  /* payPhase: 'confirming' (pago aprobado) | 'processing' (pago en proceso). */
+  const [payPhase, setPayPhase] = useState(() =>
+    initialTracking ? (phaseForPaymentStatus(initialTracking.status) || 'confirming') : null);
+  /* payOutcome: lo que muestra la confirmación — 'confirmed' | 'confirming' |
+     'processing' | 'declined'. */
+  const [payOutcome, setPayOutcome] = useState(null);
+  const [payPolling, setPayPolling] = useState(false);
+  const [paymentNotice, setPaymentNotice] = useState(null);
+  /* Retorno de MP sin borrador: datos mínimos sacados de la referencia del pago. */
+  const [minimalInfo, setMinimalInfo] = useState(null);
+  const payRunRef = useRef(0);
   /* Cupón aplicado (elevado desde PaymentPanel): así el resumen, la barra móvil,
      la confirmación y el correo muestran el monto REALMENTE cobrado (con descuento)
      y no el subtotal. El descuento se re-valida/re-precia server-side igual. */
@@ -1861,7 +2089,7 @@ function BookingEngine() {
       );
       if (myId !== availabilityRequestIdRef.current) return; /* superseded */
       if (!response.ok) {
-        throw new Error(lang === 'es' ? 'No se pudo obtener la disponibilidad desde Kunas PMS.' : 'Failed to retrieve availability from Kunas PMS.');
+        throw new Error(i18nEngine[lang].availabilityError);
       }
       const data = await response.json();
       if (myId !== availabilityRequestIdRef.current) return;
@@ -1899,13 +2127,14 @@ function BookingEngine() {
         });
         setRooms(mapped);
       } else {
-        throw new Error(lang === 'es' ? 'Respuesta de API de disponibilidad inválida.' : 'Invalid availability API response.');
+        throw new Error(i18nEngine[lang].availabilityError);
       }
     } catch (err) {
       if (err.name === 'AbortError') return; /* cancelled, not a real error */
       if (myId !== availabilityRequestIdRef.current) return;
       console.error('Fetch availability error:', err);
-      setError(err.message);
+      /* Siempre el texto para el huésped (nunca "Failed to fetch" ni el PMS). */
+      setError(i18nEngine[lang].availabilityError);
     } finally {
       if (myId === availabilityRequestIdRef.current) setLoading(false);
     }
@@ -1931,6 +2160,23 @@ function BookingEngine() {
       }
     }
   }, [rooms]);
+
+  /* Guardas del flujo (no aplican mientras se sigue un pago ya hecho):
+     - sin habitación o sin tarifa elegida no se puede estar más allá del paso 1;
+     - si la habitación elegida no tiene cupo para los huéspedes, se vuelve al
+       paso 1 con un aviso (el servidor también lo rechaza: over_capacity). */
+  useEffect(() => {
+    if (creatingReservation || bookingCode) return;
+    if (selectedRoom && !roomFitsGuests(selectedRoom, search.guests)) {
+      setCapacityNotice({ roomId: selectedRoom.id, name: selectedRoom.name, capacity: roomCapacity(selectedRoom), guests: search.guests });
+      setSelectedRoom(null);
+      setCurrentStep('rooms');
+      return;
+    }
+    if (currentStep !== 'rooms' && (!selectedRoom || (selectedRate !== 'best' && selectedRate !== 'flexible'))) {
+      setCurrentStep('rooms');
+    }
+  }, [selectedRoom, selectedRate, currentStep, search.guests, creatingReservation, bookingCode]);
 
   // Skip auto-scroll on initial mount so the SearchBar is visible above the room cards.
   // Only scroll when the user navigates between steps after the first render.
@@ -1977,6 +2223,9 @@ function BookingEngine() {
   }
 
   function handleSelectRoom(room, rate) {
+    /* Elección explícita: sin tarifa o sin cupo no se avanza. */
+    if ((rate !== 'best' && rate !== 'flexible') || !roomFitsGuests(room, search.guests)) return;
+    setCapacityNotice(null);
     setSelectedRoom(room);
     setSelectedRate(rate);
     setCurrentStep('extras');
@@ -1988,171 +2237,241 @@ function BookingEngine() {
     }
   }
 
+  /* Detiene cualquier seguimiento de pago en curso (nueva búsqueda, gestionar…). */
+  function stopPaymentTracking() {
+    payRunRef.current += 1;
+    setPayPolling(false);
+  }
+
   function handleSearch(s) {
+    stopPaymentTracking();
+    clearPendingPayment();
     setSearch(s);
     setCurrentStep('rooms');
     setSelectedRoom(null);
-    setSelectedRate('flexible');
+    setSelectedRate(null);
+    setCapacityNotice(null);
     setExtras({});
     setGuestData({});
     setPaymentMethod('wompi');
     setBookingCode(null);
     setPaymentDetails(null);
+    setPayOutcome(null);
+    setPayPhase(null);
+    setPaymentNotice(null);
+    setMinimalInfo(null);
+    setCreatingReservation(false);
   }
 
   /* After payment lands, the cliente no longer creates the OTASync reservation
      directly — that's now the exclusive job of the payment webhook (Wompi or
      Mercado Pago). We poll /api/booking-status until the webhook reports the
-     booking is confirmed, then drive the confirmation UI from that. */
-  function handleConfirmBooking(code, details = null) {
+     booking is confirmed, then drive the confirmation UI from that.
+
+     Estados (motor-logic):
+     - Pago APROBADO → "Estamos confirmando tu reserva". Si en ~1 min no hay
+       confirmación, se muestra "estamos terminando de confirmarla, te llega por
+       correo" y se sigue consultando en segundo plano unos minutos.
+     - Pago EN PROCESO (PSE/Nequi/MP pending) → "Tu pago está en proceso" (no es
+       un error ni se invita a pagar de nuevo) y se sigue consultando; en Wompi
+       también se lee el estado de la transacción para detectar si se aprobó o
+       se rechazó. */
+  function handleConfirmBooking(code, details = null, opts = {}) {
+    const run = ++payRunRef.current;
+    const alive = () => payRunRef.current === run;
+    const provider = (details && details.provider) || 'wompi';
+    let phase = phaseForPaymentStatus(details && details.status) || 'confirming';
+
     setPaymentDetails(details);
+    setPaymentNotice(null);
+    setBookingCode(null);
+    setPayOutcome(null);
+    setPayPhase(phase);
+    setPayPolling(true);
     setCreatingReservation(true);
+    /* Registro del pago en curso: permite retomarlo si el huésped recarga. */
+    const pendingRecord = {
+      code,
+      provider,
+      txId: (details && details.id) || '',
+      status: (details && details.status) || '',
+      paymentMethod: (details && details.paymentMethod) || ''
+    };
+    savePendingPayment(pendingRecord);
 
-    const mustPayIVA = mustChargeIva(booking.guest, lang);
     const calc = calcTotal(booking.room, booking.rate, booking.extras, search);
-    const roomPriceVal = mustPayIVA ? calc.total : calc.subtotal;
+    /* paidAmount = lo REALMENTE cobrado online (con descuento), no el subtotal:
+       antes el correo reportaba un "pagado" mayor al cargo real de Wompi. */
+    const paidVal = payableCents != null ? Math.round(payableCents / 100) : (calc ? calc.subtotal : 0);
 
-    /* The webhook writes booking-results['direct-<code>'] once OTASync
-       confirms. Poll for up to ~60 s with backoff to give the webhook time to
-       land. If it never lands, we still surrender the loading state and show
-       a "tu pago se está procesando" message so the user is not stuck. */
-    const MAX_POLLS = 30;          /* 30 attempts × ~2 s = 60 s max wait    */
-    const POLL_INTERVAL_MS = 2000;
-    let pollCount = 0;
-    let cancelled = false;
+    /* El correo de confirmación lo envía SOLO el servidor (webhook de pago),
+       cuando la reserva ya existe en el PMS. El navegador ya no lo pide: antes
+       mandaba "Reserva confirmada" aun sin reserva (timeout/pendiente), con el
+       código EST-, y el endpoint público permitía enviar correos a cualquiera. */
 
-    const stopAndShow = (success, finalCode, otasyncId = null, reservationPending = false) => {
-      if (cancelled) return;
+    const showInterim = (outcome) => {
+      setBookingCode(code);
+      setPayOutcome(outcome);
       setCreatingReservation(false);
-      if (success) {
-        /* A-6: client-side purchase. The webhook also reports the conversion
-           server-side (Measurement Protocol) so ad-blocked sessions still
-           count; GA4 dedupes on transaction_id. value = amount charged online
-           (subtotal, no IVA). */
-        const gi = gaItem(booking.room, booking.rate, search);
-        beTrack('purchase', {
-          transaction_id: finalCode,
-          currency: 'COP',
-          /* Ingreso real cobrado online = con descuento aplicado (no el subtotal). */
-          value: payableCents != null ? Math.round(payableCents / 100) : (calc ? calc.subtotal : 0),
-          items: gi ? [gi] : []
-        });
-        setBookingCode(finalCode);
-        /* Reservation locked in — clear the draft so a future visitor on this
-           browser does not see this guest's data pre-filled. */
-        try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) { /* noop */ }
-      } else {
-        setPaymentDetails(prev => ({ ...(prev || details || {}), reservationPending: true }));
-        setBookingCode(finalCode);
-      }
-      /* paidAmount = lo REALMENTE cobrado online (con descuento), no el subtotal:
-         antes el correo reportaba un "pagado" mayor al cargo real de Wompi. */
-      sendConfirmationEmailIfPossible(finalCode, roomPriceVal, payableCents != null ? Math.round(payableCents / 100) : calc.subtotal);
     };
 
-    const pollOnce = () => {
-      if (cancelled) return;
-      pollCount += 1;
-      fetch(`/api/booking-status?ref=${encodeURIComponent(code)}`)
-        .then(r => r.json())
-        .then(data => {
-          if (cancelled) return;
-          if (data && data.status === 'confirmed' && !data.reservationPending) {
-            stopAndShow(true, data.bookingCode || code, data.otasyncId || null);
-            return;
-          }
-          if (data && data.status === 'confirmed' && data.reservationPending) {
-            /* Webhook landed but OTASync side flagged pending — show the
-               recovery copy instead of the success screen. */
-            stopAndShow(false, data.bookingCode || code, null, true);
-            return;
-          }
-          if (pollCount >= MAX_POLLS) {
-            console.warn('[booking-status] polling timed out without confirmation');
-            stopAndShow(false, code, null, true);
-            return;
-          }
-          setTimeout(pollOnce, POLL_INTERVAL_MS);
-        })
-        .catch(err => {
-          console.error('[booking-status] poll error:', err);
-          if (pollCount >= MAX_POLLS) {
-            stopAndShow(false, code, null, true);
-            return;
-          }
-          setTimeout(pollOnce, POLL_INTERVAL_MS);
-        });
+    const onConfirmed = (finalCode) => {
+      if (!alive()) return;
+      payRunRef.current += 1; /* fin del seguimiento */
+      /* A-6: client-side purchase. The webhook also reports the conversion
+         server-side (Measurement Protocol) so ad-blocked sessions still
+         count; GA4 dedupes on transaction_id. value = amount charged online
+         (subtotal, no IVA). */
+      const gi = gaItem(booking.room, booking.rate, search);
+      beTrack('purchase', {
+        transaction_id: finalCode,
+        currency: 'COP',
+        /* Ingreso real cobrado online = con descuento aplicado (no el subtotal). */
+        value: paidVal,
+        items: gi ? [gi] : []
+      });
+      setPaymentDetails(prev => ({ ...(prev || details || {}), status: 'APPROVED' }));
+      setBookingCode(finalCode);
+      setPayOutcome('confirmed');
+      setPayPolling(false);
+      setCreatingReservation(false);
+      /* Reservation locked in — clear the draft so a future visitor on this
+         browser does not see this guest's data pre-filled. */
+      try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) { /* noop */ }
+      clearPendingPayment();
+    };
+
+    const onDeclined = () => {
+      if (!alive()) return;
+      payRunRef.current += 1;
+      clearPendingPayment();
+      setPayPolling(false);
+      setCreatingReservation(false);
+      if (booking.room && booking.guest && booking.guest.email) {
+        /* Con el borrador en mano: de vuelta al paso de pago con el aviso. */
+        setBookingCode(null);
+        setPayOutcome(null);
+        setPaymentDetails(null);
+        setCurrentStep('payment');
+        setPaymentNotice(i18nEngine[lang].paymentErrorDeclined);
+      } else {
+        setBookingCode(code);
+        setPayOutcome('declined');
+      }
+    };
+
+    let attempt = 0;
+    let interimShown = false;
+
+    const pollOnce = async () => {
+      if (!alive()) return;
+      attempt += 1;
+      let data = null;
+      try {
+        const r = await fetch(`/api/booking-status?ref=${encodeURIComponent(code)}`);
+        data = await r.json().catch(() => null);
+      } catch (err) {
+        console.error('[booking-status] poll error:', err);
+      }
+      if (!alive()) return;
+      const status = interpretBookingStatus(data);
+
+      if (status === 'confirmed') {
+        onConfirmed((data && data.bookingCode) || code);
+        return;
+      }
+
+      if (status === 'soldOut') {
+        /* Pago recibido sin disponibilidad: la reserva no se va a crear. Ni
+           "llegará por correo" ni correo de confirmación; el equipo ya recibió
+           la alerta y contacta al huésped (devolución o alternativa). */
+        payRunRef.current += 1;
+        clearPendingPayment();
+        setPayPolling(false);
+        showInterim('soldout');
+        return;
+      }
+
+      if (status === 'reservationPending') {
+        /* El webhook recibió el pago pero la reserva quedó en revisión: no es un
+           error del huésped. "Estamos terminando de confirmarla" y seguimos
+           consultando en segundo plano. */
+        if (phase !== 'confirming') { phase = 'confirming'; setPayPhase('confirming'); }
+        if (!interimShown) { interimShown = true; showInterim('confirming'); }
+        else setPayOutcome('confirming');
+      }
+
+      if (phase === 'processing' && provider === 'wompi' && details && details.id) {
+        const tx = await checkWompiTransaction(details.id);
+        if (!alive()) return;
+        if (tx === 'declined') { onDeclined(); return; }
+        if (tx === 'approved') {
+          phase = 'confirming';
+          setPayPhase('confirming');
+          setPaymentDetails(prev => ({ ...(prev || details || {}), status: 'APPROVED' }));
+          if (interimShown) setPayOutcome('confirming');
+          pendingRecord.status = 'APPROVED';
+          savePendingPayment(pendingRecord);
+        }
+      }
+
+      if (!interimShown && fastPollsDone(attempt, phase)) {
+        console.warn('[booking-status] sin confirmación todavía; se sigue consultando en segundo plano');
+        interimShown = true;
+        showInterim(phase);
+      }
+
+      const delay = nextPollDelay(attempt, phase);
+      if (delay == null) {
+        /* Se acabaron las consultas: se borra el pago en curso para que una
+           recarga posterior no vuelva a dejar al huésped en la espera. */
+        clearPendingPayment();
+        setPayPolling(false);
+        if (!interimShown) { interimShown = true; showInterim(phase); }
+        return;
+      }
+      setTimeout(pollOnce, delay);
     };
 
     /* Start polling immediately — the webhook is usually faster than the
        cliente-side redirect, so the first poll often returns confirmed. */
     pollOnce();
-
-    /* NOTE: la confirmación de Mercado Pago (retorno ?payment=success) entra por
-       el efecto `mpReturnHandled` más abajo, que llama a esta misma función. */
-
-    /* The setup of the polling loop captured `cancelled` via closure; if a
-       follow-up action (manage / back) needs to abort early, future work can
-       expose a ref to set cancelled=true. For now the page is a hard reload
-       after confirmation, so cancellation is not required. */
     return;
-
-    /* Helper kept inline so the same closure has access to booking, search,
-       and lang without re-derivation. */
-    function sendConfirmationEmailIfPossible(finalCode, totalAmount, paidAmount) {
-      const guestEmail = booking.guest?.email || '';
-      const guestName = `${booking.guest?.nombre || ''} ${booking.guest?.apellido || ''}`.trim();
-      const nights = dateDiff(search.checkin, search.checkout);
-      const roomName = booking.room.name || '';
-      if (!guestEmail) return;
-      fetch('/api/send-confirmation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          guestEmail,
-          guestName,
-          bookingCode: finalCode,
-          roomName,
-          checkIn: search.checkin,
-          checkOut: search.checkout,
-          nights,
-          totalAmount,
-          paidAmount,
-          phone: booking.guest?.tel || '',
-          /* Pase de desayuno (Fase 2): el correo añade el link a los pases QR
-             solo si la reserva trae desayuno. La clave del extra es 'desayuno'. */
-          breakfast: !!(booking.extras && booking.extras.desayuno)
-        })
-      })
-      .then(r => r.json())
-      .then(emailData => console.log('[send-confirmation] Result:', emailData))
-      .catch(emailErr => console.error('[send-confirmation] Error:', emailErr));
-    }
   }
 
-  /* Retorno de Mercado Pago con pago aprobado (o pendiente): en vez de dejar al
-     huésped en el motor con un aviso, consultamos booking-status igual que en
-     Wompi y mostramos la confirmación (resumen + "antes de llegar"). Necesita el
-     borrador de la reserva (sessionStorage); sin él, queda el aviso genérico. */
-  const mpReturnHandled = useRef(false);
-  const mpReturnCode = (initialParams.payment === 'success' || initialParams.payment === 'pending')
-    ? mpReturnBookingCode() : null;
-  const mpAutoConfirm = !!(mpReturnCode && selectedRoom);
+  /* Retorno de Mercado Pago (?payment=success|pending) o pago en curso guardado
+     (recarga durante la espera): se consulta booking-status igual que en Wompi
+     y se muestra la confirmación. Sin borrador (otro navegador o venció) se
+     muestra una confirmación mínima con lo que trae la referencia del pago. */
+  const resumeHandledRef = useRef(false);
   useEffect(() => {
-    if (!mpAutoConfirm || mpReturnHandled.current) return;
-    mpReturnHandled.current = true;
-    try { sessionStorage.removeItem(MP_PENDING_KEY); } catch (e) { /* noop */ }
-    const qs = new URLSearchParams(window.location.search);
-    const paymentId = qs.get('payment_id') || qs.get('collection_id') || '';
-    /* Limpia ?payment=… para que un refresh no repita el flujo. */
-    try { window.history.replaceState(null, '', window.location.pathname); } catch (e) { /* noop */ }
-    handleConfirmBooking(mpReturnCode, {
-      provider: 'mercadopago',
-      id: paymentId || mpReturnCode,
-      paymentMethod: 'Mercado Pago',
-      status: initialParams.payment === 'success' ? 'APPROVED' : 'PENDING'
-    });
-  }, [mpAutoConfirm]);
+    if (resumeHandledRef.current) return;
+    resumeHandledRef.current = true;
+    if (initialParams.payment === 'failure') {
+      try { sessionStorage.removeItem(MP_PENDING_KEY); } catch (e) { /* noop */ }
+    }
+    if (mpReturn) {
+      try { sessionStorage.removeItem(MP_PENDING_KEY); } catch (e) { /* noop */ }
+      /* Limpia ?payment=… para que un refresh no repita el flujo (el pago en
+         curso queda guardado y se retoma desde ahí). */
+      try { window.history.replaceState(null, '', window.location.pathname); } catch (e) { /* noop */ }
+      if (!selectedRoom) setMinimalInfo(minimalFromReference(mpReturn.reference));
+      handleConfirmBooking(mpReturn.code, {
+        provider: 'mercadopago',
+        id: mpReturn.paymentId || '',
+        paymentMethod: 'Mercado Pago',
+        status: mpReturn.status
+      });
+    } else if (resumePayment) {
+      if (!selectedRoom) setMinimalInfo(minimalFromReference(null));
+      handleConfirmBooking(resumePayment.code, {
+        provider: resumePayment.provider || 'wompi',
+        id: resumePayment.txId || '',
+        paymentMethod: resumePayment.paymentMethod || '',
+        status: resumePayment.status || 'APPROVED'
+      });
+    }
+  }, []);
 
   function goToStep(id) {
     const ci = stepOrder.indexOf(currentStep);
@@ -2163,22 +2482,23 @@ function BookingEngine() {
   const extraCount = Object.values(extras).filter(Boolean).length;
 
   /* ── Creating reservation loading screen ── */
-  if ((creatingReservation || mpAutoConfirm) && !bookingCode) {
+  /* Cada estado con su texto: aprobado ("confirmando") ≠ en proceso. */
+  if (creatingReservation && !bookingCode) {
+    const processing = payPhase === 'processing';
     return (
       <div className="be-app" data-theme="editorial">
-        <div className="be-page-inner" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 340, gap: 24, textAlign: 'center', padding: '48px 24px' }}>
+        <div className={`be-page-inner be-pay-wait be-pay-wait-${processing ? 'processing' : 'confirming'}`} role="status" aria-live="polite"
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 340, gap: 24, textAlign: 'center', padding: '48px 24px' }}>
           <div style={{ width: 56, height: 56, border: '3px solid var(--border)', borderTopColor: 'var(--olive)', borderRadius: '50%', animation: 'booking-spin 0.9s linear infinite' }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <p className="t-h4" style={{ margin: 0 }}>
-              {lang === 'es' ? 'Estamos confirmando tu reserva' : 'Confirming your reservation'}
+              {processing ? t.waitProcessingTitle : t.waitConfirmingTitle}
             </p>
             <p className="t-body-sm" style={{ margin: 0, color: 'var(--fg-muted)' }}>
-              {lang === 'es' ? 'Tu pago fue aprobado. Esto puede tomar unos segundos…' : 'Your payment was approved. This may take a few seconds…'}
+              {processing ? t.waitProcessingText : t.waitConfirmingText}
             </p>
             <p className="t-body-sm" style={{ margin: '4px 0 0 0', color: 'var(--fg-muted)' }}>
-              {lang === 'es'
-                ? 'Puedes cerrar esta ventana con tranquilidad: te enviaremos la confirmación por correo en cuanto el proceso termine.'
-                : 'You can safely close this window: we will email your confirmation as soon as the process finishes.'}
+              {t.waitCloseNote}
             </p>
           </div>
         </div>
@@ -2188,13 +2508,23 @@ function BookingEngine() {
 
   /* ── Confirmation ── */
   if (bookingCode) {
+    /* Sin borrador (retorno de MP en otro navegador o borrador vencido): se
+       muestra lo que trae la referencia del pago, sin desglose. */
+    const minimal = !selectedRoom;
+    const mi = minimalInfo || {};
+    const confirmBooking = minimal
+      ? { room: mi.room || null, rate: null, extras: {}, guest: mi.guest || {}, payableCents: mi.payableCents != null ? mi.payableCents : null }
+      : booking;
+    const confirmSearch = minimal ? (mi.search || null) : search;
     return (
       <div className="be-app" data-theme="editorial">
         <div className="be-page-inner">
           <Confirmation
-            booking={booking} search={search} code={bookingCode} paymentDetails={paymentDetails} lang={lang}
-            onManage={() => { setMode('manage'); setBookingCode(null); }}
+            booking={confirmBooking} search={confirmSearch} code={bookingCode} paymentDetails={paymentDetails}
+            outcome={payOutcome || 'confirmed'} polling={payPolling} minimal={minimal} lang={lang}
+            onManage={() => { stopPaymentTracking(); setMode('manage'); setBookingCode(null); }}
             onNew={() => handleSearch({ checkin: getOffset(1), checkout: getOffset(4), guests: 2 })}
+            onRetry={() => handleSearch({ checkin: getOffset(1), checkout: getOffset(4), guests: 2 })}
           />
         </div>
       </div>
@@ -2231,7 +2561,8 @@ function BookingEngine() {
   return (
     <div className="be-app" data-theme="editorial">
       <div className="be-page-inner">
-        {!mpAutoConfirm && <PaymentReturnNotice status={initialParams.payment} lang={lang} />}
+        {/* Aviso de respaldo solo si volvimos de Mercado Pago sin poder identificar la reserva. */}
+        {!mpReturn && <PaymentReturnNotice status={initialParams.payment} lang={lang} />}
         <SearchBar search={search} onSearch={handleSearch} lang={lang} />
         <StepProgress currentStep={currentStep} lang={lang} />
         <MobileSummaryBar booking={booking} search={search} lang={lang} />
@@ -2262,22 +2593,17 @@ function BookingEngine() {
                   </h3>
                   <p style={{ fontSize: 13, color: 'var(--ink-500)', lineHeight: 1.6, margin: '0 0 8px 0', maxWidth: 480 }}>
                     {lang === 'es' 
-                      ? 'No encontramos apartaestudios libres en Kunas PMS para estas fechas. Puedes intentar buscando una semana después o escribirnos directamente por WhatsApp para ver si contamos con alguna alternativa o cancelación de última hora.' 
-                      : 'We could not find free apartaestudios in Kunas PMS for these dates. You can try searching for a week later or write to us directly on WhatsApp to see if we have any alternatives or last-minute cancellations.'}
+                      ? 'No encontramos apartaestudios libres para estas fechas. Puedes intentar buscando una semana después o escribirnos directamente por WhatsApp para ver si contamos con alguna alternativa o cancelación de última hora.' 
+                      : 'We could not find free apartaestudios for these dates. You can try searching for a week later or write to us directly on WhatsApp to see if we have any alternatives or last-minute cancellations.'}
                   </p>
                   
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
                     <button className="be-btn-secondary" onClick={() => {
-                      const checkinDate = new Date(search.checkin + 'T00:00:00');
-                      const checkoutDate = new Date(search.checkout + 'T00:00:00');
-                      const diffDays = Math.max(1, Math.round((checkoutDate - checkinDate)/86400000));
-                      checkinDate.setDate(checkinDate.getDate() + 7);
-                      checkoutDate.setDate(checkoutDate.getDate() + 7);
-                      
-                      const fmt = (d) => d.toISOString().split('T')[0];
+                      /* addDays trabaja en fecha local (toISOString pasaba a UTC y
+                         podía correr un día fuera de Colombia). */
                       handleSearch({
-                        checkin: fmt(checkinDate),
-                        checkout: fmt(checkoutDate),
+                        checkin: addDays(search.checkin, 7),
+                        checkout: addDays(search.checkout, 7),
                         guests: search.guests
                       });
                     }} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2297,17 +2623,34 @@ function BookingEngine() {
                 </div>
               ) : (
                 <div className="be-rooms-list">
-                  {/* Available rooms first (preserve API order), sold-out at end */}
+                  {capacityNotice && (
+                    <div className="be-info-box be-capacity-notice" role="status" style={{ marginTop: 0 }}>
+                      <Icon name="users" size={16} />
+                      <p style={{ margin: 0 }}>
+                        {fill(t.overCapacityNotice, {
+                          room: t.roomNames[capacityNotice.roomId] || capacityNotice.name,
+                          capacity: capacityNotice.capacity,
+                          guests: capacityNotice.guests
+                        })}
+                      </p>
+                    </div>
+                  )}
+                  {/* Con cupo y disponibles primero (la pedida desde su página va
+                      de primera), luego sin cupo / agotadas; se respeta el orden
+                      de la API dentro de cada grupo. */}
                   {[...rooms].sort((a, b) => {
-                    const aOk = a.available !== false;
-                    const bOk = b.available !== false;
-                    if (aOk === bOk) return 0;
-                    return aOk ? -1 : 1;
+                    const rank = r => {
+                      const ok = r.available !== false && roomFitsGuests(r, search.guests);
+                      if (!ok) return 2;
+                      return r.id === preselectedRoomId ? 0 : 1;
+                    };
+                    return rank(a) - rank(b);
                   }).map(room => (
                     <RoomCard key={room.id} room={room}
                       nights={dateDiff(search.checkin, search.checkout)}
                       guests={search.guests}
-                      rate={ratePerRoom[room.id] || 'flexible'}
+                      rate={ratePerRoom[room.id]}
+                      preselected={room.id === preselectedRoomId}
                       onSelect={handleSelectRoom}
                       onRateChange={r => setRatePerRoom(p => ({ ...p, [room.id]: r }))}
                       lang={lang}
@@ -2342,6 +2685,9 @@ function BookingEngine() {
                 onConfirm={handleConfirmBooking}
                 discountApplied={discountApplied}
                 setDiscountApplied={setDiscountApplied}
+                paymentNotice={paymentNotice}
+                onNoticeShown={() => setPaymentNotice(null)}
+                initialDiscountCode={initialParams.promoCode}
                 lang={lang}
               />
             </StepWrapper>
