@@ -19,7 +19,7 @@ const CACHE_TTL_MS = 30000; /* override surte efecto en <=30s sin redeploy */
    NUNCA agregar aquí secretos/llaves/credenciales. */
 const MANAGEABLE = {
   // Operación / correos
-  ALERT_ENABLED:                 { type: 'bool', group: 'Operación', label: 'Alertas operativas',
+  ALERT_ENABLED:                 { type: 'bool', group: 'Operación', label: 'Alertas operativas', default: 'true',
                                    desc: 'Envía un correo al equipo cuando algo falla en el sistema (un pago que no cuadra, un correo que no salió, etc.). Recomendado dejarlo activo.' },
   ADMIN_NOTIFY_EMAIL:            { type: 'text', group: 'Operación', label: 'Correo de avisos del equipo',
                                    desc: 'Dirección donde llegan los correos operativos y de escalamiento (alertas, pedidos del huésped, cancelaciones, etc.). NO es un correo de acceso al panel — eso se gestiona en Usuarios.' },
@@ -48,8 +48,8 @@ const MANAGEABLE = {
                                    desc: 'Muestra el campo "código de descuento" en el motor de reservas y activa la validación de los cupones.' },
   OTASYNC_AUTO_CANCEL_ENABLED:   { type: 'bool', group: 'Pagos', label: 'Cancelar la reserva en OTASync al procesar el reembolso',
                                    desc: 'Cuando apruebas o deniegas la cancelación en el panel, la reserva se marca como cancelada en OTASync (libera el inventario). Sin esto, hay que cancelarla a mano. Probar con una reserva real antes de encender.' },
-  MP_DIRECT_RESILIENT_ENABLED:   { type: 'bool', group: 'Pagos', label: 'Ruta directa de Mercado Pago resiliente (igual que Wompi)',
-                                   desc: 'Activa lock anti-doble-reserva, idempotencia por estadía, reintentos y "pago sin reserva" recuperable en la ruta directa de Mercado Pago. Solo aplica si cobras con Mercado Pago (rollback). Probar en sandbox MP antes de encender.' },
+  MP_DIRECT_RESILIENT_ENABLED:   { type: 'bool', group: 'Pagos', label: 'Ruta directa de Mercado Pago resiliente (igual que Wompi)', default: 'true',
+                                   desc: 'Protege las reservas pagadas por Mercado Pago (hoy, todos los pagos de la web): evita reservas duplicadas cuando Mercado Pago reenvía el aviso, reintenta si OTASync falla y deja el "pago sin reserva" como tarea recuperable. ENCENDIDO por defecto (aunque no esté definido); apágalo solo para volver al comportamiento anterior.' },
   // Guest app
   GUEST_SERVICE_PAYMENT_MODE:    { type: 'enum', group: 'Guest app', label: 'Pago de servicios en línea',
                                    options: ['room_charge', 'payment_link', 'wompi', 'mercadopago', 'both'],
@@ -222,9 +222,13 @@ async function getAllEffective(deps = {}) {
   for (const [key, meta] of Object.entries(MANAGEABLE)) {
     const hasOverride = ov && ov[key] !== undefined && ov[key] !== null && String(ov[key]) !== '';
     const envVal = process.env[key];
+    /* meta.default: valor efectivo cuando no hay override ni env (p. ej. un
+       interruptor que viene ENCENDIDO por defecto), para que el panel no lo
+       muestre apagado cuando en realidad está activo. */
+    const unsetValue = meta.default !== undefined ? meta.default : '';
     out[key] = {
       meta,
-      value: hasOverride ? ov[key] : (envVal !== undefined ? envVal : ''),
+      value: hasOverride ? ov[key] : (envVal !== undefined && envVal !== '' ? envVal : unsetValue),
       source: hasOverride ? 'panel' : (envVal !== undefined && envVal !== '' ? 'netlify' : 'sin definir')
     };
   }

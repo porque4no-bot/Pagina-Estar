@@ -62,7 +62,11 @@ function load({ flag = true, lock = { acquired: true }, insertImpl, avail = { '3
   });
 
   const saved = process.env.MP_DIRECT_RESILIENT_ENABLED;
-  if (flag) process.env.MP_DIRECT_RESILIENT_ENABLED = 'true'; else delete process.env.MP_DIRECT_RESILIENT_ENABLED;
+  /* flag: true → 'true' · false → 'false' (apagado explícito) · 'unset' → sin definir
+     (desde oct-2026 sin definir = ENCENDIDO). */
+  if (flag === true) process.env.MP_DIRECT_RESILIENT_ENABLED = 'true';
+  else if (flag === false) process.env.MP_DIRECT_RESILIENT_ENABLED = 'false';
+  else delete process.env.MP_DIRECT_RESILIENT_ENABLED;
 
   delete require.cache[R('_payments')];
   const payments = require('../../netlify/functions/_payments');
@@ -157,7 +161,7 @@ test('flag ON: mark-before-work → re-entrega del MISMO tx es no-op (duplicate)
   } finally { ctx.cleanup(); }
 });
 
-test('flag OFF: comportamiento previo (fetch crudo, sin lock ni idempotencia por estadía)', async () => {
+test("flag OFF ('false' explícito): comportamiento previo (fetch crudo, sin lock ni idempotencia por estadía)", async () => {
   const ctx = load({ flag: false });
   const origFetch = global.fetch;
   global.fetch = async () => new Response(JSON.stringify({ id_reservations: 'RES-RAW' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -185,5 +189,19 @@ test('flag ON: re-entrega del MISMO tx con el lock tomado → duplicate silencio
     assert.equal(body.inProgress, true);
     assert.equal(ctx.calls.insert, 0);
     assert.equal(ctx.calls.emails.length, 0, 'no alerta de doble pago por una re-entrega');
+  } finally { ctx.cleanup(); }
+});
+
+/* Oct-2026: la ruta resiliente es el DEFAULT. Sin definir la variable (ni override
+   del panel) se comporta como 'true'. */
+test('flag SIN DEFINIR → ruta resiliente por defecto (lock + insertReservation)', async () => {
+  const ctx = load({ flag: 'unset' });
+  try {
+    const ref = refFor(ctx.payments, 'EST-D10', 30000000);
+    const res = await ctx.payments.processApprovedPayment(mpTx(ref, 'MP-D10', 30000000), {});
+    const body = JSON.parse(res.body);
+    assert.equal(body.success, true);
+    assert.equal(ctx.calls.insert, 1, 'usa insertReservation (reintentos)');
+    assert.equal(ctx.calls.lockAcquired, 1, 'toma el lock single-writer');
   } finally { ctx.cleanup(); }
 });

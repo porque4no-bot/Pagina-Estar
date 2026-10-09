@@ -138,3 +138,61 @@ test('returning from Mercado Pago shows the booking confirmation', async ({ page
   await expect(page.locator('body')).not.toContainText('Kunas');
   await expect(page).not.toHaveURL(/payment=success/);
 });
+
+/* Frente MP (oct-2026): Mercado Pago ignoraba el descuento (cobraba el monto
+   completo) y no mandaba la nota, el opt-in de marketing, el plan ni el idioma.
+   La preferencia ahora recibe lo mismo que la firma de Wompi. */
+test('Mercado Pago sends the discounted amount, discount code, notes, opt-in, rate plan and language', async ({ page }) => {
+  let subtotalCents = null;
+  await page.route('**/api/validate-discount-code**', route => {
+    const u = new URL(route.request().url());
+    if (u.searchParams.get('code') === '__probe__') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, valid: false, reason: 'invalid' }) });
+    }
+    subtotalCents = Number(u.searchParams.get('subtotalCents'));
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, valid: true, code: 'RESENA10', discountCents: 5000000 }) });
+  });
+  let prefBody = null;
+  await page.route('**/api/create-mercadopago-preference', route => {
+    prefBody = JSON.parse(route.request().postData() || '{}');
+    /* Respondemos un error controlado para quedarnos en la página (sin ir a MP). */
+    return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'sold_out' }) });
+  });
+
+  await page.goto(`/reservar.html?checkin=${D1}&checkout=${D4}&guests=2`);
+  await expect(page.locator('.be-room-card')).toBeVisible();
+  await page.locator('.be-room-select-btn').first().click();
+  await expect(page.locator('.be-step-active .be-step-title')).toHaveText('Extras y servicios');
+  await page.locator('.be-step-active .be-btn-primary').click();
+
+  await expect(page.locator('.be-step-active .be-step-title')).toHaveText('Datos del huésped');
+  await page.locator('#guest-nombre').fill('Andrea');
+  await page.locator('#guest-apellido').fill('Restrepo');
+  await page.locator('#guest-email').fill('andrea.qa@example.com');
+  await page.locator('#guest-tel').fill('+57 300 111 2233');
+  await page.locator('#guest-pais').selectOption('Colombia');
+  await page.locator('#guest-motivo').selectOption('Turismo / Vacaciones');
+  await page.locator('#guest-notas').fill('Llegamos tarde, tipo 10 pm');
+  await page.locator('#guest-privacy').check();
+  await page.locator('#guest-marketing').check();
+  await page.locator('.be-step-active form button[type="submit"]').click();
+
+  await expect(page.locator('.be-step-active .be-step-title')).toHaveText('Resumen y pago');
+  await page.locator('.be-step-active input[placeholder="Ingresa tu código"]').fill('resena10');
+  await page.locator('.be-step-active button', { hasText: 'Aplicar' }).click();
+  await expect(page.locator('.be-step-active')).toContainText('RESENA10');
+
+  await page.locator('.be-step-active .be-payment-opt', { hasText: 'Mercado Pago' }).click();
+  await page.locator('.be-step-active .be-step-footer .be-btn-primary').click();
+  await expect.poll(() => prefBody).not.toBeNull();
+
+  expect(subtotalCents).toBeGreaterThan(5000000);
+  expect(prefBody.amountCents).toBe(subtotalCents - 5000000);
+  expect(prefBody.discountCode).toBe('RESENA10');
+  expect(prefBody.notes).toBe('Llegamos tarde, tipo 10 pm');
+  expect(prefBody.marketingOptIn).toBe(true);
+  expect(['best', 'flexible']).toContain(prefBody.ratePlan);
+  expect(prefBody.lang).toBe('es');
+  /* El error controlado se muestra sin códigos internos. */
+  await expect(page.locator('.be-step-active .be-info-error')).toBeVisible();
+});

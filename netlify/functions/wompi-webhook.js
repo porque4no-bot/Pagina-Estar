@@ -41,6 +41,27 @@ try {
   txStore = null;
 }
 
+/* Alertas de dinero de la reserva directa ("pago sin reserva", "doble pago",
+   "monto incorrecto") → _alert.reportAlert: log + correo al equipo
+   (deduplicado por incidente) + TAREA en la cola del panel (ops-queue). Antes
+   eran sendEmail sueltos sin tarea. Nunca lanza. */
+async function moneyAlert({ kind, message, context, dedupeKey, incident }) {
+  /* Doble pago / monto incorrecto: marca el tx como ya alertado para que
+     reconcile-payments no abra además un "pago sin reserva" contradictorio. */
+  if (incident && incident.transactionId) {
+    try {
+      await require('./_payment-incidents').recordPaymentIncident({ provider: 'wompi', ...incident, kind });
+    } catch (e) { /* best-effort */ }
+  }
+  try {
+    await require('./_alert').reportAlert({
+      kind, severity: 'critical', message, context: context || {}, dedupeKey, ttlSec: 7 * 24 * 3600
+    });
+  } catch (e) {
+    console.error(`[wompi-webhook] money alert ${kind} failed:`, e && e.message);
+  }
+}
+
 // Helper to get session key from Kunas PMS — delegates to shared store
 async function getSessionKey(_token, _username, _password) {
   return sharedGetSessionKey();
@@ -552,6 +573,21 @@ async function handleGuestServicePayment(transaction, corsHeaders, overrides = {
   return reply({ received: true, folio: result });
 }
 
+/* Alertas de dinero de COTIZACIONES (doble pago, pago sin reserva): se conserva
+   el correo detallado (adminPendingHtml, con el botón "Reintentar reserva") y
+   además se abre una TAREA en la cola del panel (ops-queue), deduplicada por
+   incidente (pay-<tipo>-<tx>): el mismo criterio que moneyAlert de la reserva
+   directa, sin mandar un segundo correo. Nunca lanza. */
+async function quoteMoneyAlert(deps, { kind, subject, html, context, dedupeKey }) {
+  try {
+    await deps.sendEmail({ to: deps.adminEmail(), subject, html });
+  } catch (e) { console.error(`[wompi-webhook] quote money alert email (${kind}) failed:`, e && e.message); }
+  try {
+    const enqueue = deps.enqueueOpsTask || ((t) => require('./_ops-queue').enqueue(t));
+    await enqueue({ kind, severity: 'critical', title: String(subject || '').replace(/^\W+\s*/, ''), context: context || {}, dedupeKey });
+  } catch (e) { console.error(`[wompi-webhook] quote money alert task (${kind}) failed:`, e && e.message); }
+}
+
 // Handle a Wompi payment whose reference is a stored quote id (COT-...).
 // Loads the quote, verifies the amount, creates the OTASync reservation and
 // marks the quote as 'aceptada'. Returns a Netlify response object.
@@ -620,15 +656,17 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
     }
     console.error(`[wompi-webhook] quote ${quoteId} is already being processed by tx ${lock.ownerTx} (started ${lock.startedAt}). Refusing tx ${transaction.id}.`);
     try {
-      await deps.sendEmail({
-        to: deps.adminEmail(),
+      await quoteMoneyAlert(deps, {
+        kind: 'payment_double_charge',
         subject: `⚠ Doble pago detectado — ${quoteId}`,
         html: `<p>La cotización <strong>${quoteId}</strong> recibió un segundo pago aprobado mientras procesábamos el primero.</p>
                <ul>
                  <li>Primera transacción (en curso): ${lock.ownerTx}</li>
                  <li>Segunda transacción (rechazada): ${transaction.id}</li>
                </ul>
-               <p>Verifica con Wompi y reembolsa la transacción duplicada.</p>`
+               <p>Verifica con Wompi y reembolsa la transacción duplicada.</p>`,
+        context: { quoteId, firstTransaction: lock.ownerTx, secondTransaction: transaction.id },
+        dedupeKey: `pay-double-${transaction.id}`
       });
     } catch (e) { console.error('[wompi-webhook] double-pay alert email failed:', e.message); }
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ message: 'Quote already being processed by another transaction', ownerTx: lock.ownerTx }) };
@@ -676,11 +714,13 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
       quote.updatedAt = now;
       try { await deps.saveQuote(store, quote); } catch (e) { /* non-fatal */ }
       try {
-        await deps.sendEmail({
-          to: deps.adminEmail(),
-          subject: `⚠ Pago sin reserva (sin credenciales PMS) — ${quoteId}`,
-          html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [{ reason: 'otasync_credentials_missing' }] })
-        });
+        await quoteMoneyAlert(deps, {
+        kind: 'payment_without_reservation',
+        subject: `⚠ Pago sin reserva (sin credenciales PMS) — ${quoteId}`,
+        html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [{ reason: 'otasync_credentials_missing' }] }),
+        context: { quoteId, transactionId: transaction.id },
+        dedupeKey: `pay-noreservation-${transaction.id}`
+      });
       } catch (e) { console.error('[wompi-webhook] admin alert email failed:', e.message); }
       console.error(`[wompi-webhook] quote ${quoteId} PAGADA sin credenciales OTASync en producción; marcada reservationPending.`);
       return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
@@ -735,11 +775,13 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
           quote.updatedAt = now;
           try { await deps.saveQuote(store, quote); } catch (e) { /* non-fatal */ }
           try {
-            await deps.sendEmail({
-              to: deps.adminEmail(),
-              subject: `⚠ Pago sin reserva — ${quoteId}`,
-              html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls })
-            });
+            await quoteMoneyAlert(deps, {
+        kind: 'payment_without_reservation',
+        subject: `⚠ Pago sin reserva — ${quoteId}`,
+        html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls }),
+        context: { quoteId, transactionId: transaction.id },
+        dedupeKey: `pay-noreservation-${transaction.id}`
+      });
           } catch (e) { console.error('[wompi-webhook] admin alert email failed:', e.message); }
           return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
         }
@@ -755,11 +797,13 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
       quote.updatedAt = now;
       try { await deps.saveQuote(store, quote); } catch (saveErr) { console.error('[wompi-webhook] failed to mark pending:', saveErr.message); }
       try {
-        await deps.sendEmail({
-          to: deps.adminEmail(),
-          subject: `Pago pendiente de verificación — ${quoteId}`,
-          html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [{ reason: 'availability_check_failed' }] })
-        });
+        await quoteMoneyAlert(deps, {
+        kind: 'payment_without_reservation',
+        subject: `Pago pendiente de verificación — ${quoteId}`,
+        html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [{ reason: 'availability_check_failed' }] }),
+        context: { quoteId, transactionId: transaction.id },
+        dedupeKey: `pay-noreservation-${transaction.id}`
+      });
       } catch (mailErr) { console.error('[wompi-webhook] admin alert email failed:', mailErr.message); }
       return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
     }
@@ -777,10 +821,12 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
     quote.updatedAt = now;
     try { await deps.saveQuote(store, quote); } catch (e) { /* non-fatal */ }
     try {
-      await deps.sendEmail({
-        to: deps.adminEmail(),
+      await quoteMoneyAlert(deps, {
+        kind: 'payment_without_reservation',
         subject: `⚠ Pago sin reserva — ${quoteId}`,
-        html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [] })
+        html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [] }),
+        context: { quoteId, transactionId: transaction.id },
+        dedupeKey: `pay-noreservation-${transaction.id}`
       });
     } catch (e) { console.error('[wompi-webhook] admin alert email failed:', e.message); }
     console.error(`[wompi-webhook] reservation ${reason} for quote ${quoteId}, tx ${transaction.id}; marked reservationPending.`);
@@ -960,11 +1006,13 @@ async function handleQuotePayment(transaction, corsHeaders, overrides = {}) {
       quote.updatedAt = nowIso;
       try { await deps.saveQuote(store, quote); } catch (e) { /* non-fatal */ }
       try {
-        await deps.sendEmail({
-          to: deps.adminEmail(),
-          subject: `⚠ Pago sin reserva (error inesperado) — ${quoteId}`,
-          html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [{ reason: 'unexpected_error', detail: err && err.message }] })
-        });
+        await quoteMoneyAlert(deps, {
+        kind: 'payment_without_reservation',
+        subject: `⚠ Pago sin reserva (error inesperado) — ${quoteId}`,
+        html: deps.adminPendingHtml({ quote, transactionId: transaction.id, shortfalls: [{ reason: 'unexpected_error', detail: err && err.message }] }),
+        context: { quoteId, transactionId: transaction.id },
+        dedupeKey: `pay-noreservation-${transaction.id}`
+      });
       } catch (e) { /* alerta best-effort */ }
     } catch (e2) { console.error('[wompi-webhook] no se pudo marcar pendiente tras excepción:', e2 && e2.message); }
     return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, quoteId, reservationPending: true }) };
@@ -1319,25 +1367,13 @@ exports.handler = async (event, context) => {
 
   if (!priceVerifyOk) {
     console.error(`[wompi-webhook] price_mismatch — refusing to create direct booking. bookingCode=${decoded.bookingCode}, tx=${transaction.id}, roomType=${decoded.roomTypeId}, paid_cents=${transaction.amount_in_cents}, expected_cents=${expectedCentsForAlert}, reason=${priceReason}`);
-    try {
-      await sendEmail({
-        to: adminEmail(),
-        subject: `⚠ Pago Wompi con monto incorrecto — ${decoded.bookingCode}`,
-        html: `<p>Un pago Wompi fue aprobado por un monto distinto al precio esperado. La reserva NO se creó en OTASync.</p>
-               <ul>
-                 <li><strong>Código:</strong> ${decoded.bookingCode}</li>
-                 <li><strong>Transacción Wompi:</strong> ${transaction.id}</li>
-                 <li><strong>Habitación:</strong> ${decoded.roomTypeId}</li>
-                 <li><strong>Fechas:</strong> ${decoded.checkin} → ${decoded.checkout}</li>
-                 <li><strong>Monto pagado (centavos):</strong> ${transaction.amount_in_cents}</li>
-                 <li><strong>Monto esperado (centavos):</strong> ${expectedCentsForAlert}</li>
-                 <li><strong>Motivo:</strong> ${priceReason}</li>
-               </ul>
-               <p>Revisar manualmente: o bien devolver el pago, o crear la reserva en OTASync si el motivo fue una desviación legítima.</p>`
-      });
-    } catch (mailErr) {
-      console.error('[wompi-webhook] price_mismatch admin alert failed:', mailErr.message);
-    }
+    await moneyAlert({
+      kind: 'payment_amount_mismatch',
+      message: `Pago Wompi con monto incorrecto — ${decoded.bookingCode}. La reserva NO se creó: devolver el pago o crear la reserva a mano si la desviación fue legítima.`,
+      context: { bookingCode: decoded.bookingCode, transactionId: transaction.id, roomTypeId: decoded.roomTypeId, checkin: decoded.checkin, checkout: decoded.checkout, paidCents: transaction.amount_in_cents, expectedCents: expectedCentsForAlert, reason: priceReason },
+      dedupeKey: `pay-amount-${transaction.id}`,
+      incident: { transactionId: transaction.id, bookingCode: decoded.bookingCode }
+    });
     return {
       statusCode: 200,
       headers: corsHeaders,
@@ -1364,17 +1400,13 @@ exports.handler = async (event, context) => {
       const expired = !prev.createdAt || (Date.now() - prev.createdAt) > STAY_IDEM_MAX_AGE_MS;
       if (!expired && prev.transactionId && prev.transactionId !== transaction.id) {
         console.error(`[wompi-webhook] DUPLICATE STAY paid: stay=${stayIdemKey} already booked by tx ${prev.transactionId}; second tx ${transaction.id}. Not creating a second reservation.`);
-        try {
-          await sendEmail({
-            to: adminEmail(),
-            subject: `⚠ Doble pago de reserva directa — ${decoded.bookingCode}`,
-            html: `<p>Se recibió un segundo pago aprobado para la MISMA estadía. No se creó una segunda reserva.</p>
-                   <ul><li>Estadía: ${escapeHtml(decoded.checkin)} → ${escapeHtml(decoded.checkout)}, hab. ${escapeHtml(String(decoded.roomTypeId))}</li>
-                   <li>Reserva existente (tx): ${escapeHtml(prev.transactionId)} → ${escapeHtml(String(prev.bookingCode || ''))}</li>
-                   <li>Segundo pago (tx): ${escapeHtml(transaction.id)}</li></ul>
-                   <p>Verifica con Wompi y reembolsa el cargo duplicado.</p>`
-          });
-        } catch (e) { console.error('[wompi-webhook] duplicate-stay alert failed:', e.message); }
+        await moneyAlert({
+          kind: 'payment_double_charge',
+          message: `Doble pago de la misma estadía (Wompi) — ${decoded.bookingCode}: no se creó una segunda reserva. Verificar con Wompi y reembolsar el cargo duplicado.`,
+          context: { bookingCode: decoded.bookingCode, checkin: decoded.checkin, checkout: decoded.checkout, roomTypeId: decoded.roomTypeId, existingBooking: prev.bookingCode || '', existingTransaction: prev.transactionId, newTransaction: transaction.id },
+          dedupeKey: `pay-double-${transaction.id}`,
+          incident: { transactionId: transaction.id, bookingCode: decoded.bookingCode }
+        });
         return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ success: true, bookingCode: prev.bookingCode, duplicate: true }) };
       }
     }
@@ -1396,23 +1428,12 @@ exports.handler = async (event, context) => {
 
     if (selectedRoomId === 0) {
       console.error(`[wompi-webhook] Direct booking PAID but SOLD OUT. No rooms available for roomTypeId=${decoded.roomTypeId}, bookingCode=${decoded.bookingCode}, tx=${transaction.id}. Marking reservationPending.`);
-      try {
-        await sendEmail({
-          to: adminEmail(),
-          subject: `⚠ Pago sin reserva directa (Habitación Agotada) — ${decoded.bookingCode}`,
-          html: `<p>Se recibió un pago aprobado por Wompi para una reserva directa, pero la habitación seleccionada ya no tiene disponibilidad en OTASync. La reserva NO se creó.</p>
-                 <ul>
-                   <li><strong>Código:</strong> ${decoded.bookingCode}</li>
-                   <li><strong>Huésped:</strong> ${decoded.firstName} ${decoded.lastName} — ${decoded.email}</li>
-                   <li><strong>Check-in / Check-out:</strong> ${decoded.checkin} → ${decoded.checkout}</li>
-                   <li><strong>Habitación (Room Type ID):</strong> ${decoded.roomTypeId}</li>
-                   <li><strong>ID Transacción Wompi:</strong> ${transaction.id}</li>
-                 </ul>
-                 <p>La transacción está marcada como procesada. Crear manualmente en OTASync o gestionar reembolso.</p>`
-        });
-      } catch (mailErr) {
-        console.error('[wompi-webhook] sold out admin alert failed:', mailErr.message);
-      }
+      await moneyAlert({
+        kind: 'payment_without_reservation',
+        message: `Pago sin reserva (Wompi) — ${decoded.bookingCode}: la habitación ya no tiene disponibilidad en OTASync. Crear a mano o gestionar el reembolso.`,
+        context: { bookingCode: decoded.bookingCode, guest: `${decoded.firstName} ${decoded.lastName}`.trim(), email: decoded.email, checkin: decoded.checkin, checkout: decoded.checkout, roomTypeId: decoded.roomTypeId, transactionId: transaction.id },
+        dedupeKey: `pay-noreservation-${transaction.id}`
+      });
 
       if (directBookingResultStore) {
         try {
@@ -1758,23 +1779,12 @@ exports.handler = async (event, context) => {
     console.error(`[wompi-webhook] Error creating direct booking in Kunas: ${err.message}. bookingCode=${decoded.bookingCode}, tx=${transaction.id}`);
     // Alert admin so the reservation can be manually created — the transaction is already
     // deduped so Wompi retries will be no-ops; manual intervention is required.
-    try {
-      await sendEmail({
-        to: adminEmail(),
-        subject: `⚠ Pago sin reserva directa — ${decoded.bookingCode}`,
-        html: `<p>Falló la creación de reserva en OTASync tras pago Wompi confirmado.</p>
-               <ul>
-                 <li><strong>Código:</strong> ${decoded.bookingCode}</li>
-                 <li><strong>Huésped:</strong> ${decoded.firstName} ${decoded.lastName} — ${decoded.email}</li>
-                 <li><strong>Check-in / Check-out:</strong> ${decoded.checkin} → ${decoded.checkout}</li>
-                 <li><strong>ID Transacción Wompi:</strong> ${transaction.id}</li>
-                 <li><strong>Error:</strong> ${err.message}</li>
-               </ul>
-               <p>La transacción está marcada como procesada. Crear manualmente en OTASync.</p>`
-      });
-    } catch (mailErr) {
-      console.error('[wompi-webhook] admin alert for failed direct booking failed:', mailErr.message);
-    }
+    await moneyAlert({
+      kind: 'payment_without_reservation',
+      message: `Pago sin reserva (Wompi) — ${decoded.bookingCode}: falló la creación de la reserva en OTASync tras un pago confirmado. Crear a mano en OTASync.`,
+      context: { bookingCode: decoded.bookingCode, guest: `${decoded.firstName} ${decoded.lastName}`.trim(), email: decoded.email, checkin: decoded.checkin, checkout: decoded.checkout, transactionId: transaction.id, error: String(err.message || '').slice(0, 200) },
+      dedupeKey: `pay-noreservation-${transaction.id}`
+    });
     return {
       statusCode: 200,
       headers: corsHeaders,

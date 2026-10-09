@@ -413,7 +413,7 @@ async function findReservationByReference(reference, dateArrival) {
   if (!ref || !arr) return null;
   try {
     const { reservations } = await getReservationsByDate({
-      filterBy: 'date_arrival', dfrom: arr, dto: arr, arrivals: 1
+      filterBy: 'date_arrival', dfrom: arr, dto: arr, arrivals: 1, includeNote: true
     });
     return (reservations || []).find(r => r.reference === ref) || null;
   } catch (e) {
@@ -933,7 +933,7 @@ function isHoldReservation(r) {
 
 const RESERVATIONS_MAX_PAGES = 20;
 
-async function getReservationsByDate({ filterBy, dfrom, dto, arrivals = 0, departures = 0, status = '0' } = {}) {
+async function getReservationsByDate({ filterBy, dfrom, dto, arrivals = 0, departures = 0, status = '0', includeNote = false } = {}) {
   if (!hasOtasyncCreds()) return { reservations: [], isMock: true };
   const { token, propertyId } = otasyncCreds();
   const out = [];
@@ -968,7 +968,11 @@ async function getReservationsByDate({ filterBy, dfrom, dto, arrivals = 0, depar
     if (!res.ok) throw new Error(`reservations returned status ${res.status}`);
     const data = await res.json();
     const list = Array.isArray(data.reservations) ? data.reservations : [];
-    list.forEach(r => out.push(normalizeReservation(r)));
+    /* includeNote: solo para uso INTERNO del servidor (findReservationByReference
+       lee el 'ID Transaccion' de la nota). Nunca se expone a paneles/clientes. */
+    list.forEach(r => out.push(includeNote
+      ? { ...normalizeReservation(r), note: String((r && (r.note || r.notes)) || '') }
+      : normalizeReservation(r)));
     totalPages = Number(data.total_pages_number) || 1;
     page++;
   } while (page <= totalPages && page <= RESERVATIONS_MAX_PAGES);
@@ -979,7 +983,7 @@ module.exports = {
   getReservationsByDate, normalizeReservation, isHoldReservation, inferLang, reservaTieneDesayuno,
   otasyncCreds, hasOtasyncCreds, getSessionKey, getAvailabilityByType, findUnavailable,
   buildRoomsFromQuote, buildExtrasFromQuote, createHold, releaseHold, cancelReservation, createConfirmedReservation,
-  insertReservation,
+  insertReservation, findReservationByReference,
   getDynamicPricing, EXTRA_GUEST_SURCHARGE,
   getExtras, insertExtra, ensureGuestServiceExtra, getReservationFirstRoom,
   addReservationExtra, addReservationPayment, postOrderExtrasToFolio
