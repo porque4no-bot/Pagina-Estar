@@ -39,7 +39,12 @@ async function directBookingReconciled(resultsStore, bookingCode) {
        needs manual handling, so we want it reported. */
     /* Blob corrupto → fail-safe: tratar como NO reconciliado para que el huérfano
        se reporte y se revise a mano, en vez de darlo por bueno en silencio. */
-    try { return !JSON.parse(raw).reservationPending; } catch (e) { return false; }
+    /* resolvedAt: recepción lo marcó resuelto (reserva creada a mano o dinero
+       devuelto) desde el panel Hoy — auditado en staff-audit. */
+    try {
+      const entry = JSON.parse(raw);
+      return !entry.reservationPending || Boolean(entry.resolvedAt);
+    } catch (e) { return false; }
   } catch (e) {
     return false;
   }

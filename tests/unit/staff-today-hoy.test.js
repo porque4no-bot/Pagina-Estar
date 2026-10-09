@@ -120,6 +120,42 @@ test('si la cola o los check-ins fallan, el tablero sale igual (enrichment parci
   assert.equal(b.arrivals[0].checkin.done, false);
 });
 
+test('Blobs caído en booking-results y cola que falla (strict) → enrichment payments/tasks en false y fila "desconocida"', async () => {
+  const { mod, blobs } = load({
+    window: [res({ id: '9004', in: DATE, out: '2026-10-09', ref: 'EST-CAIDO' })],
+    stores: { 'booking-results': {} }
+  });
+  blobs.stores['booking-results'].failGet = true;
+  let strictSeen = null;
+  /* La cola real devuelve [] ante fallos salvo con strict → aquí lanza como lo haría. */
+  mod._test.setDeps({ listOpen: async (opts) => { strictSeen = opts && opts.strict; throw new Error('ops-queue 503'); } });
+  const b = JSON.parse((await call(mod)).body);
+  assert.equal(strictSeen, true, 'staff-today pide la cola en modo strict');
+  assert.equal(b.enrichment.payments, false);
+  assert.equal(b.enrichment.tasks, false);
+  const row = b.arrivals[0];
+  assert.equal(row.payment, null);
+  assert.equal(row.paymentUnknown, true, 'no se afirma "sin registro de pago"');
+  assert.equal(row.tasksUnknown, true);
+});
+
+test('"pago sin reserva" en booking-results pero la reserva está en el tablero → reserva_creada', async () => {
+  const { mod } = load({
+    window: [res({ id: '9005', in: DATE, out: '2026-10-09', ref: 'EST-XYZ12' })],
+    stores: { 'booking-results': { 'direct-EST-XYZ12': JSON.stringify({ bookingCode: 'EST-XYZ12', reservationPending: true, reason: 'insert_failed', provider: 'wompi', amountInCents: 100000, createdAt: '2026-10-01T10:00:00Z' }) } }
+  });
+  const b = JSON.parse((await call(mod)).body);
+  assert.equal(b.arrivals[0].payment.status, 'reserva_creada');
+});
+
+test('_ops-queue.listOpen: best-effort por defecto, lanza con strict', async () => {
+  const ops = require('../../netlify/functions/_ops-queue');
+  const broken = { getStore: () => ({ list: async () => { throw new Error('503'); } }) };
+  assert.deepEqual(await ops.listOpen(broken), []);
+  await assert.rejects(ops.listOpen({ ...broken, strict: true }));
+  await assert.rejects(ops.listOpen({ getStore: () => null, strict: true }), (e) => e.unavailable === true);
+});
+
 test('publicReservation sin extra mantiene la forma mínima (compatibilidad)', () => {
   const { mod } = load();
   const pub = mod._test.publicReservation(res({ id: '1', in: DATE, out: '2026-10-09' }));

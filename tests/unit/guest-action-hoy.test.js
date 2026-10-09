@@ -79,7 +79,7 @@ test('si la cola falla, el pedido igual se registra (best-effort)', async () => 
   }
 });
 
-test('folio encendido (posteado) o pago en línea → NO encola cargo manual', async () => {
+test('folio encendido (posteado) o pago en línea con link → NO encola cargo manual', async () => {
   let s = setup();
   process.env.GUEST_SERVICE_FOLIO_ENABLED = 'true';
   try {
@@ -90,12 +90,48 @@ test('folio encendido (posteado) o pago en línea → NO encola cargo manual', a
     delete process.env.GUEST_SERVICE_FOLIO_ENABLED;
     mod._test.resetDeps();
   }
-  s = setup();
+  process.env.GUEST_SERVICE_PAYMENT_MODE = 'wompi';
+  s = setup({ createGuestWompiCheckout: async () => 'https://checkout.example/pay' });
   try {
     const res = await mod.handler(order('online'));
     assert.equal(res.statusCode, 201);
-    assert.equal(s.tasks.length, 0, 'los pedidos en línea no son "cargar a la cuenta"');
+    assert.equal(JSON.parse(res.body).paymentRequired, true);
+    assert.equal(s.tasks.length, 0, 'con link de pago en curso no hay tarea manual');
   } finally {
+    delete process.env.GUEST_SERVICE_PAYMENT_MODE;
+    mod._test.resetDeps();
+  }
+});
+
+test('"Pagar en línea" sin link (modo room_charge de producción) → tarea folio_manual_charge', async () => {
+  process.env.GUEST_SERVICE_PAYMENT_MODE = 'room_charge';
+  const s = setup();
+  try {
+    const res = await mod.handler(order('online'));
+    assert.equal(res.statusCode, 201);
+    assert.equal(JSON.parse(res.body).paymentRequired, false);
+    assert.equal(s.tasks.length, 1);
+    assert.equal(s.tasks[0].kind, 'folio_manual_charge');
+    assert.equal(s.tasks[0].context.paymentPreference, 'online');
+    assert.match(s.tasks[0].title, /sin pago en línea/);
+    assert.equal(s.persisted[s.persisted.length - 1].v.folioStatus, 'manual');
+  } finally {
+    delete process.env.GUEST_SERVICE_PAYMENT_MODE;
+    mod._test.resetDeps();
+  }
+});
+
+test('"Pagar en línea" con checkout de Wompi caído → tarea folio_manual_charge', async () => {
+  process.env.GUEST_SERVICE_PAYMENT_MODE = 'wompi';
+  const s = setup({ createGuestWompiCheckout: async () => { throw new Error('wompi caído'); } });
+  try {
+    const res = await mod.handler(order('online'));
+    assert.equal(res.statusCode, 201);
+    assert.equal(JSON.parse(res.body).paymentRequired, false);
+    assert.equal(s.tasks.length, 1);
+    assert.equal(s.tasks[0].context.paymentPreference, 'online');
+  } finally {
+    delete process.env.GUEST_SERVICE_PAYMENT_MODE;
     mod._test.resetDeps();
   }
 });

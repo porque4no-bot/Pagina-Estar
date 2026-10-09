@@ -216,3 +216,29 @@ test('appendStaffAudit escribe una entrada append-only con actor y acción', asy
   const fail = await hoy.appendStaffAudit({ action: 'checkin.view' }, { getStore });
   assert.equal(fail.ok, false);
 });
+
+test('paymentFromResult respeta resolvedAt; withReservationMatch apaga la alarma si la reserva existe', () => {
+  const pend = { reservationPending: true, reason: 'insert_failed', provider: 'wompi', amountInCents: 100 };
+  assert.equal(hoy.paymentFromResult(pend, null).status, 'pago_sin_reserva');
+  const resolved = hoy.paymentFromResult({ ...pend, resolvedAt: '2026-10-08T12:00:00Z', resolvedBy: 'rec@estar.co', resolution: 'reserva_creada' }, null);
+  assert.equal(resolved.status, 'resuelto');
+  assert.deepEqual(resolved.resolution, { at: '2026-10-08T12:00:00Z', by: 'rec@estar.co', how: 'reserva_creada' });
+  const p = hoy.paymentFromResult(pend, null);
+  assert.equal(hoy.withReservationMatch(p, { status: 'confirmed' }).status, 'reserva_creada');
+  assert.equal(p.status, 'pago_sin_reserva', 'no muta el original');
+  assert.equal(hoy.withReservationMatch(p, { status: 'canceled' }).status, 'pago_sin_reserva');
+  assert.equal(hoy.withReservationMatch(p, null).status, 'pago_sin_reserva');
+});
+
+test('getWebPayment distingue "no existe" (null) de "no se pudo leer" (lanza unavailable)', async () => {
+  const { getStore, stores } = memStores({ 'booking-results': {} });
+  const deps = { getStore, getPaymentDetails: async () => null };
+  assert.equal(await hoy.getWebPayment({ reference: 'EST-ABCDE', bookingCode: '1' }, deps), null);
+  stores['booking-results'].failGet = true;
+  await assert.rejects(hoy.getWebPayment({ reference: 'EST-ABCDE', bookingCode: '1' }, deps), (e) => e.unavailable === true);
+  /* payment-details caído (sin dep inyectado) también es "no se pudo leer". */
+  stores['booking-results'].failGet = false;
+  const deps2 = { getStore };
+  stores['payment-details'] = { get: async () => { throw new Error('503'); } };
+  await assert.rejects(hoy.getWebPayment({ reference: 'EST-ABCDE', bookingCode: '1' }, deps2), (e) => e.unavailable === true);
+});

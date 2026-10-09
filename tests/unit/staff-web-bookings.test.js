@@ -97,3 +97,29 @@ test('sin OTASync (o si falla) devuelve solo lo registrado en booking-results', 
   assert.equal(b.items.length, 3);
   assert.equal(b.items.find(x => x.webCode === 'EST-MPOK1').bookingCode, '9001', 'usa el otasyncId del webhook');
 });
+
+test('"pago sin reserva" que YA cruza con una reserva activa de Kunas → reserva_creada, sin alarma', async () => {
+  const { mod } = setup({ reservations: [r({ id: '9300', ref: 'EST-AGOTA', email: 'a@x.co' })] });
+  const b = JSON.parse((await mod.handler({ httpMethod: 'GET', queryStringParameters: {}, headers: {} })).body);
+  const sold = b.items.find(x => x.webCode === 'EST-AGOTA');
+  assert.equal(sold.bookingCode, '9300');
+  assert.equal(sold.payment.status, 'reserva_creada');
+  assert.equal(sold.needsAttention, false);
+  assert.equal(b.attention, 0);
+  /* Si la reserva que cruza está cancelada, sigue siendo alarma. */
+  const s2 = setup({ reservations: [r({ id: '9300', ref: 'EST-AGOTA', status: 'canceled' })] });
+  const b2 = JSON.parse((await s2.mod.handler({ httpMethod: 'GET', queryStringParameters: {}, headers: {} })).body);
+  assert.equal(b2.items.find(x => x.webCode === 'EST-AGOTA').needsAttention, true);
+});
+
+test('lectura parcial de booking-results → partial:true (la UI no acusa "sin registro de pago")', async () => {
+  const { mod } = setup({ reservations: [r({ id: '9100', ref: 'EST-HUERF' })] });
+  const b0 = JSON.parse((await mod.handler({ httpMethod: 'GET', queryStringParameters: {}, headers: {} })).body);
+  assert.equal(b0.partial, false);
+  const s = setup({ reservations: [r({ id: '9100', ref: 'EST-HUERF' })] });
+  const store = { list: async () => ({ blobs: [{ key: 'direct-EST-MPOK1' }] }), get: async () => { throw new Error('blobs 503'); } };
+  s.mod._test.setDeps({ getStore: () => store });
+  const b = JSON.parse((await s.mod.handler({ httpMethod: 'GET', queryStringParameters: {}, headers: {} })).body);
+  assert.equal(b.partial, true);
+  assert.equal(b.storeAvailable, true);
+});

@@ -107,3 +107,24 @@ test('sin llave de Resend → 200 con sent:false y reason no-key', async () => {
   assert.equal(r.statusCode, 200);
   assert.equal(JSON.parse(r.body).reason, 'no-key');
 });
+
+test('sin pago registrado ni saldo cobrado en Kunas → 422, no manda "Total pagado" con el total', async () => {
+  /* Kunas no trae remaining_amount y no hay booking-results para la referencia. */
+  const s = setup({ found: booking({ raw: { reference: 'EST-NOPAY', email: 'ana@cliente.co', total_price: '450000' } }) });
+  const r = await post(s.mod, { bookingCode: '9001' });
+  assert.equal(r.statusCode, 422, r.body);
+  assert.equal(JSON.parse(r.body).reason, 'sin_pago_registrado');
+  assert.equal(s.sent.length, 0);
+  /* Saldo igual al total → nada cobrado → tampoco. */
+  const s2 = setup({ found: booking({ raw: { reference: 'EST-NOPAY', email: 'ana@cliente.co', total_price: '450000', remaining_amount: '450000' } }) });
+  assert.equal((await post(s2.mod, { bookingCode: '9001' })).statusCode, 422);
+  assert.equal(s2.sent.length, 0);
+});
+
+test('si el registro de pago no se puede leer → 503, no reenvía', async () => {
+  const s = setup();
+  s.blobs.stores['booking-results'].failGet = true;
+  const r = await post(s.mod, { bookingCode: '9001' });
+  assert.equal(r.statusCode, 503);
+  assert.equal(s.sent.length, 0);
+});

@@ -9,7 +9,9 @@ function memStore(initial = {}) {
     data,
     meta,
     failSet: false,
+    failGet: false,
     async get(key, opts = {}) {
+      if (store.failGet) throw new Error('blobs down');
       const v = data[key];
       if (v == null) return null;
       if (opts.type === 'json') return typeof v === 'string' ? JSON.parse(v) : v;

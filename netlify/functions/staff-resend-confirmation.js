@@ -102,7 +102,13 @@ exports.handler = async (event) => {
   }
 
   const raw = booking.raw || {};
-  const payment = await hoy.getWebPayment({ reference: raw.reference, bookingCode: booking.bookingCode || bookingCode }, deps);
+  let payment;
+  try {
+    payment = await hoy.getWebPayment({ reference: raw.reference, bookingCode: booking.bookingCode || bookingCode }, deps);
+  } catch (e) {
+    console.error('[staff-resend-confirmation] payment lookup failed:', e.message);
+    return jsonResponse(503, { error: 'No se pudo leer el registro de pago; intenta de nuevo' });
+  }
   let breakfast = false;
   try {
     breakfast = booking.demo ? false : Boolean(deps.extractBreakfastEntitlement(raw, booking.capacity).included);
@@ -110,6 +116,15 @@ exports.handler = async (event) => {
 
   const params = buildConfirmationParams(booking, payment, breakfast);
   if (!params.guestEmail) return jsonResponse(422, { error: 'La reserva no tiene correo del huésped en el PMS' });
+  /* Sin pago registrado NO se reenvía: la plantilla cae al total cuando
+     paidAmount es 0 ("Total pagado (online): $<total>") y el hotel le daría al
+     huésped un comprobante escrito de un pago que no existe. */
+  if (!(Number(params.paidAmount) > 0)) {
+    return jsonResponse(422, {
+      sent: false, reason: 'sin_pago_registrado',
+      error: 'No hay pago en línea registrado para esta reserva; no se reenvía la confirmación de pago'
+    });
+  }
 
   let result;
   try {

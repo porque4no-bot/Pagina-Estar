@@ -168,3 +168,12 @@ test('handler: fallo del fetch MP NO impide reportar huérfanos de Wompi (try/ca
     assert.equal(body.orphans, 1, 'el huérfano de Wompi se reporta aunque MP falle');
   } finally { ctx.cleanup(); }
 });
+
+test('directBookingReconciled: pending sin resolver se reporta; resuelto desde el panel (resolvedAt) ya no', async () => {
+  const { directBookingReconciled } = require('../../netlify/functions/reconcile-payments')._test;
+  const store = (entry) => ({ get: async () => (entry == null ? null : JSON.stringify(entry)) });
+  assert.equal(await directBookingReconciled(store({ reservationPending: true }), 'EST-A'), false);
+  assert.equal(await directBookingReconciled(store({ reservationPending: true, resolvedAt: '2026-10-08T15:00:00Z' }), 'EST-A'), true);
+  assert.equal(await directBookingReconciled(store({ reservationPending: false }), 'EST-A'), true);
+  assert.equal(await directBookingReconciled(store(null), 'EST-A'), false);
+});

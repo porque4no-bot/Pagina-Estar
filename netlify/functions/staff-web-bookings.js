@@ -50,7 +50,7 @@ function isoDay(ms) {
 function webRow({ webCode, entry }, reservation) {
   const e = entry || {};
   const r = reservation || null;
-  const payment = hoy.paymentFromResult(e, null);
+  const payment = hoy.withReservationMatch(hoy.paymentFromResult(e, null), r);
   const otasyncId = (r && r.idReservations) || e.otasyncId ||
     (e.bookingCode && String(e.bookingCode) !== String(webCode) ? String(e.bookingCode) : null);
   return {
@@ -145,7 +145,10 @@ exports.handler = async (event) => {
       attention: all.filter(x => x.needsAttention).length,
       items: all,
       pmsAvailable,
-      storeAvailable: !results.unavailable
+      storeAvailable: !results.unavailable,
+      /* Lectura parcial de booking-results: la UI no debe marcar "sin registro
+         de pago" en las reservas de Kunas sin cruce. */
+      partial: Boolean(results.unavailable || results.partial)
     });
   } catch (e) {
     console.error('[staff-web-bookings]', e.message);

@@ -29,7 +29,7 @@ function extractFunction(src, header) {
 function sandbox() {
   const provider = html.match(/const HOY_PROVIDER = \{[^}]*\};/);
   assert.ok(provider, 'HOY_PROVIDER no está en el HTML');
-  const names = ['hoyEsc', 'hoyMoney', 'hoyWhen', 'hoyPayLine', 'hoyFlags', 'hoyRow', 'hoyWebRow', 'hoyLoc', 'hoyCheckinHtml'];
+  const names = ['hoyEsc', 'hoyMoney', 'hoyWhen', 'hoyPayLine', 'hoyCanResendPayment', 'hoyFlags', 'hoyRow', 'hoyWebRow', 'hoyLoc', 'hoyCheckinHtml'];
   const src = provider[0].replace('const HOY_PROVIDER', 'var HOY_PROVIDER') + '\n' +
     names.map(n => extractFunction(html, `function ${n}(`)).join('\n');
   const ctx = {};
@@ -134,4 +134,43 @@ test('hoyCheckinHtml: muestra datos del registro, destino de extranjeros y docum
   assert.match(out, /quedó registrado \(auditoría\)/);
   const none = ctx.hoyCheckinHtml({ checkins: [{ checkinId: 'C', guests: [], documents: [] }] });
   assert.match(none, /guardado de documentos de adultos está apagado/);
+});
+
+/* ── Correcciones de revisión ── */
+
+test('hoyRow: web SIN pago registrado no ofrece "Reenviar confirmación"; con Blobs caído no dice "sin registro"', () => {
+  const ctx = sandbox();
+  const noPay = ctx.hoyRow({ ...base, payment: null });
+  assert.match(noPay, /Web sin registro de pago/);
+  assert.doesNotMatch(noPay, /hoy-resend/, 'sin pago el correo diría "Total pagado" con el total');
+  const unknown = ctx.hoyRow({ ...base, payment: null, paymentUnknown: true, tasksUnknown: true, pendingOrders: [], pendingOrdersCount: 0 });
+  assert.doesNotMatch(unknown, /Web sin registro de pago/);
+  assert.match(unknown, /Pago: no se pudo leer el registro/);
+  assert.match(unknown, /Pedidos: no se pudo leer la cola/);
+  const pend = ctx.hoyRow({ ...base, payment: { provider: 'wompi', amountCents: 1000, status: 'pago_sin_reserva' } });
+  assert.doesNotMatch(pend, /hoy-resend/);
+});
+
+test('hoyPayLine: "reserva ya creada" y "resuelto" no salen en rojo', () => {
+  const ctx = sandbox();
+  const created = ctx.hoyPayLine({ provider: 'wompi', amountCents: 100000, status: 'reserva_creada', reason: 'insert_failed' });
+  assert.doesNotMatch(created, /hoy-tag-bad/);
+  assert.match(created, /Reserva ya creada en Kunas/);
+  const resolved = ctx.hoyPayLine({ provider: 'wompi', amountCents: 100000, status: 'resuelto', resolution: { how: 'devuelto', by: 'rec@estar.co' } });
+  assert.doesNotMatch(resolved, /hoy-tag-bad/);
+  assert.match(resolved, /Resuelto: dinero devuelto/);
+});
+
+test('hoyWebRow: pago sin reserva ofrece marcar resuelto; huérfana sin pago no reenvía; lectura parcial no acusa', () => {
+  const ctx = sandbox();
+  const bad = ctx.hoyWebRow({ webCode: 'EST-XYZ12', needsAttention: true,
+    payment: { provider: 'wompi', amountCents: 100, status: 'pago_sin_reserva', reason: 'insert_failed' } });
+  assert.match(bad, /hoy-web-resolve" data-web="EST-XYZ12" data-resolution="reserva_creada"/);
+  assert.match(bad, /data-resolution="devuelto"/);
+  const orphan = { webCode: 'EST-ORPH1', bookingCode: '77', guestName: 'B', hasEmail: true, pmsStatus: 'confirmed', payment: null, needsAttention: false, source: 'otasync' };
+  const o1 = ctx.hoyWebRow(orphan, false);
+  assert.match(o1, /Sin registro de pago/);
+  assert.doesNotMatch(o1, /hoy-resend/);
+  const o2 = ctx.hoyWebRow(orphan, true);
+  assert.doesNotMatch(o2, /Sin registro de pago/);
 });

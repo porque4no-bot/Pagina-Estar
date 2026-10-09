@@ -86,39 +86,76 @@ function paymentFromResult(entry, details) {
   const d = details || {};
   const amountCents = Number(e.amountInCents || e.amountCents || d.amountInCents) || null;
   const pending = e.reservationPending === true;
+  /* Marcador resuelto a mano desde el panel (staff-resolve-web-payment): el
+     reservationPending se conserva como histórico, pero ya no es una alarma. */
+  const resolved = pending && Boolean(e.resolvedAt);
   return {
     provider: e.provider || d.provider || null,
     method: e.paymentMethod || d.method || null,
     amountCents,
     transactionId: e.transactionId || d.transactionId || null,
-    status: pending ? 'pago_sin_reserva' : 'aprobado',
+    status: pending ? (resolved ? 'resuelto' : 'pago_sin_reserva') : 'aprobado',
     reason: pending ? (e.reason || 'pending') : null,
+    resolution: resolved
+      ? { at: e.resolvedAt, by: e.resolvedBy || null, how: e.resolution || null }
+      : null,
     paidAt: e.createdAt || d.paymentDate || d.savedAt || null,
     ratePlan: e.ratePlan || d.ratePlan || null
   };
 }
 
+/* Error que distingue "no se pudo leer" de "no existe": quien lo recibe NO debe
+   concluir que no hay pago (ver staff-today `enrichment.payments`). */
+function storeUnavailable(name, cause) {
+  return Object.assign(new Error(`${name} unavailable`), { unavailable: true, cause });
+}
+
+/* null = no existe la entrada. LANZA (unavailable) si el store falla: un timeout
+   o 5xx de Blobs no es lo mismo que "sin registro de pago". Una entrada corrupta
+   (JSON inválido) sí se trata como inexistente. */
+/* Si el pago quedó como "pago sin reserva" pero la reserva YA EXISTE en Kunas
+   (cruce por la referencia EST- o el id), el marcador está viejo: alguien la creó
+   a mano o un reintento la creó. Se muestra como "reserva creada", no en rojo,
+   para que nadie la cree otra vez ni devuelva la plata. No muta el original. */
+function withReservationMatch(payment, reservation) {
+  if (!payment || payment.status !== 'pago_sin_reserva' || !reservation) return payment;
+  const st = String(reservation.status || '').toLowerCase();
+  if (st === 'canceled' || st === 'cancelled') return payment;
+  return { ...payment, status: 'reserva_creada' };
+}
+
 async function readBookingResult(webCode, deps = {}) {
   if (!isWebReference(webCode)) return null;
   const store = safeStore('booking-results', deps);
-  if (!store) return null;
+  if (!store) throw storeUnavailable('booking-results');
+  let raw;
   try {
-    const raw = await store.get(`direct-${String(webCode).trim()}`);
-    if (!raw) return null;
-    return typeof raw === 'string' ? JSON.parse(raw) : raw;
-  } catch (e) { return null; }
+    raw = await store.get(`direct-${String(webCode).trim()}`);
+  } catch (e) { throw storeUnavailable('booking-results', e); }
+  if (!raw) return null;
+  if (typeof raw !== 'string') return raw;
+  try { return JSON.parse(raw); } catch (e) { return null; }
 }
 
+/* Igual que arriba para el snapshot durable payment-details. Con dep inyectado
+   se usa tal cual; si no, se lee el store directo para poder distinguir el error
+   (getPaymentDetails de _payment-details se lo traga y devuelve null). */
 async function readPaymentDetails(code, deps = {}) {
   if (!code) return null;
+  if (deps.getPaymentDetails) return (await deps.getPaymentDetails(String(code))) || null;
+  let raw;
   try {
-    const get = deps.getPaymentDetails || require('./_payment-details').getPaymentDetails;
-    return (await get(String(code))) || null;
-  } catch (e) { return null; }
+    const store = deps.getStore ? deps.getStore('payment-details') : require('./_payment-details').paymentDetailsStore();
+    raw = await store.get(String(code));
+  } catch (e) { throw storeUnavailable('payment-details', e); }
+  if (!raw) return null;
+  if (typeof raw !== 'string') return raw;
+  try { return JSON.parse(raw); } catch (e) { return null; }
 }
 
 /* Pago en línea de una reserva: booking-results por el código web (EST-…) y,
    si falta el monto, payment-details por el id OTASync o el código web.
+   LANZA (err.unavailable) si algún store no responde — el llamador decide.
    Solo consulta reservas web/corporativas (las de OTA no pasan por nuestra
    pasarela). */
 async function getWebPayment({ reference, bookingCode } = {}, deps = {}) {
@@ -374,9 +411,10 @@ async function listRecentWebResults({ days = 30, now = Date.now(), deps = {} } =
   keys = keys.slice(0, MAX_WEB_RESULTS_SCAN);
   const cutoff = now - days * DAY_MS;
   const items = [];
+  let readErrors = 0;
   await mapLimit(keys, CONCURRENCY, async (key) => {
     let raw;
-    try { raw = await store.get(key); } catch (e) { return; }
+    try { raw = await store.get(key); } catch (e) { readErrors += 1; return; }
     if (!raw) return;
     let entry;
     try { entry = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (e) { return; }
@@ -385,7 +423,9 @@ async function listRecentWebResults({ days = 30, now = Date.now(), deps = {} } =
     items.push({ webCode: key.slice('direct-'.length), entry, ts });
   });
   items.sort((a, b) => b.ts - a.ts);
-  return { items, scanned: keys.length };
+  /* partial: alguna entrada no se pudo leer — una reserva de Kunas sin cruce NO
+     significa "sin registro de pago" en ese caso. */
+  return { items, scanned: keys.length, partial: readErrors > 0, readErrors };
 }
 
 /* ── Auditoría de accesos del staff ────────────────────────────────────── */
@@ -416,7 +456,7 @@ function clientIp(event) {
 module.exports = {
   WEB_REF_RE, CHECKIN_ID_RE, DOC_STORES, ORDER_TASK_KINDS, VERIFY_TASK_KIND, MAX_CHECKIN_SCAN, DAY_MS,
   blobStore, safeStore, timestampFromKey, mapLimit,
-  isWebReference, isQuoteReference, paymentFromResult, readBookingResult, getWebPayment, channelLabel,
+  isWebReference, isQuoteReference, paymentFromResult, withReservationMatch, readBookingResult, readPaymentDetails, getWebPayment, channelLabel,
   checkinSummary, findCheckins, loadCheckin, checkinView, occupantView, isForeignNationality,
   listCheckinDocuments, documentAad, docKind,
   tasksByBooking, listRecentWebResults, appendStaffAudit, clientIp

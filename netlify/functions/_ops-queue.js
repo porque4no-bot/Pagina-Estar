@@ -55,9 +55,15 @@ async function enqueue({ kind, severity = 'error', title, context = {}, dedupeKe
   }
 }
 
+/* `deps.strict`: en vez de tragarse el fallo (→ []), LANZA si el store no está
+   disponible o el listado falla, para que un lector (panel Hoy) distinga
+   "no hay tareas" de "no se pudo leer la cola". Por defecto, best-effort. */
 async function listOpen(deps = {}) {
   const s = opsStore(deps);
-  if (!s) return [];
+  if (!s) {
+    if (deps.strict) throw Object.assign(new Error('ops-queue unavailable'), { unavailable: true });
+    return [];
+  }
   try {
     /* Las tareas resueltas se mueven al prefijo `done/` (ver resolve()), así el
        prefijo `ops/` contiene SOLO abiertas. Se filtra por status igual (defensa
@@ -77,6 +83,7 @@ async function listOpen(deps = {}) {
     items.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     return items.slice(0, MAX_LIST);
   } catch (e) {
+    if (deps.strict) throw e;
     return [];
   }
 }

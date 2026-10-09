@@ -91,6 +91,11 @@ function publicReservation(r, extra = {}) {
     totalPrice: Number(r.totalPrice) || 0,
     balance: Number(r.remainingAmount) || 0,
     payment,
+    /* true = no se pudo leer el registro de pago (Blobs caído): la UI no debe
+       mostrar "sin registro de pago" en ese caso. */
+    paymentUnknown: extra.paymentUnknown === true,
+    /* true = no se pudo leer la cola de tareas: "0 pedidos" no es confiable. */
+    tasksUnknown: extra.tasksUnknown === true,
     checkin: latest
       ? {
           done: true,
@@ -121,6 +126,7 @@ async function buildEnrichment(reservations, deps = {}) {
   const codes = list.map(r => r.idReservations);
   const status = { payments: true, checkins: true, tasks: true };
   const payments = new Map();
+  const unknownPayments = new Set();
   let checkinMap = new Map();
   let taskMap = new Map();
 
@@ -129,10 +135,20 @@ async function buildEnrichment(reservations, deps = {}) {
 
   await Promise.all([
     (async () => {
+      /* getWebPayment LANZA si booking-results/payment-details no responden: esa
+         reserva queda "desconocida" (no "sin registro de pago") y el tablero
+         avisa lectura parcial con enrichment.payments=false. */
       try {
         await hoy.mapLimit(list, 8, async (r) => {
-          const p = await hoy.getWebPayment({ reference: r.reference, bookingCode: r.idReservations }, deps);
-          if (p) payments.set(r.idReservations, p);
+          try {
+            const p = await hoy.getWebPayment({ reference: r.reference, bookingCode: r.idReservations }, deps);
+            /* La fila ES una reserva de Kunas: si el pago decía "sin reserva",
+               ya se creó (a mano o por reintento) → no es alarma. */
+            if (p) payments.set(r.idReservations, hoy.withReservationMatch(p, r));
+          } catch (e) {
+            status.payments = false;
+            unknownPayments.add(r.idReservations);
+          }
         });
       } catch (e) { status.payments = false; }
     })(),
@@ -145,14 +161,18 @@ async function buildEnrichment(reservations, deps = {}) {
     })(),
     (async () => {
       try {
+        /* strict: un fallo de la cola LANZA en vez de devolver [] — si no, el
+           tablero diría "0 pedidos por cobrar" cuando en verdad no pudo leerla. */
         const listOpen = deps.listOpen || require('./_ops-queue').listOpen;
-        taskMap = hoy.tasksByBooking(await listOpen());
+        taskMap = hoy.tasksByBooking(await listOpen({ strict: true }));
       } catch (e) { status.tasks = false; }
     })()
   ]);
 
   const toPublic = (r) => publicReservation(r, {
     payment: payments.get(r.idReservations) || null,
+    paymentUnknown: unknownPayments.has(r.idReservations),
+    tasksUnknown: !status.tasks,
     checkins: checkinMap.get(r.idReservations) || [],
     tasks: taskMap.get(r.idReservations)
   });
