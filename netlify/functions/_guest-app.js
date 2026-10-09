@@ -533,6 +533,7 @@ module.exports = {
   assertBookingActive,
   cleanText,
   corsHeaders,
+  fetchOtasyncReservation,
   getReservation,
   getReservationDetail,
   guestStore,

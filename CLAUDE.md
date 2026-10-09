@@ -206,6 +206,14 @@ API routes are rewritten: `/api/*` → `/.netlify/functions/:splat` (see `netlif
 | `upload-drive-credentials` | Service account credential upload (admin) |
 | `drive-probe` | Health check for Google Drive integration |
 
+**SIRE (Migración Colombia — foreign guests):**
+
+| Function | Purpose |
+|---|---|
+| `sire-export` | Export of the SIRE flat file for the group VPS uploader (`tools/sire-uploader/`). GET with a Bearer compared in constant time against `SIRE_EXPORT_TOKEN` (secret, NOT panel-manageable; **off/503 without it**), rate-limited, gated `SIRE_ENABLED`. Reads `guest-checkins` (decrypts via `_guest-app`), latest check-in per booking, **foreign guests only**: row E on check-in date, S on check-out date (Bogotá dates, never future). Returns `{listo, conteos, filas (opaque ids), txt, avisos}` — avisos identify only booking code + guest index; logs only counts. POST `ack`/`desmarcar` → `sire-reports` store so nothing is reported twice (movement id = booking + normalized document number + E/S — never a configurable catalog code). Each booking is checked against OTASync first: cancelled/no-show/not found/unverifiable ⇒ not exported, listed in `excluidos`; OTASync dates win over the token's. Unreported movements older than the window come back in `atrasados` so the uploader catches up after any stall; long stays stay readable past the lookback via the `sire-pending-exits` index. Undecryptable check-ins ⇒ `advertencias` (all undecryptable ⇒ not `listo`). No file is returned while `SIRE_HOTEL_CODE`/`SIRE_REPORT_START` are missing or without OTASync creds |
+
+The uploader itself (Python + Playwright, systemd timer 10:00 Bogotá on the group VPS, ensayo → owner confirmation → real upload; CAPTCHA ⇒ stop, leave the file, alert) lives in `tools/sire-uploader/` with its own README and `SIRE.md` (doc for the VPS repo `00 - Indice/`). It is NOT deployed by Netlify.
+
 **Cleaning quality control (control de aseo):**
 
 | Function | Purpose |
@@ -254,6 +262,8 @@ Panel functions migrated to the new `authorize` layer (per-permission gate, env-
 | `_payment-incidents` | Marks a payment tx whose money alert the webhook already raised (double charge / amount mismatch) in Blobs (`payment-incidents`, key `<provider>:<tx>`), so `reconcile-payments` doesn't also open a contradictory "paid without reservation" task for it. Best-effort |
 | `_ttlock` | TTLock Open Platform client (keyboard-PIN locks): generates per-reservation temporary codes via `keyboardPwd/get`. Mock-safe; gated by `TTLOCK_ENABLED` + `TTLOCK_*`. Never breaks check-in |
 | `_guest-app` | Guest app utilities: token verification, reservation lookup, and PII protection (`protectRecord`/`unprotectRecord` for records, `sealBinaryForStore`/`openBinaryFromStore` for raw document buffers) — all delegating to `_crypto-vault` |
+| `_sire` | Pure SIRE flat-file generator (no network): column order (`COLUMNS`, overridable with `SIRE_COLUMNS`), delimiter (`SIRE_DELIMITER`), date format (`SIRE_DATE_FORMAT`), one row per movement (`movementRow`) + empty-column detection. **TODO(SIRE): format not yet confirmed against the portal** |
+| `_sire-catalog` | SIRE code tables: document type, countries (DANE/DIAN codes), Colombian cities (DIVIPOLA, Manizales `17001` default), name/document normalization. Correctable without code via `SIRE_*_CODES_JSON`. **TODO(SIRE): codes not yet confirmed** |
 | `_ops-queue` | Append-only **operational task queue** (Blobs `ops-queue`): `enqueue`/`listOpen`/`resolve`/`getItem`. Idempotent by dedupeKey (an open task isn't duplicated; a resolved key re-opens on recurrence). `_alert.reportAlert` enqueues every alert as a task → the Staff App replaces the email inbox. Best-effort, never throws |
 | `_staff-hoy` | Helpers for the Hoy front (read-only except the `staff-audit` append): web-payment lookup (`getWebPayment`), channel label, check-in scan by key timestamp (`findCheckins`) + registry-only projection (`checkinView`), document listing/AAD, open tasks per booking (`tasksByBooking`), recent web results, `appendStaffAudit`. Task kinds it reads: `folio_manual_charge` (from `guest-action` when the folio flag is OFF), `folio_post_failed`, `checkin_manual_review` (from `guest-checkin`) |
 | `_crypto-vault` | **Reversible** envelope encryption for guest PII (AES-256-GCM): `seal()`/`open()` with HKDF-derived, **versioned** keys (key ring → real rotation + crypto-shredding) and AAD binding ciphertext to `bookingCode\|type`. Reads legacy `version:1` envelopes for backward compat. Round-trip test gates the build. Config: `GUEST_APP_DATA_ENCRYPTION_KEY` (single key) + optional `GUEST_APP_KEY_RING`/`GUEST_APP_ACTIVE_KEY_ID` for rotation |
@@ -555,6 +565,22 @@ CLEANING_AI_TIMEOUT_MS=   # default 30000
 Access is gated by the `cleaning.audit` permission (role **aseo** in `/admin` →
 Usuarios; `STAFF_EMAILS`/`ADMIN_EMAILS` still work as break-glass superusers). Photos are archived to Google Drive when `GOOGLE_DRIVE_FOLDER_ID` +
 service-account are configured; otherwise only the Blobs backup is kept.
+
+**SIRE (Migración Colombia — `sire-export` + VPS uploader):**
+```
+SIRE_ENABLED=              # 'true' enables the export (panel-manageable); OFF → 503
+SIRE_EXPORT_TOKEN=         # SECRET — Bearer for /api/sire-export (32+ chars). Unset ⇒ export OFF. Never panel-manageable
+SIRE_HOTEL_CODE=           # establishment code from Migración (no file is exported without it)
+SIRE_CITY_CODE=            # optional, default 17001 (Manizales)
+SIRE_DELIMITER=            # optional, default TAB (panel-manageable)
+SIRE_DATE_FORMAT=          # optional, YYYY-MM-DD default | DD/MM/YYYY | YYYYMMDD | DD-MM-YYYY (panel-manageable)
+SIRE_COLUMNS=              # optional column order (comma list; primer_apellido/segundo_apellido available)
+SIRE_TEXT_ASCII=           # optional, 'false' keeps accents/case in names (default UPPERCASE ASCII)
+SIRE_DOC_TYPE_CODES_JSON= / SIRE_COUNTRY_CODES_JSON= / SIRE_CITY_CODES_JSON=   # optional code corrections
+SIRE_REPORT_START=         # YYYY-MM-DD of the first real upload; earlier movements are never exported (panel-manageable). Required
+SIRE_EXPORT_LOOKBACK_DAYS= # optional, default 190
+```
+VPS side (secrets in the VPS `.secrets/`, never here): see `tools/sire-uploader/README.md`.
 
 **Misc:**
 ```
