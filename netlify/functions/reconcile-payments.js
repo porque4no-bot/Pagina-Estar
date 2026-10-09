@@ -17,6 +17,7 @@ const { getQuoteStore, loadQuote, effectiveStatus } = require('./_quotes-store')
    _payments). Probamos ambos al cruzar. */
 const { decodeDirectReference: decodeWompiDirect } = require('./_direct-pricing');
 const { decodeDirectReference: decodeMpDirect } = require('./_payments');
+const { readPaymentIncident, STORE_NAME: INCIDENTS_STORE } = require('./_payment-incidents');
 
 function getBookingResultsStore() {
   try {
@@ -169,6 +170,14 @@ async function fetchRecentApprovedMP() {
   return { transactions: all.slice(0, MAX_TRANSACTIONS) };
 }
 
+function getIncidentsStore() {
+  try {
+    return getStore({ name: INCIDENTS_STORE, consistency: 'strong' });
+  } catch (e) {
+    return null;
+  }
+}
+
 function getNotifiedStore() {
   try {
     return getStore({ name: 'reconcile-notified', consistency: 'strong' });
@@ -283,6 +292,7 @@ exports.handler = async (event, context, overrides = {}) => {
   let quoteStore;
   try { quoteStore = getQuoteStore(); } catch (e) { quoteStore = null; }
   const resultsStore = getBookingResultsStore();
+  const incidentsStore = deps.incidentsStore !== undefined ? deps.incidentsStore : getIncidentsStore();
 
   for (const tx of transactions) {
     const ref = String(tx.reference || '');
@@ -332,6 +342,13 @@ exports.handler = async (event, context, overrides = {}) => {
 
     const reconciled = await directBookingReconciled(resultsStore, decoded.bookingCode);
     if (reconciled) continue;
+
+    /* Doble pago / monto incorrecto: el webhook NO crea reserva ni escribe
+       booking-results, pero ya abrió SU tarea (pay-double-/pay-amount-<tx>, con
+       la instrucción correcta: reembolsar). Reportarlo aquí como "pago sin reserva
+       — crear la reserva" daría dos tareas contradictorias e invitaría a crear
+       una reserva duplicada. */
+    if (await readPaymentIncident(incidentsStore, tx.provider, tx.id)) continue;
 
     orphans.push({
       quoteId: null,

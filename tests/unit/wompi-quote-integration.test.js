@@ -54,6 +54,7 @@ function dependencies(quote, overrides = {}) {
     adminEmail: () => 'admin@example.com',
     paymentConfirmationHtml: () => '<p>confirmed</p>',
     adminPendingHtml: () => '<p>pending</p>',
+    enqueueOpsTask: async () => {},
     getSessionKey: async () => 'session-key',
     fetch: async () => new Response(JSON.stringify({ id_reservations: 'RES-100' }), {
       status: 200,

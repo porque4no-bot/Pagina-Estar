@@ -228,3 +228,24 @@ test('reconcile: un pago de hace 2 minutos (webhook aún trabajando) NO se alert
     assert.ok(ctx.recon._test.MIN_AGE_MS >= 5 * 60000);
   } finally { ctx.cleanup(); }
 });
+
+test('reconcile: un doble pago / monto incorrecto ya alertado por el webhook NO se reporta además como "pago sin reserva"', async () => {
+  const mk = (code) => payments.createDirectReference({ checkin: '2026-11-07', checkout: '2026-11-08', guestsCount: 1, roomTypeId: '31348', firstName: 'Ana', lastName: 'R', email: 'a@x.co', phone: '300', extrasMask: '0000000', bookingCode: code, amountCents: 20000000 });
+  const fetchImpl = async (url) => {
+    if (String(url).includes('mercadopago')) {
+      return new Response(JSON.stringify({ results: [mpPayment(mk('EST-B2'), 'MP-DBL', 200000), mpPayment(mk('EST-AMX'), 'MP-AMT', 1000), mpPayment(mk('EST-ORF'), 'MP-ORF', 200000)], paging: { total: 3 } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  };
+  const ctx = load({
+    env: { MERCADOPAGO_ACCESS_TOKEN: 'tok' }, fetchImpl,
+    seed: { 'payment-incidents': { 'mercadopago:MP-DBL': { kind: 'payment_double_charge' }, 'mercadopago:MP-AMT': { kind: 'payment_amount_mismatch' } } }
+  });
+  const alerts = [];
+  try {
+    const body = JSON.parse((await ctx.recon.handler(undefined, undefined, { reportAlert: async (a) => { alerts.push(a); return {}; } })).body);
+    assert.equal(body.orphans, 1, 'solo el huérfano real');
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].dedupeKey, 'pay-noreservation-MP-ORF');
+  } finally { ctx.cleanup(); }
+});

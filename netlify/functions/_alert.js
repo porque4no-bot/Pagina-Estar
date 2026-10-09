@@ -75,6 +75,23 @@ async function shouldSend(getStore, key, ttlMs, now, logger) {
   }
 }
 
+/* Ley 1581: el contexto de una alerta puede traer datos personales del huésped
+   (nombre, correo, teléfono) que SÍ van en el correo al equipo y en la tarea del
+   panel (con control de acceso), pero NO deben quedar en los logs de Netlify ni
+   en los log drains de terceros. Se redactan por nombre de clave (recursivo). */
+const PII_KEY_RE = /(e-?mail|correo|phone|tel[eé]fono|celular|guest|hu[eé]sped|nombre|name|contacto|documento|cedula|c[eé]dula|address|direcci[oó]n)/i;
+const PII_KEY_ALLOW = new Set(['roomName', 'kind', 'listName']);
+function redactForLog(value, depth = 0) {
+  if (value == null || typeof value !== 'object' || depth > 4) return value;
+  if (Array.isArray(value)) return value.map(v => redactForLog(v, depth + 1));
+  const out = {};
+  for (const k of Object.keys(value)) {
+    if (PII_KEY_RE.test(k) && !PII_KEY_ALLOW.has(k)) out[k] = '[redactado]';
+    else out[k] = redactForLog(value[k], depth + 1);
+  }
+  return out;
+}
+
 async function reportAlert({ kind, severity = 'error', message, context = {}, dedupeKey, ttlSec, deps = {} } = {}) {
   const logger = deps.logger || console;
   const now = (deps.now || Date.now)();
@@ -82,7 +99,7 @@ async function reportAlert({ kind, severity = 'error', message, context = {}, de
   /* 1. Always log first — this never depends on email/Blobs. */
   try {
     const line = `[alert] kind=${kind} severity=${severity} ${message}`;
-    (severity === 'warn' ? logger.warn : logger.error).call(logger, line, context);
+    (severity === 'warn' ? logger.warn : logger.error).call(logger, line, redactForLog(context));
   } catch (e) { /* logging must never throw */ }
 
   /* 1b. Cola de tareas (Staff App v2): toda alerta es también una TAREA accionable,
@@ -123,4 +140,4 @@ async function reportAlert({ kind, severity = 'error', message, context = {}, de
 }
 
 module.exports = { reportAlert };
-module.exports._test = { stableHash, alertHtml, shouldSend, DEFAULT_TTL_SEC };
+module.exports._test = { stableHash, alertHtml, shouldSend, redactForLog, DEFAULT_TTL_SEC };

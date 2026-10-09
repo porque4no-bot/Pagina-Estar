@@ -365,3 +365,122 @@ test('normalizeTransaction(MP) conserva los datos que pide un reembolso y el sna
   assert.equal(d.paymentDate, '2026-10-08T15:00:00.000-05:00');
   assert.equal(d.reference, null, 'no guarda la referencia larga (PII)');
 });
+
+/* ── Revisión del frente: hallazgos ─────────────────────────────────────── */
+
+test('login de OTASync falla con el tx YA marcado → pendiente + alerta "pago sin reserva" y 200 (no 500)', async () => {
+  const { deps, calls, blobs } = makeDeps({});
+  deps.getSessionKey = async () => { throw new Error('Authentication failed (503)'); };
+  deps.otasyncCreds = () => { throw new Error('Authentication failed (creds)'); };
+  const tx = nextTx();
+  const res = await processApprovedPayment(mpTx(refFor('EST-AU1', 30000000), tx, 30000000), H, deps);
+  assert.equal(res.statusCode, 200);
+  assert.equal(body(res).reservationPending, true);
+  const br = blobs.read('booking-results', 'direct-EST-AU1');
+  assert.equal(br.reservationPending, true);
+  assert.equal(br.reason, 'auth_failed');
+  assert.equal(calls.alerts.length, 1);
+  assert.equal(calls.alerts[0].kind, 'payment_without_reservation');
+  assert.equal(calls.alerts[0].dedupeKey, `pay-noreservation-${tx}`);
+  assert.equal(calls.insert.length, 0);
+  assert.equal(calls.release, 1, 'libera el lock');
+});
+
+test('ruta resiliente: no pide la sesión aparte (insertReservation la obtiene y renueva)', async () => {
+  const { deps, calls } = makeDeps({});
+  let asked = 0;
+  deps.getSessionKey = async () => { asked++; return 'pkey'; };
+  const res = await processApprovedPayment(mpTx(refFor('EST-AU2', 30000000), nextTx(), 30000000), H, deps);
+  assert.equal(body(res).success, true);
+  assert.equal(calls.insert.length, 1);
+  assert.equal(asked, 0);
+});
+
+test('excepción inesperada con el tx ya marcado → pendiente + alerta y 200; la re-entrega es duplicado', async () => {
+  const { deps, calls, blobs } = makeDeps({});
+  deps.acquireQuoteLock = async () => { throw new Error('boom'); };
+  const tx = nextTx();
+  const res = await processApprovedPayment(mpTx(refFor('EST-UX1', 30000000), tx, 30000000), H, deps);
+  assert.equal(res.statusCode, 200);
+  assert.equal(body(res).reservationPending, true);
+  assert.equal(blobs.read('booking-results', 'direct-EST-UX1').reason, 'unexpected_error');
+  assert.equal(calls.alerts[0].dedupeKey, `pay-noreservation-${tx}`);
+  const again = await processApprovedPayment(mpTx(refFor('EST-UX1', 30000000), tx, 30000000), H, deps);
+  assert.equal(body(again).duplicate, true);
+});
+
+test('última defensa con la nota del MISMO tx → re-entrega: sin alerta, booking-results con ese tx', async () => {
+  const blobs = memBlobs();
+  const tx = nextTx();
+  const { deps, calls } = makeDeps({ blobs, found: { idReservations: '3083710', reference: 'EST-RE5', note: `Plan: Estricta. Creado por Webhook mercadopago. ID Transaccion: ${tx}` } });
+  const res = await processApprovedPayment(mpTx(refFor('EST-RE5', 30000000), tx, 30000000), H, deps);
+  assert.equal(body(res).duplicate, true);
+  assert.equal(calls.alerts.length, 0);
+  assert.equal(blobs.read('booking-results', 'direct-EST-RE5').transactionId, tx);
+});
+
+test('última defensa con OTRO tx en la nota → alerta de doble pago y booking-results NO queda con el tx nuevo', async () => {
+  const blobs = memBlobs();
+  const tx = nextTx();
+  const { deps, calls } = makeDeps({ blobs, found: { idReservations: '3083711', reference: 'EST-RE6', note: 'Creado por Webhook mercadopago. ID Transaccion: 999111' } });
+  const res = await processApprovedPayment(mpTx(refFor('EST-RE6', 30000000), tx, 30000000), H, deps);
+  assert.equal(body(res).duplicate, true);
+  assert.equal(calls.insert.length, 0);
+  assert.equal(calls.alerts.length, 1);
+  assert.equal(calls.alerts[0].kind, 'payment_double_charge');
+  assert.equal(calls.alerts[0].dedupeKey, `pay-double-${tx}`);
+  assert.equal(blobs.read('booking-results', 'direct-EST-RE6').transactionId, '999111', 'queda el tx que creó la reserva');
+  assert.ok(blobs.read('payment-incidents', `mercadopago:${tx}`), 'el tx nuevo queda como incidente ya alertado');
+});
+
+test('última defensa sin poder saber qué tx la creó → alerta de POSIBLE doble pago para verificar', async () => {
+  const blobs = memBlobs();
+  const tx = nextTx();
+  const { deps, calls } = makeDeps({ blobs, found: { idReservations: '3083712', reference: 'EST-RE7' } });
+  await processApprovedPayment(mpTx(refFor('EST-RE7', 30000000), tx, 30000000), H, deps);
+  assert.equal(calls.alerts.length, 1);
+  assert.match(calls.alerts[0].message, /Posible doble pago/);
+  assert.equal(blobs.read('booking-results', 'direct-EST-RE7').transactionId, null);
+});
+
+test('doble pago y monto incorrecto dejan el incidente marcado (reconcile no los repite como "sin reserva")', async () => {
+  const key = 'booking_31348_2026-11-10_2026-11-12_ana@example.com';
+  const blobs = memBlobs({ 'booking-idempotency': { [key]: { bookingCode: 3300301, transactionId: 'MP-OTHER2', createdAt: Date.now() } } });
+  const { deps } = makeDeps({ blobs });
+  const tx1 = nextTx();
+  await processApprovedPayment(mpTx(refFor('EST-DS2', 30000000), tx1, 30000000), H, deps);
+  assert.equal(blobs.read('payment-incidents', `mercadopago:${tx1}`).kind, 'payment_double_charge');
+  assert.equal(blobs.read('booking-results', 'direct-EST-DS2'), null, 'no se inventa una reserva para el segundo código');
+
+  const tx2 = nextTx();
+  await processApprovedPayment(mpTx(refFor('EST-AM2', 30000000), tx2, 100000), H, deps);
+  assert.equal(blobs.read('payment-incidents', `mercadopago:${tx2}`).kind, 'payment_amount_mismatch');
+});
+
+test('_alert: el log no lleva nombre/correo/teléfono del huésped (Ley 1581); la tarea y el correo sí', () => {
+  const { redactForLog } = require('../../netlify/functions/_alert')._test;
+  const out = redactForLog({ bookingCode: 'EST-1', transactionId: '9', guest: 'Ana Ríos', email: 'a@x.co', phone: '300', nested: { guestEmail: 'b@x.co', roomName: 'Clásica' } });
+  assert.equal(out.bookingCode, 'EST-1');
+  assert.equal(out.transactionId, '9');
+  assert.equal(out.guest, '[redactado]');
+  assert.equal(out.email, '[redactado]');
+  assert.equal(out.phone, '[redactado]');
+  assert.equal(out.nested.guestEmail, '[redactado]');
+  assert.equal(out.nested.roomName, 'Clásica');
+});
+
+test('_alert.reportAlert: lo que se loguea va redactado', async () => {
+  const { reportAlert } = require('../../netlify/functions/_alert');
+  const logged = [];
+  const logger = { error: (...a) => logged.push(a), warn: (...a) => logged.push(a) };
+  const prev = process.env.ALERT_ENABLED;
+  process.env.ALERT_ENABLED = 'false';
+  try {
+    await reportAlert({ kind: 'payment_without_reservation', severity: 'critical', message: 'Pago sin reserva — EST-1', context: { email: 'a@x.co', guest: 'Ana' }, dedupeKey: 'k', deps: { logger, opsDeps: { getStore: () => ({ get: async () => null, set: async () => ({}), list: async () => ({ blobs: [] }) }) } } });
+  } finally {
+    if (prev === undefined) delete process.env.ALERT_ENABLED; else process.env.ALERT_ENABLED = prev;
+  }
+  const text = JSON.stringify(logged);
+  assert.ok(!text.includes('a@x.co'));
+  assert.ok(!text.includes('Ana'));
+});

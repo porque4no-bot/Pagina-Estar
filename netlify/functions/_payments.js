@@ -273,7 +273,17 @@ function paymentDeps(overrides = {}) {
    van por _alert.reportAlert → log + correo al equipo (deduplicado) + TAREA en
    la cola del panel (ops-queue). Antes eran sendEmail sueltos: si el correo se
    perdía, nadie se enteraba. dedupeKey por incidente (tx). Nunca lanza. */
-async function moneyAlert(deps, { kind, message, context, dedupeKey }) {
+async function moneyAlert(deps, { kind, message, context, dedupeKey, incident }) {
+  /* Doble pago / monto incorrecto: marca el tx como "ya alertado" para que
+     reconcile-payments no lo vuelva a reportar como "pago sin reserva" (dos
+     tareas contradictorias para el mismo pago). */
+  if (incident && incident.transactionId) {
+    try {
+      await (deps.recordPaymentIncident || require('./_payment-incidents').recordPaymentIncident)(
+        { ...incident, kind }, { getStore: deps.getStore, now: deps.now }
+      );
+    } catch (e) { /* best-effort */ }
+  }
   try {
     await deps.reportAlert({
       kind, severity: 'critical', message, context: context || {}, dedupeKey, ttlSec: MONEY_ALERT_TTL_SEC
@@ -685,6 +695,33 @@ async function legacyInsert(payload) {
   return response.json();
 }
 
+/* "recordPending SIEMPRE" de la ruta directa resiliente: el pago ya se capturó
+   y el tx ya está marcado, así que CUALQUIER fallo antes de tener la reserva
+   deja (a) el pendiente en booking-results (el motor lo muestra y la
+   reconciliación lo cruza) y (b) la alerta de dinero con tarea en el panel, y
+   responde 200 (que MP no reintente sin fin). Nunca pisa un confirmado. */
+const PENDING_MESSAGES = {
+  insert_failed: 'la reserva NO se pudo crear en OTASync tras reintentos',
+  auth_failed: 'no se pudo iniciar sesión en OTASync',
+  unexpected_error: 'falló el procesamiento antes de crear la reserva'
+};
+async function recordDirectPending(deps, resultsStore, { code, decoded, transaction, ratePlan, reason, error, reply }) {
+  await writeBookingResult(resultsStore, code, {
+    bookingCode: code, reservationPending: true, reason,
+    provider: transaction.provider, paymentMethod: transaction.paymentMethod,
+    transactionId: transaction.id, amountInCents: transaction.amountCents, ratePlan: ratePlan || null,
+    createdAt: new Date(deps.now()).toISOString()
+  });
+  await moneyAlert(deps, {
+    kind: 'payment_without_reservation',
+    message: `Pago sin reserva — ${code}: pago ${transaction.provider} aprobado pero ${PENDING_MESSAGES[reason] || PENDING_MESSAGES.unexpected_error}. Crear a mano o reembolsar (queda PENDIENTE; la reconciliación la ve).`,
+    context: { bookingCode: code, transactionId: transaction.id, reason, error: String((error && error.message) || '').slice(0, 200), checkin: decoded && decoded.checkin, checkout: decoded && decoded.checkout },
+    dedupeKey: `pay-noreservation-${transaction.id}`
+  });
+  const res = { success: true, bookingCode: code, reservationPending: true };
+  return reply ? reply(res) : res;
+}
+
 async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
   const reply = (obj) => ({ statusCode: 200, headers: corsHeaders, body: JSON.stringify(obj) });
   const decoded = decodeDirectReference(transaction.reference);
@@ -699,7 +736,8 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
       kind: 'payment_amount_mismatch',
       message: `Pago ${transaction.provider} con monto incorrecto — reserva directa ${code}. La reserva NO se creó: revisar y reembolsar o crear a mano.`,
       context: { bookingCode: code, transactionId: transaction.id, paidCents: transaction.amountCents, expectedCents: decoded.amountCents, roomTypeId: decoded.roomTypeId, checkin: decoded.checkin, checkout: decoded.checkout },
-      dedupeKey: `pay-amount-${transaction.id}`
+      dedupeKey: `pay-amount-${transaction.id}`,
+      incident: { provider: transaction.provider, transactionId: transaction.id, bookingCode: code }
     });
     return reply({ message: 'Amount mismatch; logged for manual follow-up' });
   }
@@ -725,7 +763,8 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
         kind: 'payment_double_charge',
         message: `Doble pago detectado — reserva directa ${code}: llegó un segundo pago aprobado mientras se procesaba el primero. Reembolsar el duplicado.`,
         context: { bookingCode: code, firstTransaction: lock.ownerTx, secondTransaction: transaction.id, provider: transaction.provider },
-        dedupeKey: `pay-double-${transaction.id}`
+        dedupeKey: `pay-double-${transaction.id}`,
+        incident: { provider: transaction.provider, transactionId: transaction.id, bookingCode: code }
       });
       return reply({ success: true, bookingCode: code, duplicate: true, ownerTx: lock.ownerTx });
     }
@@ -746,7 +785,8 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
           kind: 'payment_double_charge',
           message: `Doble pago — reserva directa ${code}: llegó otro pago aprobado para una reserva que ya ${existing.reservationPending ? 'estaba registrada como pendiente' : 'existe'}. No se creó otra reserva; reembolsar el duplicado.`,
           context: { bookingCode: code, existingBooking: existing.bookingCode, existingTransaction: existing.transactionId, newTransaction: transaction.id, provider: transaction.provider },
-          dedupeKey: `pay-double-${transaction.id}`
+          dedupeKey: `pay-double-${transaction.id}`,
+          incident: { provider: transaction.provider, transactionId: transaction.id, bookingCode: code }
         });
       }
       return reply({ success: true, bookingCode: existing.bookingCode || code, duplicate: true, ...(existing.reservationPending ? { reservationPending: true } : {}) });
@@ -772,7 +812,8 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
                 kind: 'payment_double_charge',
                 message: `Doble pago de la misma estadía — ${code}: ya hay una reserva para esas fechas, habitación y correo. No se creó otra; reembolsar el cargo duplicado.`,
                 context: { bookingCode: code, existingBooking: prev.bookingCode, existingTransaction: prev.transactionId, newTransaction: transaction.id, roomTypeId: decoded.roomTypeId, checkin: decoded.checkin, checkout: decoded.checkout },
-                dedupeKey: `pay-double-${transaction.id}`
+                dedupeKey: `pay-double-${transaction.id}`,
+                incident: { provider: transaction.provider, transactionId: transaction.id, bookingCode: code }
               });
               return reply({ success: true, bookingCode: prev.bookingCode, duplicate: true });
             }
@@ -791,13 +832,33 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
     let found = null;
     try { found = await deps.findReservationByReference(code, decoded.checkin); } catch (e) { found = null; }
     if (found && found.idReservations) {
-      console.warn(`[payments] reservation for reference ${code} already exists in OTASync (${found.idReservations}); tx ${transaction.id} will not create another.`);
+      /* ¿La creó ESTE pago? La nota de OTASync lleva "ID Transaccion: <tx>". Solo
+         si coincide es una re-entrega del mismo pago. Si es OTRO tx (la misma
+         preferencia pagada dos veces) o no se puede saber, es un posible doble
+         cobro: se alerta y booking-results NO se escribe con el tx nuevo (así la
+         reconciliación no da por conciliados los dos cobros). */
+      const m = /ID Transaccion:\s*([^\s.,;]+)/i.exec(String(found.note || ''));
+      const creatorTx = m ? m[1] : null;
+      const sameTx = creatorTx !== null && String(creatorTx) === String(transaction.id);
+      console.warn(`[payments] reservation for reference ${code} already exists in OTASync (${found.idReservations}, creator tx ${creatorTx || 'unknown'}); tx ${transaction.id} will not create another.`);
       await writeBookingResult(resultsStore, code, {
         bookingCode: found.idReservations, otasyncId: found.idReservations,
-        provider: transaction.provider, paymentMethod: transaction.paymentMethod,
-        transactionId: transaction.id, amountInCents: transaction.amountCents,
+        provider: transaction.provider,
+        transactionId: sameTx ? transaction.id : creatorTx,
+        ...(sameTx ? { paymentMethod: transaction.paymentMethod, amountInCents: transaction.amountCents } : {}),
         recoveredFrom: 'otasync_reference', createdAt: new Date(deps.now()).toISOString()
       });
+      if (!sameTx) {
+        await moneyAlert(deps, {
+          kind: 'payment_double_charge',
+          message: creatorTx
+            ? `Doble pago — reserva directa ${code}: la reserva ${found.idReservations} ya existe en OTASync creada por otro pago (${creatorTx}). No se creó otra; reembolsar el cargo duplicado.`
+            : `Posible doble pago — reserva directa ${code}: la reserva ${found.idReservations} ya existe en OTASync y no se pudo confirmar qué pago la creó. No se creó otra; verificar en ${transaction.provider} si hay dos cobros y reembolsar el duplicado.`,
+          context: { bookingCode: code, existingBooking: found.idReservations, existingTransaction: creatorTx, newTransaction: transaction.id, provider: transaction.provider },
+          dedupeKey: `pay-double-${transaction.id}`,
+          incident: { provider: transaction.provider, transactionId: transaction.id, bookingCode: code }
+        });
+      }
       return reply({ success: true, bookingCode: found.idReservations, duplicate: true });
     }
 
@@ -831,8 +892,19 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
     const side = await loadDirectSideData(code, deps);
     const ratePlan = await deriveRatePlan(decoded, transaction.amountCents, side.discount, deps);
 
-    const creds = deps.otasyncCreds();
-    const pkey = await deps.getSessionKey();
+    /* Credenciales/sesión de OTASync DENTRO de la protección: en la ruta
+       resiliente el tx ya está marcado procesado, así que si esto lanzara el
+       reintento de MP chocaría con alreadyProcessed y el pago quedaría sin
+       reserva y sin alerta. insertReservation obtiene (y renueva) su propia
+       sesión con withSessionRetry: aquí la clave solo hace falta para el legacy. */
+    let creds, pkey = '';
+    try {
+      creds = deps.otasyncCreds();
+      if (!resilient) pkey = await deps.getSessionKey();
+    } catch (authErr) {
+      if (!resilient) throw authErr; /* legacy: el tx no está marcado → MP reintenta */
+      return await recordDirectPending(deps, resultsStore, { code, decoded, transaction, ratePlan, reason: 'auth_failed', error: authErr, reply });
+    }
 
     let roomDetails = {};
     try {
@@ -857,19 +929,7 @@ async function processDirectPayment(transaction, corsHeaders, deps, resilient) {
         data = await deps.insertReservation(payload);
       } catch (insertErr) {
         console.error(`[payments] direct insert failed for ${code} (tx ${transaction.id}): ${insertErr.message}`);
-        await writeBookingResult(resultsStore, code, {
-          bookingCode: code, reservationPending: true, reason: 'insert_failed',
-          provider: transaction.provider, paymentMethod: transaction.paymentMethod,
-          transactionId: transaction.id, amountInCents: transaction.amountCents, ratePlan: ratePlan || null,
-          createdAt: new Date(deps.now()).toISOString()
-        });
-        await moneyAlert(deps, {
-          kind: 'payment_without_reservation',
-          message: `Pago sin reserva — ${code}: pago ${transaction.provider} aprobado pero la reserva NO se pudo crear en OTASync tras reintentos. Crear a mano o reembolsar (queda PENDIENTE; la reconciliación la ve).`,
-          context: { bookingCode: code, transactionId: transaction.id, error: String(insertErr.message || '').slice(0, 200), guest: `${decoded.firstName} ${decoded.lastName}`.trim(), email: decoded.email, checkin: decoded.checkin, checkout: decoded.checkout },
-          dedupeKey: `pay-noreservation-${transaction.id}`
-        });
-        return reply({ success: true, bookingCode: code, reservationPending: true });
+        return await recordDirectPending(deps, resultsStore, { code, decoded, transaction, ratePlan, reason: 'insert_failed', error: insertErr, reply });
       }
     } else {
       data = await deps.legacyInsert(payload);
@@ -1010,7 +1070,20 @@ async function processApprovedPayment(transaction, corsHeaders, overrides = {}) 
     const resilient = await mpDirectResilient(deps);
     if (resilient) {
       await markProcessed(transaction.id, deps);
-      return await processDirectPayment(transaction, corsHeaders, deps, true);
+      try {
+        return await processDirectPayment(transaction, corsHeaders, deps, true);
+      } catch (err) {
+        /* Red de seguridad: el tx YA está marcado, así que una excepción no puede
+           subir como 500 (el reintento de MP sería descartado como duplicado y el
+           pago quedaría sin reserva y sin alerta). Pendiente + alerta + 200. */
+        console.error(`[payments] direct processing threw for tx ${transaction.id}:`, err && err.message);
+        const decoded = decodeDirectReference(transaction.reference) || {};
+        const code = decoded.bookingCode || transaction.reference;
+        return await recordDirectPending(deps, tryStore('booking-results', deps), {
+          code, decoded, transaction, ratePlan: null, reason: 'unexpected_error', error: err,
+          reply: (obj) => ({ statusCode: 200, headers: corsHeaders, body: JSON.stringify(obj) })
+        });
+      }
     }
     const legacy = await processDirectPayment(transaction, corsHeaders, deps, false);
     if (legacy && legacy.statusCode >= 200 && legacy.statusCode < 300) await markProcessed(transaction.id, deps);
@@ -1045,5 +1118,5 @@ module.exports = {
 };
 module.exports._test = {
   buildDirectReservationPayload, writeBookingResult, readBookingResult, loadDirectSideData,
-  deriveRatePlan, moneyAlert, paymentDeps, STAY_IDEM_MAX_AGE_MS
+  deriveRatePlan, moneyAlert, paymentDeps, recordDirectPending, STAY_IDEM_MAX_AGE_MS
 };
